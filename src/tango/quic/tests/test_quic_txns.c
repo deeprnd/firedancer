@@ -3,12 +3,22 @@
 #include "../../../util/net/fd_ip4.h"
 #include "../../../ballet/base64/fd_base64.h"
 
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+
 
 FD_IMPORT_BINARY(transaction, "src/tango/quic/tests/quic_txn.bin");
+
+fd_quic_conn_t *   gbl_conn   = NULL;
+fd_quic_stream_t * gbl_stream = NULL;
 
 int g_handshake_complete = 0;
 int g_conn_final = 0;
 int g_stream_notify = 0;
+
+/* track txns sent */
+ulong sent_cnt = 0UL;
 
 void
 cb_conn_new( fd_quic_conn_t  * conn,
@@ -33,6 +43,9 @@ cb_conn_final( fd_quic_conn_t * conn,
   (void)quic_ctx;
   FD_LOG_NOTICE(( "cb_conn_final" ));
   g_conn_final = 1;
+
+  gbl_conn = NULL;
+  gbl_stream = NULL;
 }
 
 void
@@ -51,8 +64,14 @@ cb_stream_notify( fd_quic_stream_t * stream,
                   int                notify_type ) {
   (void)stream;
   (void)stream_ctx;
-  g_stream_notify = 1;
-  FD_LOG_NOTICE(( "cb_stream_notify %d", notify_type ));
+
+  stream = NULL;
+
+  if( notify_type == FD_QUIC_NOTIFY_END ) {
+    sent_cnt++;
+  } else {
+    FD_LOG_WARNING(( "stream ended in failure: %d", (int)notify_type ));
+  }
 }
 
 void
@@ -76,13 +95,35 @@ cb_now( void * context ) {
   return (ulong)fd_log_wallclock();
 }
 
+
+ulong
+findch( char * buf, ulong buf_sz, char ch ) {
+  for( ulong j = 0UL; j < buf_sz; ++j ) {
+    char cur = buf[j];
+
+    if( cur == '\0' ) return -1UL;
+    if( cur == ch   ) return j;
+  }
+
+  return -1UL;
+}
+
+
 int
+read_pkt( uchar * out_buf, ulong * out_buf_sz );
+
+
+void
 run_quic_client( fd_quic_t *         quic,
-                 fd_quic_udpsock_t * udpsock,
-                 fd_aio_pkt_info_t * pkt ) {
+                 fd_quic_udpsock_t * udpsock ) {
+
+  uchar buf[2048];
+
+  fd_aio_pkt_info_t pkt = { .buf = buf, .buf_sz = 0UL };
+
   uint dst_ip;
   if( FD_UNLIKELY( !fd_cstr_to_ip4_addr( "198.18.0.1", &dst_ip  ) ) ) FD_LOG_ERR(( "invalid --dst-ip" ));
-  ushort dst_port = 9007;
+  ushort dst_port = 9001;
 
 
   #define MSG_SZ_MIN (1UL)
@@ -101,74 +142,116 @@ run_quic_client( fd_quic_t *         quic,
   fd_quic_set_aio_net_tx( quic, udpsock->aio );
   FD_TEST( fd_quic_init( quic ) );
 
-  fd_quic_conn_t * conn = fd_quic_connect( quic, dst_ip, dst_port, NULL );
-  while ( FD_UNLIKELY( !( g_handshake_complete || g_conn_final ) ) ) {
+  /* zero length indicates no input */
+  pkt.buf_sz = 0UL;
+
+  while( 1 ) {
+    fd_quic_service( quic );
+    fd_quic_udpsock_service( udpsock );
+
+    if( !gbl_conn ) {
+      /* if no connection, try making one */
+      FD_LOG_NOTICE(( "Creating connection" ));
+
+      gbl_conn = fd_quic_connect( quic, dst_ip, dst_port, NULL );
+
+      continue;
+    }
+
+    if( gbl_conn->state != FD_QUIC_CONN_STATE_ACTIVE ) {
+      continue;
+    }
+
+    if( !gbl_stream ) {
+      gbl_stream = fd_quic_conn_new_stream( gbl_conn, FD_QUIC_TYPE_UNIDIR );
+
+      continue;
+    }
+
+    if( pkt.buf_sz == 0UL ) {
+      ulong out_buf_sz = 0UL;
+      if( read_pkt( pkt.buf, &out_buf_sz ) ) {
+        /* no input, so done */
+        break;
+      }
+
+      /* skip empty lines */
+      if( out_buf_sz == 0UL ) {
+        continue;
+      }
+
+      pkt.buf_sz = (ushort)out_buf_sz;
+    }
+
+    /* have gbl_conn, gbl_stream and input, so try sending a transaction */
+    int rc = fd_quic_stream_send( gbl_stream, &pkt, 1 /* num chunks */, 1 /* FIN flag */ );
+    if( rc == 1 ) {
+      /* we sent 1 chunk */
+
+      /* set buf_sz to zero to indicate more input needed */
+      pkt.buf_sz = 0UL;
+
+      /* we used this gbl_stream, so set to NULL */
+      gbl_stream = NULL;
+    }
+  }
+
+  if( gbl_conn ) {
+    FD_LOG_NOTICE(( "Closing connection" ));
+    fd_quic_conn_close( gbl_conn, 0 );
+  }
+
+  /* wait for connection to close */
+  while( gbl_conn ) {
     fd_quic_service( quic );
     fd_quic_udpsock_service( udpsock );
   }
-  FD_TEST( conn );
-  FD_TEST( conn->state == FD_QUIC_CONN_STATE_ACTIVE );
 
-  fd_quic_stream_t * stream = fd_quic_conn_new_stream( conn, FD_QUIC_TYPE_UNIDIR );
-  FD_TEST( stream );
-  int rc = 0;
-  if( stream ) {
-    #define CHUNK_SIZE 500
-    #define MAX_CHUNKS 5
-    fd_aio_pkt_info_t chunks[MAX_CHUNKS] = { 0};
-    ulong num_chunks = 0;
-    for( ulong i=0; i<5; i++ ) {
-        ulong offset = ( ushort ) ( i * CHUNK_SIZE );
-        chunks[i].buf = (uchar *)pkt->buf + offset;
-        if( (i+1)*CHUNK_SIZE <= pkt->buf_sz ) {
-          chunks[i].buf_sz = CHUNK_SIZE;
-        } else {
-          chunks[i].buf_sz = ( ushort ) ( pkt->buf_sz - (i*CHUNK_SIZE) );
-          num_chunks = i+1;
-          break;
-        }
-    }
-    for( ulong j=0; j < MAX_CHUNKS; j++ ) {
-      FD_LOG_NOTICE(( "chunk %lu %d", j, chunks[j].buf_sz));
-    }
-
-    rc = fd_quic_stream_send( stream, chunks, num_chunks, 1 );
-    FD_LOG_NOTICE(( "rc %d", rc ));
-  }
-  while ( FD_UNLIKELY( !( g_stream_notify || g_conn_final ) ) ) {
-    fd_quic_service( quic );
-    fd_quic_udpsock_service( udpsock );
-  }
-
-  if( conn ) {
-    fd_quic_conn_close( conn, 0 );
-  }
+  /* finalize quic */
   fd_quic_fini( quic );
-
-  return rc;
 }
+
+
+int
+read_pkt( uchar * out_buf, ulong * out_buf_sz ) {
+  char buf[2048];
+  ulong buf_sz = sizeof( buf );
+
+  if( fgets( buf, (int)buf_sz, stdin ) == NULL ) {
+    if( ferror( stdin ) ) {
+      FD_LOG_WARNING(( "Error reading input: %d %s", errno, strerror( errno ) ));
+    }
+    return 1;
+  }
+
+  ulong j = findch( buf, sizeof( buf ), '\n' );
+  if( j == ( -1UL ) ) {
+    /* filled up input without carriage return, so line too long */
+    FD_LOG_WARNING(( "Input line too long" ));
+    return 1;
+  }
+
+  buf[j] = '\0';
+
+  /* base64 decode */
+  int base64_sz = fd_base64_decode( buf, out_buf );
+
+  if( base64_sz == -1 ) {
+    FD_LOG_WARNING(( "Failed to base64 decode input line" ));
+    FD_LOG_HEXDUMP_NOTICE(( "data", buf, j ));
+    return 1;
+  }
+
+  *out_buf_sz = (ulong)base64_sz;
+
+  return 0;
+}
+
 
 int
 main( int argc,
       char ** argv ) {
   fd_boot( &argc, &argv );
-  const char * payload = fd_env_strip_cmdline_cstr( &argc, &argv, "--payload-base64-encoded", NULL, NULL );
-
-  fd_aio_pkt_info_t pkt;
-  uchar buf[1300];
-  if( !payload ) {
-    pkt.buf =    ( void * )transaction;
-    pkt.buf_sz = ( ushort )transaction_sz;
-  } else {
-    int buf_sz = fd_base64_decode( payload, buf );
-    if ( buf_sz == -1 ) {
-      FD_LOG_NOTICE(( "bad input %s", payload ));
-      return -1;
-    }
-    FD_LOG_NOTICE(( "transaction size %d!", buf_sz ));
-    pkt.buf = (void *)buf;
-    pkt.buf_sz = ( ushort ) buf_sz;
-  }
 
   fd_wksp_t * wksp = fd_wksp_new_anonymous( fd_cstr_to_shmem_page_sz("normal"),
                                             1UL << 15,
@@ -216,8 +299,9 @@ main( int argc,
   client_cfg->net.ephem_udp_port.lo = (ushort)udpsock->listen_port;
   client_cfg->net.ephem_udp_port.hi = (ushort)(udpsock->listen_port + 1);
   client_cfg->initial_rx_max_stream_data = 1<<15;
+  client_cfg->idle_timeout = (ulong)10000e6;
 
-  int num_sent = run_quic_client( quic, udpsock, &pkt );
+  run_quic_client( quic, udpsock );
 
   fd_wksp_free_laddr( fd_quic_delete( fd_quic_leave( quic ) ) );
   fd_quic_udpsock_destroy( udpsock );
@@ -225,11 +309,7 @@ main( int argc,
 
   fd_halt();
 
-  switch( num_sent ) {
-    case 1: return 0; /* If no packets were successfully transmitted return one. */
-    case 2: return 0; /* If no packets were successfully transmitted return one. */
-    case 3: return 0; /* If no packets were successfully transmitted return one. */
-    case 0: return 1; /* If the single packet was transmitted successfully return zero. */
-    default: return -num_sent;
-  }
+  FD_LOG_NOTICE(( "Sent %lu transactions", sent_cnt ));
+
+  return (int)sent_cnt;
 }
