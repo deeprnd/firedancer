@@ -112,8 +112,8 @@ tile_snap( tile_snap_t *     snap_cur, /* Snapshot for each tile, indexed [0,til
 
     FD_COMPILER_MFENCE();
     snap->tid       = FD_MGAUGE_GET( TILE, TID );
-    snap->nvcsw     = FD_MCNT_GET( TILE, CONTEXT_SWITCH_VOLUNTARY );
-    snap->nivcsw    = FD_MCNT_GET( TILE, CONTEXT_SWITCH_INVOLUNTARY );
+    snap->nvcsw     = FD_MCNT_GET( TILE, CONTEXT_SWITCH_VOLUNTARY_COUNT );
+    snap->nivcsw    = FD_MCNT_GET( TILE, CONTEXT_SWITCH_INVOLUNTARY_COUNT );
     snap->in_backp  = FD_MGAUGE_GET( TILE, IN_BACKPRESSURE );
     snap->backp_cnt = FD_MCNT_GET( TILE, BACKPRESSURE );
     for( ulong i=0UL; i<9UL; i++ ) {
