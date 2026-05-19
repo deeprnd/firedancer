@@ -389,7 +389,7 @@ struct ctx {
   ulong manifest_slot;
   struct {
     ulong send_pkt_cnt;
-    ulong sent_pkt_types[FD_METRICS_ENUM_REPAIR_SENT_REQUEST_TYPE_CNT];
+    ulong sent_pkt_types[FD_METRICS_ENUM_REPAIR_SENT_REQUEST_TYPES_CNT];
     ulong current_slot;
     ulong old_shred;
     ulong last_requested_slot;
@@ -785,11 +785,12 @@ after_shred( ctx_t      * ctx,
     if( FD_UNLIKELY( !blk_insert_check( ctx, blk, shred->slot, evicted ) ) ) return;
 
     if( FD_LIKELY( fd_forest_data_shred_insert( ctx->forest, shred->slot, shred->slot - shred->data.parent_off, shred->idx, shred->fec_set_idx, slot_complete, ref_tick, src, mr, cmr ) ) ) {
-      if( FD_UNLIKELY( src == SHRED_SRC_REPAIR && ( rtt = fd_inflights_request_match( ctx->inflights, nonce, shred->slot, shred->idx, &peer ) ) > 0 ) ) {
+      if( FD_UNLIKELY( src == SHRED_SRC_REPAIR && ( rtt = fd_inflights_request_remove( ctx->inflights, nonce, shred->slot, shred->idx, &peer ) ) > 0 ) ) {
         fd_policy_peer_response_update( ctx->policy, &peer, rtt );
         fd_histf_sample( ctx->metrics->response_latency, (ulong)rtt );
       }
     }
+
   } else {
     fd_forest_code_shred_insert( ctx->forest, shred->slot, shred->idx );
   }
@@ -1502,12 +1503,12 @@ populate_allowed_fds( fd_topo_t const *      topo FD_PARAM_UNUSED,
 
 static inline void
 metrics_write( ctx_t * ctx ) {
-  FD_MGAUGE_SET( REPAIR, SLOT_CURRENT,          ctx->metrics->current_slot );
-  FD_MGAUGE_SET( REPAIR, SLOT_HIGHEST_REPAIRED, fd_forest_highest_repaired_slot( ctx->forest ) );
-  FD_MCNT_SET( REPAIR, SHRED_OLD,             ctx->metrics->old_shred );
-  FD_MCNT_SET( REPAIR, PEER_REQUESTED,        fd_policy_peer_pool_used( ctx->policy->peers.pool ) );
-  FD_MCNT_SET( REPAIR, SIGN_TILE_UNAVAILABLE, ctx->metrics->sign_tile_unavail );
-  FD_MCNT_SET( REPAIR, SHRED_REREQUESTED,     ctx->metrics->rerequest );
+  FD_MGAUGE_SET( REPAIR, CURRENT_SLOT,    ctx->metrics->current_slot );
+  FD_MGAUGE_SET( REPAIR, REPAIRED_SLOTS,  fd_forest_highest_repaired_slot( ctx->forest ) );
+  FD_MCNT_SET( REPAIR, OLD_SHRED,         ctx->metrics->old_shred );
+  FD_MCNT_SET( REPAIR, REQUEST_PEERS,     fd_policy_peer_pool_used( ctx->policy->peers.pool ) );
+  FD_MCNT_SET( REPAIR, SIGN_TILE_UNAVAIL, ctx->metrics->sign_tile_unavail );
+  FD_MCNT_SET( REPAIR, REREQUEST_QUEUE,   ctx->metrics->rerequest );
 
   FD_MGAUGE_SET( REPAIR, SLOT_LAST_REQUESTED,   ctx->metrics->last_requested_slot );
   FD_MGAUGE_SET( REPAIR, ORPHAN_LAST_REQUESTED, ctx->metrics->last_requested_orphan );
