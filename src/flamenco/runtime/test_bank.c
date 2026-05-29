@@ -349,7 +349,7 @@ test_bank_dead_eviction( void * mem ) {
   FD_TEST( fd_banks_pool_used( bank_data_pool )==1UL );
 
   /* Case: started-replaying dead bank can be pruned without requesting cancellation info. */
-  fd_bank_t * bank_N = fd_banks_new_bank( banks, bank_P->idx, 0L, 0 );
+  fd_bank_t * bank_N = fd_banks_new_bank( banks, bank_P->idx, 0L );
   FD_TEST( fd_banks_pool_used( bank_data_pool )==2UL );
   bank_N = fd_banks_clone_from_parent( banks, bank_N->idx );
   FD_TEST( bank_N );
