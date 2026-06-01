@@ -45,6 +45,14 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha || 'main' }}
           submodules: recursive
 
+      - name: Install clang-15
+        run: |
+          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 15
+          sudo mkdir -p /opt/clang/clang-15.0.6
+          printf 'export CC=clang-15\nexport CXX=clang++-15\nexport PATH="/usr/lib/llvm-15/bin:$PATH"\n' | sudo tee /opt/clang/clang-15.0.6/activate
+
       - uses: ./.github/actions/deps
         with:
           compiler: clang
