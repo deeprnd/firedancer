@@ -287,5 +287,5 @@ jobs:
           MACHINE: linux_gcc_neoverse_n2
         run: |
           ./deps.sh fetch install
-          make -j CC=gcc-${{ matrix.gcc_version }} clean
-          make -j CC=gcc-${{ matrix.gcc_version }} all
+          make -j CC=gcc-${{ matrix.gcc_version }} CXX=g++-${{ matrix.gcc_version }} clean
+          make -j CC=gcc-${{ matrix.gcc_version }} CXX=g++-${{ matrix.gcc_version }} all
