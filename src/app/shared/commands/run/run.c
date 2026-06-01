@@ -270,7 +270,7 @@ main_pid_namespace( void * _args ) {
   }
 #else
   if( FD_UNLIKELY( !config->is_firedancer && !config->development.no_agave ) ) {
-    FD_LOG_WARNING(( "Frankendancer/Agave hosting is disabled (FD_WITH_AGAVE=0). "
+    FD_LOG_WARNING(( "Agave hosting is disabled (FD_WITH_AGAVE=0). "
                      "Proceeding without spawning run-agave." ));
   }
 #endif
@@ -756,11 +756,7 @@ run_firedancer_init( config_t * config,
   else if( FD_UNLIKELY( -1==err ) )             FD_LOG_ERR(( "could not stat [consensus.identity_path] `%s` (%i-%s)", config->paths.identity_key, errno, fd_io_strerror( errno ) ));
 
   if( FD_UNLIKELY( !config->is_firedancer ) ) {
-    for( ulong i=0UL; i<config->frankendancer.paths.authorized_voter_paths_cnt; i++ ) {
-      err = stat( config->frankendancer.paths.authorized_voter_paths[ i ], &st );
-      if( FD_UNLIKELY( -1==err && errno==ENOENT ) ) FD_LOG_ERR(( "[consensus.authorized_voter_paths] key does not exist `%s`", config->frankendancer.paths.authorized_voter_paths[ i ] ));
-      else if( FD_UNLIKELY( -1==err ) )             FD_LOG_ERR(( "could not stat [consensus.authorized_voter_paths] `%s` (%i-%s)", config->frankendancer.paths.authorized_voter_paths[ i ], errno, fd_io_strerror( errno ) ));
-    }
+    FD_LOG_ERR(( "Frankendancer/Agave run initialization is disabled (FD_WITH_AGAVE=0)." ));
   }
 
   /* FIXME: fdctl_check_configure unconditionally checks for network

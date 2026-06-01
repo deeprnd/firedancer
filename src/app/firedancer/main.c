@@ -3,8 +3,8 @@
 #include "../shared/boot/fd_boot.h"
 #include "../shared/commands/configure/configure.h"
 
-char const * FD_APP_NAME    = "Firedancer";
-char const * FD_BINARY_NAME = "firedancer";
+char const * FD_APP_NAME    = "Tickoni";
+char const * FD_BINARY_NAME = "tickoni";
 
 extern fd_topo_obj_callbacks_t fd_obj_cb_mcache;
 extern fd_topo_obj_callbacks_t fd_obj_cb_dcache;

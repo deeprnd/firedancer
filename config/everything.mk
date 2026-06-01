@@ -10,7 +10,7 @@ OBJDIR:=$(BASEDIR)/$(BUILDDIR)
 #
 # Use ?= so that users can (optionally) perform partial compilation in special
 # circumstances.
-LOCAL_MKS?=$(shell $(FIND) -L src -type f -name Local.mk)
+LOCAL_MKS?=$(filter-out src/app/fdctl/Local.mk src/app/fddev/Local.mk,$(shell $(FIND) -L src -type f -name Local.mk))
 
 CPPFLAGS+=-DFD_BUILD_INFO=\"$(OBJDIR)/info\"
 CPPFLAGS+=$(EXTRA_CPPFLAGS)

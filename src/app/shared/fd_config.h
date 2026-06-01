@@ -7,96 +7,15 @@
 
 #include <net/if.h>
 
+#ifndef FD_WITH_AGAVE
+#define FD_WITH_AGAVE 0
+#endif
+
 #define NAME_SZ                          (256UL)
 #define AFFINITY_SZ                      (256UL)
 #define CONFIGURE_STAGE_COUNT            ( 12UL)
 #define GOSSIP_TILE_ENTRYPOINTS_MAX      ( 16UL)
 #define IP4_PORT_STR_MAX                 ( 22UL)
-
-struct fd_configh {
-  char dynamic_port_range[ 32 ];
-
-  struct {
-    char  ledger[ PATH_MAX ];
-    char  accounts_path[ PATH_MAX ];
-    ulong authorized_voter_paths_cnt;
-    char  authorized_voter_paths[ 16 ][ PATH_MAX ];
-  } paths;
-
-  struct {
-    char solana_metrics_config[ 512 ];
-  } reporting;
-
-  struct {
-    uint  limit_size;
-    ulong account_indexes_cnt;
-    char  account_indexes[ 4 ][ 32 ];
-    ulong account_index_include_keys_cnt;
-    char  account_index_include_keys[ 32 ][ FD_BASE58_ENCODED_32_SZ ];
-    ulong account_index_exclude_keys_cnt;
-    char  account_index_exclude_keys[ 32 ][ FD_BASE58_ENCODED_32_SZ ];
-    int   enable_accounts_disk_index;
-    char  accounts_index_path[ PATH_MAX ];
-    char  accounts_hash_cache_path[ PATH_MAX ];
-    int   require_tower;
-    char  snapshot_archive_format[ 10 ];
-  } ledger;
-
-  struct {
-    int    port_check;
-  } gossip;
-
-  struct {
-    int    snapshot_fetch;
-    int    genesis_fetch;
-    int    poh_speed_test;
-    char   expected_genesis_hash[ FD_BASE58_ENCODED_32_SZ ];
-    uint   wait_for_supermajority_at_slot;
-    char   expected_bank_hash[ FD_BASE58_ENCODED_32_SZ ];
-    int    wait_for_vote_to_start_leader;
-    ulong  hard_fork_at_slots_cnt;
-    uint   hard_fork_at_slots[ 32 ];
-    ulong  known_validators_cnt;
-    char   known_validators[ 16 ][ 256 ];
-    int    os_network_limits_test;
-  } consensus;
-
-  struct {
-    ushort port;
-    int    extended_tx_metadata_storage;
-    int    full_api;
-    int    private;
-    char   bind_address[ 16 ];
-    char   public_address[ IP4_PORT_STR_MAX ];
-    int    transaction_history;
-    int    only_known;
-    int    pubsub_enable_block_subscription;
-    int    pubsub_enable_vote_subscription;
-    int    bigtable_ledger_storage;
-  } rpc;
-
-  struct {
-    int  enabled;
-    int  incremental_snapshots;
-    uint full_snapshot_interval_slots;
-    uint incremental_snapshot_interval_slots;
-    uint minimum_snapshot_download_speed;
-    uint maximum_snapshot_download_abort;
-    uint maximum_full_snapshots_to_retain;
-    uint maximum_incremental_snapshots_to_retain;
-    char path[ PATH_MAX ];
-    char incremental_path[ PATH_MAX ];
-  } snapshots;
-
-  struct {
-    uint bank_tile_count;
-    uint resolh_tile_count;
-    char agave_affinity[ AFFINITY_SZ ];
-    uint agave_unified_scheduler_handler_threads;
-  } layout;
-};
-
-typedef struct fd_configh fd_configh_t;
 
 struct fd_configf {
   struct {
@@ -243,10 +162,7 @@ struct fd_config {
   uint gid;
 
   int is_firedancer;
-  union {
-    fd_configh_t frankendancer;
-    fd_configf_t firedancer;
-  };
+  fd_configf_t firedancer;
 
   /* The name of the action being executed (e.g. "run", "dev",
      "backtest").  Populated by fd_main before topo_init runs. */

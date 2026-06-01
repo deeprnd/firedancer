@@ -29,5 +29,12 @@ if rg -n 'targets: ".*fdctl.*"' .github/workflows/tests.yml >/dev/null; then
   fail "tests.yml must not include fdctl target in default CI matrix"
 fi
 
-echo "agave-guard: OK"
+if rg -n 'targets: ".*firedancer.*"' .github/workflows/tests.yml >/dev/null; then
+  fail "tests.yml default CI matrix must use tickoni target"
+fi
 
+if [[ -e src/app/fdctl/commands/run_agave.c || -e src/app/fdctl/commands/run_agave.h ]]; then
+  fail "run-agave command sources must remain removed"
+fi
+
+echo "agave-guard: OK"

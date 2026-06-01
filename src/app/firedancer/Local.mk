@@ -31,7 +31,7 @@ $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/testnet-jito.to
 $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/mainnet-jito.toml
 $(OBJDIR)/obj/app/firedancer/version.d: src/app/firedancer/version.h
 
-.PHONY: firedancer
+.PHONY: tickoni firedancer
 
 # firedancer core
 $(call add-objs,topology,fd_firedancer)
@@ -51,7 +51,13 @@ $(call add-objs,version,firedancer_version)
 ifdef FD_HAS_SSE
 # ifdef FD_HAS_BLST -- will be a required dependency soon
 ifdef FD_HAS_S2NBIGNUM
-$(call make-bin,firedancer,main,fd_firedancer fdctl_shared fdctl_platform fd_discof fd_disco fd_choreo fd_flamenco fd_funk fd_quic fd_tls fd_reedsol fd_waltz fd_tango fd_ballet fd_util firedancer_version,$(OPENSSL_LIBS))
+$(call make-bin,tickoni,main,fd_firedancer fdctl_shared fdctl_platform fd_discof fd_disco fd_choreo fd_flamenco fd_funk fd_quic fd_tls fd_reedsol fd_waltz fd_tango fd_ballet fd_util firedancer_version,$(OPENSSL_LIBS))
+
+# Compatibility alias during rename transition.
+firedancer: $(OBJDIR)/bin/firedancer
+$(OBJDIR)/bin/firedancer: $(OBJDIR)/bin/tickoni
+	$(MKDIR) $(dir $@) && \
+ln -sf tickoni $@
 endif
 # endif
 endif
