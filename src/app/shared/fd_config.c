@@ -13,10 +13,6 @@
 #include <sys/utsname.h>
 #include <sys/mman.h>
 
-#ifndef FD_WITH_AGAVE
-#define FD_WITH_AGAVE 0
-#endif
-
 /* TODO: Rewrite this ... */
 
 static inline void
@@ -288,7 +284,7 @@ fd_config_fill( fd_config_t * config,
   if( FD_UNLIKELY( config->is_firedancer ) ) {
     fd_config_fillf( config );
   } else {
-    FD_LOG_ERR(( "Frankendancer/Agave config fill is disabled (FD_WITH_AGAVE=0)." ));
+    FD_LOG_ERR(( "legacy runtime config fill is disabled." ));
   }
 
 
@@ -321,7 +317,7 @@ fd_config_fill( fd_config_t * config,
     strncpy( config->cluster, "development", sizeof(config->cluster) );
 
     if( FD_UNLIKELY( !config->is_firedancer ) ) {
-      FD_LOG_ERR(( "Frankendancer/Agave local-cluster overrides are disabled (FD_WITH_AGAVE=0)." ));
+      FD_LOG_ERR(( "legacy runtime local-cluster overrides are disabled." ));
     }
   }
 
@@ -396,7 +392,7 @@ fd_config_validate( fd_config_t const * config ) {
   if( FD_LIKELY( config->is_firedancer ) ) {
     fd_config_validatef( &config->firedancer );
   } else {
-    FD_LOG_ERR(( "Frankendancer/Agave config validation is disabled (FD_WITH_AGAVE=0)." ));
+    FD_LOG_ERR(( "legacy runtime config validation is disabled." ));
   }
 
   CFG_HAS_NON_EMPTY( name );

@@ -1,6 +1,6 @@
 #include "main.h"
-#include "../firedancer/topology.h"
-#include "../firedancer/config.h"
+#include "../tickoni/topology.h"
+#include "../tickoni/config.h"
 #include "../shared_dev/boot/fd_dev_boot.h"
 
 int

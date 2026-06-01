@@ -19,8 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: ./.github/actions/submodule-init
-
       - uses: ./.github/actions/deps
         with:
           extras: +dev

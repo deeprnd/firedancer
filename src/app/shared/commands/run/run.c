@@ -19,7 +19,6 @@
 #include <dirent.h>
 #include <sched.h>
 #include <stdio.h>
-#include <stdlib.h> /* getenv */
 #include <poll.h>
 #include <unistd.h>
 #include <errno.h>
@@ -33,10 +32,6 @@
 #include "../../../../util/tile/fd_tile_private.h"
 
 extern fd_topo_obj_callbacks_t * CALLBACKS[];
-
-#ifndef FD_WITH_AGAVE
-#define FD_WITH_AGAVE 0
-#endif
 
 #define NAME "run"
 
@@ -136,36 +131,6 @@ create_clone_stack( void ) {
 }
 
 
-static int
-execve_agave( int config_memfd,
-                    int pipefd ) {
-  if( FD_UNLIKELY( -1==fcntl( pipefd, F_SETFD, 0 ) ) ) FD_LOG_ERR(( "fcntl(F_SETFD,0) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-  pid_t child = fork();
-  if( FD_UNLIKELY( -1==child ) ) FD_LOG_ERR(( "fork() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-  if( FD_LIKELY( !child ) ) {
-    char _current_executable_path[ PATH_MAX ];
-    FD_TEST( -1!=fd_file_util_self_exe( _current_executable_path ) );
-
-    char config_fd[ 32 ];
-    FD_TEST( fd_cstr_printf_check( config_fd, sizeof( config_fd ), NULL, "%d", config_memfd ) );
-    char * args[ 5 ] = { _current_executable_path, "run-agave", "--config-fd", config_fd, NULL };
-
-    char * envp[] = { NULL, NULL };
-    char * google_creds = getenv( "GOOGLE_APPLICATION_CREDENTIALS" );
-    char provide_creds[ PATH_MAX+30UL ];
-    if( FD_UNLIKELY( google_creds ) ) {
-      FD_TEST( fd_cstr_printf_check( provide_creds, sizeof( provide_creds ), NULL, "GOOGLE_APPLICATION_CREDENTIALS=%s", google_creds ) );
-      envp[ 0 ] = provide_creds;
-    }
-
-    if( FD_UNLIKELY( -1==execve( _current_executable_path, args, envp ) ) ) FD_LOG_ERR(( "execve() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-  } else {
-    if( FD_UNLIKELY( -1==fcntl( pipefd, F_SETFD, FD_CLOEXEC ) ) ) FD_LOG_ERR(( "fcntl(F_SETFD,FD_CLOEXEC) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-    return child;
-  }
-  return 0;
-}
-
 static pid_t
 execve_tile( fd_topo_tile_t const * tile,
              fd_cpuset_t const *    floating_cpu_set,
@@ -255,25 +220,6 @@ main_pid_namespace( void * _args ) {
   if( FD_UNLIKELY( -1==config_memfd ) ) FD_LOG_ERR(( "fd_config_to_memfd() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
 
   ulong child_cnt = 0UL;
-#if FD_WITH_AGAVE
-  if( FD_LIKELY( !config->is_firedancer && !config->development.no_agave ) ) {
-    int pipefd[ 2 ];
-    if( FD_UNLIKELY( pipe2( pipefd, O_CLOEXEC ) ) ) FD_LOG_ERR(( "pipe2() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-    fds[ child_cnt ] = (struct pollfd){ .fd = pipefd[ 0 ], .events = 0 };
-    child_pids[ child_cnt ] = execve_agave( config_memfd, pipefd[ 1 ] );
-    FD_TEST( child_pids[ child_cnt ]>0 );
-    actual_pids[ child_cnt ] = (ulong)child_pids[ child_cnt ];
-    child_idxs[ child_cnt ] = ULONG_MAX;
-    if( FD_UNLIKELY( close( pipefd[ 1 ] ) ) ) FD_LOG_ERR(( "close() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-    strncpy( child_names[ child_cnt ], "agave", 32 );
-    child_cnt++;
-  }
-#else
-  if( FD_UNLIKELY( !config->is_firedancer && !config->development.no_agave ) ) {
-    FD_LOG_WARNING(( "Agave hosting is disabled (FD_WITH_AGAVE=0). "
-                     "Proceeding without spawning run-agave." ));
-  }
-#endif
 
   errno = 0;
   int save_priority = getpriority( PRIO_PROCESS, 0 );
@@ -288,7 +234,6 @@ main_pid_namespace( void * _args ) {
 
   for( ulong i=0UL; i<config->topo.tile_cnt; i++ ) {
     fd_topo_tile_t const * tile = &config->topo.tiles[ i ];
-    if( FD_UNLIKELY( tile->is_agave ) ) continue;
 
     if( need_xdp ) {
       if( FD_UNLIKELY( strcmp( tile->name, "net" ) ) ) {
@@ -756,7 +701,7 @@ run_firedancer_init( config_t * config,
   else if( FD_UNLIKELY( -1==err ) )             FD_LOG_ERR(( "could not stat [consensus.identity_path] `%s` (%i-%s)", config->paths.identity_key, errno, fd_io_strerror( errno ) ));
 
   if( FD_UNLIKELY( !config->is_firedancer ) ) {
-    FD_LOG_ERR(( "Frankendancer/Agave run initialization is disabled (FD_WITH_AGAVE=0)." ));
+    FD_LOG_ERR(( "run initialization only supports Tickoni runtime paths" ));
   }
 
   /* FIXME: fdctl_check_configure unconditionally checks for network
@@ -773,7 +718,6 @@ run_firedancer_init( config_t * config,
 
    + main
    +-- pidns
-       +-- agave
        +-- tile 0
        +-- tile 1
        ...
@@ -787,7 +731,7 @@ run_firedancer_init( config_t * config,
     (b) main is the parent of pidns, so it can issue a waitpid() on the
         child PID, and when it completes terminate itself.
 
-    (c) pidns is the parent of agave and the tiles, so it could
+    (c) pidns is the parent of the tiles, so it could
         issue a waitpid() of -1 to wait for any of them to terminate,
         but how would it know if main has died?
 

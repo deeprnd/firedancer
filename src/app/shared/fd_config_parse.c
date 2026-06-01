@@ -2,10 +2,6 @@
 #include "../platform/fd_config_macros.c"
 #include "fd_config_private.h"
 
-#ifndef FD_WITH_AGAVE
-#define FD_WITH_AGAVE 0
-#endif
-
 static void
 fd_config_check_configf( fd_config_t *  config,
                          fd_configf_t * config_f ) {
@@ -97,8 +93,8 @@ fd_config_extract_pod( uchar *       pod,
     CFG_POP    ( cstr,   paths.genesis                                    );
     CFG_POP    ( cstr,   paths.accounts                                   );
   } else {
-    FD_LOG_ERR(( "Frankendancer/Agave configuration is disabled (FD_WITH_AGAVE=0). "
-                 "Use the firedancer binary and firedancer config profiles." ));
+    FD_LOG_ERR(( "legacy runtime configuration paths are disabled. "
+                 "Use Tickoni runtime config profiles." ));
   }
 
   CFG_POP_ARRAY( cstr,   gossip.entrypoints                               );
@@ -222,7 +218,6 @@ fd_config_extract_pod( uchar *       pod,
   CFG_POP      ( bool,   development.sandbox                              );
   CFG_POP      ( bool,   development.no_clone                             );
   CFG_POP      ( cstr,   development.core_dump                            );
-  CFG_POP      ( bool,   development.no_agave                             );
   CFG_POP      ( bool,   development.bootstrap                            );
 
   CFG_POP      ( bool,   development.gossip.allow_private_address         );
@@ -264,7 +259,7 @@ fd_config_extract_pod( uchar *       pod,
     if( FD_UNLIKELY( !fd_config_extract_podf( pod, &config->firedancer ) ) ) return NULL;
     fd_config_check_configf( config, &config->firedancer );
   } else {
-    FD_LOG_ERR(( "Frankendancer/Agave pod extraction is disabled (FD_WITH_AGAVE=0)." ));
+    FD_LOG_ERR(( "legacy runtime pod extraction is disabled." ));
   }
 
   /* Renamed config options */

@@ -1,11 +1,11 @@
-name: Firedancer
+name: Legacy Firedancer Localnet
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       machine:
-        type: string
+        description: Machine profile
+        required: false
         default: linux_gcc_zen2
-  workflow_dispatch:
 jobs:
   firedancer-localnet:
     timeout-minutes: 30

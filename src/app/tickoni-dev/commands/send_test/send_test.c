@@ -26,7 +26,7 @@ up the entire gossip subtopo.
 #include "../../../../disco/net/fd_net_tile.h" /* fd_topos_net_tiles */
 #include "../../../../discof/tower/fd_tower_tile.h"
 #include "../../../../flamenco/leaders/fd_leaders_base.h" /* FD_STAKE_OUT_MTU */
-#include "../../../../app/firedancer/topology.h" /* fd_topo_configure_tile */
+#include "../../../../app/tickoni/topology.h" /* fd_topo_configure_tile */
 #include "../../../../disco/keyguard/fd_keyload.h"
 
 #include "../core_subtopo.h"

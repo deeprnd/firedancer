@@ -6,7 +6,7 @@
 #include "../../../disco/fd_clock_tile.h"
 #include "../../../discof/gossip/fd_gossip_tile.h"
 
-#include "../../firedancer/commands/monitor_gossip/gossip_diag.h"
+#include "../../tickoni/commands/monitor_gossip/gossip_diag.h"
 
 #include "core_subtopo.h"
 #include "gossip.h"

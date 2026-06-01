@@ -61,7 +61,7 @@ This phase removes remaining migration-era compatibility and legacy naming from 
 
 1. Remove or replace remaining `.github/actions/submodule-init` usage in workflows where Agave/submodule setup is no longer required.
 2. Update CI/runtime scripts to call `tickoni` directly, then remove the temporary `firedancer` alias target.
-3. Rename app paths from `src/app/firedancer` and `src/app/firedancer-dev` to Tickoni-native naming.
+3. Rename app paths from `src/app/tickoni` and `src/app/tickoni-dev` to Tickoni-native naming.
 4. Complete shared config cleanup by removing residual Frankendancer wording and dead Agave-only fields in config structs/parsers.
 5. Re-baseline validation by running full CI-equivalent build/test targets on a writable runner and addressing regressions.
 

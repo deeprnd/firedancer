@@ -7,10 +7,6 @@
 
 #include <net/if.h>
 
-#ifndef FD_WITH_AGAVE
-#define FD_WITH_AGAVE 0
-#endif
-
 #define NAME_SZ                          (256UL)
 #define AFFINITY_SZ                      (256UL)
 #define CONFIGURE_STAGE_COUNT            ( 12UL)
@@ -232,7 +228,6 @@ struct fd_config {
   struct {
     int sandbox;
     int no_clone;
-    int no_agave;
     int bootstrap;
 
     char core_dump[ 16 ];

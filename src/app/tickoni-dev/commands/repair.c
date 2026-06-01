@@ -9,8 +9,8 @@
 #include "../../../util/pod/fd_pod_format.h"
 #include "../../../util/tile/fd_tile_private.h"
 
-#include "../../firedancer/topology.h"
-#include "../../firedancer/topology.c"
+#include "../../tickoni/topology.h"
+#include "../../tickoni/topology.c"
 #include "../../shared/commands/configure/configure.h"
 #include "../../shared/commands/run/run.h" /* initialize_workspaces */
 #include "../../shared/fd_config.h" /* config_t */
@@ -58,7 +58,7 @@ restore_terminal( void ) {
 fd_topo_run_tile_t
 fdctl_tile_run( fd_topo_tile_t const * tile );
 
-/* repair_topo is a subset of "src/app/firedancer/topology.c" at commit
+/* repair_topo is a subset of "src/app/tickoni/topology.c" at commit
    0d8386f4f305bb15329813cfe4a40c3594249e96, slightly modified to work
    as a repair catchup.  TODO ideally, one should invoke the firedancer
    topology first, and exclude the parts that are not needed, instead of
@@ -173,7 +173,7 @@ repair_topo( config_t * config ) {
   FOR(net_tile_cnt) fd_topos_net_rx_link( topo, "net_quic",   i, config->net.ingress_buffer_size );
   FOR(net_tile_cnt) fd_topos_net_rx_link( topo, "net_shred",  i, config->net.ingress_buffer_size );
 
-  /*                                              topo, tile_name, tile_wksp, metrics_wksp, cpu_idx,                       is_agave, uses_id_keyswitch, uses_av_keyswitch */
+  /*                                              topo, tile_name, tile_wksp, metrics_wksp, cpu_idx,                       is_legacy_hosted, uses_id_keyswitch, uses_av_keyswitch */
   FOR(shred_tile_cnt)              fd_topob_tile( topo, "shred",   "shred",   "metric_in",  tile_to_cpu[ topo->tile_cnt ], 0,        1,                 0 );
   fd_topo_tile_t * repair_tile =   fd_topob_tile( topo, "repair",  "repair",  "metric_in",  tile_to_cpu[ topo->tile_cnt ], 0,        1,                 0 );
 

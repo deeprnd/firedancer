@@ -21,7 +21,7 @@ jobs:
           compiler: clang
           machine: linux_clang_x86_64
           compiler-version: 15.0.6
-          targets: firedancer-dev
+          targets: tickoni
           extras: rpath
     env:
       MACHINE: ${{ matrix.machine }}
@@ -30,8 +30,6 @@ jobs:
       CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
     steps:
       - uses: actions/checkout@v6
-
-      - uses: ./.github/actions/submodule-init
 
       - uses: ./.github/actions/deps
         with:

@@ -130,8 +130,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: ./.github/actions/submodule-init
-
       - uses: dtolnay/rust-toolchain@1.94.0
 
       - uses: ./.github/actions/deps
@@ -192,8 +190,6 @@ jobs:
     if: ${{ inputs.clang != 'none' }}
     steps:
       - uses: actions/checkout@v6
-
-      - uses: ./.github/actions/submodule-init
 
       - uses: dtolnay/rust-toolchain@1.94.0
 
@@ -258,8 +254,6 @@ jobs:
         gcc_version: [12]
     steps:
       - uses: actions/checkout@v6
-
-      - uses: ./.github/actions/submodule-init
 
       - name: Run build
         env:

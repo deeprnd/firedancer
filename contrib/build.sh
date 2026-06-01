@@ -176,7 +176,7 @@ FD_REPO_DIR=$(realpath $(dirname $(realpath "$0"))/..)
 BUILD_TARGETS=( all asm ppp seccomp-policies )
 TEST_TARGETS=( unit-test fuzz-test )
 
-RUST_TARGETS=( fdctl fddev integration-test )
+RUST_TARGETS=( integration-test )
 OTHER_TARGETS=( ${BUILD_TARGETS[@]} ${TEST_TARGETS[@]} )
 
 # Overrides for list of targets to build for certain
