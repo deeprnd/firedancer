@@ -273,7 +273,7 @@ jobs:
     if: ${{ inputs.build_arm }}
     strategy:
       matrix:
-        gcc_version: [12]
+        gcc_version: [13]
     steps:
       - uses: actions/checkout@v6
 
