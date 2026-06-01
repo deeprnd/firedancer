@@ -129,6 +129,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install gcc-12
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-12 g++-12
+          sudo mkdir -p /opt/gcc/gcc-12.4.0
+          printf 'export CC=gcc-12\nexport CXX=g++-12\n' | sudo tee /opt/gcc/gcc-12.4.0/activate
+
       - uses: dtolnay/rust-toolchain@1.94.0
 
       - uses: ./.github/actions/deps
@@ -188,6 +195,16 @@ jobs:
     if: ${{ inputs.clang != 'none' }}
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install clang-18 and clang-19
+        run: |
+          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 18
+          sudo /tmp/llvm.sh 19
+          sudo mkdir -p /opt/clang/clang-18.1.6 /opt/clang/clang-19.1.7
+          printf 'export CC=clang-18\nexport CXX=clang++-18\nexport PATH="/usr/lib/llvm-18/bin:$PATH"\n' | sudo tee /opt/clang/clang-18.1.6/activate
+          printf 'export CC=clang-19\nexport CXX=clang++-19\nexport PATH="/usr/lib/llvm-19/bin:$PATH"\n' | sudo tee /opt/clang/clang-19.1.7/activate
 
       - uses: dtolnay/rust-toolchain@1.94.0
 

@@ -10,6 +10,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Install CBMC
+        run: sudo apt-get install -y cbmc
+
       - name: Check Proofs
         run: |
           cbmc --version
