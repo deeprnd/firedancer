@@ -53,7 +53,8 @@ ifdef FD_HAS_SSE
 ifdef FD_HAS_S2NBIGNUM
 $(call make-bin,tickoni,main,fd_firedancer fdctl_shared fdctl_platform fd_discof fd_disco fd_choreo fd_flamenco fd_funk fd_quic fd_tls fd_reedsol fd_waltz fd_tango fd_ballet fd_util firedancer_version,$(OPENSSL_LIBS))
 
-# Compatibility alias during rename transition.
+# Compatibility shim during rename transition.
+# Removal date: 2026-12-31 (Phase 8 legacy surface removal).
 firedancer: $(OBJDIR)/bin/firedancer
 $(OBJDIR)/bin/firedancer: $(OBJDIR)/bin/tickoni
 	$(MKDIR) $(dir $@) && \

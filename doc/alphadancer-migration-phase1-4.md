@@ -74,6 +74,8 @@ This phase hardens the new Tickoni surface for internal consumers:
 3. Add migration shims only where required, with explicit removal dates.
 4. Add regression checks that block reintroduction of removed names/paths in CI.
 
+Reference implementation doc: `doc/tickoni-interface-contract.md`.
+
 ## Phase 8: Legacy Surface Removal
 
 This phase fully removes compatibility shims once downstream callers are migrated:

@@ -22,7 +22,7 @@ help() {
   echo " Args: --ARG <ARG1>,<ARG2>,<ARG3>,..."
   echo "   --targets        -t  Targets to compile during building"
   echo "                        This will be used for all types of builds."
-  echo "                        For example: all,unit-test,fdctl"
+  echo "                        For example: all,unit-test,tickoni"
   echo "   --machines       -m  Machine types to build for"
   echo "                        For example: linux_gcc_icelake,linux_clang_noarch64"
   echo "   --gcc-versions   -g  GCC compiler versions to use for builds"
@@ -37,7 +37,7 @@ help() {
   echo "                        For example: gcc-11.4.0,linux_gcc_zen4,ALL"
   echo "   --clang-except       Comma separated group of clang-compiler,machine,target to exclude"
   echo "                        Use 'ALL' to exclude for all of any of the types."
-  echo "                        For example: ALL,linux_clang_minimal,fdctl"
+  echo "                        For example: ALL,linux_clang_minimal,tickoni"
   echo "                        This argument can be supplied multiple times."
   echo
   echo " Exit Codes:"
