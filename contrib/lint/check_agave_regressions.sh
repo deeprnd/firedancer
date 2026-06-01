@@ -16,6 +16,14 @@ if [[ ! -d src/app/firedancer || ! -d src/app/firedancer-dev ]]; then
   fail "firedancer app paths must exist"
 fi
 
+for removed_path in .github/workflows/test_firedancer_localnet.yml \
+                    .github/workflows/test_firedancer_testnet.yml \
+                    .github/actions/submodule-init/action.yml; do
+  if [[ -e "$removed_path" ]]; then
+    fail "$removed_path must stay removed"
+  fi
+done
+
 if [[ -d src/app/tickoni || -d src/app/tickoni-dev ]]; then
   fail "tickoni app paths must stay removed after rollback"
 fi
@@ -72,6 +80,10 @@ for workflow in .github/workflows/tests.yml \
     fail "$workflow must not depend on submodule-init"
   fi
 done
+
+if rg -n 'submodule-init' .github/workflows >/dev/null; then
+  fail ".github/workflows must not reference submodule-init"
+fi
 
 if [[ -e src/app/fdctl/commands/run_agave.c || -e src/app/fdctl/commands/run_agave.h ]]; then
   fail "run-agave command sources must remain removed"

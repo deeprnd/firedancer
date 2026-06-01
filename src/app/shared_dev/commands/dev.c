@@ -26,8 +26,6 @@ dev_cmd_args( int *    pargc,
   args->dev.no_watch = fd_env_strip_cmdline_contains( pargc, pargv, "--no-watch" );
   args->dev.no_configure = fd_env_strip_cmdline_contains( pargc, pargv, "--no-configure" );
   args->dev.no_init_workspaces = fd_env_strip_cmdline_contains( pargc, pargv, "--no-init-workspaces" );
-  (void)fd_env_strip_cmdline_contains( pargc, pargv, "--no-agave"  );
-  (void)fd_env_strip_cmdline_contains( pargc, pargv, "--no-solana" );
 }
 
 void

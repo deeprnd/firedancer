@@ -652,7 +652,7 @@ void
 fdctl_check_configure( config_t const * config ) {
   configure_result_t check = fd_cfg_stage_hugetlbfs.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
   if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-    FD_LOG_ERR(( "Huge pages are not configured correctly: %s. You can run `fdctl configure init hugetlbfs` "
+    FD_LOG_ERR(( "Huge pages are not configured correctly: %s. You can run `tickoni configure init hugetlbfs` "
                  "to create the mounts correctly. This must be done after every system restart before running "
                  "Firedancer.", check.message ));
 
@@ -660,34 +660,34 @@ fdctl_check_configure( config_t const * config ) {
     if( fd_cfg_stage_bonding.enabled( config ) ) {
       check = fd_cfg_stage_bonding.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
       if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-        FD_LOG_ERR(( "Bonded network device is not configured correctly: %s. You can run `fdctl configure init bonding` "
+        FD_LOG_ERR(( "Bonded network device is not configured correctly: %s. You can run `tickoni configure init bonding` "
                     "to configure the bonding driver.", check.message ));
     }
 
     check = fd_cfg_stage_ethtool_channels.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
     if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-      FD_LOG_ERR(( "Network %s. You can run `fdctl configure init ethtool-channels` to set the number of channels on the "
+      FD_LOG_ERR(( "Network %s. You can run `tickoni configure init ethtool-channels` to set the number of channels on the "
                   "network device correctly.", check.message ));
 
     check = fd_cfg_stage_ethtool_offloads.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
     if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-      FD_LOG_ERR(( "Network %s. You can run `fdctl configure init ethtool-offloads` to disable features "
+      FD_LOG_ERR(( "Network %s. You can run `tickoni configure init ethtool-offloads` to disable features "
                   "as required.", check.message ));
 
     check = fd_cfg_stage_ethtool_loopback.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
     if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-      FD_LOG_ERR(( "Network %s. You can run `fdctl configure init ethtool-loopback` to disable tx-udp-segmentation "
+      FD_LOG_ERR(( "Network %s. You can run `tickoni configure init ethtool-loopback` to disable tx-udp-segmentation "
                   "on the loopback device.", check.message ));
   }
 
   check = fd_cfg_stage_sysctl.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
   if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-    FD_LOG_ERR(( "Kernel parameters are not configured correctly: %s. You can run `fdctl configure init sysctl` "
+    FD_LOG_ERR(( "Kernel parameters are not configured correctly: %s. You can run `tickoni configure init sysctl` "
                  "to set kernel parameters correctly.", check.message ));
 
   check = fd_cfg_stage_hyperthreads.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
   if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-    FD_LOG_ERR(( "Hyperthreading is not configured correctly: %s. You can run `fdctl configure init hyperthreads` "
+    FD_LOG_ERR(( "Hyperthreading is not configured correctly: %s. You can run `tickoni configure init hyperthreads` "
                  "to configure hyperthreading correctly.", check.message ));
 }
 
@@ -697,7 +697,7 @@ run_firedancer_init( config_t * config,
                      int        check_configure ) {
   struct stat st;
   int err = stat( config->paths.identity_key, &st );
-  if( FD_UNLIKELY( -1==err && errno==ENOENT ) ) FD_LOG_ERR(( "[consensus.identity_path] key does not exist `%s`. You can generate an identity key at this path by running `fdctl keys new %s --config <toml>`", config->paths.identity_key, config->paths.identity_key ));
+  if( FD_UNLIKELY( -1==err && errno==ENOENT ) ) FD_LOG_ERR(( "[consensus.identity_path] key does not exist `%s`. You can generate an identity key at this path by running `tickoni keys new %s --config <toml>`", config->paths.identity_key, config->paths.identity_key ));
   else if( FD_UNLIKELY( -1==err ) )             FD_LOG_ERR(( "could not stat [consensus.identity_path] `%s` (%i-%s)", config->paths.identity_key, errno, fd_io_strerror( errno ) ));
 
   if( FD_UNLIKELY( !config->is_firedancer ) ) {

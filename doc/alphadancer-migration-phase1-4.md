@@ -81,6 +81,7 @@ Reference implementation doc: `doc/tickoni-interface-contract.md`.
 This phase fully removes compatibility shims once downstream callers are migrated:
 
 1. Delete temporary alias targets and wrappers that still expose `firedancer` naming.
+   Current exception: retain the `firedancer` runtime synonym for operator compatibility until explicitly removed.
 2. Remove obsolete workflows, actions, and scripts tied to Frankendancer-era assumptions.
 3. Remove dead code paths guarded only for historical Agave/Frankendancer support.
 4. Clean remaining docs/config examples that mention deprecated command paths.
