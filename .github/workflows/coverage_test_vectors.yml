@@ -34,7 +34,7 @@ jobs:
       MACHINE: linux_clang_icelake
       EXTRAS: llvm-cov
       COMPILER: clang
-      COMPILER_VERSION: 15.0.6
+      COMPILER_VERSION: 18
 
     steps:
       # ── base commit ────────────────────────────────────────────────────────
@@ -45,18 +45,16 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha || 'main' }}
           submodules: recursive
 
-      - name: Install clang-15
+      - name: Install clang-18
         run: |
-          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
-          chmod +x /tmp/llvm.sh
-          sudo /tmp/llvm.sh 15
-          sudo mkdir -p /opt/clang/clang-15.0.6
-          printf 'export CC=clang-15\nexport CXX=clang++-15\nexport PATH="/usr/lib/llvm-15/bin:$PATH"\n' | sudo tee /opt/clang/clang-15.0.6/activate
+          sudo apt-get install -y clang-18 llvm-18
+          sudo mkdir -p /opt/clang/clang-18
+          printf 'export CC=clang-18\nexport CXX=clang++-18\nexport PATH="/usr/lib/llvm-18/bin:$PATH"\n' | sudo tee /opt/clang/clang-18/activate
 
       - uses: ./.github/actions/deps
         with:
           compiler: clang
-          compiler-version: 15.0.6
+          compiler-version: 18
           extras: +dev
       - uses: ./.github/actions/cpusonline
       - uses: ./.github/actions/hugepages
