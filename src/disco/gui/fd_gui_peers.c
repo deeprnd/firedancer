@@ -1560,13 +1560,13 @@ fd_gui_peers_poll( fd_gui_peers_ctx_t * peers, long now ) {
 
       /* bandwidth_tracking */
       fd_gui_peers_bandwidth_tracking_ele_remove( peers->bw_tracking, peer, peers->contact_info_table );
-      peer->row.gossvf_rx_sum.rate_ema = (long)fd_gui_ema( peer->row.gossvf_rx_sum.update_timestamp_ns, now, (double)((long)peer->row.gossvf_rx_sum.cur - (long)peer->row.gossvf_rx_sum.ref) * 1e9 / window, (double)peer->row.gossvf_rx_sum.rate_ema, FD_GUI_PEERS_EMA_HALF_LIFE_NS );
-      peer->row.gossvf_rx_sum.ref      = peer->row.gossvf_rx_sum.cur;
-      peer->row.gossvf_rx_sum.update_timestamp_ns = now;
+      peer->gossvf_rx_sum.rate_ema = (long)fd_gui_ema( peer->gossvf_rx_sum.update_timestamp_ns, now, (double)((long)peer->gossvf_rx_sum.cur - (long)peer->gossvf_rx_sum.ref) * 1e9 / window, (double)peer->gossvf_rx_sum.rate_ema, FD_GUI_PEERS_EMA_HALF_LIFE_NS );
+      peer->gossvf_rx_sum.ref      = peer->gossvf_rx_sum.cur;
+      peer->gossvf_rx_sum.update_timestamp_ns = now;
 
-      peer->row.gossip_tx_sum.rate_ema = (long)fd_gui_ema( peer->row.gossip_tx_sum.update_timestamp_ns, now, (double)((long)peer->row.gossip_tx_sum.cur - (long)peer->row.gossip_tx_sum.ref) * 1e9 / window, (double)peer->row.gossip_tx_sum.rate_ema, FD_GUI_PEERS_EMA_HALF_LIFE_NS );
-      peer->row.gossip_tx_sum.ref      = peer->row.gossip_tx_sum.cur;
-      peer->row.gossip_tx_sum.update_timestamp_ns = now;
+      peer->gossip_tx_sum.rate_ema = (long)fd_gui_ema( peer->gossip_tx_sum.update_timestamp_ns, now, (double)((long)peer->gossip_tx_sum.cur - (long)peer->gossip_tx_sum.ref) * 1e9 / window, (double)peer->gossip_tx_sum.rate_ema, FD_GUI_PEERS_EMA_HALF_LIFE_NS );
+      peer->gossip_tx_sum.ref      = peer->gossip_tx_sum.cur;
+      peer->gossip_tx_sum.update_timestamp_ns = now;
       fd_gui_peers_bandwidth_tracking_ele_insert( peers->bw_tracking, peer, peers->contact_info_table );
     }
 
