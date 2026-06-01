@@ -2,6 +2,10 @@
 #include "../platform/fd_config_macros.c"
 #include "fd_config_private.h"
 
+#ifndef FD_WITH_AGAVE
+#define FD_WITH_AGAVE 0
+#endif
+
 static void
 fd_config_check_configf( fd_config_t *  config,
                          fd_configf_t * config_f ) {
@@ -156,10 +160,15 @@ fd_config_extract_pod( uchar *       pod,
     CFG_POP    ( cstr,   paths.genesis                                    );
     CFG_POP    ( cstr,   paths.accounts                                   );
   } else {
+#if FD_WITH_AGAVE
     CFG_POP1   ( cstr,   scratch_directory,           paths.base          );
     CFG_POP1   ( cstr,   ledger.path,                 frankendancer.paths.ledger );
     CFG_POP1   ( cstr,   consensus.identity_path,     paths.identity_key  );
     CFG_POP1   ( cstr,   consensus.vote_account_path, paths.vote_account  );
+#else
+    FD_LOG_ERR(( "Frankendancer/Agave configuration is disabled (FD_WITH_AGAVE=0). "
+                 "Use the firedancer binary and firedancer config profiles." ));
+#endif
   }
 
   CFG_POP_ARRAY( cstr,   gossip.entrypoints                               );
@@ -325,7 +334,11 @@ fd_config_extract_pod( uchar *       pod,
     if( FD_UNLIKELY( !fd_config_extract_podf( pod, &config->firedancer ) ) ) return NULL;
     fd_config_check_configf( config, &config->firedancer );
   } else {
+#if FD_WITH_AGAVE
     if( FD_UNLIKELY( !fd_config_extract_podh( pod, &config->frankendancer ) ) ) return NULL;
+#else
+    FD_LOG_ERR(( "Frankendancer/Agave pod extraction is disabled (FD_WITH_AGAVE=0)." ));
+#endif
   }
 
   /* Renamed config options */

@@ -1,0 +1,23 @@
+name: Agave Guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: agave-guard_${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
+    runs-on:
+      labels: X64
+      group: fd-public-repo
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check Agave regressions
+        run: bash contrib/lint/check_agave_regressions.sh
+

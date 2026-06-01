@@ -34,6 +34,10 @@
 
 extern fd_topo_obj_callbacks_t * CALLBACKS[];
 
+#ifndef FD_WITH_AGAVE
+#define FD_WITH_AGAVE 0
+#endif
+
 #define NAME "run"
 
 void
@@ -251,6 +255,7 @@ main_pid_namespace( void * _args ) {
   if( FD_UNLIKELY( -1==config_memfd ) ) FD_LOG_ERR(( "fd_config_to_memfd() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
 
   ulong child_cnt = 0UL;
+#if FD_WITH_AGAVE
   if( FD_LIKELY( !config->is_firedancer && !config->development.no_agave ) ) {
     int pipefd[ 2 ];
     if( FD_UNLIKELY( pipe2( pipefd, O_CLOEXEC ) ) ) FD_LOG_ERR(( "pipe2() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
@@ -263,6 +268,12 @@ main_pid_namespace( void * _args ) {
     strncpy( child_names[ child_cnt ], "agave", 32 );
     child_cnt++;
   }
+#else
+  if( FD_UNLIKELY( !config->is_firedancer && !config->development.no_agave ) ) {
+    FD_LOG_WARNING(( "Frankendancer/Agave hosting is disabled (FD_WITH_AGAVE=0). "
+                     "Proceeding without spawning run-agave." ));
+  }
+#endif
 
   errno = 0;
   int save_priority = getpriority( PRIO_PROCESS, 0 );
