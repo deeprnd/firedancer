@@ -60,6 +60,10 @@ on:
         type: string
         description: Runner labels where clang jobs will get scheduled
         default: '["ubuntu-latest"]'
+      arm_runner_labels:
+        type: string
+        description: Runner labels where arm jobs will get scheduled
+        default: '["ubuntu-latest"]'
   workflow_dispatch:
     inputs:
       cid:
@@ -117,6 +121,10 @@ on:
       clang_runner_labels:
         type: string
         description: Runner labels where clang jobs will get scheduled
+        default: '["ubuntu-latest"]'
+      arm_runner_labels:
+        type: string
+        description: Runner labels where arm jobs will get scheduled
         default: '["ubuntu-latest"]'
 concurrency:
   group: builds_${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.cid }}
@@ -260,7 +268,8 @@ jobs:
           contrib/build.sh --no-rust --no-gcc ${{ env.BUILD_ARGS }}
 
   build_arm:
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: ${{ fromJSON(inputs.arm_runner_labels) }}
     if: ${{ inputs.build_arm }}
     strategy:
       matrix:

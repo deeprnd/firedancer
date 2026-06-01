@@ -36,7 +36,8 @@ jobs:
     uses: ./.github/workflows/builds.yml
     with:
       cid: 1
-      build_arm: false
+      build_arm: true
+      arm_runner_labels: '["ubuntu-24.04-arm"]'
       check_run: true
       verbose: true
       exit_on_err: true
