@@ -281,11 +281,13 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y gcc-${{ matrix.gcc_version }} g++-${{ matrix.gcc_version }}
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.gcc_version }} 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.gcc_version }} 100
 
       - name: Run build
         env:
-          MACHINE: linux_gcc_neoverse_n2
+          MACHINE: native
         run: |
           ./deps.sh fetch install
-          make -j CC=gcc-${{ matrix.gcc_version }} CXX=g++-${{ matrix.gcc_version }} clean
-          make -j CC=gcc-${{ matrix.gcc_version }} CXX=g++-${{ matrix.gcc_version }} all
+          make -j clean
+          make -j all

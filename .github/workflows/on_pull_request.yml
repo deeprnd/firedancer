@@ -13,10 +13,6 @@ permissions:
   pull-requests: write
 
 jobs:
-  migration_policy:
-    if: false
-    uses: ./.github/workflows/migration_policy.yml
-
   tests:
     if: false
     uses: ./.github/workflows/tests.yml
