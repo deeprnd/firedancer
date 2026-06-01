@@ -1537,14 +1537,6 @@
 | <span class="metrics-name">diag_&#8203;vote_&#8203;status</span> | gauge | Precise status of the vote subsystem: 0=disabled (non-voting or no tower tile), 1=not started (tower tile not running or no votes cast yet), 2=delinquent (vote distance exceeds threshold or vote stalled), 3=voting (voting normally) |
 | <span class="metrics-name">diag_&#8203;replay_&#8203;status</span> | gauge | Precise status of the replay subsystem: 0=disabled (no replay tile), 1=not started (replay tile not running or slots are zero), 2=behind (replay lagging behind turbine or reset slot stalled), 3=running (replay keeping up) |
 | <span class="metrics-name">diag_&#8203;turbine_&#8203;status</span> | gauge | Precise status of the turbine subsystem: 0=disabled (no shred or replay tiles), 1=not started (tiles not all running or turbine slot is zero), 2=stalled (turbine slot not advancing), 3=repair outpacing (repair byte throughput exceeds turbine), 4=running (turbine receiving normally) |
-| <span class="metrics-name">diag_&#8203;device_&#8203;irq</span> | counter | Number of device IRQs across all CPUs |
-| <span class="metrics-name">diag_&#8203;device_&#8203;irq_&#8203;undesired</span> | counter | Number of device hard IRQs that stole CPU time from fixed tiles |
-| <span class="metrics-name">diag_&#8203;softirq</span><br/>{softirq="<span class="metrics-enum">net</span>"} | counter | Number of soft-IRQs across all CPUs (NET_TX, NET_RX) |
-| <span class="metrics-name">diag_&#8203;softirq</span><br/>{softirq="<span class="metrics-enum">disk</span>"} | counter | Number of soft-IRQs across all CPUs (BLOCK) |
-| <span class="metrics-name">diag_&#8203;softirq</span><br/>{softirq="<span class="metrics-enum">other</span>"} | counter | Number of soft-IRQs across all CPUs (e.g. TIMER, HRTIMER, IRQ_POLL, TASKLET, SCHED, RCU, ...) |
-| <span class="metrics-name">diag_&#8203;softirq_&#8203;undesired</span><br/>{softirq="<span class="metrics-enum">net</span>"} | counter | Number of soft-IRQs that stole CPU time from fixed tiles (NET_TX, NET_RX) |
-| <span class="metrics-name">diag_&#8203;softirq_&#8203;undesired</span><br/>{softirq="<span class="metrics-enum">disk</span>"} | counter | Number of soft-IRQs that stole CPU time from fixed tiles (BLOCK) |
-| <span class="metrics-name">diag_&#8203;softirq_&#8203;undesired</span><br/>{softirq="<span class="metrics-enum">other</span>"} | counter | Number of soft-IRQs that stole CPU time from fixed tiles (e.g. TIMER, HRTIMER, IRQ_POLL, TASKLET, SCHED, RCU, ...) |
 
 </div>
 
