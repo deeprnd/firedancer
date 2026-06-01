@@ -211,6 +211,6 @@ fi
 # TODO add firedancer-dev integration tests here
 
 # Broken because genesis creation is unreliable
-#src/app/tickoni-dev/tests/test_single_transfer.sh
+#src/app/firedancer-dev/tests/test_single_transfer.sh
 # Broken because 'firedancer-dev txn' is unreliable
-#src/app/tickoni-dev/tests/test_single_txn.sh
+#src/app/firedancer-dev/tests/test_single_txn.sh

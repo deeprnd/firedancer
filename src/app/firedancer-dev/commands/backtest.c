@@ -12,7 +12,7 @@
 
 */
 #define _GNU_SOURCE
-#include "../../tickoni/topology.h"
+#include "../../firedancer/topology.h"
 #include "../../shared/commands/configure/configure.h"
 #include "../../shared/commands/run/run.h" /* initialize_workspaces */
 #include "../../shared/commands/watch/watch.h"

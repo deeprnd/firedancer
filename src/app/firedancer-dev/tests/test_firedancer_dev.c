@@ -1,8 +1,8 @@
 #define _GNU_SOURCE
 #include "../main.h"
 
-#include "../../tickoni/topology.h"
-#include "../../tickoni/config.h"
+#include "../../firedancer/topology.h"
+#include "../../firedancer/config.h"
 #include "../../platform/fd_sys_util.h"
 #include "../../shared/fd_config_file.h"
 #include "../../shared/commands/configure/configure.h"

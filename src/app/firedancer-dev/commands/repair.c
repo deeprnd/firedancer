@@ -9,8 +9,8 @@
 #include "../../../util/pod/fd_pod_format.h"
 #include "../../../util/tile/fd_tile_private.h"
 
-#include "../../tickoni/topology.h"
-#include "../../tickoni/topology.c"
+#include "../../firedancer/topology.h"
+#include "../../firedancer/topology.c"
 #include "../../shared/commands/configure/configure.h"
 #include "../../shared/commands/run/run.h" /* initialize_workspaces */
 #include "../../shared/fd_config.h" /* config_t */
@@ -58,7 +58,7 @@ restore_terminal( void ) {
 fd_topo_run_tile_t
 fdctl_tile_run( fd_topo_tile_t const * tile );
 
-/* repair_topo is a subset of "src/app/tickoni/topology.c" at commit
+/* repair_topo is a subset of "src/app/firedancer/topology.c" at commit
    0d8386f4f305bb15329813cfe4a40c3594249e96, slightly modified to work
    as a repair catchup.  TODO ideally, one should invoke the firedancer
    topology first, and exclude the parts that are not needed, instead of

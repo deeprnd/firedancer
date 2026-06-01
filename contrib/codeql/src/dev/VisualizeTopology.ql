@@ -2,7 +2,7 @@ import cpp
 
   /* Point this predicate to the topology to be visualized */
 predicate inTopology(Location loc) {
-  loc.getFile().getRelativePath() = "src/app/tickoni/topology.c" or
+  loc.getFile().getRelativePath() = "src/app/firedancer/topology.c" or
   loc.getFile().getRelativePath() = "src/disco/net/fd_net_tile_topo.c"
 }
 

@@ -2,7 +2,7 @@
 Constructed using a full topology which is pruned down. */
 
 #define _GNU_SOURCE
-#include "../../../tickoni/topology.h"
+#include "../../../firedancer/topology.h"
 #include "../../../shared/fd_action.h"
 #include "../../../shared/commands/configure/configure.h"
 #include "../../../shared/commands/run/run.h"

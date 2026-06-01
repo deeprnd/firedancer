@@ -10,12 +10,8 @@ if [[ -f .gitmodules ]]; then
   fail ".gitmodules exists; agave submodule metadata must stay removed"
 fi
 
-if [[ -d src/app/firedancer || -d src/app/firedancer-dev ]]; then
-  fail "legacy app paths src/app/firedancer* must stay removed"
-fi
-
-if [[ ! -d src/app/tickoni || ! -d src/app/tickoni-dev ]]; then
-  fail "tickoni app paths must exist"
+if [[ ! -d src/app/firedancer || ! -d src/app/firedancer-dev ]]; then
+  fail "firedancer app paths must exist"
 fi
 
 if rg -n 'agave/target' config/everything.mk >/dev/null; then
@@ -44,8 +40,8 @@ if [[ -e src/app/fdctl/commands/run_agave.c || -e src/app/fdctl/commands/run_aga
 fi
 
 for path in src/app/shared \
-            src/app/tickoni \
-            src/app/tickoni-dev \
+            src/app/firedancer \
+            src/app/firedancer-dev \
             .github/workflows/tests.yml \
             .github/workflows/builds.yml \
             .github/workflows/codeql.yml \
