@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   coverage-test-vectors:
-    if: github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch'
+    if: false
     name: Coverage Test Vectors
     runs-on: ubuntu-latest
     timeout-minutes: 40

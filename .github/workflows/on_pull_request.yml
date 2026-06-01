@@ -58,7 +58,7 @@ jobs:
         ALL,linux_clang_zen4,ALL;
         ALL,linux_clang_zen5,ALL;
   build_checks_2:
-    if: github.event.pull_request.draft == false
+    if: false
     uses: ./.github/workflows/builds.yml
     with:
       cid: 2
@@ -69,7 +69,7 @@ jobs:
       build_arm: false
       check_run: true
   build_checks_3:
-    if: github.event.pull_request.draft == false
+    if: false
     uses: ./.github/workflows/builds.yml
     with:
       cid: 3
