@@ -231,7 +231,7 @@ fi
 # makefiles present in the config/machine directory.
 
 if [[ ${#MACHINES[@]} -eq 0 ]]; then
-  for machine in "$FD_REPO_DIR"/config/machine/linux_*.mk; do
+  for machine in "$FD_REPO_DIR"/config/machine/linux_*.mk "$FD_REPO_DIR"/config/machine/native.mk; do
     MACHINES+=( $(basename "$machine") )
   done
 fi
