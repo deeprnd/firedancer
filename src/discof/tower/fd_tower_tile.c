@@ -1075,6 +1075,37 @@ query_epoch_voters( fd_tower_tile_t *      ctx,
 
     epoch_vtr_map_ele_insert( map, vtr, pool );
   }
+  fd_accdb_ro_pipe_fini( ro_pipe );
+
+  /* Reconcile our local tower with the on-chain tower (stored inside
+     our vote account).
+
+     Skip reconciliation on the first replay_slot_completed if booted
+     with wait_for_supermajority.  This prevents spurious lockout_check
+     failures (slot <= last_vote_slot) and threshold_check failures
+     (deep stale tower with no voter support) */
+
+  *our_vote_acct_bal    = ULONG_MAX;
+  *found_our_vote_acct  = 0;
+  fd_funk_txn_xid_t reconcile_xid = fd_bank_xid( bank );
+  fd_accdb_ro_t reconcile_ro[1];
+  if( FD_LIKELY( fd_accdb_open_ro( ctx->accdb, reconcile_ro, &reconcile_xid, ctx->vote_account ) ) ) {
+    *found_our_vote_acct = 1;
+    ctx->our_vote_acct_sz = fd_ulong_min( fd_accdb_ref_data_sz( reconcile_ro ), FD_VOTE_STATE_DATA_MAX );
+    *our_vote_acct_bal = fd_accdb_ref_lamports( reconcile_ro );
+    fd_memcpy( ctx->our_vote_acct, fd_accdb_ref_data_const( reconcile_ro ), ctx->our_vote_acct_sz );
+    fd_accdb_close_ro( ctx->accdb, reconcile_ro );
+    int skip_reconcile = !ctx->init && ctx->wfs;
+    if( FD_LIKELY( !skip_reconcile ) ) {
+      ulong root;
+      fd_tower_vote_remove_all( ctx->scratch_tower );
+      fd_tower_from_vote_acc( ctx->scratch_tower, &root, ctx->our_vote_acct, ctx->our_vote_acct_sz );
+      fd_tower_reconcile( ctx->tower, ctx->scratch_tower, root );
+    } else {
+      FD_LOG_NOTICE(( "wait_for_supermajority: skipping tower reconcile on init slot %lu", slot_completed->slot ));
+    }
+  }
+
   return total_stake;
 }
 
