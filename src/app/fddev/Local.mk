@@ -1,3 +1,6 @@
+FD_WITH_AGAVE ?= 0
+
+ifeq ($(FD_WITH_AGAVE),1)
 ifdef FD_HAS_HOSTED
 ifdef FD_HAS_LINUX
 ifdef FD_HAS_ALLOCA
@@ -42,4 +45,7 @@ endif
 endif
 endif
 endif
+endif
+else
+$(info Skipping fddev build (FD_WITH_AGAVE=0))
 endif

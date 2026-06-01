@@ -4,6 +4,10 @@
 #include "../shared/boot/fd_boot.h"
 #include "../shared/commands/configure/configure.h"
 
+#ifndef FD_WITH_AGAVE
+#define FD_WITH_AGAVE 0
+#endif
+
 char const * FD_APP_NAME    = "Frankendancer";
 char const * FD_BINARY_NAME = "fdctl";
 
@@ -84,7 +88,9 @@ fd_topo_run_tile_t * TILES[] = {
 
 extern action_t fd_action_run;
 extern action_t fd_action_run1;
+#if FD_WITH_AGAVE
 extern action_t fd_action_run_agave;
+#endif
 extern action_t fd_action_configure;
 extern action_t fd_action_monitor;
 extern action_t fd_action_keys;
@@ -100,7 +106,9 @@ extern action_t fd_action_metrics;
 action_t * ACTIONS[] = {
   &fd_action_run,
   &fd_action_run1,
+#if FD_WITH_AGAVE
   &fd_action_run_agave,
+#endif
   &fd_action_configure,
   &fd_action_monitor,
   &fd_action_keys,

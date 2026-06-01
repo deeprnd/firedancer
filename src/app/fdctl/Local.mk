@@ -1,4 +1,7 @@
 include src/app/fdctl/with-version.mk
+FD_WITH_AGAVE ?= 0
+
+ifeq ($(FD_WITH_AGAVE),1)
 $(info Using FRANKENDANCER_VERSION=$(FIREDANCER_VERSION_CSTR) ($(FIREDANCER_CI_COMMIT)))
 $(shell echo "#define FDCTL_MAJOR_VERSION $(FIREDANCER_VERSION_MAJOR)"                          >  src/app/fdctl/version2.h)
 $(shell echo "#define FDCTL_MINOR_VERSION $(FIREDANCER_VERSION_MINOR)"                          >> src/app/fdctl/version2.h)
@@ -143,4 +146,7 @@ endif
 endif
 endif
 endif
+endif
+else
+$(info Skipping fdctl build (FD_WITH_AGAVE=0))
 endif

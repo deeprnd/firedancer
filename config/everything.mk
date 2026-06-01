@@ -79,11 +79,11 @@ help:
 info: $(OBJDIR)/info
 
 clean: frontend-clean
-	$(RMDIR) $(OBJDIR) && $(RMDIR) target && $(RMDIR) agave/target && \
+	$(RMDIR) $(OBJDIR) && $(RMDIR) target && \
 $(SCRUB)
 
 distclean:
-	$(RMDIR) $(BASEDIR) && $(RMDIR) target && $(RMDIR) agave/target && \
+	$(RMDIR) $(BASEDIR) && $(RMDIR) target && \
 $(SCRUB)
 
 run-unit-test:
