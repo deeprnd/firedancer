@@ -865,7 +865,7 @@ action_t fd_action_run1 = {
   .args        = run1_cmd_args,
   .fn          = run1_cmd_fn,
   .perm        = NULL,
-  .description = "Start up a single Firedancer tile"
+  .description = "Start up a single Tickoni tile"
 };
 
 action_t fd_action_run = {
@@ -874,7 +874,7 @@ action_t fd_action_run = {
   .fn             = run_cmd_fn,
   .require_config = 1,
   .perm           = run_cmd_perm,
-  .description    = "Start up a Firedancer validator",
+  .description    = "Start up a Tickoni validator",
   .permission_err = "insufficient permissions to execute command `%s`. It is recommended "
                     "to start Firedancer as the root user, but you can also start it "
                     "with the missing capabilities listed above. The program only needs "

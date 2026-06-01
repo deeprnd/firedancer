@@ -32,8 +32,25 @@ if [[ ! -f doc/tickoni-interface-contract.md ]]; then
   fail "doc/tickoni-interface-contract.md must exist"
 fi
 
+if [[ ! -f doc/tickoni-identity-and-packaging.md ]]; then
+  fail "doc/tickoni-identity-and-packaging.md must exist"
+fi
+
 if ! rg -n "Removal date: \`${TICKONI_SHIM_REMOVAL_DATE}\`" doc/tickoni-interface-contract.md >/dev/null; then
   fail "tickoni interface contract must declare shim removal date ${TICKONI_SHIM_REMOVAL_DATE}"
+fi
+
+for dockerfile in contrib/containers/archlinux.dockerfile \
+                  contrib/containers/gcc-8.dockerfile \
+                  contrib/containers/gcc-9.dockerfile \
+                  contrib/containers/gcc-10.dockerfile; do
+  if ! rg -n '^WORKDIR /data/tickoni$' "$dockerfile" >/dev/null; then
+    fail "$dockerfile must use /data/tickoni workdir"
+  fi
+done
+
+if rg -n 'src/app/fdctl/version.mk' contrib/tag-release.py >/dev/null; then
+  fail "contrib/tag-release.py must use Tickoni version metadata path"
 fi
 
 if rg -n 'agave/target' config/everything.mk >/dev/null; then

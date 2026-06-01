@@ -95,6 +95,8 @@ This phase makes Tickoni the canonical project identity in deliverables:
 3. Ensure telemetry, metrics labels, and runtime identifiers reflect Tickoni naming where safe.
 4. Validate upgrade/rollback runbooks against the renamed artifacts.
 
+Reference implementation doc: `doc/tickoni-identity-and-packaging.md`.
+
 ## Phase 10: Post-Migration Hardening
 
 This phase closes migration risk and establishes steady-state engineering policy:
@@ -102,4 +104,6 @@ This phase closes migration risk and establishes steady-state engineering policy
 1. Run full performance and reliability baselines on the Agave-free Tickoni path.
 2. Add CI policy checks that prevent new Agave coupling and legacy-name regressions.
 3. Archive migration notes into a final cutover record with known constraints and follow-ups.
+
+Reference implementation doc: `doc/tickoni-cutover-record.md`.
 4. Lift temporary migration freezes and define the new roadmap scope for HFT AI infrastructure work.

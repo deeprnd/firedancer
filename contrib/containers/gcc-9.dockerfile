@@ -17,6 +17,6 @@ RUN cd /tmp && \
     ln -s /opt/cmake-3.26.5-linux-x86_64/bin/cpack /usr/local/bin/cpack && \
     rm -f /tmp/cmake-3.26.5-linux-x86_64.tar.gz
 
-WORKDIR /data/firedancer
+WORKDIR /data/tickoni
 
 CMD ["/bin/bash"]

@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: 0 4 * * *
 jobs:
+  migration_policy:
+    uses: ./.github/workflows/migration_policy.yml
+
   coverage-report:
     uses: ./.github/workflows/coverage_report.yml
     secrets: inherit
