@@ -277,13 +277,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install GCC ${{ matrix.gcc_version }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gcc-${{ matrix.gcc_version }} g++-${{ matrix.gcc_version }}
+
       - name: Run build
         env:
           MACHINE: linux_gcc_neoverse_n2
+          CC: gcc-${{ matrix.gcc_version }}
+          CXX: g++-${{ matrix.gcc_version }}
         run: |
-          if [ "${{ matrix.gcc_version }}" != "8" ]; then
-            source /opt/rh/gcc-toolset-${{ matrix.gcc_version }}/enable
-          fi
           ./deps.sh fetch install
           make -j clean
           make -j all
