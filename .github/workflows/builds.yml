@@ -55,11 +55,11 @@ on:
       gcc_runner_labels:
         type: string
         description: Runner labels where gcc jobs will get scheduled
-        default: '["self-hosted", "X64", "rocky9"]'
+        default: '["ubuntu-latest"]'
       clang_runner_labels:
         type: string
         description: Runner labels where clang jobs will get scheduled
-        default: '["self-hosted", "X64", "rocky9"]'
+        default: '["ubuntu-latest"]'
   workflow_dispatch:
     inputs:
       cid:
@@ -113,11 +113,11 @@ on:
       gcc_runner_labels:
         type: string
         description: Runner labels where gcc jobs will get scheduled
-        default: '["self-hosted", "X64", "rocky9"]'
+        default: '["ubuntu-latest"]'
       clang_runner_labels:
         type: string
         description: Runner labels where clang jobs will get scheduled
-        default: '["self-hosted", "X64", "rocky9"]'
+        default: '["ubuntu-latest"]'
 concurrency:
   group: builds_${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.cid }}
   cancel-in-progress: true
@@ -125,7 +125,6 @@ jobs:
   build_gcc:
     runs-on:
       labels: ${{ fromJSON(inputs.gcc_runner_labels) }}
-      group: fd-public-repo
     if: ${{ inputs.gcc != 'none' }}
     steps:
       - uses: actions/checkout@v6
@@ -186,7 +185,6 @@ jobs:
   build_clang:
     runs-on:
       labels: ${{ fromJSON(inputs.clang_runner_labels) }}
-      group: fd-public-repo
     if: ${{ inputs.clang != 'none' }}
     steps:
       - uses: actions/checkout@v6
@@ -245,9 +243,7 @@ jobs:
           contrib/build.sh --no-rust --no-gcc ${{ env.BUILD_ARGS }}
 
   build_arm:
-    runs-on:
-      labels: ARM64
-      group: fd-public-repo
+    runs-on: ubuntu-latest
     if: ${{ inputs.build_arm }}
     strategy:
       matrix:

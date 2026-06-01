@@ -21,9 +21,7 @@ permissions:
 
 jobs:
   benchmark:
-    runs-on:
-      labels: [self-hosted, 512G]
-      group: fd-public-repo
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       CC: gcc

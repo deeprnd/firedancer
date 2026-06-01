@@ -10,9 +10,7 @@ concurrency:
 
 jobs:
   policy:
-    runs-on:
-      labels: X64
-      group: fd-public-repo
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 

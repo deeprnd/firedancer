@@ -24,9 +24,7 @@ jobs:
   coverage-test-vectors:
     if: github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch'
     name: Coverage Test Vectors
-    runs-on:
-      labels: icelake
-      group: fd-public-repo
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     environment:
       name: coverage-report

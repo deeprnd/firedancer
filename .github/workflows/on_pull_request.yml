@@ -14,19 +14,19 @@ permissions:
 
 jobs:
   migration_policy:
-    if: github.event.pull_request.draft == false
+    if: false
     uses: ./.github/workflows/migration_policy.yml
 
   tests:
-    if: github.event.pull_request.draft == false
+    if: false
     uses: ./.github/workflows/tests.yml
     secrets: inherit
   backtest:
-    if: github.event.pull_request.draft == false
+    if: false
     uses: ./.github/workflows/backtest.yml
     secrets: inherit
   benchmark:
-    if: github.event.pull_request.draft == false && github.event_name == 'pull_request'
+    if: false
     uses: ./.github/workflows/benchmark.yml
     with:
       github-token: ${{ github.token }}

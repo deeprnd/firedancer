@@ -52,7 +52,7 @@ jobs:
       clang: none
       verbose: true
       cid: 4
-      gcc_runner_labels: '["self-hosted", "X64", "750G"]'
+      gcc_runner_labels: '["ubuntu-latest"]'
   builds_3:
     uses: ./.github/workflows/builds.yml
     with:
@@ -61,7 +61,7 @@ jobs:
       clang: none
       verbose: true
       cid: 5
-      gcc_runner_labels: '["self-hosted", "X64", "750G"]'
+      gcc_runner_labels: '["ubuntu-latest"]'
   builds_4:
     uses: ./.github/workflows/builds.yml
     with:
@@ -73,7 +73,7 @@ jobs:
       clang: none
       verbose: true
       cid: 6
-      gcc_runner_labels: '["self-hosted", "X64", "750G"]'
+      gcc_runner_labels: '["ubuntu-latest"]'
   backtest:
     uses: ./.github/workflows/backtest.yml
     with:

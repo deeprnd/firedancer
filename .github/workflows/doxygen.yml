@@ -7,9 +7,7 @@ jobs:
   doxygen:
     timeout-minutes: 20
     name: Doxygen
-    runs-on:
-      labels: rocky9
-      group: fd-public-repo
+    runs-on: ubuntu-latest
     environment:
       name: doxygen
       url: ${{ vars.DOXYGEN_URL }}

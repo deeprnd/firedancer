@@ -10,9 +10,7 @@ jobs:
   coverage-report:
     timeout-minutes: 60
     name: Coverage Report
-    runs-on:
-      labels: icelake
-      group: fd-public-repo
+    runs-on: ubuntu-latest
     environment:
       name: coverage-report
       url: ${{ vars.COVERAGE_URL }}

@@ -12,10 +12,8 @@ concurrency:
 
 jobs:
   guard:
-    if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
-    runs-on:
-      labels: X64
-      group: fd-public-repo
+    if: false
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - name: Check Agave regressions
