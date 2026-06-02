@@ -4,11 +4,14 @@ on:
 
 jobs:
   check-cbmc:
-    runs-on: [self-hosted, X64]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Install CBMC
+        run: sudo apt-get install -y cbmc
 
       - name: Check Proofs
         run: |

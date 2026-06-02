@@ -55,11 +55,15 @@ on:
       gcc_runner_labels:
         type: string
         description: Runner labels where gcc jobs will get scheduled
-        default: '["self-hosted", "X64", "rocky9"]'
+        default: '["ubuntu-latest"]'
       clang_runner_labels:
         type: string
         description: Runner labels where clang jobs will get scheduled
-        default: '["self-hosted", "X64", "rocky9"]'
+        default: '["ubuntu-latest"]'
+      arm_runner_labels:
+        type: string
+        description: Runner labels where arm jobs will get scheduled
+        default: '["ubuntu-latest"]'
   workflow_dispatch:
     inputs:
       cid:
@@ -113,11 +117,15 @@ on:
       gcc_runner_labels:
         type: string
         description: Runner labels where gcc jobs will get scheduled
-        default: '["self-hosted", "X64", "rocky9"]'
+        default: '["ubuntu-latest"]'
       clang_runner_labels:
         type: string
         description: Runner labels where clang jobs will get scheduled
-        default: '["self-hosted", "X64", "rocky9"]'
+        default: '["ubuntu-latest"]'
+      arm_runner_labels:
+        type: string
+        description: Runner labels where arm jobs will get scheduled
+        default: '["ubuntu-latest"]'
 concurrency:
   group: builds_${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.cid }}
   cancel-in-progress: true
@@ -125,12 +133,16 @@ jobs:
   build_gcc:
     runs-on:
       labels: ${{ fromJSON(inputs.gcc_runner_labels) }}
-      group: fd-public-repo
     if: ${{ inputs.gcc != 'none' }}
     steps:
       - uses: actions/checkout@v6
 
-      - uses: ./.github/actions/submodule-init
+      - name: Install gcc-12
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-12 g++-12
+          sudo mkdir -p /opt/gcc/gcc-12.4.0
+          printf 'export CC=gcc-12\nexport CXX=g++-12\n' | sudo tee /opt/gcc/gcc-12.4.0/activate
 
       - uses: dtolnay/rust-toolchain@1.94.0
 
@@ -188,12 +200,19 @@ jobs:
   build_clang:
     runs-on:
       labels: ${{ fromJSON(inputs.clang_runner_labels) }}
-      group: fd-public-repo
     if: ${{ inputs.clang != 'none' }}
     steps:
       - uses: actions/checkout@v6
 
-      - uses: ./.github/actions/submodule-init
+      - name: Install clang-18 and clang-19
+        run: |
+          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 18
+          sudo /tmp/llvm.sh 19
+          sudo mkdir -p /opt/clang/clang-18.1.6 /opt/clang/clang-19.1.7
+          printf 'export CC=clang-18\nexport CXX=clang++-18\nexport PATH="/usr/lib/llvm-18/bin:$PATH"\n' | sudo tee /opt/clang/clang-18.1.6/activate
+          printf 'export CC=clang-19\nexport CXX=clang++-19\nexport PATH="/usr/lib/llvm-19/bin:$PATH"\n' | sudo tee /opt/clang/clang-19.1.7/activate
 
       - uses: dtolnay/rust-toolchain@1.94.0
 
@@ -250,24 +269,25 @@ jobs:
 
   build_arm:
     runs-on:
-      labels: ARM64
-      group: fd-public-repo
+      labels: ${{ fromJSON(inputs.arm_runner_labels) }}
     if: ${{ inputs.build_arm }}
     strategy:
       matrix:
-        gcc_version: [12]
+        gcc_version: [14]
     steps:
       - uses: actions/checkout@v6
 
-      - uses: ./.github/actions/submodule-init
+      - name: Install GCC ${{ matrix.gcc_version }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gcc-${{ matrix.gcc_version }} g++-${{ matrix.gcc_version }}
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.gcc_version }} 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.gcc_version }} 100
 
       - name: Run build
         env:
-          MACHINE: linux_gcc_neoverse_n2
+          MACHINE: linux_gcc_neoverse_n1
         run: |
-          if [ "${{ matrix.gcc_version }}" != "8" ]; then
-            source /opt/rh/gcc-toolset-${{ matrix.gcc_version }}/enable
-          fi
           ./deps.sh fetch install
           make -j clean
           make -j all

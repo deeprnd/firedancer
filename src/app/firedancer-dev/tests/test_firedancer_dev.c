@@ -96,7 +96,6 @@ firedancer_dev_dev( config_t * config,
     .dev.parent_pipefd      = pipefd,
     .dev.no_configure       = 1,
     .dev.no_init_workspaces = 1,
-    .dev.no_agave           = 0,
     .dev.no_watch           = 1,
   };
   fd_cap_chk_t * chk = fd_cap_chk_join( fd_cap_chk_new( __builtin_alloca_with_align( fd_cap_chk_footprint(), FD_CAP_CHK_ALIGN ) ) );
@@ -176,7 +175,6 @@ firedancer_dev_test_run( int     argc,
       fd_config_load( 1, 1, (char const *)firedancer_default_config, firedancer_default_config_sz, NULL, NULL, 0UL, NULL, 0UL, NULL, config );
       fd_topo_initialize( config );
       config->log.log_fd = fd_log_private_logfile_fd();
-      config->frankendancer.consensus.poh_speed_test = 0;
 
       return run( config );
     } else {

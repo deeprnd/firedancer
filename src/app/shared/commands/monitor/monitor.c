@@ -618,5 +618,5 @@ action_t fd_action_monitor = {
   .fn             = monitor_cmd_fn,
   .require_config = 1,
   .perm           = monitor_cmd_perm,
-  .description    = "Monitor a locally running Firedancer instance with a terminal GUI",
+  .description    = "Monitor a locally running Tickoni instance with a terminal GUI",
 };

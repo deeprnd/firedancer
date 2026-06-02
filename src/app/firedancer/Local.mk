@@ -31,7 +31,11 @@ $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/testnet-jito.to
 $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/mainnet-jito.toml
 $(OBJDIR)/obj/app/firedancer/version.d: src/app/firedancer/version.h
 
-.PHONY: firedancer
+# version (no external lib deps, always built)
+$(call make-lib,firedancer_version)
+$(call add-objs,version,firedancer_version)
+
+.PHONY: tickoni firedancer
 
 # firedancer core
 $(call add-objs,topology,fd_firedancer)
@@ -44,14 +48,17 @@ $(call add-objs,commands/shred_version,fd_firedancer)
 $(call add-objs,commands/set_identity,fd_firedancer)
 $(call add-objs,commands/monitor_gossip/monitor_gossip commands/monitor_gossip/gossip_diag,fd_firedancer)
 
-# version
-$(call make-lib,firedancer_version)
-$(call add-objs,version,firedancer_version)
-
 ifdef FD_HAS_SSE
 # ifdef FD_HAS_BLST -- will be a required dependency soon
 ifdef FD_HAS_S2NBIGNUM
-$(call make-bin,firedancer,main,fd_firedancer fdctl_shared fdctl_platform fd_discof fd_disco fd_choreo fd_flamenco fd_funk fd_quic fd_tls fd_reedsol fd_waltz fd_tango fd_ballet fd_util firedancer_version,$(OPENSSL_LIBS))
+$(call make-bin,tickoni,main,fd_firedancer fdctl_shared fdctl_platform fd_discof fd_disco fd_choreo fd_flamenco fd_funk fd_quic fd_tls fd_reedsol fd_waltz fd_tango fd_ballet fd_util firedancer_version,$(OPENSSL_LIBS))
+
+# Compatibility shim during rename transition.
+# Removal date: 2026-12-31 (Phase 8 legacy surface removal).
+firedancer: $(OBJDIR)/bin/firedancer
+$(OBJDIR)/bin/firedancer: $(OBJDIR)/bin/tickoni
+	$(MKDIR) $(dir $@) && \
+ln -sf tickoni $@
 endif
 # endif
 endif
