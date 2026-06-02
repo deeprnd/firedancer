@@ -1,4 +1,4 @@
-BUILDDIR?=linux/gcc/neoverse_v1
+BUILDDIR?=linux/gcc/neoverse_n1
 
 
 include config/extra/with-gcc-pre.mk
@@ -11,7 +11,7 @@ include config/extra/with-debug.mk
 include config/extra/with-security.mk
 include config/extra/with-threads.mk
 
-CPPFLAGS+=-mcpu=neoverse-v1
+CPPFLAGS+=-mcpu=neoverse-n1+rcpc3
 CPPFLAGS+=-DFD_HAS_INT128=1 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1
 
 FD_HAS_INT128:=1

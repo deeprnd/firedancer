@@ -286,7 +286,7 @@ jobs:
 
       - name: Run build
         env:
-          MACHINE: linux_gcc_neoverse_v1
+          MACHINE: linux_gcc_neoverse_n1
         run: |
           ./deps.sh fetch install
           make -j clean
