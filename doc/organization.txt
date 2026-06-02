@@ -21,7 +21,7 @@ Firedancer source tree
   │   └── tool/        Config files for developer tools
   │
   ├── corpus/          Fuzz seed corpus
-  ├── dump/            Fuzz regression vectors, ledger archives
+  ├── dump/            Fuzz regression vectors, validator ledger archives
   │
   ├── frontend/        Firedancer GUI
   │
