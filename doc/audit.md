@@ -10,9 +10,11 @@
   "case_id": "PAY-84721",
   "actor_type": "agent",
   "actor_id": "payment_exception_agent",
+  "agent_identity": "agent://payment_exception_agent/prod",
   "model_id": "model_provider/model_name",
   "action": "tool_call",
   "tool": "read_processor_log",
+  "invocation_protocol": "mcp",
   "input_hash": "hash_12ab...",
   "output_hash": "hash_88fc...",
   "policy_version": "policy_2026_06_01",
@@ -45,7 +47,7 @@ agent:
 
 evidence:
   processor_logs: hash://processor_logs
-  ledger_entries: hash://ledger_entries
+  accounting_entries: hash://accounting_entries
   case_history: hash://case_history
 
 expected:

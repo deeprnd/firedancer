@@ -60,6 +60,17 @@ Security posture:
 - denied actions are logged
 - replay divergence is treated as a serious event
 
+## Agent Identity and Capability Boundaries
+
+Every tool request must resolve to an agent identity, case scope, policy
+version, and explicit capability. Model-native function calls and
+MCP-compatible requests are untrusted input until the broker validates that
+envelope.
+
+High-impact actions are proposals routed to a separate privileged executor.
+Policy can constrain action type, resource scope, value, rate, environment,
+and required approval before any downstream change is executed.
+
 ## Agent Capability Manifest
 
 ```yaml
@@ -81,7 +92,7 @@ requires_approval:
 
 denied:
   - release_payout
-  - mutate_ledger
+  - post_ledger_adjustment
   - freeze_account
   - approve_refund
   - delete_audit_record

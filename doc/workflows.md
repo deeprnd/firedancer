@@ -34,7 +34,7 @@ Agents cannot directly release funds or override payment controls.
 Events:
 
 ```text
-ledger_mismatch
+accounting_entry_mismatch
 processor_batch_mismatch
 bank_statement_diff
 double_capture_suspected
@@ -45,14 +45,14 @@ settlement_amount_mismatch
 Agent tasks:
 
 - match records
-- compare ledger entries
+- compare accounting ledger entries
 - explain discrepancy
 - prepare correction proposal
 - attach supporting evidence
 - route to finance operations
 - generate audit packet
 
-Agents cannot directly mutate the ledger in v1.
+Agents cannot directly post accounting ledger adjustments in v1.
 
 ### 3. Fraud and Risk Case Triage
 
@@ -113,7 +113,7 @@ Agents do not make final regulated compliance determinations in v1.
 5. case_router_tile creates case PAY-84721
 6. policy_tile assigns allowed capabilities
 7. payment_exception_agent investigates
-8. agent calls approved tools through tool broker
+8. agent calls approved tools through the MCP-compatible function-call broker
 9. audit_tile records all prompts, tools, and outputs
 10. agent drafts proposed merchant response
 11. policy engine allows draft-only action

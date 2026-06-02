@@ -4,7 +4,7 @@
 
 ```text
 Financial Event Streams
-  payments / ledger / fraud / compliance / disputes
+  payments / accounting ledger / fraud / compliance / disputes
         |
         v
 Tickoni Runtime
@@ -35,7 +35,7 @@ CaseOps Board
   outcomes
         |
         v
-Audit Ledger
+Audit Journal
   immutable event chain
   replay capsules
   exportable evidence
@@ -102,6 +102,10 @@ processor_webhook
 
 Agents operate as controlled workers, not unrestricted actors.
 
+Each run carries an agent identity, role, case scope, and policy version.
+Money-impacting integrations stay behind the tool broker and privileged action
+boundary.
+
 Agent roles:
 
 ```text
@@ -126,7 +130,7 @@ Agents can:
 Agents cannot directly:
 
 - move money
-- mutate ledgers
+- post accounting ledger adjustments
 - release payouts
 - freeze accounts
 - change compliance status
@@ -137,6 +141,10 @@ Agents cannot directly:
 ### 4. Tool Broker
 
 All agent tool use goes through a tool broker.
+
+The broker normalizes model-native function calls and MCP-compatible tool
+requests into the same capability envelope. MCP is an integration protocol,
+not a trust boundary.
 
 The broker enforces:
 
@@ -154,10 +162,10 @@ Tool capabilities:
 ```text
 read_payment_event
 read_processor_log
-read_ledger_entry
+read_accounting_entry
 read_case_history
 draft_customer_response
-propose_ledger_correction
+propose_ledger_adjustment
 route_case_to_queue
 request_human_approval
 ```
@@ -166,7 +174,7 @@ Restricted capabilities:
 
 ```text
 release_payout
-mutate_ledger
+post_ledger_adjustment
 freeze_account
 approve_refund
 close_compliance_case
@@ -181,6 +189,7 @@ Tickoni uses policy as the central control layer.
 Every meaningful action is checked against:
 
 - actor identity
+- agent or service identity
 - agent role
 - case type
 - environment
@@ -190,11 +199,12 @@ Every meaningful action is checked against:
 - policy version
 - required approvals
 - action risk level
+- action or downstream-system scope
 
 Allowed policy decision:
 
 ```yaml
-requested_action: propose_ledger_correction
+requested_action: propose_ledger_adjustment
 case_type: reconciliation_break
 agent: reconciliation_agent
 environment: production
@@ -249,7 +259,7 @@ severity: high
 
 evidence:
   processor_batch: hash://a11
-  ledger_entries: hash://b22
+  accounting_entries: hash://b22
   bank_statement: hash://c33
 
 agent_findings:
@@ -261,7 +271,7 @@ policy:
     - draft_correction
     - route_finance_ops
   denied_actions:
-    - mutate_ledger
+    - post_ledger_adjustment
     - release_funds
 
 audit:
@@ -269,11 +279,12 @@ audit:
   event_chain: audit://PAY-84721
 ```
 
-### 7. Audit Ledger
+### 7. Audit Journal
 
 Tickoni’s audit layer is a first-class system, not a logging feature.
 
-Every meaningful event is recorded into an append-only, hash-chained ledger.
+Every meaningful event is recorded into an append-only, hash-chained audit
+journal.
 
 Audit records include:
 

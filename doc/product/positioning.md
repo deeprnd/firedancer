@@ -2,7 +2,7 @@
 
 ## Category
 
-**Tickoni is a high-throughput AI harness for financial operations.**
+**Tickoni is a high-throughput AI harness for agentic finance.**
 
 It is not a coding assistant, personal agent, generic workflow tool, or quant research platform. Tickoni is built for financial systems where AI agents need to operate around high-volume event streams, strict permissions, forensic auditability, and policy-gated actions.
 
@@ -28,6 +28,10 @@ Tickoni does not compete with foundation models such as OpenAI, Claude, Gemini, 
 
 Those models are interchangeable inference engines inside the Tickoni runtime. Tickoni competes with agent harnesses, workflow systems, and automation runtimes that sit above models and decide how agents use tools, memory, permissions, and context.
 
+Tickoni is an agent framework with an integrated execution and audit runtime.
+Model-native function calls, MCP clients, and signed financial adapters
+integrate at explicit boundaries without becoming trusted by default.
+
 The competitive question is not “which model is smartest?” It is:
 
 **Which harness makes financial agent work fast, isolated, budgeted, policy-bounded, and replayable?**
@@ -43,10 +47,10 @@ Tickoni is designed for fintech operations such as:
 * compliance case preparation
 * merchant risk review
 * treasury alerts
-* ledger discrepancy investigation
-* financial operations automation
+* accounting ledger discrepancy investigation
+* agentic finance automation
 
-Agents may summarize, classify, investigate, route, draft, recommend, and prepare evidence. They should not directly move money, mutate ledgers, approve payouts, freeze accounts, or override risk rules without policy and human approval.
+Agents may summarize, classify, investigate, route, draft, recommend, and prepare evidence. They should not directly move money, post accounting ledger adjustments, approve payouts, freeze accounts, or override risk rules without policy and human approval.
 
 # Competitive Landscape
 
@@ -75,7 +79,7 @@ OpenClaw automates personal workflows. Tickoni governs financial workflows.
 
 | OpenClaw              | Tickoni                       |
 | --------------------- | ----------------------------- |
-| General automation    | Financial operations harness  |
+| General automation    | Agentic finance harness        |
 | Broad skills/plugins  | Signed financial adapters     |
 | Personal productivity | Regulated event operations    |
 | Broad system access   | Capability-scoped actions     |
@@ -85,7 +89,7 @@ OpenClaw automates personal workflows. Tickoni governs financial workflows.
 | Agent convenience     | Policy-gated financial action |
 
 **Message:**
-Tickoni is not “OpenClaw for fintech.” It is the opposite: a constrained, auditable harness for financial operations where broad agent autonomy is unacceptable.
+Tickoni is not “OpenClaw for fintech.” It is the opposite: a constrained, auditable harness for agentic finance where broad agent autonomy is unacceptable.
 
 ## Hermes
 
@@ -137,18 +141,18 @@ Tickoni can borrow the work-memory idea from Hermes, but replaces self-improveme
 
 * not a fintech operations runtime
 * not event-stream native
-* not built for payment, ledger, fraud, or compliance workflows
+* not built for payment, accounting ledger, fraud, or compliance workflows
 * cost and autonomy concerns in long sessions
 
 **Tickoni Positioning vs Amp:**
 
-Amp accelerates developers. Tickoni accelerates financial operations without sacrificing control.
+Amp accelerates developers. Tickoni accelerates agentic finance without sacrificing control.
 
 | Amp                   | Tickoni                                 |
 | --------------------- | --------------------------------------- |
-| Coding agent          | Financial operations harness            |
-| Codebase context      | Event, case, ledger, and policy context |
-| Software productivity | Financial operations throughput         |
+| Coding agent          | Agentic finance harness                  |
+| Codebase context      | Event, case, accounting ledger, and policy context |
+| Software productivity | Agentic finance throughput               |
 | PR generation         | Operational action proposals            |
 | Software engineering  | Fintech operations infrastructure       |
 
@@ -180,10 +184,10 @@ OpenCode is for code. Tickoni is for money-adjacent event systems. If Tickoni is
 | OpenCode                  | Tickoni                                      |
 | ------------------------- | -------------------------------------------- |
 | Terminal coding harness   | Financial event harness                      |
-| File/shell tools          | Payment, ledger, fraud, and compliance tools |
+| File/shell tools          | Payment, accounting ledger, fraud, and compliance tools |
 | Developer workflow        | Operations workflow                          |
 | Generic agent permissions | Financial capability model                   |
-| Code history              | Case replay and audit ledger                 |
+| Code history              | Case replay and audit journal                |
 
 **Message:**
 Tickoni should borrow open-source ergonomics from OpenCode, but should not compete as a generic coding agent.
@@ -256,7 +260,7 @@ Cognitum starts from agents. Tickoni starts from financial event integrity.
 | Always-on agents     | Policy-gated financial operators                |
 | Generic memory       | Auditable case memory                           |
 | Plugin system        | Signed regulated adapters                       |
-| Edge/IoT orientation | Payments, fraud, ledger, compliance orientation |
+| Edge/IoT orientation | Payments, fraud, accounting ledger, compliance orientation |
 
 **Message:**
 Tickoni should not try to become a general agent OS. It should become the trusted execution and audit layer for AI-operated financial infrastructure.
@@ -269,7 +273,7 @@ Tickoni is built around financial event streams:
 
 ```text
 payment.failed
-ledger.mismatch
+accounting_entry.mismatch
 chargeback.opened
 merchant.risk_changed
 fraud.alert_created
@@ -295,7 +299,7 @@ Tickoni needs finance-native capabilities:
 
 ```text
 read_transaction
-read_ledger_entry
+read_accounting_entry
 read_case
 summarize_case
 request_evidence
@@ -304,13 +308,32 @@ recommend_action
 propose_correction
 route_to_queue
 approve_payout
-mutate_ledger
+post_ledger_adjustment
 freeze_account
 ```
 
 Dangerous actions should be denied by default and require policy plus approval.
 
-## 3. Inference Spend Governance
+## 3. Agentic Finance Interoperability
+
+Tickoni should support agentic finance integrations without making autonomy the
+security model.
+
+The interoperability boundary includes:
+
+* model-native function calls and MCP-compatible tools
+* explicit agent identity and permission envelopes
+* capability-scoped policy
+* signed financial adapters
+* signed action proposals
+* separate approval and privileged execution paths
+
+The product promise:
+
+**Protocol compatibility expands the integration surface, not the agent's
+authority.**
+
+## 4. Inference Spend Governance
 
 Generic agent harnesses often make model usage visible only after the fact: tokens used, API calls made, or session cost.
 
@@ -332,9 +355,9 @@ The product promise:
 
 **Every financial case has a bounded inference budget, not an open-ended agent loop.**
 
-## 4. CaseOps Board
+## 5. CaseOps Board
 
-Tickoni’s board is not project management. It is a financial operations control plane.
+Tickoni’s board is not project management. It is an agentic finance control plane.
 
 Suggested v1 columns:
 
@@ -361,7 +384,7 @@ Each card represents a financial case with:
 * audit trail
 * replay capsule
 
-## 5. Forensic Audit Ledger
+## 6. Forensic Audit Journal
 
 Tickoni should outperform every generic harness on auditability.
 
@@ -389,14 +412,14 @@ The product promise:
 
 This creates replayable case provenance rather than generic agent memory.
 
-## 6. Agents Are Off the Money Path
+## 7. Agents Are Off the Money Path
 
 Agents can investigate, summarize, classify, draft, recommend, and prepare actions.
 
 Agents should not directly:
 
 * move money
-* mutate ledgers
+* post accounting ledger adjustments
 * approve payouts
 * freeze accounts
 * override compliance rules
@@ -417,7 +440,7 @@ See [roadmap](roadmap.md) for delivery timeline.
 4. Agent worker roles
 5. Policy-approved workflow templates
 6. Policy-gated tool access
-7. Immutable audit ledger
+7. Immutable audit journal
 8. Replay capsule per case
 9. Three workflow lanes:
 
@@ -426,6 +449,7 @@ See [roadmap](roadmap.md) for delivery timeline.
    * fraud/risk triage
 10. Human approval for money-impacting actions
 11. Basic adapter framework for financial systems
+12. MCP-compatible tool descriptions and identity-scoped capability envelopes
 
 ## V1 Should Exclude
 
@@ -449,7 +473,7 @@ Tickoni should be compared against agent harnesses on four dimensions:
 | Speed | Human-scale task automation | High-throughput financial event processing |
 | Isolation | Docker, VM, or OS-level sandboxing | Memory sandboxing plus capability-scoped financial adapters |
 | Spend governance | Session or provider-level token visibility | Per-case budgets, routing, caching, attribution, and hard caps |
-| Audit replay | Logs, traces, or task history | Forensic replay ledger with policy decisions and approvals |
+| Audit replay | Logs, traces, or task history | Forensic replay journal with policy decisions and approvals |
 
 These dimensions make the category boundary clear: Tickoni is not trying to be the broadest or most autonomous agent system. It is the controlled execution layer for financial agent operations.
 
@@ -466,7 +490,7 @@ Agent platforms compete on capability.
 | Ruflo | Agent swarms | ●●○ | ●○○ | ○○○ | ●○○ |
 | Cognitum | Agent runtime | ●●○ | ●●○ | ●○○ | ●○○ |
 | Amp / OpenCode | Coding harness | ●●● | ●●○ | ●○○ | ●●○ |
-| **Tickoni** | Financial operations harness | **●●●** | **●●●** | **●●●** | **●●●** |
+| **Tickoni** | Agentic finance harness | **●●●** | **●●●** | **●●●** | **●●●** |
 
 ## Dimension Definitions
 
@@ -519,7 +543,7 @@ Includes:
 Measures whether agent behavior can be reconstructed and verified.
 
 - ○ Logs, traces, task history
-- ●●● Forensic replay ledger
+- ●●● Forensic replay journal
 
 Includes:
 
@@ -551,7 +575,7 @@ Tickoni controls how agents operate:
 
 Tickoni should own this category:
 
-**Auditable AI harness for high-throughput financial operations.**
+**Auditable AI harness for high-throughput agentic finance.**
 
 The core competitive line:
 

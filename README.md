@@ -6,6 +6,10 @@ Fast runtime first. Agents second.
 
 Tickoni turns AI agents into controlled, observable execution units running on a high-performance event engine.
 
+For agentic finance, that means agents can inspect payment and accounting ledger
+events, call scoped tools, and prepare actions without receiving unrestricted
+control of a production system.
+
 Built for:
 
 - ⚡ speed
@@ -53,6 +57,7 @@ No mystery state.
 | 🤖 Agent Harness       | Run AI agents as controlled workers with scoped capabilities instead of unrestricted access      |
 | 🛠️ Tool Broker         | Every tool call is authorized, executed, measured, and recorded                                  |
 | 🛡️ Capability Security | Agents receive explicit permissions instead of owning the environment                            |
+| 🔑 Agent Identity       | Every action is bound to an agent role, policy version, and capability scope                      |
 | 📜 Audit Engine        | Capture events, prompts, responses, tool calls, state transitions, failures, and decisions       |
 | ⏪ Replay Capsules     | Reconstruct previous executions for debugging, testing, and verification                         |
 | 📊 Runtime Telemetry   | Monitor throughput, latency, queues, resources, tools, policies, and failures                    |
@@ -105,6 +110,10 @@ Tiles communicate through shared-memory channels.
 Every interaction follows the same path:
 
 agent → capability check → tool execution → audit → replay
+
+Model-native function calls and MCP-compatible tools terminate at the same
+broker boundary. The runtime treats protocol compatibility as an integration
+surface, not as permission to bypass policy.
 
 Every tool call captures:
 
@@ -181,13 +190,13 @@ No black boxes.
 ## Documentation
 
 - [Overview](doc/overview.md)
-- [Competitive positioning](doc/positioning.md)
+- [Competitive positioning](doc/product/positioning.md)
 - [Architecture](doc/architecture.md)
 - [Workflows](doc/workflows.md)
 - [Observability](doc/observability.md)
 - [Security](doc/security.md)
 - [Audit and replay](doc/audit.md)
-- [Roadmap](doc/roadmap.md)
+- [Roadmap](doc/product/roadmap.md)
 - [Build system](doc/build-system.md)
 - [Testing](doc/testing.md)
 

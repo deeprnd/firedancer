@@ -2,7 +2,11 @@
 
 ## What Tickoni Is
 
-Tickoni is an AI harness for financial operations.
+Tickoni is an AI harness for agentic finance.
+
+It is designed as a controlled execution and audit layer for agentic finance:
+financial workflows where AI agents investigate events, use tools, and propose
+actions across payment systems, accounting ledgers, and risk infrastructure.
 
 It combines:
 
@@ -14,11 +18,13 @@ It combines:
 - case lifecycle management
 - human approval gates
 - fintech-native adapters
+- MCP-compatible and model-native function-call adapters
+- agent identity and capability-scoped policy
 
 The core idea is simple:
 
 > AI agents may investigate, summarize, classify, recommend, draft, and propose.
-> They must not directly move money, mutate ledgers, override controls, or bypass policy.
+> They must not directly move money, post accounting ledger adjustments, override controls, or bypass policy.
 
 Tickoni lets financial companies use AI safely in operational workflows without giving autonomous agents uncontrolled access to production systems.
 
@@ -37,7 +43,7 @@ Tickoni is not:
 - a plugin marketplace
 - an autonomous money-moving agent
 
-Tickoni is built for regulated financial operations where every action must be attributable, policy-checked, and recoverable.
+Tickoni is built for regulated agentic finance workflows where every action must be attributable, policy-checked, and recoverable.
 
 ## Positioning
 
@@ -95,7 +101,7 @@ Tickoni is built around those requirements from day one.
 
 ### 1. AI Is Off the Critical Path
 
-AI agents do not sit in the hot path for settlement, ledger mutation, account freezing, payout release, or other money-impacting actions.
+AI agents do not sit in the hot path for settlement, accounting ledger posting, account freezing, payout release, or other money-impacting actions.
 
 Agents operate through a controlled tool broker and policy engine.
 
@@ -149,7 +155,7 @@ It focuses on high-value fintech operations:
 - fraud
 - compliance
 - disputes
-- ledger exceptions
+- accounting ledger exceptions
 - financial case operations
 
 ## Runtime Foundation
@@ -185,11 +191,11 @@ Tickoni applies these ideas to fintech event operations.
 
 - high-throughput financial event pipeline
 - policy-gated AI agents
-- forensic audit ledger
+- forensic audit journal
 - deterministic replay
 - fintech case operations
 
-The goal is to reuse the architectural lessons of a production-exercised high-throughput runtime and apply them to regulated financial operations: payments, reconciliation, fraud, disputes, compliance, ledger exceptions, and money-moving workflows.
+The goal is to reuse the architectural lessons of a production-exercised high-throughput runtime and apply them to regulated agentic finance workflows: payments, reconciliation, fraud, disputes, compliance, accounting ledger exceptions, and money-moving workflows.
 
 Firedancer has been performance-tested, designed around restrictive isolation, and exercised against real production transaction traffic through its gradual hybrid deployment. That makes its architectural approach especially relevant for fintech systems where correctness, throughput, isolation, and auditability matter. Tickoni builds on those lessons rather than starting from a generic web-service or chatbot stack.
 
@@ -206,7 +212,7 @@ Tickoni processes:
 - fraud alerts
 - compliance alerts
 - dispute events
-- ledger mismatches
+- accounting ledger mismatches
 - customer risk events
 - merchant risk events
 
@@ -227,6 +233,14 @@ That means the runtime must be able to answer:
 - whether the entire sequence can be replayed
 
 A Firedancer-style architecture is a strong foundation for this because it treats the system as a high-throughput, explicitly controlled execution pipeline rather than a loose collection of services.
+
+### Developer Integration Surface
+
+Tickoni should be straightforward to extend from modern AI development
+environments, including Claude Code and OpenAI Codex. That means explicit
+schemas, documented APIs, MCP-compatible tool descriptions, and testable
+capability manifests. Development convenience does not grant a coding agent
+production credentials or unrestricted capabilities.
 
 ### Why Zig
 
@@ -268,11 +282,10 @@ Tickoni is built for teams operating high-volume financial systems:
 - card issuers
 - acquirers
 - remittance companies
-- crypto exchanges
 - lending platforms
 - marketplaces with payment operations
 - fintech infrastructure companies
-- financial operations teams
+- agentic finance teams
 - fraud operations teams
 - reconciliation teams
 - compliance operations teams
@@ -301,10 +314,10 @@ Tickoni CaseOps
   board for payments, fraud, reconciliation, disputes, compliance
 
 Tickoni Audit
-  forensic replay ledger
+  forensic replay journal
 
 Tickoni Connect
-  processors, banks, ledgers, CRMs, risk engines
+  processors, banks, core accounting ledgers, CRMs, risk engines
 
 Tickoni Enterprise
   RBAC, SIEM, compliance exports, data residency
@@ -321,7 +334,7 @@ The infrastructure differentiation is the combination of:
 ```text
 high-throughput event runtime
 + policy-gated agents
-+ forensic audit ledger
++ forensic audit journal
 + deterministic replay
 + fintech-native case workflows
 ```
@@ -366,6 +379,6 @@ Tickoni optimizes for:
 
 The infrastructure thesis:
 
-> AI agents will enter financial operations, but they will only be trusted when every action is controlled, every decision is replayable, and every outcome is auditable.
+> Agentic finance will only be trusted when every action is controlled, every decision is replayable, and every outcome is auditable.
 
 Tickoni is the harness for AI-operated financial infrastructure.

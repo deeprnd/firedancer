@@ -20,6 +20,7 @@ Observability is not a logging layer added after the fact. It is a first-class p
 | Token usage       | Model tokens consumed per agent run and per case              |
 | Tool activity     | Call rate, success rate, error rate per tool                  |
 | Policy decisions  | Allow/deny/require-approval counts and rates per policy       |
+| Identity scope    | Agent, capability, and downstream-system scope per call       |
 | Failures          | Tile crashes, tool errors, agent errors, policy engine errors |
 | Replay divergence | Rate and reason of replay mismatches                          |
 
@@ -81,6 +82,12 @@ This makes it possible to answer:
 - which tools are failing
 - which tools are being denied frequently
 - whether a specific tool is a bottleneck for agent latency
+- whether MCP adapters are producing unusual deny rates
+
+Protocol adapters should expose the same counters as conventional tools, with
+labels for invocation protocol, agent identity, capability scope, adapter, and
+method where applicable. Labels must remain bounded to avoid turning metrics
+into an unbounded evidence store.
 
 ## Agent Run Metrics
 

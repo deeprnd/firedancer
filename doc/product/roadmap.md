@@ -51,6 +51,8 @@ V1 proves four infrastructure advantages:
 - fraud triage agent
 - risk reviewer agent
 - controlled tool broker
+- model-native function-call and MCP-compatible tool envelopes
+- explicit agent identity context
 - tool-call audit
 - prompt/output capture
 - agent budget controls
@@ -64,6 +66,7 @@ V1 proves four infrastructure advantages:
 ### P0: Policy
 
 - capability-based permission system
+- resource and downstream-system scopes
 - action allow/deny/approval decisions
 - policy versioning
 - environment separation
@@ -73,7 +76,7 @@ V1 proves four infrastructure advantages:
 
 ### P0: Audit
 
-- append-only audit ledger
+- append-only audit journal
 - hash-chained audit records
 - content-addressed evidence storage
 - full agent trajectory capture
@@ -94,18 +97,7 @@ V1 proves four infrastructure advantages:
 - cached context reuse
 - cost attribution by workflow
 
-### P0: CaseOps Board
-
-- case lifecycle board
-- event-backed cards
-- evidence panel
-- agent findings panel
-- policy decision panel
-- approval panel
-- audit timeline
-- replay status indicator
-
-### P0: Fintech Workflows
+### P1: Fintech Workflows
 
 #### Payment Exceptions
 
@@ -118,7 +110,7 @@ V1 proves four infrastructure advantages:
 
 #### Reconciliation Breaks
 
-- ingest ledger mismatch events
+- ingest accounting ledger mismatch events
 - compare source records
 - identify likely discrepancy reason
 - prepare correction proposal
@@ -134,9 +126,20 @@ V1 proves four infrastructure advantages:
 - recommend review queue
 - propose non-executing risk action
 
+### P1: CaseOps Board
+
+- case lifecycle board
+- event-backed cards
+- evidence panel
+- agent findings panel
+- policy decision panel
+- approval panel
+- audit timeline
+- replay status indicator
+
 ### P1: TigerBeetle FinanceDB Integration
 
-Goal: integrate TigerBeetle as the finance-native ledger backend without
+Goal: integrate TigerBeetle as the finance-native accounting ledger backend without
 weakening Tickoni's policy, isolation, audit, or replay boundaries.
 
 TigerBeetle is a specialized financial transaction database, not Tickoni's
@@ -145,12 +148,12 @@ workflow state, evidence, and audit records in their dedicated stores.
 
 Deliverables:
 
-- generic `ledger_connector` interface
+- generic `accounting_ledger_connector` interface
 - TigerBeetle connector implementation
 - isolated privileged action executor
 - no direct TigerBeetle connectivity from agents
 - signed action envelopes with deterministic action IDs
-- policy and human-approval enforcement before ledger mutation
+- policy and human-approval enforcement before accounting ledger posting
 - deterministic `approved_action_id` to TigerBeetle `transfer.id` mapping
 - append-only audit records before and after each mutation attempt
 - transfer result read-back and reconciliation
@@ -167,14 +170,14 @@ Exit criteria:
 - every transfer attempt and result is present in the Tickoni audit chain
 - reconciliation detects mismatched or missing transfer outcomes
 - replay never mutates a production TigerBeetle cluster
-- TigerBeetle remains replaceable through the `ledger_connector` boundary
+- TigerBeetle remains replaceable through the `accounting_ledger_connector` boundary
 
 ## V1 Non-Goals
 
 V1 should not include:
 
 - autonomous money movement
-- autonomous ledger mutation
+- autonomous accounting ledger posting
 - autonomous account freezing
 - autonomous payout approval
 - autonomous compliance decisions
@@ -287,7 +290,7 @@ Deliverables:
 Exit criteria:
 
 - deterministic replay works
-- audit ledger is append-only
+- audit journal is append-only
 - tiles can be started, stopped, and monitored
 - event hashes are stable
 - agent execution cannot access unauthorized capabilities
@@ -304,7 +307,7 @@ Deliverables:
 - tile pipeline
 - case creation
 - policy decision path
-- audit ledger
+- audit journal
 - replay capsule
 - runtime telemetry
 
@@ -389,7 +392,10 @@ Exit criteria:
 ### V2
 
 - real processor connectors
-- ledger system connectors
+- core accounting ledger connectors
+- agentic payments protocol evaluation
+- MCP server and function-call SDK for signed financial adapters
+- developer integration guides for Claude Code and OpenAI Codex
 - case assignment
 - SLA management
 - SIEM export
@@ -412,7 +418,7 @@ Exit criteria:
 
 ### V4
 
-- full financial operations control plane
+- full agentic finance control plane
 - multi-region event processing
 - cross-entity fraud graph
 - advanced replay/debugger
@@ -438,7 +444,7 @@ Agents may:
 Agents may not directly:
 
 - move money
-- mutate ledgers
+- post accounting ledger adjustments
 - delete evidence
 - override policy
 - approve regulated outcomes
