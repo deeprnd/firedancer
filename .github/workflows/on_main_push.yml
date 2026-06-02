@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
 jobs:
+  migration_policy:
+    uses: ./.github/workflows/migration_policy.yml
+
   book:
     uses: ./.github/workflows/book.yml
     secrets: inherit

@@ -3,7 +3,8 @@
 #include <stdlib.h>
 
 /* Provide the version string that the tile externs */
-__attribute__((weak)) char const fdctl_version_string[] = "0.0.0";
+__attribute__((weak)) char const tickoni_version_string[] = "0.0.0";
+__attribute__((weak)) char const fdctl_version_string[]   = "0.0.0";
 
 long
 fd_bundle_now( void ) {

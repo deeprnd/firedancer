@@ -22,7 +22,7 @@ help() {
   echo " Args: --ARG <ARG1>,<ARG2>,<ARG3>,..."
   echo "   --targets        -t  Targets to compile during building"
   echo "                        This will be used for all types of builds."
-  echo "                        For example: all,unit-test,fdctl"
+  echo "                        For example: all,unit-test,tickoni"
   echo "   --machines       -m  Machine types to build for"
   echo "                        For example: linux_gcc_icelake,linux_clang_noarch64"
   echo "   --gcc-versions   -g  GCC compiler versions to use for builds"
@@ -37,7 +37,7 @@ help() {
   echo "                        For example: gcc-11.4.0,linux_gcc_zen4,ALL"
   echo "   --clang-except       Comma separated group of clang-compiler,machine,target to exclude"
   echo "                        Use 'ALL' to exclude for all of any of the types."
-  echo "                        For example: ALL,linux_clang_minimal,fdctl"
+  echo "                        For example: ALL,linux_clang_minimal,tickoni"
   echo "                        This argument can be supplied multiple times."
   echo
   echo " Exit Codes:"
@@ -176,7 +176,7 @@ FD_REPO_DIR=$(realpath $(dirname $(realpath "$0"))/..)
 BUILD_TARGETS=( all asm ppp seccomp-policies )
 TEST_TARGETS=( unit-test fuzz-test )
 
-RUST_TARGETS=( fdctl fddev integration-test )
+RUST_TARGETS=( integration-test )
 OTHER_TARGETS=( ${BUILD_TARGETS[@]} ${TEST_TARGETS[@]} )
 
 # Overrides for list of targets to build for certain
@@ -231,7 +231,7 @@ fi
 # makefiles present in the config/machine directory.
 
 if [[ ${#MACHINES[@]} -eq 0 ]]; then
-  for machine in "$FD_REPO_DIR"/config/machine/linux_*.mk; do
+  for machine in "$FD_REPO_DIR"/config/machine/linux_*.mk "$FD_REPO_DIR"/config/machine/native.mk; do
     MACHINES+=( $(basename "$machine") )
   done
 fi

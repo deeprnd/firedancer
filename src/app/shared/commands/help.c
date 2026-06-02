@@ -14,8 +14,8 @@ help_cmd_fn( args_t *   args   FD_PARAM_UNUSED,
   FD_LOG_STDOUT(( "%s control binary\n\n", FD_APP_NAME ));
   FD_LOG_STDOUT(( "Usage: %s <SUBCOMMAND> [OPTIONS]\n\n", FD_BINARY_NAME ));
   FD_LOG_STDOUT(( "\nOPTIONS:\n" ));
-  /* fdctl does not have many flag arguments so we hard-code the
-     --config parameter. */
+  /* Tickoni currently has few global flag arguments so we hard-code
+     the --config parameter here. */
   FD_LOG_STDOUT(( "        --config <PATH>    Path to config TOML file\n" ));
   FD_LOG_STDOUT(( "        --version          Show the current software version\n" ));
   FD_LOG_STDOUT(( "        --help             Print this help message\n\n" ));

@@ -157,7 +157,7 @@ def emit_sarif(warnings: List[Dict[str, object]]) -> None:
             {
                 "tool": {
                     "driver": {
-                        "name": "firedancer-thread-safety-analysis",
+                        "name": "tickoni-thread-safety-analysis",
                         "informationUri": "https://clang.llvm.org/docs/ThreadSafetyAnalysis.html",
                         "rules": list(rules.values()),
                     }

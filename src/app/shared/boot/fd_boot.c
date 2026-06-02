@@ -7,6 +7,7 @@
 #include "../../../disco/topo/fd_topo.h"
 
 #include <errno.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -266,8 +267,15 @@ fd_main( int                        argc,
     &argc,
     &argv,
     "--config",
-    "FIREDANCER_CONFIG_TOML",
+    "TICKONI_CONFIG_TOML",
     NULL );
+  if( FD_UNLIKELY( !opt_user_config_path ) ) {
+    char const * legacy_config_path = fd_env_strip_cmdline_cstr( NULL, NULL, NULL, "FIREDANCER_CONFIG_TOML", NULL );
+    if( FD_UNLIKELY( legacy_config_path ) ) {
+      opt_user_config_path = legacy_config_path;
+      FD_LOG_WARNING(( "FIREDANCER_CONFIG_TOML is deprecated; use TICKONI_CONFIG_TOML instead (removal date: 2026-12-31)" ));
+    }
+  }
 
   action_t * action = NULL;
   for( ulong i=0UL; ACTIONS[ i ]; i++ ) {

@@ -15,7 +15,7 @@ if [[ -z "$MACHINES" ]]; then
 fi
 
 if [[ -z "$TARGETS" ]]; then
-  TARGETS="all integration-test fdctl"
+  TARGETS="all integration-test tickoni"
 fi
 
 for extra in $EXTRAS; do

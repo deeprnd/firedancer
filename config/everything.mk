@@ -10,7 +10,7 @@ OBJDIR:=$(BASEDIR)/$(BUILDDIR)
 #
 # Use ?= so that users can (optionally) perform partial compilation in special
 # circumstances.
-LOCAL_MKS?=$(shell $(FIND) -L src -type f -name Local.mk)
+LOCAL_MKS?=$(filter-out src/app/fdctl/Local.mk src/app/fddev/Local.mk,$(shell $(FIND) -L src -type f -name Local.mk))
 
 CPPFLAGS+=-DFD_BUILD_INFO=\"$(OBJDIR)/info\"
 CPPFLAGS+=$(EXTRA_CPPFLAGS)
@@ -79,11 +79,11 @@ help:
 info: $(OBJDIR)/info
 
 clean: frontend-clean
-	$(RMDIR) $(OBJDIR) && $(RMDIR) target && $(RMDIR) agave/target && \
+	$(RMDIR) $(OBJDIR) && $(RMDIR) target && \
 $(SCRUB)
 
 distclean:
-	$(RMDIR) $(BASEDIR) && $(RMDIR) target && $(RMDIR) agave/target && \
+	$(RMDIR) $(BASEDIR) && $(RMDIR) target && \
 $(SCRUB)
 
 run-unit-test:
@@ -271,7 +271,7 @@ define _make-proof
 
 .PHONY: $(1)
 $(1):
-	$(CBMC) $(MKPATH)$(2) --c17 -DCBMC --function cbmc_main
+	$(CBMC) $(MKPATH)$(2) --c11 -DCBMC -D__STDC_VERSION__=201710L --function cbmc_main
 
 proof: $(1)
 

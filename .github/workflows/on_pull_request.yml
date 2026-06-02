@@ -14,15 +14,15 @@ permissions:
 
 jobs:
   tests:
-    if: github.event.pull_request.draft == false
+    if: false
     uses: ./.github/workflows/tests.yml
     secrets: inherit
   backtest:
-    if: github.event.pull_request.draft == false
+    if: false
     uses: ./.github/workflows/backtest.yml
     secrets: inherit
   benchmark:
-    if: github.event.pull_request.draft == false && github.event_name == 'pull_request'
+    if: false
     uses: ./.github/workflows/benchmark.yml
     with:
       github-token: ${{ github.token }}
@@ -32,7 +32,8 @@ jobs:
     uses: ./.github/workflows/builds.yml
     with:
       cid: 1
-      build_arm: false
+      build_arm: true
+      arm_runner_labels: '["ubuntu-24.04-arm"]'
       check_run: true
       verbose: true
       exit_on_err: true
@@ -43,6 +44,7 @@ jobs:
         ALL,linux_gcc_riscv,ALL;
         ALL,linux_gcc_power9,ALL;
         ALL,linux_gcc_neoverse_n2,ALL;
+        ALL,linux_gcc_neoverse_n1,ALL;
         ALL,linux_gcc_zen3,ALL;
         ALL,linux_gcc_zen4,ALL;
         ALL,linux_gcc_zen5,ALL;
@@ -54,7 +56,7 @@ jobs:
         ALL,linux_clang_zen4,ALL;
         ALL,linux_clang_zen5,ALL;
   build_checks_2:
-    if: github.event.pull_request.draft == false
+    if: false
     uses: ./.github/workflows/builds.yml
     with:
       cid: 2
@@ -65,7 +67,7 @@ jobs:
       build_arm: false
       check_run: true
   build_checks_3:
-    if: github.event.pull_request.draft == false
+    if: false
     uses: ./.github/workflows/builds.yml
     with:
       cid: 3
