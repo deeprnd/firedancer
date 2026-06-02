@@ -1,11 +1,14 @@
 include src/app/fdctl/with-version.mk
-define FDCTL_VERSION2_H
-#define FDCTL_MAJOR_VERSION $(FIREDANCER_VERSION_MAJOR)
-#define FDCTL_MINOR_VERSION $(FIREDANCER_VERSION_MINOR)
-#define FDCTL_PATCH_VERSION $(FIREDANCER_VERSION_PATCH)
-#define FDCTL_VERSION_CSTR "$(FIREDANCER_VERSION_CSTR)"
-endef
-$(file >src/app/fdctl/version2.h,$(FDCTL_VERSION2_H))
+FD_WITH_AGAVE ?= 0
+
+ifeq ($(FD_WITH_AGAVE),1)
+$(info Using FRANKENDANCER_VERSION=$(FIREDANCER_VERSION_CSTR) ($(FIREDANCER_CI_COMMIT)))
+$(shell echo "#define FDCTL_MAJOR_VERSION $(FIREDANCER_VERSION_MAJOR)"                          >  src/app/fdctl/version2.h)
+$(shell echo "#define FDCTL_MINOR_VERSION $(FIREDANCER_VERSION_MINOR)"                          >> src/app/fdctl/version2.h)
+$(shell echo "#define FDCTL_PATCH_VERSION $(FIREDANCER_VERSION_PATCH)"                          >> src/app/fdctl/version2.h)
+$(shell echo '#define FDCTL_VERSION_CSTR "$(FIREDANCER_VERSION_CSTR)"'                          >> src/app/fdctl/version2.h)
+$(shell echo '#define FDCTL_COMMIT_REF_CSTR "$(FIREDANCER_CI_COMMIT)"'                          >> src/app/fdctl/version2.h)
+$(shell echo "#define FDCTL_COMMIT_REF_U32 0x$(shell echo $(FIREDANCER_CI_COMMIT) | cut -c -8)" >> src/app/fdctl/version2.h)
 
 # Update version.h only if version changed or doesn't exist
 ifneq ($(shell cmp -s src/app/fdctl/version.h src/app/fdctl/version2.h && echo "same"),same)
@@ -37,7 +40,6 @@ ifdef FD_HAS_THREADS
 .PHONY: fdctl cargo-validator cargo-solana cargo-ledger-tool rust solana check-agave-hash
 
 # fdctl commands
-$(call add-objs,commands/run_agave,fd_fdctl)
 $(call add-objs,commands/set_identityh,fd_fdctl)
 
 $(call make-bin-rust,fdctl,main,fd_fdctl fdctl_shared fdctl_platform fd_discoh fd_disco fd_choreo agave_validator fd_flamenco fd_quic fd_tls fd_reedsol fd_waltz fd_tango fd_ballet fd_util fdctl_version)
@@ -143,4 +145,8 @@ agave-ledger-tool: $(OBJDIR)/bin/agave-ledger-tool
 endif
 endif
 endif
+endif
+endif
+else
+$(info Skipping fdctl build (FD_WITH_AGAVE=0))
 endif

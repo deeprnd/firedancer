@@ -21,9 +21,7 @@ permissions:
 
 jobs:
   benchmark:
-    runs-on:
-      labels: [self-hosted, 512G]
-      group: fd-public-repo
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       CC: gcc
@@ -204,10 +202,10 @@ jobs:
           ## Performance Measurements ⏳
           | Suite  | Baseline | New   | Change |
           |--------|----------|-------|--------|
-          | backtest \`mainnet-424669000-perf\` per slot | ${fmt(baseline_sps, "s")} | ${fmt(newval_sps, "s")} | \`${sps_pct_change}%\` ${changeIcon(sps_pct_change, 5.0)} |
-          | backtest \`mainnet-424669000-perf\` snapshot load | ${fmt(baseline_snapshot_load, "s")} | ${fmt(newval_snapshot_load, "s")} | \`${snapshot_load_pct_change}%\` ${changeIcon(snapshot_load_pct_change, 5.0)} |
-          | backtest \`mainnet-424669000-perf\` total elapsed | ${fmt(baseline_total_elapsed, "s")} | ${fmt(newval_total_elapsed, "s")} | \`${total_elapsed_pct_change}%\` ${changeIcon(total_elapsed_pct_change, 5.0)} |
-          | \`firedancer mem\` usage with \`mainnet.toml\` | ${fmt(baseline_default_mem, "GiB")} | ${fmt(newval_default_mem, "GiB")} | \`${default_mem_pct_change}%\` ${changeIcon(default_mem_pct_change, 5.0)} |
+          | backtest \`mainnet-406545575-perf\` per slot | ${fmt(baseline_sps, "s")} | ${fmt(newval_sps, "s")} | \`${sps_pct_change}%\` ${changeIcon(sps_pct_change, 5.0)} |
+          | backtest \`mainnet-406545575-perf\` snapshot load | ${fmt(baseline_snapshot_load, "s")} | ${fmt(newval_snapshot_load, "s")} | \`${snapshot_load_pct_change}%\` ${changeIcon(snapshot_load_pct_change, 5.0)} |
+          | backtest \`mainnet-406545575-perf\` total elapsed | ${fmt(baseline_total_elapsed, "s")} | ${fmt(newval_total_elapsed, "s")} | \`${total_elapsed_pct_change}%\` ${changeIcon(total_elapsed_pct_change, 5.0)} |
+          | \`tickoni mem\` usage with \`mainnet.toml\` | ${fmt(baseline_default_mem, "GiB")} | ${fmt(newval_default_mem, "GiB")} | \`${default_mem_pct_change}%\` ${changeIcon(default_mem_pct_change, 5.0)} |
           `;
 
           const body = table;

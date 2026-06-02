@@ -633,11 +633,5 @@ action_t fd_action_monitor = {
   .fn             = monitor_cmd_fn,
   .require_config = 1,
   .perm           = monitor_cmd_perm,
-  .description    = "Monitor a locally running Firedancer instance with a terminal GUI",
-  .detail         = "Connects to a running validator and continuously renders a terminal\n"
-                    "dashboard of tile activity and the message passing links between them.  A\n"
-                    "tile is a single thread pinned to a CPU core that performs one part of the\n"
-                    "validator's work.  The validator must be running.",
-  .usage          = "monitor [OPTIONS]",
-  .args_help      = monitor_args_help,
+  .description    = "Monitor a locally running Tickoni instance with a terminal GUI",
 };

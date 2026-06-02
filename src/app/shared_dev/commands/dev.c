@@ -26,8 +26,6 @@ dev_cmd_args( int *    pargc,
   args->dev.no_watch = fd_env_strip_cmdline_contains( pargc, pargv, "--no-watch" );
   args->dev.no_configure = fd_env_strip_cmdline_contains( pargc, pargv, "--no-configure" );
   args->dev.no_init_workspaces = fd_env_strip_cmdline_contains( pargc, pargv, "--no-init-workspaces" );
-  args->dev.no_agave = fd_env_strip_cmdline_contains( pargc, pargv, "--no-agave"  ) ||
-                       fd_env_strip_cmdline_contains( pargc, pargv, "--no-solana" );
 }
 
 void
@@ -87,8 +85,7 @@ update_config_for_dev( fd_config_t * config ) {
      exists and we don't know it.  If it doesn't exist, we'll keep it
      set to zero and get from gossip. */
   char genesis_path[ PATH_MAX ];
-  if( FD_LIKELY( config->is_firedancer ) ) fd_memcpy( genesis_path, config->paths.genesis, PATH_MAX );
-  else FD_TEST( fd_cstr_printf_check( genesis_path, PATH_MAX, NULL, "%s/genesis.bin", config->frankendancer.paths.ledger ) );
+  fd_memcpy( genesis_path, config->paths.genesis, PATH_MAX );
 
   ushort shred_version = 0;
   int result = read_genesis_bin( genesis_path, &shred_version, NULL );
@@ -132,7 +129,7 @@ run_firedancer_threaded( config_t * config,
   fd_topo_join_workspaces( &config->topo, FD_SHMEM_JOIN_MODE_READ_WRITE, config->development.core_dump_level );
   fd_topo_run_single_process( &config->topo, 2, config->uid, config->gid, fdctl_tile_run );
 
-  if( FD_UNLIKELY( agave_main && !config->development.no_agave ) ) {
+  if( FD_UNLIKELY( agave_main ) ) {
     agave_main( config );
   }
 }
@@ -151,7 +148,6 @@ dev_cmd_fn( args_t *   args,
   }
 
   update_config_for_dev( config );
-  if( FD_UNLIKELY( args->dev.no_agave ) ) config->development.no_agave = 1;
 
   if( FD_LIKELY( args->dev.no_watch ) ) {
     if( FD_LIKELY( !config->development.no_clone ) ) run_firedancer( config, args->dev.parent_pipefd, !args->dev.no_init_workspaces );

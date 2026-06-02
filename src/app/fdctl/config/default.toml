@@ -1539,9 +1539,9 @@ dynamic_port_range = "8900-9000"
     # launch this subprocess, although it will prevent the validator
     # from operating correctly.
     #
-    # In development, you can disable agave for testing and debugging
-    # with the `--no-agave` argument to `fddev`.
-    no_agave = false
+    # Agave hosting is disabled by default in Alphadancer migration mode.
+    # Legacy Agave boot paths require explicit build-time opt-in.
+    no_agave = true
 
     # Sometimes, it may be useful to run a bootstrap Firedancer
     # validator, either for development or for testing purposes.  The

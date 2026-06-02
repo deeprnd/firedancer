@@ -20,7 +20,6 @@
 #include <dirent.h>
 #include <sched.h>
 #include <stdio.h>
-#include <stdlib.h> /* getenv */
 #include <poll.h>
 #include <unistd.h>
 #include <errno.h>
@@ -133,36 +132,6 @@ create_clone_stack( void ) {
 }
 
 
-static int
-execve_agave( int config_memfd,
-                    int pipefd ) {
-  if( FD_UNLIKELY( -1==fcntl( pipefd, F_SETFD, 0 ) ) ) FD_LOG_ERR(( "fcntl(F_SETFD,0) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-  pid_t child = fork();
-  if( FD_UNLIKELY( -1==child ) ) FD_LOG_ERR(( "fork() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-  if( FD_LIKELY( !child ) ) {
-    char _current_executable_path[ PATH_MAX ];
-    FD_TEST( -1!=fd_file_util_self_exe( _current_executable_path ) );
-
-    char config_fd[ 32 ];
-    FD_TEST( fd_cstr_printf_check( config_fd, sizeof( config_fd ), NULL, "%d", config_memfd ) );
-    char * args[ 5 ] = { _current_executable_path, "run-agave", "--config-fd", config_fd, NULL };
-
-    char * envp[] = { NULL, NULL };
-    char * google_creds = getenv( "GOOGLE_APPLICATION_CREDENTIALS" );
-    char provide_creds[ PATH_MAX+30UL ];
-    if( FD_UNLIKELY( google_creds ) ) {
-      FD_TEST( fd_cstr_printf_check( provide_creds, sizeof( provide_creds ), NULL, "GOOGLE_APPLICATION_CREDENTIALS=%s", google_creds ) );
-      envp[ 0 ] = provide_creds;
-    }
-
-    if( FD_UNLIKELY( -1==execve( _current_executable_path, args, envp ) ) ) FD_LOG_ERR(( "execve() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-  } else {
-    if( FD_UNLIKELY( -1==fcntl( pipefd, F_SETFD, FD_CLOEXEC ) ) ) FD_LOG_ERR(( "fcntl(F_SETFD,FD_CLOEXEC) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-    return child;
-  }
-  return 0;
-}
-
 static pid_t
 execve_tile( fd_topo_tile_t const * tile,
              fd_cpuset_t const *    floating_cpu_set,
@@ -252,18 +221,6 @@ main_pid_namespace( void * _args ) {
   if( FD_UNLIKELY( -1==config_memfd ) ) FD_LOG_ERR(( "fd_config_to_memfd() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
 
   ulong child_cnt = 0UL;
-  if( FD_LIKELY( !config->is_firedancer && !config->development.no_agave ) ) {
-    int pipefd[ 2 ];
-    if( FD_UNLIKELY( pipe2( pipefd, O_CLOEXEC ) ) ) FD_LOG_ERR(( "pipe2() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-    fds[ child_cnt ] = (struct pollfd){ .fd = pipefd[ 0 ], .events = 0 };
-    child_pids[ child_cnt ] = execve_agave( config_memfd, pipefd[ 1 ] );
-    FD_TEST( child_pids[ child_cnt ]>0 );
-    actual_pids[ child_cnt ] = (ulong)child_pids[ child_cnt ];
-    child_idxs[ child_cnt ] = ULONG_MAX;
-    if( FD_UNLIKELY( close( pipefd[ 1 ] ) ) ) FD_LOG_ERR(( "close() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-    strncpy( child_names[ child_cnt ], "agave", 32 );
-    child_cnt++;
-  }
 
   errno = 0;
   int save_priority = getpriority( PRIO_PROCESS, 0 );
@@ -280,7 +237,6 @@ main_pid_namespace( void * _args ) {
 
   for( ulong i=0UL; i<config->topo.tile_cnt; i++ ) {
     fd_topo_tile_t const * tile = &config->topo.tiles[ i ];
-    if( FD_UNLIKELY( tile->is_agave ) ) continue;
 
     if( need_xdp ) {
       if( FD_UNLIKELY( strcmp( tile->name, "net" ) ) ) {
@@ -738,7 +694,7 @@ void
 fdctl_check_configure( config_t const * config ) {
   configure_result_t check = fd_cfg_stage_hugetlbfs.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
   if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-    FD_LOG_ERR(( "Huge pages are not configured correctly: %s. You can run `%s configure init hugetlbfs` "
+    FD_LOG_ERR(( "Huge pages are not configured correctly: %s. You can run `tickoni configure init hugetlbfs` "
                  "to create the mounts correctly. This must be done after every system restart before running "
                  "Firedancer.", check.message, FD_BINARY_NAME ));
 
@@ -746,35 +702,35 @@ fdctl_check_configure( config_t const * config ) {
     if( fd_cfg_stage_bonding.enabled( config ) ) {
       check = fd_cfg_stage_bonding.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
       if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-        FD_LOG_ERR(( "Bonded network device is not configured correctly: %s. You can run `%s configure init bonding` "
-                    "to configure the bonding driver.", check.message, FD_BINARY_NAME ));
+        FD_LOG_ERR(( "Bonded network device is not configured correctly: %s. You can run `tickoni configure init bonding` "
+                    "to configure the bonding driver.", check.message ));
     }
 
     check = fd_cfg_stage_ethtool_channels.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
     if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-      FD_LOG_ERR(( "Network %s. You can run `%s configure init ethtool-channels` to set the number of channels on the "
-                  "network device correctly.", check.message, FD_BINARY_NAME ));
+      FD_LOG_ERR(( "Network %s. You can run `tickoni configure init ethtool-channels` to set the number of channels on the "
+                  "network device correctly.", check.message ));
 
     check = fd_cfg_stage_ethtool_offloads.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
     if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-      FD_LOG_ERR(( "Network %s. You can run `%s configure init ethtool-offloads` to disable features "
-                  "as required.", check.message, FD_BINARY_NAME ));
+      FD_LOG_ERR(( "Network %s. You can run `tickoni configure init ethtool-offloads` to disable features "
+                  "as required.", check.message ));
 
     check = fd_cfg_stage_ethtool_loopback.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
     if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-      FD_LOG_ERR(( "Network %s. You can run `%s configure init ethtool-loopback` to disable tx-udp-segmentation "
-                  "on the loopback device.", check.message, FD_BINARY_NAME ));
+      FD_LOG_ERR(( "Network %s. You can run `tickoni configure init ethtool-loopback` to disable tx-udp-segmentation "
+                  "on the loopback device.", check.message ));
   }
 
   check = fd_cfg_stage_sysctl.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
   if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-    FD_LOG_ERR(( "Kernel parameters are not configured correctly: %s. You can run `%s configure init sysctl` "
-                 "to set kernel parameters correctly.", check.message, FD_BINARY_NAME ));
+    FD_LOG_ERR(( "Kernel parameters are not configured correctly: %s. You can run `tickoni configure init sysctl` "
+                 "to set kernel parameters correctly.", check.message ));
 
   check = fd_cfg_stage_hyperthreads.check( config, FD_CONFIGURE_CHECK_TYPE_RUN );
   if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
-    FD_LOG_ERR(( "Hyperthreading is not configured correctly: %s. You can run `%s configure init hyperthreads` "
-                 "to configure hyperthreading correctly.", check.message, FD_BINARY_NAME ));
+    FD_LOG_ERR(( "Hyperthreading is not configured correctly: %s. You can run `tickoni configure init hyperthreads` "
+                 "to configure hyperthreading correctly.", check.message ));
 }
 
 void
@@ -783,15 +739,11 @@ run_firedancer_init( config_t * config,
                      int        check_configure ) {
   struct stat st;
   int err = stat( config->paths.identity_key, &st );
-  if( FD_UNLIKELY( -1==err && errno==ENOENT ) ) FD_LOG_ERR(( "[consensus.identity_path] key does not exist `%s`. You can generate an identity key at this path by running `%s keys new %s --config <toml>`", config->paths.identity_key, FD_BINARY_NAME, config->paths.identity_key ));
+  if( FD_UNLIKELY( -1==err && errno==ENOENT ) ) FD_LOG_ERR(( "[consensus.identity_path] key does not exist `%s`. You can generate an identity key at this path by running `tickoni keys new %s --config <toml>`", config->paths.identity_key, config->paths.identity_key ));
   else if( FD_UNLIKELY( -1==err ) )             FD_LOG_ERR(( "could not stat [consensus.identity_path] `%s` (%i-%s)", config->paths.identity_key, errno, fd_io_strerror( errno ) ));
 
   if( FD_UNLIKELY( !config->is_firedancer ) ) {
-    for( ulong i=0UL; i<config->frankendancer.paths.authorized_voter_paths_cnt; i++ ) {
-      err = stat( config->frankendancer.paths.authorized_voter_paths[ i ], &st );
-      if( FD_UNLIKELY( -1==err && errno==ENOENT ) ) FD_LOG_ERR(( "[consensus.authorized_voter_paths] key does not exist `%s`", config->frankendancer.paths.authorized_voter_paths[ i ] ));
-      else if( FD_UNLIKELY( -1==err ) )             FD_LOG_ERR(( "could not stat [consensus.authorized_voter_paths] `%s` (%i-%s)", config->frankendancer.paths.authorized_voter_paths[ i ], errno, fd_io_strerror( errno ) ));
-    }
+    FD_LOG_ERR(( "run initialization only supports Tickoni runtime paths" ));
   }
 
   /* FIXME: fdctl_check_configure unconditionally checks for network
@@ -833,7 +785,6 @@ initialize_accdb_fd( config_t const * config ) {
 
    + main
    +-- pidns
-       +-- agave
        +-- tile 0
        +-- tile 1
        ...
@@ -847,7 +798,7 @@ initialize_accdb_fd( config_t const * config ) {
     (b) main is the parent of pidns, so it can issue a waitpid() on the
         child PID, and when it completes terminate itself.
 
-    (c) pidns is the parent of agave and the tiles, so it could
+    (c) pidns is the parent of the tiles, so it could
         issue a waitpid() of -1 to wait for any of them to terminate,
         but how would it know if main has died?
 
@@ -991,13 +942,7 @@ action_t fd_action_run1 = {
   .args        = run1_cmd_args,
   .fn          = run1_cmd_fn,
   .perm        = NULL,
-  .description = "Start up a single Firedancer tile",
-  .detail      = "Runs one tile of the validator topology in the current process.  A tile is a\n"
-                 "single thread pinned to a CPU core that performs one part of the validator's\n"
-                 "work.  This is primarily an internal command used by `run` to spawn individual\n"
-                 "tiles; most operators should use `run` instead.",
-  .usage       = "run1 <tile-name> <kind-id> [OPTIONS]",
-  .args_help   = run1_args_help,
+  .description = "Start up a single Tickoni tile"
 };
 
 action_t fd_action_run = {
@@ -1006,12 +951,7 @@ action_t fd_action_run = {
   .fn             = run_cmd_fn,
   .require_config = 1,
   .perm           = run_cmd_perm,
-  .description    = "Start up a Firedancer validator",
-  .detail         = "Boots and runs the full validator described by the configuration file.  This\n"
-                    "is the main command operators use to run Firedancer.  It must be started with\n"
-                    "sufficient privileges to perform boot-time setup, after which it drops\n"
-                    "privileges to the configured user.",
-  .usage          = "run [OPTIONS]",
+  .description    = "Start up a Tickoni validator",
   .permission_err = "insufficient permissions to execute command `%s`. It is recommended "
                     "to start Firedancer as the root user, but you can also start it "
                     "with the missing capabilities listed above. The program only needs "

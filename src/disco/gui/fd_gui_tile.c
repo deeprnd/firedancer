@@ -713,6 +713,8 @@ privileged_init( fd_topo_t const *      topo,
   }
 }
 
+extern char const tickoni_version_string[];
+
 static void
 unprivileged_init( fd_topo_t const *      topo,
                    fd_topo_tile_t const * tile ) {
@@ -741,7 +743,9 @@ unprivileged_init( fd_topo_t const *      topo,
 
   ctx->ref_wallclock = fd_log_wallclock();
   ctx->ref_tickcount = fd_tickcount();
-  ctx->tick_per_ns = fd_tempo_tick_per_ns( NULL );
+  *(double *)&ctx->tick_per_ns = fd_tempo_tick_per_ns( NULL );
+
+  FD_TEST( fd_cstr_printf_check( ctx->version_string, sizeof( ctx->version_string ), NULL, "%s", tickoni_version_string ) );
 
   ctx->topo = topo;
   ctx->peers = fd_gui_peers_join( fd_gui_peers_new( _peers, ctx->gui_server, ctx->topo, http_param.max_ws_connection_cnt, tile->gui.wfs_bank_hash, fd_clock_tile_now( ctx->clock ) ) );

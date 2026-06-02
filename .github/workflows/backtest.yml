@@ -31,9 +31,7 @@ on:
 jobs:
   backtest-ledger-replay:
     timeout-minutes: ${{ fromJSON(inputs.timeout) }}
-    runs-on:
-      labels: [self-hosted, 512G]
-      group: fd-public-repo
+    runs-on: ubuntu-latest
     env:
       CC: gcc
       MACHINE: ${{ inputs.machine }}
@@ -45,8 +43,6 @@ jobs:
           sudo killall firedancer-dev || true
 
       - uses: actions/checkout@v6
-
-      - uses: ./.github/actions/submodule-init
 
       - uses: ./.github/actions/deps
         with:

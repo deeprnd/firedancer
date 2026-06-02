@@ -1405,7 +1405,5 @@ action_t fd_action_watch = {
   .fn             = watch_cmd_fn,
   .require_config = 1,
   .perm           = watch_cmd_perm,
-  .description    = "Watch a locally running Firedancer instance with a terminal GUI",
-  .detail         = "Connects to a running validator and renders a terminal dashboard of the\n"
-                    "most important monitoring and operational metrics.",
+  .description    = "Watch a locally running Tickoni instance with a terminal GUI",
 };
