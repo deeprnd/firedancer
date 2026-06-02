@@ -167,7 +167,7 @@ to the instructions below to acquire memory.
 **Use static variables**: If your program requires small-ish amount of
 memory (e.g. 4 MiB), use `.bss` by declaring uninitialized static
 variables.  This has the benefit of better support for some embedded
-targets such as on-chain virtual machines.
+execution targets.
 
 **Memory allocation**: If a larger amount of memory is required, tests
 should allocate an anon workspace from shmem given the following flags:
