@@ -1322,30 +1322,30 @@
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| <span class="metrics-name">tower_&#8203;frag_&#8203;ignored</span> | counter | replay_slot_completed frags we ignored |
-| <span class="metrics-name">tower_&#8203;slot_&#8203;last_&#8203;ignored</span> | gauge | Most recent ignored replay_slot_completed frag |
-| <span class="metrics-name">tower_&#8203;frag_&#8203;eqvoc_&#8203;detected</span> | counter | replay_slot_completed frags we detect as equivocations |
-| <span class="metrics-name">tower_&#8203;slot_&#8203;last_&#8203;eqvoc</span> | gauge | Most recent equivocating replay_slot_completed frag |
-| <span class="metrics-name">tower_&#8203;replay_&#8203;slot</span> | gauge | Most recently replayed slot, ULONG_MAX if nothing replayed yet. Not monotonically increasing |
-| <span class="metrics-name">tower_&#8203;vote_&#8203;slot</span> | gauge | Highest voted slot in the local tower, ULONG_MAX if haven't voted. Monotonically increasing |
-| <span class="metrics-name">tower_&#8203;reset_&#8203;slot</span> | gauge | Most recent reset slot, ULONG_MAX if no reset yet. Not monotonically increasing |
-| <span class="metrics-name">tower_&#8203;root_&#8203;slot</span> | gauge | Highest rooted slot, ULONG_MAX if no root yet. Monotonically increasing |
-| <span class="metrics-name">tower_&#8203;init_&#8203;slot</span> | gauge | Init slot, either the snapshot or genesis slot. Set once and does not change |
-| <span class="metrics-name">tower_&#8203;frag_&#8203;not_&#8203;ready_&#8203;dropped</span> | counter | Frags dropped because they arrived before the tower tile was initialized |
-| <span class="metrics-name">tower_&#8203;eqvoc_&#8203;proof</span><br/>{eqvoc_&#8203;proof_&#8203;result="<span class="metrics-enum">success</span>"} | counter | Equivocation proofs, by validation outcome (Valid equivocation proof) |
-| <span class="metrics-name">tower_&#8203;eqvoc_&#8203;proof</span><br/>{eqvoc_&#8203;proof_&#8203;result="<span class="metrics-enum">error</span>"} | counter | Equivocation proofs, by validation outcome (Proof failed validation (gossip-only)) |
-| <span class="metrics-name">tower_&#8203;ghost_&#8203;vote</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">success</span>"} | counter | Result of counting a vote towards ghost (Vote was counted towards ghost) |
-| <span class="metrics-name">tower_&#8203;ghost_&#8203;vote</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">not_&#8203;voted</span>"} | counter | Result of counting a vote towards ghost (Skipped because voter hasn't voted) |
-| <span class="metrics-name">tower_&#8203;ghost_&#8203;vote</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">too_&#8203;old</span>"} | counter | Result of counting a vote towards ghost (Slot was behind the root) |
-| <span class="metrics-name">tower_&#8203;ghost_&#8203;vote</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">already_&#8203;voted</span>"} | counter | Result of counting a vote towards ghost (Slot was not newer than previous vote) |
-| <span class="metrics-name">tower_&#8203;hard_&#8203;fork_&#8203;vote</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">success</span>"} | counter | Result of counting a vote towards hard fork detection (Vote was counted, no hard fork agreement reached) |
-| <span class="metrics-name">tower_&#8203;hard_&#8203;fork_&#8203;vote</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">success_&#8203;matched</span>"} | counter | Result of counting a vote towards hard fork detection (52%+ of stake agreed on our bank hash) |
-| <span class="metrics-name">tower_&#8203;hard_&#8203;fork_&#8203;vote</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">mismatched</span>"} | counter | Result of counting a vote towards hard fork detection (52%+ of stake agreed on a different bank hash than ours (we hard forked)) |
-| <span class="metrics-name">tower_&#8203;hard_&#8203;fork_&#8203;vote</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">unknown_&#8203;voter</span>"} | counter | Result of counting a vote towards hard fork detection (Voter not in voter set) |
-| <span class="metrics-name">tower_&#8203;hard_&#8203;fork_&#8203;vote</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">already_&#8203;voted</span>"} | counter | Result of counting a vote towards hard fork detection (Voter already voted for this block_id) |
-| <span class="metrics-name">tower_&#8203;hard_&#8203;fork_&#8203;vote</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">too_&#8203;old</span>"} | counter | Result of counting a vote towards hard fork detection (Slot not newer than previous) |
-| <span class="metrics-name">tower_&#8203;hard_&#8203;fork_&#8203;matched_&#8203;slot</span> | gauge | Highest slot where 52%+ of stake agreed on our bank hash |
-| <span class="metrics-name">tower_&#8203;hard_&#8203;fork_&#8203;mismatched_&#8203;slot</span> | gauge | Highest slot where 52%+ of stake agreed on a different bank hash than ours (we hard forked) |
+| <span class="metrics-name">tower_&#8203;ignored_&#8203;cnt</span> | counter | Number of replay_slot_completed frags we ignored |
+| <span class="metrics-name">tower_&#8203;ignored_&#8203;slot</span> | gauge | Most recent ignored replay_slot_completed frag |
+| <span class="metrics-name">tower_&#8203;eqvoc_&#8203;cnt</span> | counter | Number of replay_slot_completed frags we detect as equivocations |
+| <span class="metrics-name">tower_&#8203;eqvoc_&#8203;slot</span> | gauge | Most recent equivocating replay_slot_completed frag |
+| <span class="metrics-name">tower_&#8203;replay_&#8203;slot</span> | gauge | The most recently replayed slot, ULONG_MAX if nothing replayed yet. Not monotonically increasing. |
+| <span class="metrics-name">tower_&#8203;vote_&#8203;slot</span> | gauge | The highest voted slot in the local tower, ULONG_MAX if haven't voted. Monotonically increasing. |
+| <span class="metrics-name">tower_&#8203;reset_&#8203;slot</span> | gauge | The most recent reset slot, ULONG_MAX if no reset yet. Not monotonically increasing. |
+| <span class="metrics-name">tower_&#8203;root_&#8203;slot</span> | gauge | The highest rooted slot, ULONG_MAX if no root yet. Monotonically increasing. |
+| <span class="metrics-name">tower_&#8203;init_&#8203;slot</span> | gauge | Init slot. Either the snapshot or genesis slot. Set once and does not change. |
+| <span class="metrics-name">tower_&#8203;not_&#8203;ready</span> | counter | Frag was dropped because it arrived before tower tile was initialized |
+| <span class="metrics-name">tower_&#8203;eqvoc_&#8203;success</span> | counter | Number of success proofs |
+| <span class="metrics-name">tower_&#8203;eqvoc_&#8203;err</span> | counter | Number of proofs that failed validation (gossip-only) |
+| <span class="metrics-name">tower_&#8203;ghost</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">success</span>"} | counter | Result of counting a vote towards ghost (Vote was counted towards ghost) |
+| <span class="metrics-name">tower_&#8203;ghost</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">not_&#8203;voted</span>"} | counter | Result of counting a vote towards ghost (Skipped because voter hasn't voted) |
+| <span class="metrics-name">tower_&#8203;ghost</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">too_&#8203;old</span>"} | counter | Result of counting a vote towards ghost (Slot was behind the root) |
+| <span class="metrics-name">tower_&#8203;ghost</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">already_&#8203;voted</span>"} | counter | Result of counting a vote towards ghost (Slot was not newer than previous vote) |
+| <span class="metrics-name">tower_&#8203;hfork</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">success</span>"} | counter | Result of counting a vote towards hard fork detection (Vote was counted, no hard fork agreement reached) |
+| <span class="metrics-name">tower_&#8203;hfork</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">success_&#8203;matched</span>"} | counter | Result of counting a vote towards hard fork detection (52%+ of stake agreed on our bank hash) |
+| <span class="metrics-name">tower_&#8203;hfork</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">mismatched</span>"} | counter | Result of counting a vote towards hard fork detection (52%+ of stake agreed on a different bank hash than ours (we hard forked)) |
+| <span class="metrics-name">tower_&#8203;hfork</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">unknown_&#8203;vtr</span>"} | counter | Result of counting a vote towards hard fork detection (Voter not in voter set) |
+| <span class="metrics-name">tower_&#8203;hfork</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">already_&#8203;voted</span>"} | counter | Result of counting a vote towards hard fork detection (Voter already voted for this block_id) |
+| <span class="metrics-name">tower_&#8203;hfork</span><br/>{hard_&#8203;fork_&#8203;vote_&#8203;result="<span class="metrics-enum">too_&#8203;old</span>"} | counter | Result of counting a vote towards hard fork detection (Slot not newer than previous) |
+| <span class="metrics-name">tower_&#8203;hfork_&#8203;matched_&#8203;slot</span> | gauge | Highest slot where 52%+ of stake agreed on our bank hash |
+| <span class="metrics-name">tower_&#8203;hfork_&#8203;mismatched_&#8203;slot</span> | gauge | Highest slot where 52%+ of stake agreed on a different bank hash than ours (we hard forked) |
 | <span class="metrics-name">tower_&#8203;fork_&#8203;decision</span><br/>{tower_&#8203;fork_&#8203;decision="<span class="metrics-enum">no_&#8203;vote_&#8203;not_&#8203;recent</span>"} | counter | Result of deciding which fork to vote/reset on (Haven't voted yet and best block is not recent enough to vote (can't vote)) |
 | <span class="metrics-name">tower_&#8203;fork_&#8203;decision</span><br/>{tower_&#8203;fork_&#8203;decision="<span class="metrics-enum">empty_&#8203;tower_&#8203;vote</span>"} | counter | Result of deciding which fork to vote/reset on (Haven't voted yet, voting for best block (can vote)) |
 | <span class="metrics-name">tower_&#8203;fork_&#8203;decision</span><br/>{tower_&#8203;fork_&#8203;decision="<span class="metrics-enum">ancestor_&#8203;rollback</span>"} | counter | Result of deciding which fork to vote/reset on (Rollback to an ancestor of our prev vote (can't vote)) |

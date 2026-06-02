@@ -1599,11 +1599,8 @@ metrics_write( fd_tower_tile_t * ctx ) {
   FD_MCNT_ENUM_COPY( TOWER, VOTE_TXN,               ctx->metrics.votes      );
   FD_MCNT_ENUM_COPY( TOWER, VOTE_SLOT_COUNTED,      ctx->metrics.vote_slots );
   FD_MCNT_ENUM_COPY( TOWER, VOTE_INTERMEDIATE_GATE, ctx->metrics.gate_int   );
-
-  ulong eqvoc_proof[ FD_METRICS_ENUM_EQVOC_PROOF_RESULT_CNT ];
-  eqvoc_proof[ FD_METRICS_ENUM_EQVOC_PROOF_RESULT_V_SUCCESS_IDX ] = ctx->metrics.eqvoc_success;
-  eqvoc_proof[ FD_METRICS_ENUM_EQVOC_PROOF_RESULT_V_ERROR_IDX   ] = ctx->metrics.eqvoc_err;
-  FD_MCNT_ENUM_COPY( TOWER, EQVOC_PROOF, eqvoc_proof );
+  FD_MCNT_SET( TOWER, EQVOC_SUCCESS, ctx->metrics.eqvoc_success );
+  FD_MCNT_SET( TOWER, EQVOC_ERR,     ctx->metrics.eqvoc_err     );
 
   FD_MCNT_ENUM_COPY( TOWER, GHOST_VOTE, ctx->metrics.ghost );
 

@@ -1855,7 +1855,8 @@ EXAMPLES
 
     <!-- Eqvoc -->
 
-    <counter name="EqvocProof" enum="EqvocProofResult" summary="Equivocation proofs, by validation outcome" />
+    <counter name="EqvocSuccess" summary="Number of success proofs" />
+    <counter name="EqvocErr"     summary="Number of proofs that failed validation (gossip-only)" />
 
     <!-- Ghost -->
 
