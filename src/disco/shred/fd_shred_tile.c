@@ -1060,6 +1060,7 @@ after_frag( fd_shred_ctx_t *    ctx,
 
     /* Compute merkle root and chained merkle root. */
 
+    int replay_fwd = 1;
     if( FD_LIKELY( ctx->store ) ) { /* firedancer-only */
 
       set->leader_bank = NULL; /* un-used by firedancer */
@@ -1087,8 +1088,9 @@ after_frag( fd_shred_ctx_t *    ctx,
          enables replay to acquire the exclusive lock for removes
          without getting starved. */
 
-      if( FD_LIKELY( !fec->data_sz ) ) {
-        /* if data_sz is non-zero, we've already inserted this FEC set into the store */
+      /* if data_sz is non-zero, we've already inserted this FEC set into the store */
+      if( FD_UNLIKELY( fec->data_sz ) ) replay_fwd = 0;
+      else {
         for( ulong i=0UL; i<FD_FEC_SHRED_CNT; i++ ) {
           fd_shred_t * data_shred = set->data_shreds[i].s;
           ulong        payload_sz = fd_shred_payload_sz( data_shred );
@@ -1109,7 +1111,7 @@ after_frag( fd_shred_ctx_t *    ctx,
       }
     }
 
-    if( FD_LIKELY( ctx->shred_out_idx!=ULONG_MAX ) ) { /* firedancer-only */
+    if( FD_LIKELY( ctx->shred_out_idx!=ULONG_MAX && replay_fwd ) ) { /* firedancer-only */
 
       /* Additionally, publish a frag to notify repair and replay that
          the FEC set is complete.  Note the ordering wrt store shred
@@ -1302,19 +1304,9 @@ unprivileged_init( fd_topo_t *      topo,
     }
     fec_sets_shmem = (uchar *)fd_topo_obj_laddr( topo, fec_sets_obj_id ) + (ctx->round_robin_id * fec_sets_required_sz);
 
-    /* Initialize the rnonce.  The repair tile sets it, so we can only
-       do this in firedancer mode.  In frankendancer mode, we initialize
-       it randomly in privileged_init just so that an attacker can't
-       guess it. */
-    FD_LOG_DEBUG(( "Loading rnonce_ss" ));
     ulong rnonce_ss_id = fd_pod_queryf_ulong( topo->props, ULONG_MAX, "rnonce_ss" );
     FD_TEST( rnonce_ss_id!=ULONG_MAX );
-    void const * shared_rnonce = fd_topo_obj_laddr( topo, rnonce_ss_id );
-    ulong * nonce_initialized = (ulong *)(sizeof(fd_rnonce_ss_t)+(uchar const *)shared_rnonce);
-    while( !FD_VOLATILE_CONST( *nonce_initialized ) ) FD_SPIN_PAUSE();
-    FD_COMPILER_MFENCE();
-    memcpy( ctx->repair_nonce_ss, shared_rnonce, sizeof(fd_rnonce_ss_t) );
-    FD_LOG_DEBUG(( "Loaded rnonce_ss" ));
+    memcpy( ctx->repair_nonce_ss, fd_topo_obj_laddr( topo, rnonce_ss_id ), sizeof(fd_rnonce_ss_t) );
 
   } else if ( FD_LIKELY( ctx->store_out_idx!=ULONG_MAX ) ) { /* frankendancer-only */
     FD_TEST( 0==strcmp( topo->links[tile->out_link_id[ ctx->store_out_idx ]].name, "shred_store" ) );

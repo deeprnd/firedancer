@@ -1173,10 +1173,10 @@ metric introduced.
 </tile>
 
 <tile name="diag">
-    <gauge name="BundleHealth" summary="0=unhealthy, 1=healthy, 2=disabled. A healthy bundle subsystem means at least one bundle tile currently zhas an active connection to the block engine server" />
-    <gauge name="VoteHealth" summary="0=unhealthy, 1=healthy, 2=disabled. A healthy vote subsystem means the client has cast at least one vote in both the last 60 seconds and last 150 slots (before the currently replay slot)" />
-    <gauge name="ReplayHealth" summary="0=unhealthy, 1=healthy, 2=disabled. A healthy replay subsystem means that the largest fully-processed replay slot on the chosen consensus fork is within 12 slots of the current turbine slot" />
-    <gauge name="TurbineHealth" summary="0=unhealthy, 1=healthy, 2=disabled. A healthy turbine subsystem means that the largest slot associated with received turbine shreds has not stalled for 12 seconds, and also that the average replay ingress traffic exceeds the average ingress repair traffic over the past 12 seconds" />
+    <gauge name="BundleStatus" summary="Precise status of the bundle subsystem: 0=disabled (no bundle tiles configured), 1=disconnected (all bundle tiles disconnected), 2=connecting (at least one bundle tile connecting, none connected or sleeping), 3=connected (at least one bundle tile connected), 4=sleeping (at least one bundle tile sleeping, none connected)" />
+    <gauge name="VoteStatus" summary="Precise status of the vote subsystem: 0=disabled (non-voting or no tower tile), 1=not started (tower tile not running or no votes cast yet), 2=delinquent (vote distance exceeds threshold or vote stalled), 3=voting (voting normally)" />
+    <gauge name="ReplayStatus" summary="Precise status of the replay subsystem: 0=disabled (no replay tile), 1=not started (replay tile not running or slots are zero), 2=behind (replay lagging behind turbine or reset slot stalled), 3=running (replay keeping up)" />
+    <gauge name="TurbineStatus" summary="Precise status of the turbine subsystem: 0=disabled (no shred or replay tiles), 1=not started (tiles not all running or turbine slot is zero), 2=stalled (turbine slot not advancing), 3=repair outpacing (repair byte throughput exceeds turbine), 4=running (turbine receiving normally)" />
 </tile>
 
 <tile name="genesi">
@@ -1252,58 +1252,6 @@ metric introduced.
     <counter name="TransactionsSent" summary="Number of benchmark packets sent" />
 </tile>
 
-<enum name="EqvocShredResult">
-    <!-- Result of checking one of our own incoming shreds (turbine/repair) against
-         previously seen shreds for the same slot.  FD_EQVOC_SUCCESS here means
-         "no equivocation detected" (the common case). -->
-
-    <!-- No conflict (the common case: the shred does not equivocate) -->
-    <int value="0" name="NoConflict" label="Shred does not equivocate" />
-
-    <!-- Conflict types (proof successfully constructed) -->
-    <int value="1" name="SuccessMerkle" label="Merkle root conflict" />
-    <int value="2" name="SuccessLast" label="Last shred index conflict" />
-    <int value="3" name="SuccessChained" label="Chained merkle root conflict" />
-
-    <!-- Failure reasons (proof could not be constructed) -->
-    <int value="4" name="ErrSlot" label="Shreds were for different slots" />
-    <int value="5" name="ErrVersion" label="Either shred had wrong shred version" />
-    <int value="6" name="ErrType" label="Wrong shred type (must be chained merkle)" />
-    <int value="7" name="ErrMerkle" label="Failed to derive merkle root" />
-    <int value="8" name="ErrSignature" label="Failed to sig verify" />
-    <int value="9" name="ErrShredSlot" label="Slot older than root" />
-    <int value="10" name="ErrShredIdx" label="Shred index >= FD_SHRED_BLK_MAX" />
-</enum>
-
-<enum name="EqvocProofResult">
-    <!-- Result of inserting one chunk of a DuplicateShred gossip proof.  Most
-         chunks just get buffered, so FD_EQVOC_SUCCESS here means "chunk accepted,
-         proof not yet complete" - NOT "no conflict".  A complete proof is only
-         verified on the final chunk. -->
-
-    <!-- Chunk accepted, proof not yet complete (the common case) -->
-    <int value="0" name="InProgress" label="Chunk accepted, proof not yet complete" />
-
-    <!-- Conflict types (complete proof reassembled and verified) -->
-    <int value="1" name="SuccessMerkle" label="Merkle root conflict" />
-    <int value="2" name="SuccessLast" label="Last shred index conflict" />
-    <int value="3" name="SuccessChained" label="Chained merkle root conflict" />
-
-    <!-- Chunk-level failures -->
-    <int value="4" name="ErrChunkSlot" label="Slot older than root or unable to derive leader schedule" />
-    <int value="5" name="ErrChunkFrom" label="Unrecognized from address" />
-    <int value="6" name="ErrChunkCnt" label="num_chunks != FD_EQVOC_CHUNK_CNT" />
-    <int value="7" name="ErrChunkIdx" label="chunk_index >= FD_EQVOC_CHUNK_CNT" />
-    <int value="8" name="ErrChunkLen" label="chunk_len does not match expected length for chunk_index" />
-
-    <!-- Reassembled-proof failures (final chunk only) -->
-    <int value="9" name="ErrSerde" label="Invalid serialization of reassembled shreds" />
-    <int value="10" name="ErrSlot" label="Reassembled shreds were for different slots" />
-    <int value="11" name="ErrVersion" label="Either reassembled shred had wrong shred version" />
-    <int value="12" name="ErrType" label="Wrong shred type (must be chained merkle)" />
-    <int value="13" name="ErrMerkle" label="Failed to derive merkle root" />
-    <int value="14" name="ErrSignature" label="Failed to sig verify" />
-</enum>
 
 <enum name="GhostVoteResult">
     <int value="0" name="Success" label="Vote was counted towards ghost" />
@@ -1389,11 +1337,8 @@ metric introduced.
 
     <!-- Eqvoc -->
 
-    <counter name="EqvocShred" enum="EqvocShredResult" summary="Result of checking one of our own incoming shreds for equivocation (per shred)" />
-    <counter name="EqvocProof" enum="EqvocProofResult" summary="Result of inserting one chunk of a DuplicateShred gossip proof (per chunk)" />
-
-    <counter name="EqvocProofConstructed" summary="Number of duplicate proofs we constructed from shreds" />
-    <counter name="EqvocProofVerified"    summary="Number of duplicate proofs we verified from gossip" />
+    <counter name="EqvocSuccess" summary="Number of success proofs" />
+    <counter name="EqvocErr"     summary="Number of proofs that failed validation (gossip-only)" />
 
     <!-- Ghost -->
 
