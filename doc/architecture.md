@@ -41,8 +41,6 @@ Audit Ledger
   exportable evidence
 ```
 
----
-
 ## Technical Architecture
 
 ### 1. Event Runtime
@@ -74,8 +72,6 @@ Each tile has:
 - auditable event emission
 - replay support
 
----
-
 ### 2. Shared-Memory Event Pipeline
 
 Tickoni uses a high-throughput pipeline inspired by Firedancer’s tile architecture.
@@ -101,8 +97,6 @@ processor_webhook
   -> agent_dispatch_tile
   -> audit_tile
 ```
-
----
 
 ### 3. Agent Harness
 
@@ -139,8 +133,6 @@ Agents cannot directly:
 - override policy
 - access secrets
 - delete audit records
-
----
 
 ### 4. Tool Broker
 
@@ -182,8 +174,6 @@ close_compliance_case
 
 Restricted capabilities require explicit policy and human approval, and may be disabled entirely in v1.
 
----
-
 ### 5. Policy Engine
 
 Tickoni uses policy as the central control layer.
@@ -224,8 +214,6 @@ decision: deny
 reason: agent_cannot_release_funds
 policy_version: policy_2026_06_01
 ```
-
----
 
 ### 6. CaseOps Board
 
@@ -280,8 +268,6 @@ audit:
   replay_capsule: capsule://PAY-84721
   event_chain: audit://PAY-84721
 ```
-
----
 
 ### 7. Audit Ledger
 
@@ -338,8 +324,6 @@ The audit system must answer:
 - what changed downstream
 - whether it can be replayed
 
----
-
 ### 8. Replay Capsules
 
 Every material case gets a replay capsule.
@@ -394,8 +378,6 @@ Reason:
   policy version mismatch
 ```
 
----
-
 ### 9. Sandboxing
 
 Tickoni avoids using Docker as the primary security model for the runtime.
@@ -423,5 +405,3 @@ Agent tool isolation:
 - tool-level capability tokens
 - full tool-call logging
 - network access controlled per tool
-
----

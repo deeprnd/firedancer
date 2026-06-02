@@ -6,13 +6,14 @@ V1 should prove the category with a narrow, high-value harness.
 
 ### V1 Goal
 
-Build the first usable version of Tickoni as a high-throughput, policy-gated AI harness for fintech event operations.
+Build the first usable version of Tickoni as a high-throughput, isolated, cost-controlled, policy-gated AI harness for fintech event operations.
 
-V1 should support:
+V1 proves four infrastructure advantages:
 
-1. payment exception handling
-2. reconciliation break handling
-3. fraud/risk case triage
+1. event processing speed
+2. financial control-plane isolation
+3. inference spend governance
+4. forensic audit replay
 
 ## V1 Feature Set
 
@@ -29,6 +30,18 @@ V1 should support:
 - backpressure handling
 - runtime telemetry
 
+### P0: Isolation / Control Boundary
+
+- memory-isolated agent execution
+- no arbitrary shell access
+- no unrestricted syscalls from agent logic
+- no unrestricted network access
+- signed financial adapters only
+- capability-scoped execution
+- adapter permission manifests
+- sensitive-action boundaries
+- runtime enforcement independent of prompts
+
 ### P0: Agent Harness
 
 - model-provider abstraction
@@ -41,6 +54,12 @@ V1 should support:
 - tool-call audit
 - prompt/output capture
 - agent budget controls
+- per-agent token budgets
+- per-case inference budgets
+- model routing policies
+- context-size controls
+- retry-loop limits
+- model usage attribution
 
 ### P0: Policy
 
@@ -62,6 +81,18 @@ V1 should support:
 - case event timeline
 - replay capsule per material case
 - audit export as JSONL
+
+### P0: Inference Governance
+
+- token accounting per case
+- token accounting per agent
+- model call audit trail
+- model routing rules
+- context window controls
+- inference budget enforcement
+- runaway loop prevention
+- cached context reuse
+- cost attribution by workflow
 
 ### P0: CaseOps Board
 
@@ -103,6 +134,41 @@ V1 should support:
 - recommend review queue
 - propose non-executing risk action
 
+### P1: TigerBeetle FinanceDB Integration
+
+Goal: integrate TigerBeetle as the finance-native ledger backend without
+weakening Tickoni's policy, isolation, audit, or replay boundaries.
+
+TigerBeetle is a specialized financial transaction database, not Tickoni's
+general-purpose application database. Tickoni should keep case metadata,
+workflow state, evidence, and audit records in their dedicated stores.
+
+Deliverables:
+
+- generic `ledger_connector` interface
+- TigerBeetle connector implementation
+- isolated privileged action executor
+- no direct TigerBeetle connectivity from agents
+- signed action envelopes with deterministic action IDs
+- policy and human-approval enforcement before ledger mutation
+- deterministic `approved_action_id` to TigerBeetle `transfer.id` mapping
+- append-only audit records before and after each mutation attempt
+- transfer result read-back and reconciliation
+- network isolation, mTLS, and scoped executor credentials
+- deterministic mock connector for replay
+- isolated TigerBeetle environment for integration tests and demos
+- finance database telemetry and invariant alerts
+
+Exit criteria:
+
+- only the privileged action executor can reach TigerBeetle
+- an agent cannot directly create, modify, or submit a transfer
+- retries cannot create duplicate transfers
+- every transfer attempt and result is present in the Tickoni audit chain
+- reconciliation detects mismatched or missing transfer outcomes
+- replay never mutates a production TigerBeetle cluster
+- TigerBeetle remains replaceable through the `ledger_connector` boundary
+
 ## V1 Non-Goals
 
 V1 should not include:
@@ -138,6 +204,9 @@ Tickoni v1 is successful if it can demonstrate:
 8. useful CaseOps board for operators
 9. clear differentiation from generic agent frameworks
 10. credible systems architecture for fintech buyers
+11. agent execution cannot escape capability boundaries
+12. every case has measurable inference cost
+13. runaway agent loops are prevented by runtime controls
 
 ## Completed Foundation Story: Tickoni Runtime Cutover
 
@@ -182,15 +251,17 @@ Tickoni should be built as serious systems software.
 Priorities:
 
 1. correctness
-2. auditability
-3. deterministic replay
-4. policy enforcement
-5. operational usefulness
-6. throughput
-7. latency
-8. developer ergonomics
-9. extensibility
-10. broad agent autonomy
+2. isolation
+3. auditability
+4. deterministic replay
+5. policy enforcement
+6. spend control
+7. operational usefulness
+8. throughput
+9. latency
+10. developer ergonomics
+11. extensibility
+12. broad agent autonomy
 
 In that order.
 
@@ -209,6 +280,9 @@ Deliverables:
 - audit tile
 - replay prototype
 - one synthetic payment event stream
+- memory sandbox prototype
+- capability enforcement prototype
+- token accounting prototype
 
 Exit criteria:
 
@@ -216,6 +290,8 @@ Exit criteria:
 - audit ledger is append-only
 - tiles can be started, stopped, and monitored
 - event hashes are stable
+- agent execution cannot access unauthorized capabilities
+- inference usage is measurable per event
 
 ### Phase 1: V1 Runtime
 
@@ -251,6 +327,12 @@ Deliverables:
 - prompt/tool audit capture
 - denied-action capture
 - agent budget controls
+- memory sandbox integration
+- model spend accounting
+- inference budgets
+- model routing
+- context management
+- runaway-loop protection
 
 Exit criteria:
 
@@ -258,6 +340,8 @@ Exit criteria:
 - agent cannot call forbidden tools
 - every tool call is audited
 - every output is attached to the case
+- agent cannot exceed assigned inference budget
+- agent cannot bypass capability boundary
 
 ### Phase 3: CaseOps Board
 
@@ -379,6 +463,9 @@ Runtime must not:
 - use prompts for enforcement
 - hide state changes
 - allow unaudited mutations
+- expose raw system access to agents
+- rely on containers as the only isolation layer
+- allow unlimited inference loops
 
 ### Audit
 
