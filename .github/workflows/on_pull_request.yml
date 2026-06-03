@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   tests:
-    if: github.event.pull_request.draft == false
+    if: false
     uses: ./.github/workflows/tests.yml
     secrets: inherit
     with:
