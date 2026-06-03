@@ -56,7 +56,7 @@ jobs:
             deps-extras: "+dev"
             targets: "all integration-test tickoni"
             compiler: clang
-            compiler-version: 15.0.6
+            compiler-version: 18.1.6
             run-unit-tests: true
           - test-case: native
             machine: native
