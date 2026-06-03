@@ -17,17 +17,33 @@ giving unrelated concepts the same tile identity.
 
 ## Current Repository State
 
-The current `tickoni` binary is still the full Firedancer validator application
-with a Tickoni runtime identity. Its main program lives in
-[`src/app/firedancer/main.c`](../../src/app/firedancer/main.c), and its topology
-lives in [`src/app/firedancer/topology.c`](../../src/app/firedancer/topology.c).
+The repository now has two Tickoni-relevant runtime paths:
+
+1. The compatibility `tickoni` validator binary is still derived from the full
+   Firedancer application. Its main program lives in
+   [`src/app/firedancer/main.c`](../../src/app/firedancer/main.c), and its
+   topology lives in
+   [`src/app/firedancer/topology.c`](../../src/app/firedancer/topology.c).
+2. The new Zig-native Tickoni scaffold exists under
+   [`src/app/tickoni/`](../../src/app/tickoni/) and
+   [`src/tickoni/`](../../src/tickoni/). It currently builds
+   `tickoni-supervisor` through [`build.zig`](../../build.zig).
 
 The legacy Frankendancer topology remains in
 [`src/app/fdctl/topology.c`](../../src/app/fdctl/topology.c). It is gated behind
 `FD_WITH_AGAVE=1` and is outside the canonical runtime path.
 
-There are currently no Zig source files in the repository. The Zig-native
-runtime described in [`roadmap.md`](roadmap.md) is still to be built.
+The Zig scaffold is Step 1 infrastructure, not the final product topology. It
+currently proves a synthetic two-tile lifecycle:
+
+```text
+tksrce -> tksink
+```
+
+That path starts, stops, and monitors Tickoni-owned non-Solana tiles in
+dev/test mode. It does not yet implement the Phase 0 financial event pipeline,
+real shared-memory queues, sandboxed child processes, audit hashing, replay, or
+runtime telemetry.
 
 The inherited C topology ABI stores tile names in `char name[ 7UL ]`, so any
 tile name registered through that ABI is limited to six characters. The
@@ -116,7 +132,7 @@ under `src/tickoni/c_abi/`. Avoid adding Tickoni fields to
 
 ## Proposed Tickoni V1 Topology
 
-Use a new product tree:
+Use the product tree that is now being introduced:
 
 ```text
 src/app/tickoni/          Zig supervisor and CLI
@@ -126,6 +142,10 @@ src/tickoni/schema/       Financial events, cases, capabilities, audit envelopes
 src/tickoni/tiles/        Tickoni-owned tile implementations
 src/tickoni/connectors/   Signed adapter manifests and connector implementations
 ```
+
+`src/app/tickoni/`, `src/tickoni/runtime/`, `src/tickoni/c_abi/`, and
+`src/tickoni/tiles/` already exist. `schema/` and `connectors/` should be added
+only when Phase 0 and later phase work needs them.
 
 ### Runtime IDs
 
@@ -160,15 +180,17 @@ external event API
   -> tkings
   -> tknorm
   -> tkdedu
-  -> tkcase
+  -> tkpoly
+  -> tkaudt
 
-tkcase -> tkpoly -> tkdisp -> tkagnt      asynchronous investigation
+tkcase -> tkdisp -> tkagnt                asynchronous investigation, Phase 2+
 
 tkagnt -> tkmodl                    model calls
 tkagnt -> tktool -> tkadpt          capability-scoped reads and proposals
 tkapi  -> tkpoly -> tkexec          approved sensitive actions only
 
-all boundary events -> tkaudt -> tkevid
+all boundary events -> tkaudt
+Phase 1+ evidence  -> tkevid
 replay capsule      -> tkrepl -> deterministic pipeline with tkexec disabled
 all tile metrics    -> tkmetr
 ```
@@ -208,9 +230,12 @@ runtime no longer depends on it.
 
 ### Step 1: Establish the product boundary
 
-1. Create `src/app/tickoni/` and `src/tickoni/`.
-2. Build a Zig supervisor that starts a Tickoni-only topology.
-3. Add a narrow C ABI for the selected queue and sandbox primitives.
+Status: partially complete.
+
+1. `src/app/tickoni/` and `src/tickoni/` exist.
+2. The Zig supervisor starts a Tickoni-only synthetic topology in dev/test mode.
+3. Narrow C ABI declarations exist for selected queue and sandbox primitives,
+   but they are not yet exercised by the Step 1 synthetic pipeline.
 4. Keep `src/app/firedancer/`, `src/disco/`, and `src/discof/` as
    upstream-compatible validator code.
 5. Move the canonical `tickoni` target to the new app only after the supervisor
@@ -231,6 +256,17 @@ tkmetr + tkdiag
 
 Use one synthetic payment stream. Prove stable event hashes, append-only audit,
 backpressure, replay comparison, and sandbox failure behavior.
+
+Before adding Phase 1 case routing or Phase 2 agents, document and implement
+the Firedancer-style topology answers for each Phase 0 link:
+
+1. owner tile
+2. workspace or backing allocation
+3. producer and consumer mapping mode
+4. queue depth and MTU
+5. reliable or unreliable behavior
+6. overrun, restart, and shutdown behavior
+7. queue, drop, latency, and crash metrics
 
 ### Step 3: Complete the Phase 1 runtime
 
