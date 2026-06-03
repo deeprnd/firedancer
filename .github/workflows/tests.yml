@@ -3,6 +3,23 @@
 name: Tests
 on:
   workflow_call:
+    inputs:
+      runner_labels:
+        type: string
+        description: Runner labels for test jobs
+        default: '["ubuntu-latest"]'
+      gigantic_page_cnt:
+        type: string
+        description: Number of gigantic (1 GiB) pages to allocate per NUMA node
+        default: '64'
+      job_mem:
+        type: string
+        description: Memory per test job in bytes, passed as --job-mem (empty = default 6 GiB)
+        default: ''
+      skip_integration_tests:
+        type: boolean
+        description: Skip integration tests (use on memory-constrained runners)
+        default: false
   workflow_dispatch:
 concurrency:
   group: tests_${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -39,7 +56,7 @@ jobs:
             deps-extras: "+dev"
             targets: "all integration-test tickoni"
             compiler: clang
-            compiler-version: 15.0.6
+            compiler-version: 18.1.6
             run-unit-tests: true
           - test-case: native
             machine: native
@@ -51,12 +68,14 @@ jobs:
             compiler-version: 12.4.0
             run-unit-tests: true
             run-integration-tests: true
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: ${{ fromJSON(inputs.runner_labels || '["ubuntu-latest"]') }}
     env:
       MACHINE: ${{ matrix.machine }}
       EXTRAS: ${{ matrix.extras || '' }}
       CC: ${{ matrix.compiler }}
       CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
+      TEST_OPTS: ${{ inputs.job_mem != '' && format('--job-mem {0}', inputs.job_mem) || '' }}
     steps:
       - name: cleanup
         if: always()
@@ -74,6 +93,8 @@ jobs:
 
       - uses: ./.github/actions/hugepages
         if: ${{ matrix.run-unit-tests || matrix.run-integration-tests }}
+        with:
+          count_gigantic: ${{ inputs.gigantic_page_cnt || '64' }}
 
       - uses: ./.github/actions/cpusonline
 
@@ -115,7 +136,7 @@ jobs:
           make run-test-vectors
 
       - name: run integration tests
-        if: ${{ matrix.run-integration-tests }}
+        if: ${{ matrix.run-integration-tests && !inputs.skip_integration_tests }}
         run: |
           sudo prlimit --pid $$ --memlock=-1:-1
           source /opt/${{ matrix.compiler }}/${{ matrix.compiler }}-${{ matrix.compiler-version }}/activate

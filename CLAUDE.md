@@ -58,3 +58,32 @@ For Firedancer builds:
 ## Code Style
 
 Follow the coding conventions in `CONTRIBUTING.md` when making code changes.
+
+### CLI Tooling Guidance
+
+All developer tooling lives in `justfile` only. Never add dev tool targets to
+`config/everything.mk` or any upstream Makefile — those are Firedancer's build
+system and must not be modified for our tooling.
+
+**Recipe naming convention:** `category-scope-verb-component`
+
+- **category:** `quality` | `security` | `test`
+- **scope:** `format` | `lint` | `codeql` | `gitleaks` | `seccomp` | `proof` | `sanitize` | `unit` | `integration`
+- **verb:** `check` | `fix` — tests have no verb
+- **component:** `fd` (Firedancer C code) | `tk` (tickoni Zig code) | `all`
+
+Every scope must have `-fd`, `-tk`, and `-all` variants. If a tool only applies
+to one component, the other returns `@true` directly in the justfile — not in
+the shell script. `-all` always composes both, even if one is a no-op.
+
+Badge-updating aggregators follow `category-check-all` (e.g.,
+`quality-check-all`, `security-check-all`) and compose all `-all` variants for
+their category.
+
+**Shell scripts** (`contrib/quality.sh`, `contrib/security.sh`) contain only
+real implementations. No skip stubs, no `need_cmd` guards, no `|| true`
+fallbacks — those are mocks and belong in the justfile if needed. If a command
+is in the shell script, it must do real work and fail if the tool is absent.
+
+**Ownership:** `contrib/quality.sh` and `contrib/security.sh` are our files.
+`contrib/lint.sh` is upstream Firedancer — do not modify it.

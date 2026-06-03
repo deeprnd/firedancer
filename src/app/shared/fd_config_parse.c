@@ -94,7 +94,7 @@ fd_config_extract_pod( uchar *       pod,
     CFG_POP    ( cstr,   paths.accounts                                   );
   } else {
     FD_LOG_ERR(( "legacy runtime configuration paths are disabled. "
-                 "Use Tickoni runtime config profiles." ));
+                 "Use runtime config profiles." ));
   }
 
   CFG_POP_ARRAY( cstr,   gossip.entrypoints                               );
