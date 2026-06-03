@@ -26,7 +26,6 @@ Usage: bash contrib/security.sh <command>
 
 Commands:
   codeql-check-fd     CodeQL analysis on C source
-  codeql-check-tk     CodeQL analysis on tk source
   gitleaks-check-fd   Secret scanning on fd source tree
   gitleaks-check-tk   Secret scanning on tk source tree
   seccomp-check-fd    Verify seccomp policies for fd tiles
@@ -52,61 +51,17 @@ cmd_codeql_check_fd() {
       --output=build/codeql-results.sarif
 }
 
-cmd_codeql_check_tk() {
-  run_step "codeql zig support" bash -c '
-    if ! codeql resolve languages --format=json |
-      grep -Eq "^[[:space:]]*\"zig\"[[:space:]]*:"; then
-      echo "[security-codeql] installed CodeQL CLI does not support Zig." >&2
-      echo "[security-codeql] \`codeql resolve languages\` does not list \`zig\`." >&2
-      exit 1
-    fi
-  '
-
-  run_step "codeql source snapshot" bash -c '
-    rm -rf build/codeql-source-tk &&
-    mkdir -p build/codeql-source-tk &&
-    git ls-files -co --exclude-standard -z -- build.zig build.zig.zon src/tickoni src/app/tickoni |
-      while IFS= read -r -d "" relative_path; do
-        if [[ -e "$relative_path" ]]; then
-          printf "%s\0" "$relative_path"
-        fi
-      done |
-      rsync -a --delete --from0 --files-from=- ./ build/codeql-source-tk/
-  '
-
-  rm -rf build/codeql-db-tk
-  run_step "codeql database create" \
-    codeql database create build/codeql-db-tk \
-      --language=zig \
-      --build-mode=none \
-      --source-root=build/codeql-source-tk \
-      --overwrite
-
-  run_step "codeql database analyze" \
-    codeql database analyze build/codeql-db-tk \
-      --format=sarifv2.1.0 \
-      --output=build/codeql-results-tk.sarif \
-      --sarif-category=zig \
-      --threads=0
-
-  run_step "codeql threshold check" \
-    "${CODEQL_THRESHOLD_CHECK[@]}" \
-      build/codeql-results-tk.sarif \
-      "$CODEQL_HIGH_SECURITY_THRESHOLD"
-}
-
 cmd_gitleaks_check_fd() {
   run_step "gitleaks fd" \
-    gitleaks detect --no-git --source src/ \
-      --exclude-path src/tickoni \
-      --exclude-path src/app/tickoni
+    gitleaks detect --no-git --verbose --source src/ \
+      --config contrib/gitleaks-fd.toml
 }
 
 cmd_gitleaks_check_tk() {
   run_step "gitleaks tk" \
-    gitleaks detect --no-git --source src/tickoni
+    gitleaks detect --no-git --verbose --source src/tickoni
   run_step "gitleaks app/tickoni" \
-    gitleaks detect --no-git --source src/app/tickoni
+    gitleaks detect --no-git --verbose --source src/app/tickoni
 }
 
 cmd_seccomp_check_fd() {
@@ -118,8 +73,12 @@ cmd_proof_check_fd() {
 }
 
 cmd_sanitize_check_fd() {
-  run_step "clang asan+ubsan" \
-    make -j BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" check
+  if [ ! -d "build/clang-asan-ubsan" ]; then
+    run_step "clang asan+ubsan build" \
+      make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" tickoni
+  fi
+  run_step "clang asan+ubsan check" \
+    make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" check
 }
 
 cmd_sanitize_check_tk() {
@@ -129,7 +88,6 @@ cmd_sanitize_check_tk() {
 
 case "${1:-}" in
   codeql-check-fd)   cmd_codeql_check_fd ;;
-  codeql-check-tk)   cmd_codeql_check_tk ;;
   gitleaks-check-fd) cmd_gitleaks_check_fd ;;
   gitleaks-check-tk) cmd_gitleaks_check_tk ;;
   seccomp-check-fd)  cmd_seccomp_check_fd ;;

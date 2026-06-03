@@ -35,7 +35,7 @@ EOF
 run_include_guard_check() {
   local out
   out="$(mktemp)"
-  python3 contrib/lint/check_include_guards.py >"$out"
+  python3 contrib/lint/check_include_guards.py "$@" >"$out"
   if [ -s "$out" ]; then
     cat "$out"
     rm -f "$out"
@@ -115,7 +115,7 @@ cmd_lint_check_fd() {
   mapfile -t ch_files < <(printf '%s\n' "${files[@]}" | grep -E '\.(c|h)$')
   if [ "${#ch_files[@]}" -gt 0 ]; then
     run_step "style grep" run_style_grep "${ch_files[@]}"
-    run_step "include guards" run_include_guard_check
+    run_step "include guards" run_include_guard_check "${ch_files[@]}"
   fi
 
 }

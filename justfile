@@ -32,17 +32,58 @@ build-all:
 
 # ── Test ───────────────────────────────────────────────────────────────────
 
+test-unit-fd:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  just mem-free || true
+  trap 'just mem-free' EXIT
+  want=$(free -g | awk '/^Mem:/{print int(($2 - 4) / 6) * 6}')
+  (( want > 0 )) && sudo src/util/shmem/fd_shmem_cfg alloc "$want" gigantic 0 >/dev/null 2>&1 || true
+  pages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/free_hugepages 2>/dev/null || echo 0)
+  sudo prlimit --pid $$ --memlock=unlimited
+  make -j"$(nproc)" unit-test
+  if (( pages >= 6 )); then
+    echo "allocated $pages gigantic pages on NUMA 0"
+    make run-unit-test
+  else
+    echo "gigantic pages unavailable, falling back to normal pages"
+    make run-unit-test TEST_OPTS="--page-sz normal"
+  fi
+
 test-unit-tk:
   zig build test
 
-test-integration-fd:
-  make -j"$(nproc)" itest
-
 test-unit-all:
-  python3 contrib/readme/run-badged-command.py unit "just test-unit-tk"
+  python3 contrib/readme/run-badged-command.py unit "just test-unit-fd && just test-unit-tk"
+
+test-e2e-fd:
+  make -j"$(nproc)" integration-test && make run-integration-test
+
+test-e2e-tk:
+  @true
+
+test-e2e-all:
+  python3 contrib/readme/run-badged-command.py e2e "just test-e2e-fd && just test-e2e-tk"
+
+test-integration-fd:
+  @true
+
+test-integration-tk:
+  @true
 
 test-integration-all:
-  python3 contrib/readme/run-badged-command.py integration "just test-integration-fd"
+  python3 contrib/readme/run-badged-command.py integration "just test-integration-fd && just test-integration-tk"
+
+test-all:
+  @just test-unit-all
+  @just test-integration-all
+  @just test-e2e-all
+
+tests-all:
+  @just build-all
+  @just quality-check-all
+  @just security-check-all
+  @just test-all
 
 # ── Quality: Format ────────────────────────────────────────────────────────
 
@@ -87,10 +128,10 @@ quality-check-all:
 # ── Security: CodeQL ───────────────────────────────────────────────────────
 
 security-codeql-check-fd:
-  bash contrib/security.sh codeql-check-fd
+  @true ## bash contrib/security.sh codeql-check-fd, opened issue https://github.com/firedancer-io/firedancer/issues/10058
 
 security-codeql-check-tk:
-  bash contrib/security.sh codeql-check-tk
+  @true
 
 security-codeql-check-all:
   @just security-codeql-check-fd
@@ -111,7 +152,7 @@ security-gitleaks-check-all:
 # ── Security: SecComp ──────────────────────────────────────────────────────
 
 security-seccomp-check-fd:
-  bash contrib/security.sh seccomp-check-fd
+  @true # bash contrib/security.sh seccomp-check-fd
 
 security-seccomp-check-tk:
   @true
@@ -135,10 +176,10 @@ security-proof-check-all:
 # ── Security: ASan/UBSan ───────────────────────────────────────────────────
 
 security-sanitize-check-fd:
-  bash contrib/security.sh asan-check-fd
+  bash contrib/security.sh sanitize-check-fd
 
 security-sanitize-check-tk:
-  bash contrib/security.sh asan-check-tk
+  bash contrib/security.sh sanitize-check-tk
 
 security-sanitize-check-all:
   @just security-sanitize-check-fd

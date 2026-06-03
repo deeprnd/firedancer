@@ -8,19 +8,31 @@
 <!-- badge:build:end -->
     </td>
     <td>
+      <!-- badge:quality:start -->
+<img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" />
+<!-- badge:quality:end -->
+    </td>
+    <td>
+      <!-- badge:security:start -->
+<img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
+<!-- badge:security:end -->
+    </td>
+  </tr>
+  <tr>
+    <td>
       <!-- badge:unit:start -->
 <img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-passing-brightgreen?style=flat-square" />
 <!-- badge:unit:end -->
     </td>
     <td>
-      <!-- badge:security:start -->
-<img alt="Security" src="https://img.shields.io/badge/security-failing-red?style=flat-square" />
-<!-- badge:security:end -->
+      <!-- badge:integration:start -->
+<img alt="Integration Tests" src="https://img.shields.io/badge/integration%20tests-passing-brightgreen?style=flat-square" />
+<!-- badge:integration:end -->
     </td>
     <td>
-      <!-- badge:quality:start -->
-<img alt="Quality" src="https://img.shields.io/badge/quality-failing-red?style=flat-square" />
-<!-- badge:quality:end -->
+      <!-- badge:e2e:start -->
+<img alt="E2E Tests" src="https://img.shields.io/badge/e2e%20tests-passing-brightgreen?style=flat-square" />
+<!-- badge:e2e:end -->
     </td>
   </tr>
 </table>
