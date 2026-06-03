@@ -6,6 +6,9 @@
 
 FD_PROTOTYPES_BEGIN
 
+#define FD_RUNTIME_CONFIG_ENV "TICKONI_CONFIG_TOML"
+#define FD_LEGACY_CONFIG_ENV  "FIREDANCER_CONFIG_TOML"
+
 int
 fd_main( int                        argc,
          char **                    _argv,

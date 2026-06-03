@@ -18,7 +18,7 @@ uint  const firedancer_commit_ref        = FIREDANCER_COMMIT_REF_U32;
 char  const firedancer_commit_ref_string[] = FIREDANCER_COMMIT_REF_CSTR;
 char  const firedancer_version_string[]  = FD_EXPAND_THEN_STRINGIFY(FIREDANCER_MAJOR_VERSION) "." FD_EXPAND_THEN_STRINGIFY(FIREDANCER_MINOR_VERSION) "." FD_EXPAND_THEN_STRINGIFY(FIREDANCER_PATCH_VERSION);
 
-/* Canonical Tickoni runtime identity. */
+/* Canonical runtime identity. */
 char  const tickoni_commit_ref_string[] = FIREDANCER_COMMIT_REF_CSTR;
 char  const tickoni_version_string[]  = FD_EXPAND_THEN_STRINGIFY(FIREDANCER_MAJOR_VERSION) "." FD_EXPAND_THEN_STRINGIFY(FIREDANCER_MINOR_VERSION) "." FD_EXPAND_THEN_STRINGIFY(FIREDANCER_PATCH_VERSION);
 

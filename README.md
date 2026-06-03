@@ -1,6 +1,31 @@
-# Tickoni ⏱️😈
+# Tickoni ⏱️👹
 
-**High-throughput execution harness for AI agents.**
+<table>
+  <tr>
+    <td>
+      <!-- badge:build:start -->
+<img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
+<!-- badge:build:end -->
+    </td>
+    <td>
+      <!-- badge:unit:start -->
+<img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-passing-brightgreen?style=flat-square" />
+<!-- badge:unit:end -->
+    </td>
+    <td>
+      <!-- badge:security:start -->
+<img alt="Security" src="https://img.shields.io/badge/security-failing-red?style=flat-square" />
+<!-- badge:security:end -->
+    </td>
+    <td>
+      <!-- badge:quality:start -->
+<img alt="Quality" src="https://img.shields.io/badge/quality-failing-red?style=flat-square" />
+<!-- badge:quality:end -->
+    </td>
+  </tr>
+</table>
+
+**High-throughput AI harness for agentic finance.**
 
 Fast runtime first. Agents second.
 
@@ -23,7 +48,9 @@ AI models are probabilistic.
 
 The systems running them should not be.
 
-## Why
+## Why Tickoni?
+
+> Tickoni is named for `tick` and `oni`. The `tick` is the clock: every agent action advances on an explicit timeline you can measure, gate, and replay. The `oni` is the daemon: fast, tireless, and always executing. A powerful engine built for precision and control. Underneath, powered by Firedancer's trading-engine architecture, running a supercharged C-based event engine, Tickoni layers agent execution, embeddings, memory, and a plugin system on top of deterministic systems infrastructure.
 
 Agents are getting more powerful.
 
@@ -190,14 +217,13 @@ No black boxes.
 ## Documentation
 
 - [Overview](doc/overview.md)
-- [Competitive positioning](doc/product/positioning.md)
 - [Architecture](doc/architecture.md)
 - [Workflows](doc/workflows.md)
 - [Observability](doc/observability.md)
 - [Security](doc/security.md)
 - [Audit and replay](doc/audit.md)
 - [Roadmap](doc/product/roadmap.md)
-- [Build system](doc/build-system.md)
+- [Build](doc/build.md)
 - [Testing](doc/testing.md)
 
 ## License

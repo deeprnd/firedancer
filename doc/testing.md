@@ -21,15 +21,30 @@ kills, etc.
 Assuming system is configured and dependencies are installed:
 
 ```
-sudo src/util/shmem/fd_shmem_cfg alloc 2 gigantic 0
-make -j
+# Each test job needs 6 gigantic pages (6 GiB). Allocate based on available
+# RAM, leaving ~4 GiB for the OS: floor((RAM_GiB - 4) / 6) jobs.
+# Examples: 32 GiB RAM → 24 pages (4 jobs), 64 GiB RAM → 36 pages (6 jobs).
+sudo src/util/shmem/fd_shmem_cfg alloc 24 gigantic 0
+make -j$(nproc)
 make run-unit-test
+```
+
+`-j$(nproc)` limits parallel jobs to the number of logical CPU cores (`nproc`
+prints this value). Using plain `-j` with no limit can spawn hundreds of
+parallel compilations and exhaust memory on large builds.
+
+If gigantic pages are unavailable, pass `TEST_OPTS="--page-sz normal"` to fall
+back to regular memory (reduces parallelism but works on any machine):
+
+```
+make run-unit-test TEST_OPTS="--page-sz normal"
 ```
 
 For large page and NUMA configuration, refer to `src/util/shmem/fd_shmem_cfg --help`.
 
 Note: if your MEMLOCK limit is low, it can be increased with
 `sudo prlimit --pid $$ --memlock=$((2*1024*1024*1024))`.
+You can also set it to unlimited: `sudo prlimit --pid $$ --memlock=unlimited`.
 
 ## Test Configuration
 
