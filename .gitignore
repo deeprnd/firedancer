@@ -46,8 +46,9 @@ deps-bundle.tar.zst
 
 # VSCode
 .vscode
-
+.codex
 .claude
+memory
 
 # JetBrains
 .fleet
@@ -70,12 +71,17 @@ deps-bundle.tar.zst
 # Custom config
 /*.toml
 /*.sh
+!/pyproject.toml
 
 # Python
 venv
 .venv
 *.pyc
 *.egg-info/
+
+# Zig
+.zig-cache
+zig-out/
 
 # Fuchsia trace format
 *.fxt

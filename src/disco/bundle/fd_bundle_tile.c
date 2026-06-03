@@ -25,7 +25,7 @@
 
 #include "generated/fd_bundle_tile_seccomp.h"
 
-/* Provided by Tickoni runtime version object. */
+/* Provided by the runtime version object. */
 extern char const tickoni_version_string[];
 
 #define IN_KIND_REPLAY_OUT (1)

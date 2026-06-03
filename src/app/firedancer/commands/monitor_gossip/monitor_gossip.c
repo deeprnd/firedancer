@@ -98,7 +98,7 @@ monitor_gossip_cmd_fn( args_t *   args,
   fd_gossip_diag_ctx_t diag_ctx[1];
   if( FD_UNLIKELY( fd_gossip_diag_init( diag_ctx, &config->topo, config ) ) ) {
     FD_LOG_ERR(( "Failed to initialize gossip diagnostics. "
-                 "Is a Tickoni instance running with gossip tiles?" ));
+                 "Is a validator instance running with gossip tiles?" ));
   }
 
   printf( "Found %lu gossvf tiles\n", diag_ctx->gossvf.tile_count );
@@ -132,5 +132,5 @@ action_t fd_action_monitor_gossip = {
   .require_config = 1,
   .perm           = monitor_gossip_cmd_perm,
   .is_diagnostic  = 1,
-  .description    = "Monitor gossip diagnostics on a running Tickoni instance",
+  .description    = "Monitor gossip diagnostics on a running validator instance",
 };

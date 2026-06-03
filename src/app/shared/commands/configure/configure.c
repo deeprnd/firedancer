@@ -280,7 +280,7 @@ action_t fd_action_configure = {
   .args           = configure_cmd_args,
   .fn             = configure_cmd_fn,
   .perm           = configure_cmd_perm,
-  .description    = "Configure the local host so it can run Tickoni correctly",
+  .description    = "Configure the local host for validator runtime use",
   .permission_err = "insufficient permissions to execute command `%s`. It is recommended "
                     "to configure Firedancer as the root user. Firedancer configuration requires "
                     "root because it does privileged operating system actions like mounting huge page filesystems. "

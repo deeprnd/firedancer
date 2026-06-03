@@ -1,0 +1,6 @@
+.{
+    .name = .tickoni,
+    .fingerprint = 0x149e1b83d94619dd,
+    .version = "0.0.1",
+    .paths = .{"."},
+}

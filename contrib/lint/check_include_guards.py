@@ -10,11 +10,15 @@ import os
 def check_file(path):
     guard_name = "HEADER_fd_" + str(path).replace(".", "_").replace("/", "_").replace("-", "_")
     with open(path, "r") as f:
-        # Skip whitespace lines
+        first_line = f.readline()
+        if first_line.startswith("/* DO NOT INCLUDE DIRECTLY"):
+            return
+        # Skip whitespace and comment lines
+        line0 = first_line
         while True:
-            line0 = f.readline()
             if not line0.startswith("/* ") and not line0.startswith("// ") and line0.strip():
                 break
+            line0 = f.readline()
         line1 = f.readline()
         if not line0.startswith("#ifndef ") and not line1.startswith("#define "):
             print(f"{path}: include guard missing")
@@ -25,10 +29,13 @@ def check_file(path):
 
 
 def main():
-    # Recursive find .h files
-    for path in Path("./src").rglob("*.h"):
-        if ".pb.h" in path.name:
-            continue
+    import sys
+    if len(sys.argv) > 1:
+        paths = [Path(p) for p in sys.argv[1:] if p.endswith(".h")]
+    else:
+        os.chdir(Path(__file__).parents[2])
+        paths = [p for p in Path("./src").rglob("*.h") if ".pb.h" not in p.name]
+    for path in paths:
         try:
             check_file(path)
         except IOError:
@@ -36,5 +43,4 @@ def main():
 
 
 if __name__ == "__main__":
-    os.chdir(Path(__file__).parents[2])
     main()

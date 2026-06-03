@@ -12,6 +12,8 @@
 #include <sys/mount.h>
 #include <linux/capability.h>
 
+extern char const * FD_BINARY_NAME;
+
 static void
 init_perm( fd_cap_chk_t *   chk,
            config_t const * config FD_PARAM_UNUSED ) {
@@ -264,8 +266,8 @@ fini( config_t const * config,
 
             FD_LOG_ERR(( "Unmount of hugetlbfs at `%s` failed because the mount is still in use. "
                          "You can unmount it by killing all processes that are actively using files in "
-                         "the mount and running `tickoni configure fini hugetlbfs` again, or unmount "
-                         "manually with `umount %s`", mount_path[ i ], mount_path[ i ] ));
+                         "the mount and running `%s configure fini hugetlbfs` again, or unmount "
+                         "manually with `umount %s`", mount_path[ i ], FD_BINARY_NAME, mount_path[ i ] ));
           } else {
             FD_LOG_ERR(( "umount of hugetlbfs at `%s` failed (%i-%s)", mount_path[ i ], errno, fd_io_strerror( errno ) ));
           }
