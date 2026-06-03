@@ -17,6 +17,11 @@ jobs:
     if: false
     uses: ./.github/workflows/tests.yml
     secrets: inherit
+    with:
+      runner_labels: '["ubuntu-latest"]'
+      gigantic_page_cnt: '4'
+      job_mem: '4294967296'
+      skip_integration_tests: true
   backtest:
     if: false
     uses: ./.github/workflows/backtest.yml

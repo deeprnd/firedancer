@@ -1,0 +1,10 @@
+title = "Gitleaks config for Firedancer (fd) source tree"
+
+[extend]
+  useDefault = true
+
+[allowlist]
+  paths = [
+    '''src/tickoni''',
+    '''src/app/tickoni''',
+  ]
