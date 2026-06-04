@@ -65,7 +65,7 @@ jobs:
         shell: bash
         run: |
           sudo apt-get install -y llvm-18
-          for tool in profdata objdump ar; do
+          for tool in profdata objdump ar cov; do
             sudo update-alternatives --install /usr/bin/llvm-$tool llvm-$tool \
               /usr/bin/llvm-${tool}-18 100
           done
