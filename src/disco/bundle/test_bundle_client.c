@@ -2,6 +2,7 @@
 #include "proto/block_engine.pb.h"
 #include "../../ballet/base58/fd_base58.h"
 #include "../../ballet/nanopb/pb_encode.h"
+#include "../../util/tmpl/fd_unit_test.c"
 
 FD_IMPORT_BINARY( test_bundle_response, "src/disco/bundle/test_bundle_response.binpb" );
 
@@ -15,11 +16,12 @@ fd_bundle_now( void ) {
   return g_clock;
 }
 
+static fd_wksp_t * wksp;
+
 /* Test that packets and bundles get forwarded correctly to Firedancer
    components. */
 
-static void
-test_bundle_rx( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_rx ) {
   test_bundle_env_t env[1]; test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
 
@@ -59,8 +61,7 @@ test_bundle_rx( fd_wksp_t * wksp ) {
   test_bundle_env_destroy( env );
 }
 
-static void
-test_bundle_rx_too_many_txns( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_rx_too_many_txns ) {
   test_bundle_env_t env[1]; test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
 
@@ -143,8 +144,7 @@ test_bundle_rx_too_many_txns( fd_wksp_t * wksp ) {
 
 /* Ensure forwarding of bundles stops when builder fee info is missing. */
 
-static void
-test_bundle_no_builder_fee_info( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_no_builder_fee_info ) {
   test_bundle_env_t env[1]; test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
   state->builder_info_avail = 0;
@@ -180,8 +180,7 @@ test_bundle_no_builder_fee_info( fd_wksp_t * wksp ) {
 /* Ensure that the client reconnects (with a new TCP socket) if the
    server ends the stream */
 
-static void
-test_bundle_stream_ended( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_stream_ended ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -202,8 +201,7 @@ test_bundle_stream_ended( fd_wksp_t * wksp ) {
 
 /* Same as above, but with hard stream resets */
 
-static void
-test_bundle_stream_reset( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_stream_reset ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -226,8 +224,7 @@ test_bundle_stream_reset( fd_wksp_t * wksp ) {
 
 /* Test response header timeout */
 
-static void
-test_bundle_header_timeout( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_header_timeout ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -252,8 +249,7 @@ test_bundle_header_timeout( fd_wksp_t * wksp ) {
 
 /* Test response timeout */
 
-static void
-test_bundle_rx_end_timeout( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_rx_end_timeout ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -276,8 +272,7 @@ test_bundle_rx_end_timeout( fd_wksp_t * wksp ) {
 
 /* Test ping timeout */
 
-static void
-test_bundle_ping( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_ping ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -356,8 +351,7 @@ test_bundle_ping( fd_wksp_t * wksp ) {
 
 /* Check the client's behavior if an oversized message is received */
 
-static void
-test_bundle_msg_oversized( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_msg_oversized ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -386,8 +380,7 @@ test_bundle_msg_oversized( fd_wksp_t * wksp ) {
 
 /* Ensure that the client resets after switching keys */
 
-static void
-test_bundle_keyswitch( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_keyswitch ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -413,8 +406,7 @@ test_bundle_keyswitch( fd_wksp_t * wksp ) {
 
 /* Verify that the bundle client status is reported correctly */
 
-static void
-test_bundle_client_status( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_client_status ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -494,8 +486,7 @@ test_bundle_client_status( fd_wksp_t * wksp ) {
 
 /* Verify that reset clears everything */
 
-static void
-test_bundle_client_reset( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_client_reset ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -580,8 +571,7 @@ expect_h2_hdr( fd_h2_rbuf_t *       rbuf,
 
 /* Verify that the client requests builder fee info */
 
-static void
-test_bundle_client_request_builder_fee_info( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_client_request_builder_fee_info ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -711,8 +701,7 @@ test_bundle_client_request_builder_fee_info( fd_wksp_t * wksp ) {
 
 /* Verify that the client subscribes to packets */
 
-static void
-test_bundle_client_subscribe_packets( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_client_subscribe_packets ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -780,8 +769,7 @@ test_bundle_client_subscribe_packets( fd_wksp_t * wksp ) {
 
 /* Verify that the client subscribes to bundles */
 
-static void
-test_bundle_client_subscribe_bundles( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_client_subscribe_bundles ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -1068,8 +1056,7 @@ drain_one_bundle( fd_bundle_pending_txn_t * deque ) {
 /* Verify that the drain logic publishes one complete bundle
    atomically, stopping at bundle boundaries. */
 
-static void
-test_packet_publish_after_credit( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( packet_publish_after_credit ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
@@ -1105,8 +1092,7 @@ test_packet_publish_after_credit( fd_wksp_t * wksp ) {
 /* Verify that bundles publish atomically: one full bundle per
    after_credit-style drain, never crossing into the next bundle. */
 
-static void
-test_packet_publish_after_credit_atomic( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( packet_publish_after_credit_atomic ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
@@ -1165,8 +1151,7 @@ test_packet_publish_after_credit_atomic( fd_wksp_t * wksp ) {
 /* Bundles are all-or-nothing at the head of the queue: after_credit
    must publish the entire bundle before touching following packets. */
 
-static void
-test_bundle_publish_all_or_nothing( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_publish_all_or_nothing ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
@@ -1229,8 +1214,7 @@ test_bundle_publish_all_or_nothing( fd_wksp_t * wksp ) {
 
 /* Verify queue boundary behavior with mixed packets and bundles. */
 
-static void
-test_mixed_queue_boundary_behavior( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( mixed_queue_boundary_behavior ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
@@ -1298,8 +1282,7 @@ test_mixed_queue_boundary_behavior( fd_wksp_t * wksp ) {
 /* Messages are only buffered by grpc_rx_msg. Nothing should hit the
    output link until after_credit runs. */
 
-static void
-test_no_publish_before_after_credit( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( no_publish_before_after_credit ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
@@ -1342,8 +1325,7 @@ test_no_publish_before_after_credit( fd_wksp_t * wksp ) {
   test_bundle_env_destroy( env );
 }
 
-static void
-test_bundle_drain_atomicity( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( bundle_drain_atomicity ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
@@ -1379,8 +1361,7 @@ test_bundle_drain_atomicity( fd_wksp_t * wksp ) {
 
 /* Verify that individual packets drain up to STEM_BURST per call. */
 
-static void
-test_packet_drain_batch( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( packet_drain_batch ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
@@ -1409,8 +1390,7 @@ test_packet_drain_batch( fd_wksp_t * wksp ) {
 /* Verify correct drain ordering when bundles and packets are
    interleaved in the deque. */
 
-static void
-test_interleaved_drain( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( interleaved_drain ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
@@ -1447,8 +1427,7 @@ test_interleaved_drain( fd_wksp_t * wksp ) {
 
 /* Verify that the pending_txn_full guard fires and counts drops. */
 
-static void
-test_deque_overflow_guard( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( deque_overflow_guard ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   fd_bundle_tile_t * state = env->state;
@@ -1481,8 +1460,7 @@ test_deque_overflow_guard( fd_wksp_t * wksp ) {
 /* Verify that an HTTP error on each request type clears the
    corresponding wait flag so that step_reconnect can retry. */
 
-static void
-test_request_failed_clears_wait( fd_wksp_t * wksp ) {
+FD_UNIT_TEST( request_failed_clears_wait ) {
   test_bundle_env_t env[1];
   test_bundle_env_create( env, wksp );
   test_bundle_env_mock_conn( env );
@@ -1527,34 +1505,10 @@ main( int     argc,
   ulong        page_cnt = fd_env_strip_cmdline_ulong( &argc, &argv, "--page-cnt",    NULL, 256UL                        );
   ulong        numa_idx = fd_env_strip_cmdline_ulong( &argc, &argv, "--numa-idx",    NULL, fd_shmem_numa_idx( cpu_idx ) );
 
-  fd_wksp_t * wksp = fd_wksp_new_anonymous( fd_cstr_to_shmem_page_sz( _page_sz ), page_cnt, fd_shmem_cpu_idx( numa_idx ), "wksp", 16UL );
+  wksp = fd_wksp_new_anonymous( fd_cstr_to_shmem_page_sz( _page_sz ), page_cnt, fd_shmem_cpu_idx( numa_idx ), "wksp", 16UL );
   FD_TEST( wksp );
 
-  test_bundle_rx( wksp );
-  test_bundle_rx_too_many_txns( wksp );
-  test_bundle_stream_ended( wksp );
-  test_bundle_stream_reset( wksp );
-  test_bundle_header_timeout( wksp );
-  test_bundle_rx_end_timeout( wksp );
-  test_bundle_ping( wksp );
-  test_bundle_msg_oversized( wksp );
-  test_bundle_keyswitch( wksp );
-  test_bundle_client_status( wksp );
-  test_bundle_client_reset( wksp );
-  test_bundle_no_builder_fee_info( wksp );
-  test_bundle_client_request_builder_fee_info( wksp );
-  test_bundle_client_subscribe_packets( wksp );
-  test_bundle_client_subscribe_bundles( wksp );
-  test_packet_publish_after_credit( wksp );
-  test_packet_publish_after_credit_atomic( wksp );
-  test_bundle_publish_all_or_nothing( wksp );
-  test_mixed_queue_boundary_behavior( wksp );
-  test_no_publish_before_after_credit( wksp );
-  test_bundle_drain_atomicity( wksp );
-  test_packet_drain_batch( wksp );
-  test_interleaved_drain( wksp );
-  test_deque_overflow_guard( wksp );
-  test_request_failed_clears_wait( wksp );
+  fd_unit_tests( argc, argv );
 
   /* Check for memory leaks */
   fd_wksp_usage_t wksp_usage;

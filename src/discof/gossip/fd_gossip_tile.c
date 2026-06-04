@@ -362,6 +362,57 @@ handle_local_duplicate_shred( fd_gossip_tile_ctx_t *            ctx,
 }
 
 static inline int
+before_frag( fd_gossip_tile_ctx_t * ctx,
+             ulong                  in_idx,
+             ulong                  seq FD_PARAM_UNUSED,
+             ulong                  sig FD_PARAM_UNUSED ) {
+  /* Defer frag processing while switching identity or learning shred
+     version */
+  if( FD_UNLIKELY( ctx->is_halting_signing || ( !ctx->my_contact_info->shred_version && ctx->in[ in_idx ].kind!=IN_KIND_SHRED_VERSION ) ) ) return -1;
+
+  return 0;
+}
+
+static inline void
+during_frag( fd_gossip_tile_ctx_t * ctx,
+             ulong                  in_idx,
+             ulong                  seq FD_PARAM_UNUSED,
+             ulong                  sig FD_PARAM_UNUSED,
+             ulong                  chunk,
+             ulong                  sz,
+             ulong                  ctl FD_PARAM_UNUSED ) {
+  switch( ctx->in[ in_idx ].kind ) {
+    case IN_KIND_GOSSVF: {
+      if( FD_UNLIKELY( sz!=0UL && (chunk<ctx->in[ in_idx ].chunk0 || chunk>ctx->in[ in_idx ].wmark || sz>ctx->in[ in_idx ].mtu ) ) )
+        FD_LOG_ERR(( "chunk %lu %lu from in %d corrupt, not in range [%lu,%lu]", chunk, sz, ctx->in[ in_idx ].kind, ctx->in[ in_idx ].chunk0, ctx->in[ in_idx ].wmark ));
+
+      fd_memcpy( ctx->gossvf_staged, fd_chunk_to_laddr_const( ctx->in[ in_idx ].mem, chunk ), sz );
+      break;
+    }
+  }
+}
+
+static inline void
+after_frag( fd_gossip_tile_ctx_t * ctx,
+            ulong                  in_idx,
+            ulong                  seq    FD_PARAM_UNUSED,
+            ulong                  sig,
+            ulong                  sz,
+            ulong                  tsorig FD_PARAM_UNUSED,
+            ulong                  tspub  FD_PARAM_UNUSED,
+            fd_stem_context_t *    stem ) {
+  switch( ctx->in[ in_idx ].kind ) {
+    case IN_KIND_GOSSVF: {
+
+      FD_TEST( sz<=sizeof(ctx->gossvf_staged) );
+
+      handle_packet( ctx, sig, ctx->gossvf_staged, sz, stem );
+      break;
+    }
+  }
+}
+
+static inline int
 returnable_frag( fd_gossip_tile_ctx_t * ctx,
                  ulong                  in_idx,
                  ulong                  seq FD_PARAM_UNUSED,
@@ -373,20 +424,16 @@ returnable_frag( fd_gossip_tile_ctx_t * ctx,
                  ulong                  tspub FD_PARAM_UNUSED,
                  fd_stem_context_t *    stem ) {
 
+  /* Return early for unreliable links. */
+  if( FD_UNLIKELY( ctx->in[ in_idx ].kind==IN_KIND_GOSSVF ) ) return 0;
+
   if( FD_UNLIKELY( sz!=0UL && (chunk<ctx->in[ in_idx ].chunk0 || chunk>ctx->in[ in_idx ].wmark || sz>ctx->in[ in_idx ].mtu ) ) )
     FD_LOG_ERR(( "chunk %lu %lu from in %d corrupt, not in range [%lu,%lu]", chunk, sz, ctx->in[ in_idx ].kind, ctx->in[ in_idx ].chunk0, ctx->in[ in_idx ].wmark ));
-
-  if( FD_UNLIKELY( ctx->is_halting_signing ) ) {
-    return 1;
-  }
-
-  if( FD_UNLIKELY( !ctx->my_contact_info->shred_version && ctx->in[ in_idx ].kind!=IN_KIND_SHRED_VERSION ) ) return 1;
 
   switch( ctx->in[ in_idx ].kind ) {
     case IN_KIND_SHRED_VERSION: handle_shred_version( ctx, sig ); break;
     case IN_KIND_TXSEND:        handle_local_vote( ctx, fd_chunk_to_laddr_const( ctx->in[ in_idx ].mem, chunk ), stem ); break;
     case IN_KIND_EPOCH:         handle_epoch( ctx, fd_chunk_to_laddr_const( ctx->in[ in_idx ].mem, chunk ) ); break;
-    case IN_KIND_GOSSVF:        handle_packet( ctx, sig, fd_chunk_to_laddr_const( ctx->in[ in_idx ].mem, chunk ), sz, stem ); break;
     case IN_KIND_TOWER:         handle_local_duplicate_shred( ctx, sig, fd_chunk_to_laddr_const( ctx->in[ in_idx ].mem, chunk ), stem ); break;
     case IN_KIND_SNAPIN_MANIF: {
       if( FD_LIKELY( ctx->wfs_state==FD_GOSSIP_WFS_STATE_DONE ) ) break;
@@ -435,8 +482,8 @@ returnable_frag( fd_gossip_tile_ctx_t * ctx,
 }
 
 static void
-privileged_init( fd_topo_t *      topo,
-                 fd_topo_tile_t * tile ) {
+privileged_init( fd_topo_t const *      topo,
+                 fd_topo_tile_t const * tile ) {
   void * scratch = fd_topo_obj_laddr( topo, tile->tile_obj_id );
 
   FD_SCRATCH_ALLOC_INIT( l, scratch );
@@ -477,8 +524,8 @@ out1( fd_topo_t const *      topo,
 }
 
 static void
-unprivileged_init( fd_topo_t *      topo,
-                   fd_topo_tile_t * tile ) {
+unprivileged_init( fd_topo_t const *      topo,
+                   fd_topo_tile_t const * tile ) {
   void * scratch = fd_topo_obj_laddr( topo, tile->tile_obj_id );
 
   FD_SCRATCH_ALLOC_INIT( l, scratch );
@@ -497,8 +544,8 @@ unprivileged_init( fd_topo_t *      topo,
   FD_TEST( tile->in_cnt<=sizeof(ctx->in)/sizeof(ctx->in[0]) );
   ulong sign_in_tile_idx = ULONG_MAX;
   for( ulong i=0UL; i<tile->in_cnt; i++ ) {
-    fd_topo_link_t * link = &topo->links[ tile->in_link_id[ i ] ];
-    fd_topo_wksp_t * link_wksp = &topo->workspaces[ topo->objs[ link->dcache_obj_id ].wksp_id ];
+    fd_topo_link_t const * link = &topo->links[ tile->in_link_id[ i ] ];
+    fd_topo_wksp_t const * link_wksp = &topo->workspaces[ topo->objs[ link->dcache_obj_id ].wksp_id ];
 
     ctx->in[ i ].mem    = link_wksp->wksp;
     if( FD_LIKELY( link->mtu ) ) {
@@ -514,6 +561,7 @@ unprivileged_init( fd_topo_t *      topo,
       ctx->in[ i ].kind = IN_KIND_SHRED_VERSION;
     } else if( FD_UNLIKELY( !strcmp( link->name, "gossvf_gossip" ) ) ) {
       ctx->in[ i ].kind = IN_KIND_GOSSVF;
+      FD_TEST( link->mtu<=sizeof(ctx->gossvf_staged) );
     } else if( FD_UNLIKELY( !strcmp( link->name, "sign_gossip" ) ) ) {
       ctx->in[ i ].kind = IN_KIND_SIGN;
       sign_in_tile_idx = i;
@@ -538,8 +586,8 @@ unprivileged_init( fd_topo_t *      topo,
   *ctx->gossip_out = out1( topo, tile, "gossip_out"    );
   *ctx->gossvf_out = out1( topo, tile, "gossip_gossvf" );
 
-  fd_topo_link_t * sign_in  = &topo->links[ tile->in_link_id [ sign_in_tile_idx  ] ];
-  fd_topo_link_t * sign_out = &topo->links[ tile->out_link_id[ ctx->sign_out->idx ] ];
+  fd_topo_link_t const * sign_in  = &topo->links[ tile->in_link_id [ sign_in_tile_idx  ] ];
+  fd_topo_link_t const * sign_out = &topo->links[ tile->out_link_id[ ctx->sign_out->idx ] ];
 
   ctx->is_pending_set_identity = 0;
   ctx->keyswitch = fd_keyswitch_join( fd_topo_obj_laddr( topo, tile->id_keyswitch_obj_id ) );
@@ -676,6 +724,9 @@ FD_STATIC_ASSERT( FD_PING_TRACKER_MAX+2UL*FD_GOSSIP_MESSAGE_MAX_CRDS>=FD_CONTACT
 #define STEM_CALLBACK_DURING_HOUSEKEEPING during_housekeeping
 #define STEM_CALLBACK_METRICS_WRITE       metrics_write
 #define STEM_CALLBACK_AFTER_CREDIT        after_credit
+#define STEM_CALLBACK_BEFORE_FRAG         before_frag
+#define STEM_CALLBACK_DURING_FRAG         during_frag
+#define STEM_CALLBACK_AFTER_FRAG          after_frag
 #define STEM_CALLBACK_RETURNABLE_FRAG     returnable_frag
 
 #include "../../disco/stem/fd_stem.c"

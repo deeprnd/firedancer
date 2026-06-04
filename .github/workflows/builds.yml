@@ -144,7 +144,7 @@ jobs:
           sudo mkdir -p /opt/gcc/gcc-12.4.0
           printf 'export CC=gcc-12\nexport CXX=g++-12\n' | sudo tee /opt/gcc/gcc-12.4.0/activate
 
-      - uses: dtolnay/rust-toolchain@1.94.0
+      - uses: dtolnay/rust-toolchain@1.95.0
 
       - uses: ./.github/actions/deps
         with:
@@ -214,7 +214,7 @@ jobs:
           printf 'export CC=clang-18\nexport CXX=clang++-18\nexport PATH="/usr/lib/llvm-18/bin:$PATH"\n' | sudo tee /opt/clang/clang-18.1.6/activate
           printf 'export CC=clang-19\nexport CXX=clang++-19\nexport PATH="/usr/lib/llvm-19/bin:$PATH"\n' | sudo tee /opt/clang/clang-19.1.7/activate
 
-      - uses: dtolnay/rust-toolchain@1.94.0
+      - uses: dtolnay/rust-toolchain@1.95.0
 
       - uses: ./.github/actions/deps
         with:
