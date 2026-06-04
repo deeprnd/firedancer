@@ -3,7 +3,7 @@
 /// Build the supervisor:
 ///   zig build
 ///
-/// Run Zig unit tests (separate from 'make run-unit-test'):
+/// Run harness unit tests (separate from 'make run-unit-test'):
 ///   zig build test
 ///
 /// Install Zig test binaries for kcov coverage (used by just test-cov-tk):
@@ -53,7 +53,7 @@ pub fn build(b: *std.Build) void {
     // Test step — not wired into 'make run-unit-test'
     // Run with: zig build test
     // ---------------------------------------------------------------------------
-    const test_step = b.step("test", "Run Tickoni Zig unit tests");
+    const test_step = b.step("test", "Run harness unit tests");
 
     // Files with no cross-module imports: standalone test binaries.
     for ([_][]const u8{
@@ -93,10 +93,10 @@ pub fn build(b: *std.Build) void {
     const cov_step = b.step("cov", "Install Zig test binaries to zig-out/cov/ for kcov coverage");
 
     for ([_][2][]const u8{
-        .{ "test-topology",         "src/tickoni/runtime/topology.zig" },
-        .{ "test-tile",             "src/tickoni/runtime/tile.zig" },
-        .{ "test-queue",            "src/tickoni/c_abi/queue.zig" },
-        .{ "test-sandbox",          "src/tickoni/c_abi/sandbox.zig" },
+        .{ "test-topology", "src/tickoni/runtime/topology.zig" },
+        .{ "test-tile", "src/tickoni/runtime/tile.zig" },
+        .{ "test-queue", "src/tickoni/c_abi/queue.zig" },
+        .{ "test-sandbox", "src/tickoni/c_abi/sandbox.zig" },
         .{ "test-payment-pipeline", "src/tickoni/tiles/payment_pipeline.zig" },
     }) |entry| {
         const t = b.addTest(.{

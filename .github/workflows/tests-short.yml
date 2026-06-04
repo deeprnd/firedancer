@@ -30,7 +30,7 @@ jobs:
           paths: '^(src/(app/tickoni|tickoni)/|build\.zig(\.zon)?$|justfile$|contrib/quality\.sh$|contrib/security\.sh$|contrib/test/coverage(-tk)?\.json$|contrib/test/coverage\.sh$|contrib/readme/coverage_report\.py$|\.github/actions/|\.github/workflows/tests-short\.yml$)'
 
   short-tests:
-    name: Zig Unit Tests
+    name: Harness Unit Tests
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
@@ -48,7 +48,7 @@ jobs:
         run: just test-unit-tk
 
   cov-tk:
-    name: Zig Coverage
+    name: Harness Tests Coverage
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-24.04

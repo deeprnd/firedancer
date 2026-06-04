@@ -30,7 +30,7 @@ jobs:
           paths: '^(src/|build\.zig(\.zon)?$|justfile$|contrib/test/|contrib/make-j$|\.github/actions/|\.github/workflows/tests-xlong\.yml$)'
 
   xlong-tests:
-    name: Firedancer E2E
+    name: Engine E2E Tests
     needs: detect-changes
     if: false && needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-24.04

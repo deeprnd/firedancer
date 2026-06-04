@@ -11,7 +11,7 @@ command matrix can be documented without merging those two views.
 
 The repository currently has:
 
-- Zig unit tests for Tickoni-owned supervisor, topology, queue, sandbox, and
+- Harness unit tests for Tickoni-owned supervisor, topology, queue, sandbox, and
   Phase 0 payment pipeline behavior
 - Firedancer-derived C unit tests through the upstream unit-test Make target
 - Firedancer-derived e2e/integration-test build and run target
@@ -144,7 +144,7 @@ Practical rule of thumb:
   keeping Tickoni internals real
 - e2e/system: run the real local toolchain and avoid internal mocks
 
-## Tickoni Zig Unit Tests
+## Harness Unit Tests
 
 `just test-unit-tk` runs:
 
@@ -176,7 +176,7 @@ The Phase 0 pipeline tests cover:
 - deterministic replay comparison
 - sandbox failure diagnostics
 
-## Firedancer Unit Tests
+## Engine Unit Tests
 
 `just test-unit-fd` runs a wrapper around the Firedancer-derived unit-test
 Make targets.
@@ -195,7 +195,7 @@ It performs these steps:
 This wrapper is the preferred repo-facing Firedancer unit-test command. Do not
 invoke raw compiler commands for Firedancer tests.
 
-## Firedancer E2E
+## Engine E2E
 
 `just test-e2e-fd` runs:
 

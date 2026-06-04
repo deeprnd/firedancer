@@ -13,7 +13,7 @@ wrapper:
 - `just ...` as the repo-facing wrapper for common build and test flows
 - Firedancer-side builds and tests via `just build-fd`, `just build-fd-dev`,
   and `just test-e2e-fd`
-- `zig build ...` for the Tickoni Zig supervisor and Zig unit tests
+- `zig build ...` for the Tickoni supervisor and harness unit tests
 
 Quick start
 -----------
@@ -45,7 +45,7 @@ Run the supervisor:
 zig build run -- start
 ```
 
-Run Zig unit tests:
+Run harness unit tests:
 
 ```bash
 just test-unit-tk

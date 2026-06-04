@@ -30,7 +30,7 @@ jobs:
           paths: '^(src/|build\.zig(\.zon)?$|justfile$|contrib/test/|contrib/make-j$|contrib/readme/coverage_report\.py$|\.github/actions/|\.github/workflows/tests-long\.yml$)'
 
   long-tests:
-    name: Firedancer Unit Tests
+    name: Engine Unit Tests
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
@@ -46,7 +46,7 @@ jobs:
         run: just test-unit-fd
 
   cov-fd:
-    name: Firedancer Coverage
+    name: Engine Tests Coverage
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-24.04

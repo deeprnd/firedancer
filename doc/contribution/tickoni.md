@@ -278,7 +278,7 @@ metrics: produced, consumed, lag, backpressure_ns, malformed, dropped
 If the topology cannot be written plainly, the implementation is probably
 mixing responsibilities.
 
-## Firedancer Configuration And The Zig Harness
+## Firedancer Configuration And The AI Harness
 
 Changes to Firedancer configuration, layout, topology, sandboxing, or
 diagnostics affect the Zig harness even when no Tickoni product code changes.
