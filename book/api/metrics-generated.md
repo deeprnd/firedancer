@@ -47,6 +47,7 @@
 | <span class="metrics-name">tile_&#8203;cpu_&#8203;duration_&#8203;nanos</span><br/>{cpu_&#8203;regime="<span class="metrics-enum">idle</span>"} | counter | CPU time spent in each CPU regime (Idle (task was not runnable)) |
 | <span class="metrics-name">tile_&#8203;cpu_&#8203;duration_&#8203;nanos</span><br/>{cpu_&#8203;regime="<span class="metrics-enum">user</span>"} | counter | CPU time spent in each CPU regime (User (task was scheduled and executing in user mode)) |
 | <span class="metrics-name">tile_&#8203;cpu_&#8203;duration_&#8203;nanos</span><br/>{cpu_&#8203;regime="<span class="metrics-enum">system</span>"} | counter | CPU time spent in each CPU regime (System (task was scheduled and executing in kernel mode)) |
+| <span class="metrics-name">tile_&#8203;irq_&#8203;count</span> | counter | The number of times this tile was interrupted by an IRQ (fixed tiles only) |
 
 </div>
 
@@ -418,7 +419,7 @@
 | <span class="metrics-name">pack_&#8203;normal_&#8203;transaction_&#8203;received</span> | counter | Count of transactions received via the normal TPU path |
 | <span class="metrics-name">pack_&#8203;transaction_&#8203;inserted</span><br/>{pack_&#8203;txn_&#8203;insert_&#8203;return="<span class="metrics-enum">instr_&#8203;acct_&#8203;cnt</span>"} | counter | Result of inserting a transaction into the pack object (Transaction has an instruction that references too many accounts) |
 | <span class="metrics-name">pack_&#8203;transaction_&#8203;inserted</span><br/>{pack_&#8203;txn_&#8203;insert_&#8203;return="<span class="metrics-enum">nonce_&#8203;conflict</span>"} | counter | Result of inserting a transaction into the pack object (Bundle with two conflicting durable nonce transactions) |
-| <span class="metrics-name">pack_&#8203;transaction_&#8203;inserted</span><br/>{pack_&#8203;txn_&#8203;insert_&#8203;return="<span class="metrics-enum">bundle_&#8203;blacklist</span>"} | counter | Result of inserting a transaction into the pack object (Transaction uses an account on the bundle blacklist) |
+| <span class="metrics-name">pack_&#8203;transaction_&#8203;inserted</span><br/>{pack_&#8203;txn_&#8203;insert_&#8203;return="<span class="metrics-enum">bundle_&#8203;blacklist</span>"} | counter | Result of inserting a transaction into the pack object (Transaction is a vote in a bundle or uses an account on the bundle blacklist) |
 | <span class="metrics-name">pack_&#8203;transaction_&#8203;inserted</span><br/>{pack_&#8203;txn_&#8203;insert_&#8203;return="<span class="metrics-enum">invalid_&#8203;nonce</span>"} | counter | Result of inserting a transaction into the pack object (Transaction is an invalid durable nonce transaction) |
 | <span class="metrics-name">pack_&#8203;transaction_&#8203;inserted</span><br/>{pack_&#8203;txn_&#8203;insert_&#8203;return="<span class="metrics-enum">write_&#8203;sysvar</span>"} | counter | Result of inserting a transaction into the pack object (Transaction tries to write to a sysvar) |
 | <span class="metrics-name">pack_&#8203;transaction_&#8203;inserted</span><br/>{pack_&#8203;txn_&#8203;insert_&#8203;return="<span class="metrics-enum">estimation_&#8203;fail</span>"} | counter | Result of inserting a transaction into the pack object (Estimating compute cost and/or fee failed) |
@@ -951,6 +952,7 @@
 
 | Metric | Type | Description |
 |--------|------|-------------|
+| <span class="metrics-name">execrp_&#8203;processing</span> | gauge | Whether the tile is currently processing a task (executing, sigverifying, or PoH hashing), either 1 or 0 |
 | <span class="metrics-name">execrp_&#8203;transaction_&#8203;result</span><br/>{transaction_&#8203;result="<span class="metrics-enum">success</span>"} | counter | Result of loading and executing a transaction (Transaction executed successfully) |
 | <span class="metrics-name">execrp_&#8203;transaction_&#8203;result</span><br/>{transaction_&#8203;result="<span class="metrics-enum">instruction_&#8203;error</span>"} | counter | Result of loading and executing a transaction (An error occurred while processing an instruction) |
 | <span class="metrics-name">execrp_&#8203;transaction_&#8203;result</span><br/>{transaction_&#8203;result="<span class="metrics-enum">account_&#8203;not_&#8203;found</span>"} | counter | Result of loading and executing a transaction (The transaction fee payer address was not found) |
@@ -1061,7 +1063,8 @@
 | <span class="metrics-name">tower_&#8203;votes</span><br/>{vote_&#8203;txn_&#8203;result="<span class="metrics-enum">bad_&#8203;tower</span>"} | counter | Result of processing a vote txn (per txn) (Vote txn deserialized but tower was invalid) |
 | <span class="metrics-name">tower_&#8203;votes</span><br/>{vote_&#8203;txn_&#8203;result="<span class="metrics-enum">unknown_&#8203;block_&#8203;id</span>"} | counter | Result of processing a vote txn (per txn) (Last vote had a null block id) |
 | <span class="metrics-name">tower_&#8203;votes</span><br/>{vote_&#8203;txn_&#8203;result="<span class="metrics-enum">too_&#8203;old</span>"} | counter | Result of processing a vote txn (per txn) (Last vote slot was behind the votes root) |
-| <span class="metrics-name">tower_&#8203;votes</span><br/>{vote_&#8203;txn_&#8203;result="<span class="metrics-enum">not_&#8203;staked</span>"} | counter | Result of processing a vote txn (per txn) (Voter was not staked in the current root's epoch) |
+| <span class="metrics-name">tower_&#8203;votes</span><br/>{vote_&#8203;txn_&#8203;result="<span class="metrics-enum">not_&#8203;staked</span>"} | counter | Result of processing a vote txn (per txn) (Unable to query stake for vote slot) |
+| <span class="metrics-name">tower_&#8203;votes</span><br/>{vote_&#8203;txn_&#8203;result="<span class="metrics-enum">bad_&#8203;signer</span>"} | counter | Result of processing a vote txn (per txn) (Vote txn was not signed by the authorized voter for the vote account at the vote epoch) |
 | <span class="metrics-name">tower_&#8203;vote_&#8203;slots</span><br/>{vote_&#8203;slot_&#8203;result="<span class="metrics-enum">success</span>"} | counter | Result of counting an individual vote slot from a vote txn (per slot) (Vote slot was counted) |
 | <span class="metrics-name">tower_&#8203;vote_&#8203;slots</span><br/>{vote_&#8203;slot_&#8203;result="<span class="metrics-enum">too_&#8203;new</span>"} | counter | Result of counting an individual vote slot from a vote txn (per slot) (Vote slot was too far ahead of the votes root) |
 | <span class="metrics-name">tower_&#8203;vote_&#8203;slots</span><br/>{vote_&#8203;slot_&#8203;result="<span class="metrics-enum">unknown_&#8203;vtr</span>"} | counter | Result of counting an individual vote slot from a vote txn (per slot) (Vote account was not in the voter set) |
@@ -1175,6 +1178,14 @@
 | <span class="metrics-name">diag_&#8203;vote_&#8203;status</span> | gauge | Precise status of the vote subsystem: 0=disabled (non-voting or no tower tile), 1=not started (tower tile not running or no votes cast yet), 2=delinquent (vote distance exceeds threshold or vote stalled), 3=voting (voting normally) |
 | <span class="metrics-name">diag_&#8203;replay_&#8203;status</span> | gauge | Precise status of the replay subsystem: 0=disabled (no replay tile), 1=not started (replay tile not running or slots are zero), 2=behind (replay lagging behind turbine or reset slot stalled), 3=running (replay keeping up) |
 | <span class="metrics-name">diag_&#8203;turbine_&#8203;status</span> | gauge | Precise status of the turbine subsystem: 0=disabled (no shred or replay tiles), 1=not started (tiles not all running or turbine slot is zero), 2=stalled (turbine slot not advancing), 3=repair outpacing (repair byte throughput exceeds turbine), 4=running (turbine receiving normally) |
+| <span class="metrics-name">diag_&#8203;device_&#8203;irqs_&#8203;total</span> | counter | Number of device IRQs across all CPUs |
+| <span class="metrics-name">diag_&#8203;device_&#8203;irqs_&#8203;undesired</span> | counter | Number of device hard IRQs that stole CPU time from fixed tiles |
+| <span class="metrics-name">diag_&#8203;softirqs_&#8203;total</span><br/>{softirq="<span class="metrics-enum">net</span>"} | counter | Number of soft-IRQs across all CPUs (NET_TX, NET_RX) |
+| <span class="metrics-name">diag_&#8203;softirqs_&#8203;total</span><br/>{softirq="<span class="metrics-enum">disk</span>"} | counter | Number of soft-IRQs across all CPUs (BLOCK) |
+| <span class="metrics-name">diag_&#8203;softirqs_&#8203;total</span><br/>{softirq="<span class="metrics-enum">other</span>"} | counter | Number of soft-IRQs across all CPUs (e.g. TIMER, HRTIMER, IRQ_POLL, TASKLET, SCHED, RCU, ...) |
+| <span class="metrics-name">diag_&#8203;softirqs_&#8203;undesired</span><br/>{softirq="<span class="metrics-enum">net</span>"} | counter | Number of soft-IRQs that stole CPU time from fixed tiles (NET_TX, NET_RX) |
+| <span class="metrics-name">diag_&#8203;softirqs_&#8203;undesired</span><br/>{softirq="<span class="metrics-enum">disk</span>"} | counter | Number of soft-IRQs that stole CPU time from fixed tiles (BLOCK) |
+| <span class="metrics-name">diag_&#8203;softirqs_&#8203;undesired</span><br/>{softirq="<span class="metrics-enum">other</span>"} | counter | Number of soft-IRQs that stole CPU time from fixed tiles (e.g. TIMER, HRTIMER, IRQ_POLL, TASKLET, SCHED, RCU, ...) |
 
 </div>
 
@@ -1234,6 +1245,25 @@
 
 | Metric | Type | Description |
 |--------|------|-------------|
+| <span class="metrics-name">rpc_&#8203;request_&#8203;duration_&#8203;seconds</span> | histogram | Duration spent in service |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">genesis</span>"} | counter | Number of RPC requests served (GET /genesis.tar.bz2) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">unknown</span>"} | counter | Number of RPC requests served (Unknown or unsupported method) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getAccountInfo</span>"} | counter | Number of RPC requests served (getAccountInfo) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getBalance</span>"} | counter | Number of RPC requests served (getBalance) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getBlockHeight</span>"} | counter | Number of RPC requests served (getBlockHeight) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getClusterNodes</span>"} | counter | Number of RPC requests served (getClusterNodes) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getEpochInfo</span>"} | counter | Number of RPC requests served (getEpochInfo) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getGenesisHash</span>"} | counter | Number of RPC requests served (getGenesisHash) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getHealth</span>"} | counter | Number of RPC requests served (getHealth) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getIdentity</span>"} | counter | Number of RPC requests served (getIdentity) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getInflationGovernor</span>"} | counter | Number of RPC requests served (getInflationGovernor) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getLatestBlockhash</span>"} | counter | Number of RPC requests served (getLatestBlockhash) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getMinimumBalanceForRentExemption</span>"} | counter | Number of RPC requests served (getMinimumBalanceForRentExemption) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getMultipleAccounts</span>"} | counter | Number of RPC requests served (getMultipleAccounts) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getSlot</span>"} | counter | Number of RPC requests served (getSlot) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getTransactionCount</span>"} | counter | Number of RPC requests served (getTransactionCount) |
+| <span class="metrics-name">rpc_&#8203;request_&#8203;count</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getVersion</span>"} | counter | Number of RPC requests served (getVersion) |
+| <span class="metrics-name">rpc_&#8203;connection_&#8203;count</span> | gauge | The number of active HTTP connections to the RPC service |
 
 </div>
 
