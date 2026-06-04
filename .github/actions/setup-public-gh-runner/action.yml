@@ -70,7 +70,7 @@ runs:
       if: inputs.kcov == 'true'
       shell: bash
       run: |
-        sudo apt-get install -y \
+        sudo apt-get install -y --fix-missing \
           binutils-dev \
           cmake \
           libcurl4-openssl-dev \
