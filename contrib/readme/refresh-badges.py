@@ -51,17 +51,24 @@ def _coverage_color(pct: float) -> str:
     return "brightgreen"
 
 
-def _read_coverage_pct(path: Path) -> float:
+def _read_coverage_pct(path: Path) -> float | None:
+    """Return average line/branch/function coverage, or None if nothing was measured."""
     if not path.exists():
         raise FileNotFoundError(f"Missing coverage summary: {path}")
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
         raise ValueError(f"Failed to parse {path}: {exc}") from exc
-    pct = data.get("total", {}).get("lines", {}).get("pct")
-    if not isinstance(pct, (int, float)):
-        raise ValueError(f"Invalid coverage summary format in {path}: expected total.lines.pct number")
-    return round(float(pct), 1)
+    total = data.get("total", {})
+    pcts = [
+        float(total[m]["pct"])
+        for m in ("lines", "branches", "functions")
+        if isinstance(total.get(m, {}).get("pct"), (int, float))
+        and total[m].get("total", 0) > 0
+    ]
+    if not pcts:
+        return None
+    return round(sum(pcts) / len(pcts), 1)
 
 
 def badge_for_exit_code(alt: str, label: str, exit_code: int) -> str:
@@ -73,6 +80,8 @@ def badge_for_coverage(alt: str, label: str, exit_code: int, cov_path: Path) -> 
     if exit_code != 0:
         return build_badge(alt, label, BOOLEAN_FAILURE[0], BOOLEAN_FAILURE[1])
     pct = _read_coverage_pct(cov_path)
+    if pct is None:
+        return build_badge(alt, label, *UNKNOWN)
     return build_badge(alt, label, f"{pct:.1f}%", _coverage_color(pct))
 
 

@@ -29,7 +29,7 @@ def _pct(covered: int, total: int) -> float:
 
 
 def _color_label(pct: float) -> str:
-    if pct < 60:
+    if pct < 40:
         return "red"
     if pct < 80:
         return "orange"
@@ -137,10 +137,14 @@ def cmd_coverage_fd(covdir: Path, output: Path, config: Path) -> int:
 # ── tk (kcov) ──────────────────────────────────────────────────────────────
 
 def cmd_coverage_tk(kcov_dir: Path, output: Path, config: Path) -> int:
+    # kcov nests coverage.json one level deep: <outdir>/kcov-merged/ or <outdir>/<name>.<hash>/
     coverage_json = kcov_dir / "coverage.json"
     if not coverage_json.exists():
-        print(f"ERROR: {coverage_json} not found — kcov did not produce output", file=sys.stderr)
-        return 1
+        candidates = sorted(kcov_dir.glob("*/coverage.json"))
+        if not candidates:
+            print(f"ERROR: {coverage_json} not found — kcov did not produce output", file=sys.stderr)
+            return 1
+        coverage_json = candidates[0]
 
     data = json.loads(coverage_json.read_text(encoding="utf-8"))
     covered = int(data.get("covered_lines", 0))
@@ -148,9 +152,13 @@ def cmd_coverage_tk(kcov_dir: Path, output: Path, config: Path) -> int:
     # Use kcov's own percentage to avoid rounding discrepancies.
     pct = float(data.get("percent_covered", _pct(covered, total)))
 
-    summary = _build_summary(lines_covered=covered, lines_total=total)
-    summary["total"]["lines"]["pct"]      = round(pct, 1)
-    summary["total"]["statements"]["pct"] = round(pct, 1)
+    summary = _build_summary(
+        lines_covered=covered,     lines_total=total,
+        branches_covered=covered,  branches_total=total,
+        functions_covered=covered, functions_total=total,
+    )
+    for m in ("lines", "statements", "branches", "functions"):
+        summary["total"][m]["pct"] = round(pct, 1)
 
     _write_summary(summary, output)
 

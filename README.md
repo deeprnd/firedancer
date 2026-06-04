@@ -38,12 +38,12 @@
   <tr>
     <td>
       <!-- badge:cov-fd:start -->
-<img alt="C Coverage" src="https://img.shields.io/badge/c%20coverage-failing-red?style=flat-square" />
+<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-43.0%25-orange?style=flat-square" />
 <!-- badge:cov-fd:end -->
     </td>
     <td>
       <!-- badge:cov-tk:start -->
-<img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-unknown-lightgrey?style=flat-square" />
+<img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-failing-red?style=flat-square" />
 <!-- badge:cov-tk:end -->
     </td>
     <td></td>
