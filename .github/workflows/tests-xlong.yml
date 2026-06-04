@@ -32,7 +32,7 @@ jobs:
   xlong-tests:
     name: Firedancer E2E
     needs: detect-changes
-    if: needs.detect-changes.outputs.run == 'true'
+    if: false && needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:

@@ -30,6 +30,7 @@ jobs:
     timeout-minutes: 40
     environment:
       name: coverage-report
+      deployment: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
     env:
       CC: clang
       CXX: clang++

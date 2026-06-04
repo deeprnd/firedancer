@@ -17,6 +17,7 @@ jobs:
     environment:
       name: coverage-report
       url: ${{ vars.COVERAGE_URL }}
+      deployment: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
     steps:
       - uses: actions/checkout@v6
 
