@@ -7,7 +7,7 @@ const usage =
     \\Usage: tickoni-supervisor <command>
     \\
     \\Commands:
-    \\  start    Start a synthetic Tickoni pipeline (dev/test mode)
+    \\  start    Run the Phase 0 Tickoni pipeline spike (dev/test mode)
     \\  status   Print topology tile names
     \\
 ;
@@ -21,7 +21,7 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(1);
     };
 
-    const topo = rt.topology.syntheticPipeline();
+    const topo = rt.topology.paymentPipeline();
 
     if (std.mem.eql(u8, cmd, "start")) {
         try cmdStart(init, topo);
@@ -41,8 +41,10 @@ fn cmdStart(init: std.process.Init, topo: rt.topology.Topology) !void {
     var sup = try Supervisor.init(init.gpa, topo);
     defer sup.deinit();
 
-    try sup.startSynthetic(10_000);
-    try File.writeStreamingAll(stdout, init.io, "tickoni-supervisor: synthetic pipeline started\ntiles:\n");
+    try sup.startPaymentPipeline(.{ .event_count = 10_000, .queue_depth = 64 });
+    sup.wait();
+
+    try File.writeStreamingAll(stdout, init.io, "tickoni-supervisor: Phase 0 pipeline completed\ntiles:\n");
 
     var buf: [256]u8 = undefined;
     for (sup.monitor()) |h| {
@@ -52,6 +54,36 @@ fn cmdStart(init: std.process.Init, topo: rt.topology.Topology) !void {
             @tagName(h.state),
         });
         try File.writeStreamingAll(stdout, init.io, line);
+    }
+
+    if (sup.pipeline) |state| {
+        const metrics = state.snapshotMetrics();
+        const diag = state.snapshotDiag();
+        const metrics_line = try std.fmt.bufPrint(
+            &buf,
+            "metrics: produced={d} audited={d} duplicates={d} denied={d} backpressure_waits={d} max_queue_depth={d} max_latency_hops={d}\n",
+            .{
+                metrics.produced,
+                metrics.audited,
+                metrics.duplicates,
+                metrics.denied,
+                metrics.backpressure_waits,
+                metrics.max_queue_depth,
+                metrics.max_latency_hops,
+            },
+        );
+        try File.writeStreamingAll(stdout, init.io, metrics_line);
+
+        const diag_line = try std.fmt.bufPrint(
+            &buf,
+            "diag: sandbox_failures={d} replay_checked={s} replay_match={s}\n",
+            .{
+                diag.sandbox_failures,
+                if (diag.replay_checked) "true" else "false",
+                if (diag.replay_match) "true" else "false",
+            },
+        );
+        try File.writeStreamingAll(stdout, init.io, diag_line);
     }
 
     sup.stop();

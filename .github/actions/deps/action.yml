@@ -50,28 +50,6 @@ runs:
       run: sudo apt-get update
       if: env.HAS_APT_GET == '1'
 
-    - name: Install compiler if not present
-      shell: bash
-      run: |
-        if [[ "${{ inputs.compiler-version }}" != "system" ]]; then
-          activate="/opt/${{ inputs.compiler }}/${{ inputs.compiler }}-${{ inputs.compiler-version }}/activate"
-          if [[ ! -f "$activate" ]]; then
-            major=$(echo "${{ inputs.compiler-version }}" | cut -d. -f1)
-            if [[ "${{ inputs.compiler }}" == "clang" ]]; then
-              wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
-              chmod +x /tmp/llvm.sh
-              sudo /tmp/llvm.sh "$major"
-              sudo mkdir -p "$(dirname "$activate")"
-              printf 'export CC=clang-%s\nexport CXX=clang++-%s\nexport PATH="/usr/lib/llvm-%s/bin:$PATH"\n' \
-                "$major" "$major" "$major" | sudo tee "$activate"
-            elif [[ "${{ inputs.compiler }}" == "gcc" ]]; then
-              sudo apt-get install -y "gcc-$major" "g++-$major"
-              sudo mkdir -p "$(dirname "$activate")"
-              printf 'export CC=gcc-%s\nexport CXX=g++-%s\n' "$major" "$major" | sudo tee "$activate"
-            fi
-          fi
-        fi
-
     - id: deps-sh-hash
       shell: bash
       run: cat /etc/os-release '${{ inputs.deps-script-path }}' | sha256sum | awk '{print "HASH=" $1}' >> "$GITHUB_OUTPUT"
@@ -97,9 +75,17 @@ runs:
       shell: bash
       run: |
         if [[ "${{ inputs.compiler-version }}" != "system" ]]; then
-          activate="/opt/${{ inputs.compiler }}/${{ inputs.compiler }}-${{ inputs.compiler-version }}/activate"
-          if [[ -f "$activate" ]]; then
-            source "$activate"
+          activate_path="/opt/${{ inputs.compiler }}/${{ inputs.compiler }}-${{ inputs.compiler-version }}/activate"
+          if [[ -f "$activate_path" ]]; then
+            source "$activate_path"
+          else
+            if [[ "${{ inputs.compiler }}" == "clang" ]]; then
+              sudo apt-get install -y clang-${{ inputs.compiler-version }} clang++-${{ inputs.compiler-version }}
+            else
+              sudo apt-get install -y ${{ inputs.compiler }}-${{ inputs.compiler-version }} g++-${{ inputs.compiler-version }}
+            fi
+            sudo update-alternatives --install /usr/bin/${{ inputs.compiler }} ${{ inputs.compiler }} \
+              /usr/bin/${{ inputs.compiler }}-${{ inputs.compiler-version }} 100
           fi
         fi
         CC='${{ inputs.compiler }}' \

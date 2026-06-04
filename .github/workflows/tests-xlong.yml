@@ -1,0 +1,57 @@
+name: Tests / XLong
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-xlong-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-slim
+    outputs:
+      run: ${{ steps.detect.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          paths: '^(src/|build\.zig(\.zon)?$|justfile$|contrib/test/|contrib/make-j$|\.github/actions/|\.github/workflows/tests-xlong\.yml$)'
+
+  xlong-tests:
+    name: Engine E2E Tests
+    needs: detect-changes
+    if: false && needs.detect-changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          fd-deps: 'true'
+
+      - name: Enable all CPUs
+        uses: ./.github/actions/cpusonline
+
+      - name: Configure hugepages
+        uses: ./.github/actions/hugepages
+        with:
+          count_gigantic: 6
+          count_huge: 64
+
+      - name: Run test suite
+        run: just test-e2e-fd
