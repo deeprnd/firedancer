@@ -94,19 +94,17 @@ test-all:
 test-cov-fd:
   #!/usr/bin/env bash
   set -euo pipefail
-  echo "[cov] elevating: freeing gigantic pages before run"
   just mem-free || true
-  trap 'echo "[cov] elevating: freeing gigantic pages on exit"; just mem-free' EXIT
+  trap 'just mem-free' EXIT
   want=$(free -g | awk '/^Mem:/{print int(($2 - 4) / 6) * 6}')
-  echo "[cov] elevating: allocating gigantic pages"
   (( want > 0 )) && sudo src/util/shmem/fd_shmem_cfg alloc "$want" gigantic 0 >/dev/null 2>&1 || true
   pages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/free_hugepages 2>/dev/null || echo 0)
-  echo "[cov] elevating: setting memlock unlimited for pid $$"
   sudo prlimit --pid $$ --memlock=unlimited
-  echo "[cov] dropping to user: memory ops complete"
-  if (( pages < 6 )); then
-    echo "[cov] note: gigantic pages unavailable, falling back to normal pages"
-  fi
+  # llvm-cov inflates per-job RSS to ~5 GB; halve parallelism to stay within
+  # the 16 GB GitHub ubuntu-24.04 runner limit (vs. make -j$(nproc) used for unit tests).
+  jobs=$(( $(nproc) / 2 ))
+  (( jobs < 1 )) && jobs=1
+  make -j"${jobs}" BUILDDIR=fd-cov CC=clang-18 MACHINE=linux_clang_x86_64 EXTRAS="llvm-cov" unit-test
   export TEST_OPTS=""
   (( pages < 6 )) && export TEST_OPTS="--page-sz normal" || true
   python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd

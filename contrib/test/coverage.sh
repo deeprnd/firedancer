@@ -5,8 +5,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-MAKE_RUNNER=(./contrib/make-j)
-
 log() {
   printf '\n[%s] %s\n' "$1" "$2"
 }
@@ -34,12 +32,8 @@ cmd_coverage_fd() {
   local summary="build/coverage/fd/coverage-summary.json"
   local config="contrib/test/coverage-fd.json"
 
-  run_step "build fd with llvm-cov" \
-    "${MAKE_RUNNER[@]}" BUILDDIR="$builddir" CC=clang-18 \
-    MACHINE=linux_clang_x86_64 EXTRAS="llvm-cov" unit-test
-
-  # TEST_OPTS is set by the caller (test-cov-fd justfile recipe) which handles
-  # hugepage allocation and prlimit before invoking this script.
+  # Build is done by the test-cov-fd justfile recipe before invoking this script.
+  # TEST_OPTS is also set there (hugepage allocation and prlimit).
   run_step "run unit tests" \
     make run-unit-test BUILDDIR="$builddir" CC=clang-18 \
     MACHINE=linux_clang_x86_64 EXTRAS="llvm-cov" TEST_OPTS="${TEST_OPTS:-}"

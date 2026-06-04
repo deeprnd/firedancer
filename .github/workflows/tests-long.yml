@@ -50,7 +50,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
