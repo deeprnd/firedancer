@@ -467,7 +467,7 @@ explicit errors for operator-facing validation and malformed input.
 
 Good:
 
-- assert that a synthetic test supervisor is using the expected two-tile shape
+- assert that a synthetic test supervisor is using the expected payment pipeline shape
 - return `error.ChannelDepthNotPowerOfTwo` from topology validation
 - reject malformed financial events with a counted policy/audit record
 - fail startup when configured capacity cannot be allocated

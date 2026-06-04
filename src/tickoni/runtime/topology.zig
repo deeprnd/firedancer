@@ -58,26 +58,35 @@ pub const Topology = struct {
     }
 };
 
-// Static backing arrays for syntheticPipeline — avoids returning pointers
-// to stack-allocated data.
-const synthetic_tiles = [_]TileDescriptor{
-    .{ .id = TileId.parse("tksrce") catch unreachable, .name = "synthetic_source", .phase = 0 },
-    .{ .id = TileId.parse("tksink") catch unreachable, .name = "synthetic_sink", .phase = 0 },
+// Static backing arrays for paymentPipeline — avoids returning pointers to
+// stack-allocated data.
+const payment_tiles = [_]TileDescriptor{
+    .{ .id = TileId.parse("tkings") catch unreachable, .name = "ingest_tile", .phase = 0 },
+    .{ .id = TileId.parse("tknorm") catch unreachable, .name = "normalize_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkdedu") catch unreachable, .name = "dedupe_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkpoly") catch unreachable, .name = "policy_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkaudt") catch unreachable, .name = "audit_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkrepl") catch unreachable, .name = "replay_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkmetr") catch unreachable, .name = "metric_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkdiag") catch unreachable, .name = "diag_tile", .phase = 0 },
 };
-const synthetic_channels = [_]Channel{
-    .{ .src_idx = 0, .dst_idx = 1, .depth = 64, .mtu = 8 },
+const payment_channels = [_]Channel{
+    .{ .src_idx = 0, .dst_idx = 1, .depth = 64, .mtu = 128 },
+    .{ .src_idx = 1, .dst_idx = 2, .depth = 64, .mtu = 128 },
+    .{ .src_idx = 2, .dst_idx = 3, .depth = 64, .mtu = 128 },
+    .{ .src_idx = 3, .dst_idx = 4, .depth = 64, .mtu = 128 },
 };
 
-/// Two-tile in-process pipeline used to prove the supervisor lifecycle.
+/// Phase 0 in-process pipeline used by the Tickoni product supervisor.
 ///
-///   tksrce  -->  tksink
+///   tkings -> tknorm -> tkdedu -> tkpoly -> tkaudt
+///   tkrepl, tkmetr, and tkdiag observe the deterministic run.
 ///
-/// Neither tile is a Solana validator tile. tksrce emits sequential u64
-/// payloads; tksink counts received payloads.
-pub fn syntheticPipeline() Topology {
+/// No Solana validator tiles are registered in this topology.
+pub fn paymentPipeline() Topology {
     return .{
-        .tiles = &synthetic_tiles,
-        .channels = &synthetic_channels,
+        .tiles = &payment_tiles,
+        .channels = &payment_channels,
     };
 }
 
@@ -103,18 +112,19 @@ test "TileId equality" {
     try std.testing.expect(!a.eql(c));
 }
 
-test "syntheticPipeline has 2 tiles and 1 channel" {
-    const topo = syntheticPipeline();
-    try std.testing.expectEqual(@as(usize, 2), topo.tiles.len);
-    try std.testing.expectEqual(@as(usize, 1), topo.channels.len);
-    try std.testing.expectEqualStrings("tksrce", topo.tiles[0].id.slice());
-    try std.testing.expectEqualStrings("tksink", topo.tiles[1].id.slice());
+test "paymentPipeline has Phase 0 product tiles and channels" {
+    const topo = paymentPipeline();
+    try std.testing.expectEqual(@as(usize, 8), topo.tiles.len);
+    try std.testing.expectEqual(@as(usize, 4), topo.channels.len);
+    try std.testing.expectEqualStrings("tkings", topo.tiles[0].id.slice());
+    try std.testing.expectEqualStrings("tkaudt", topo.tiles[4].id.slice());
+    try std.testing.expectEqualStrings("tkdiag", topo.tiles[7].id.slice());
     try std.testing.expectEqual(@as(u32, 0), topo.channels[0].src_idx);
     try std.testing.expectEqual(@as(u32, 1), topo.channels[0].dst_idx);
 }
 
-test "syntheticPipeline passes validation" {
-    try syntheticPipeline().validate();
+test "paymentPipeline passes validation" {
+    try paymentPipeline().validate();
 }
 
 test "validate rejects non-power-of-two channel depth" {

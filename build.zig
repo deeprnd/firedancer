@@ -20,7 +20,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const tiles_mod = b.addModule("tiles", .{
-        .root_source_file = b.path("src/tickoni/tiles/synthetic.zig"),
+        .root_source_file = b.path("src/tickoni/tiles/payment_pipeline.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -58,7 +58,7 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/runtime/tile.zig",
         "src/tickoni/c_abi/queue.zig",
         "src/tickoni/c_abi/sandbox.zig",
-        "src/tickoni/tiles/synthetic.zig",
+        "src/tickoni/tiles/payment_pipeline.zig",
     }) |path| {
         const t_mod = b.createModule(.{
             .root_source_file = b.path(path),

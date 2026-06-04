@@ -47,18 +47,8 @@ Privileged action executor
 
 ## Phase 0 Runtime Spike
 
-Current implementation status: the Zig scaffold exists and proves a Step 1
-synthetic supervisor lifecycle. It runs:
-
-```text
-tksrce -> tksink
-```
-
-That synthetic pipeline is not the product topology. It exists to prove that a
-Tickoni-owned Zig supervisor can start, stop, and monitor non-Solana tiles.
-
-The next runtime spike should replace the counter-only synthetic path with the
-Phase 0 financial event pipeline:
+Current implementation status: the Zig supervisor runs the Phase 0 financial
+event spike in dev/test mode:
 
 ```text
 synthetic payment stream
@@ -73,16 +63,20 @@ tkmetr -> runtime metrics
 tkdiag -> process and queue diagnostics
 ```
 
-Phase 0 must prove:
+The spike proves:
 
 - bounded channel depths
 - stable event hashes
 - append-only audit records
 - deterministic replay comparison
 - visible backpressure and queue health
-- malformed-event rejection
+- audited malformed-event rejection
 - crash-only supervisor behavior
 - no Solana validator tiles in the Tickoni topology
+
+The current implementation uses heap-backed in-process bounded queues. The
+next runtime hardening step is to replace those spike rings with the selected
+shared-memory backing while keeping the same tile identities and link answers.
 
 ## Runtime Model
 
@@ -116,7 +110,7 @@ links and publish their own progress counters.
 
 ### Link Shape
 
-Phase 0 links should be documented and implemented with this shape:
+Phase 0 links are implemented with this shape:
 
 | Link | Producer | Consumer | Reliability | Payload |
 | --- | --- | --- | --- | --- |
@@ -351,3 +345,13 @@ Agent and adapter isolation:
 - capability-scoped envelopes
 - full tool-call logging
 - network access controlled per tile or adapter
+
+## Related Docs
+
+- [Development](./development.md)
+- [Build](./build.md)
+- [Testing](./testing-tickoni.md)
+- [Observability](./observability.md)
+- [Telemetry](./telemetry.md)
+- [Security](./security.md)
+- [Contribution Guide](./contribution/tickoni.md)
