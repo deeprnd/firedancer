@@ -24,11 +24,21 @@ build-tk:
 build-fd:
   make -j"$(nproc)" tickoni
 
+build-fd-gcc:
+  make -j"$(nproc)" BUILDDIR=fd-gcc CC=gcc-12 MACHINE=linux_gcc_x86_64 tickoni
+
+build-fd-clang:
+  make -j"$(nproc)" BUILDDIR=fd-clang CC=clang-18 MACHINE=linux_clang_x86_64 tickoni
+
+# Compile-only ARM lane matching the CI machine target; Firedancer runtime remains x86-64 Linux only.
+build-fd-arm:
+  make -j"$(nproc)" BUILDDIR=fd-arm CC=gcc-14 MACHINE=linux_gcc_neoverse_n1 tickoni
+
 build-fd-dev:
   make -j"$(nproc)" firedancer-dev
 
 build-all:
-  python3 contrib/readme/run-badged-command.py build "just build-tk && just build-fd"
+  python3 contrib/readme/run-badged-command.py build bash -c "just build-tk && just build-fd"
 
 # ── Test ───────────────────────────────────────────────────────────────────
 
@@ -54,7 +64,7 @@ test-unit-tk:
   zig build test
 
 test-unit-all:
-  python3 contrib/readme/run-badged-command.py unit "just test-unit-fd && just test-unit-tk"
+  python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-fd && just test-unit-tk"
 
 test-e2e-fd:
   make -j"$(nproc)" integration-test && make run-integration-test
@@ -63,7 +73,7 @@ test-e2e-tk:
   @true
 
 test-e2e-all:
-  python3 contrib/readme/run-badged-command.py e2e "just test-e2e-fd && just test-e2e-tk"
+  python3 contrib/readme/run-badged-command.py e2e bash -c "just test-e2e-fd && just test-e2e-tk"
 
 test-integration-fd:
   @true
@@ -72,12 +82,39 @@ test-integration-tk:
   @true
 
 test-integration-all:
-  python3 contrib/readme/run-badged-command.py integration "just test-integration-fd && just test-integration-tk"
+  python3 contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"
 
 test-all:
   @just test-unit-all
   @just test-integration-all
   @just test-e2e-all
+
+# ── Test: Coverage ─────────────────────────────────────────────────────────
+
+test-cov-fd:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  just mem-free || true
+  trap 'just mem-free' EXIT
+  want=$(free -g | awk '/^Mem:/{print int(($2 - 4) / 6) * 6}')
+  (( want > 0 )) && sudo src/util/shmem/fd_shmem_cfg alloc "$want" gigantic 0 >/dev/null 2>&1 || true
+  pages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/free_hugepages 2>/dev/null || echo 0)
+  sudo prlimit --pid $$ --memlock=unlimited
+  # llvm-cov inflates per-job RSS to ~5 GB; halve parallelism to stay within
+  # the 16 GB GitHub ubuntu-24.04 runner limit (vs. make -j$(nproc) used for unit tests).
+  jobs=$(( $(nproc) / 2 ))
+  (( jobs < 1 )) && jobs=1
+  make -j"${jobs}" BUILDDIR=fd-cov CC=clang-18 MACHINE=linux_clang_x86_64 EXTRAS="llvm-cov" unit-test
+  export TEST_OPTS=""
+  (( pages < 6 )) && export TEST_OPTS="--page-sz normal" || true
+  python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd
+
+test-cov-tk:
+  python3 contrib/readme/run-badged-command.py cov-tk bash contrib/test/coverage.sh coverage-tk
+
+test-cov-all:
+  @just test-cov-fd
+  @just test-cov-tk
 
 tests-all:
   @just build-all
@@ -123,7 +160,7 @@ quality-lint-check-all:
 # ── Quality: All ───────────────────────────────────────────────────────────
 
 quality-check-all:
-  python3 contrib/readme/run-badged-command.py quality "just quality-format-check-all && just quality-lint-check-all"
+  python3 contrib/readme/run-badged-command.py quality bash -c "just quality-format-check-all && just quality-lint-check-all"
 
 # ── Security: CodeQL ───────────────────────────────────────────────────────
 
@@ -188,7 +225,7 @@ security-sanitize-check-all:
 # ── Security: All ──────────────────────────────────────────────────────────
 
 security-check-all:
-  python3 contrib/readme/run-badged-command.py security "just security-codeql-check-all && just security-gitleaks-check-all && just security-seccomp-check-all && just security-proof-check-all && just security-sanitize-check-all"
+  python3 contrib/readme/run-badged-command.py security bash -c "just security-codeql-check-all && just security-gitleaks-check-all && just security-seccomp-check-all && just security-proof-check-all && just security-sanitize-check-all"
 
 # ── Memory (hugepages) ─────────────────────────────────────────────────────
 

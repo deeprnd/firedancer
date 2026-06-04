@@ -1,0 +1,81 @@
+name: Tests / Long
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-long-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-slim
+    outputs:
+      run: ${{ steps.detect.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          paths: '^(src/|build\.zig(\.zon)?$|justfile$|contrib/test/|contrib/make-j$|contrib/readme/coverage_report\.py$|\.github/actions/|\.github/workflows/tests-long\.yml$)'
+
+  long-tests:
+    name: Engine Unit Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Firedancer test environment
+        uses: ./.github/actions/setup-fd-test
+
+      - name: Run test suite
+        run: just test-unit-fd
+
+  cov-fd:
+    name: Engine Tests Coverage
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Firedancer test environment
+        uses: ./.github/actions/setup-fd-test
+        with:
+          compiler: clang
+          compiler-version: '18'
+
+      - name: Install LLVM coverage tools
+        shell: bash
+        run: |
+          sudo apt-get install -y llvm-18
+          for tool in profdata objdump ar cov; do
+            sudo update-alternatives --install /usr/bin/llvm-$tool llvm-$tool \
+              /usr/bin/llvm-${tool}-18 100
+          done
+
+      - name: Run coverage
+        run: just test-cov-fd
+
+      - name: Upload coverage summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-fd
+          path: build/coverage/fd/coverage-summary.json

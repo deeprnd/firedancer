@@ -35,6 +35,19 @@
 <!-- badge:e2e:end -->
     </td>
   </tr>
+  <tr>
+    <td>
+      <!-- badge:cov-fd:start -->
+<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-43.0%25-orange?style=flat-square" />
+<!-- badge:cov-fd:end -->
+    </td>
+    <td>
+      <!-- badge:cov-tk:start -->
+<img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-97.9%25-brightgreen?style=flat-square" />
+<!-- badge:cov-tk:end -->
+    </td>
+    <td></td>
+  </tr>
 </table>
 
 **High-throughput AI harness for agentic finance.**
@@ -230,13 +243,17 @@ No black boxes.
 
 - [Overview](doc/overview.md)
 - [Architecture](doc/architecture.md)
+- [Development](doc/development.md)
 - [Workflows](doc/workflows.md)
+- [Build](doc/build.md)
+- [Build system](doc/build-system.md)
+- [Tickoni testing](doc/testing-tickoni.md)
+- [Firedancer-style testing](doc/testing.md)
 - [Observability](doc/observability.md)
+- [Telemetry](doc/telemetry.md)
 - [Security](doc/security.md)
 - [Audit and replay](doc/audit.md)
 - [Roadmap](doc/product/roadmap.md)
-- [Build](doc/build.md)
-- [Testing](doc/testing.md)
 
 ## License
 

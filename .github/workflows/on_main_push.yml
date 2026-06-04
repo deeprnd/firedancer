@@ -3,10 +3,8 @@ on:
   push:
     branches: [main]
 jobs:
-  migration_policy:
-    uses: ./.github/workflows/migration_policy.yml
-
   book:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/book.yml
     secrets: inherit
     permissions:

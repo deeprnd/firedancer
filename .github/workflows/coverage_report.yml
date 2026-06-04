@@ -8,14 +8,20 @@ on:
   workflow_dispatch:
 jobs:
   coverage-report:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     timeout-minutes: 60
     name: Coverage Report
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: icelake
+      group: fd-public-repo
     environment:
       name: coverage-report
       url: ${{ vars.COVERAGE_URL }}
+      deployment: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     steps:
       - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/submodule-init
 
       - uses: ./.github/actions/deps
         with:

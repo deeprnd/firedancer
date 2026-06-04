@@ -22,19 +22,22 @@ permissions:
 
 jobs:
   coverage-test-vectors:
-    if: false
+    if: ${{ (github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch') && vars.SKIP_FIREDANCER_CI != 'true' }}
     name: Coverage Test Vectors
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: icelake
+      group: fd-public-repo
     timeout-minutes: 40
     environment:
       name: coverage-report
+      deployment: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     env:
       CC: clang
       CXX: clang++
       MACHINE: linux_clang_icelake
       EXTRAS: llvm-cov
       COMPILER: clang
-      COMPILER_VERSION: 18
+      COMPILER_VERSION: 15.0.6
 
     steps:
       # ── base commit ────────────────────────────────────────────────────────
@@ -45,16 +48,10 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha || 'main' }}
           submodules: recursive
 
-      - name: Install clang-18
-        run: |
-          sudo apt-get install -y clang-18 llvm-18
-          sudo mkdir -p /opt/clang/clang-18
-          printf 'export CC=clang-18\nexport CXX=clang++-18\nexport PATH="/usr/lib/llvm-18/bin:$PATH"\n' | sudo tee /opt/clang/clang-18/activate
-
       - uses: ./.github/actions/deps
         with:
           compiler: clang
-          compiler-version: 18
+          compiler-version: 15.0.6
           extras: +dev
       - uses: ./.github/actions/cpusonline
       - uses: ./.github/actions/hugepages

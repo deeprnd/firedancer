@@ -1,123 +1,249 @@
 # Tickoni Architecture
 
-## Harness Architecture
+Tickoni is a high-throughput AI harness for agentic finance. The architecture
+starts from financial event integrity, then adds controlled agents after the
+runtime can prove bounded processing, audit, replay, and isolation.
+
+The implementation rule is:
 
 ```text
-Financial Event Streams
+runtime first
+cases second
+agents third
+privileged actions last
+```
+
+AI is not part of the deterministic event critical path. A financial event must
+be ingestible, normalized, audited, and replayable before any agent investigates
+the resulting case.
+
+## Product Shape
+
+```text
+Financial event streams
   payments / accounting ledger / fraud / compliance / disputes
         |
         v
-Tickoni Runtime
+Tickoni event runtime
   Zig + Firedancer-style tile pipeline
-  high-throughput deterministic event processing
+  bounded queues, deterministic processing, explicit ownership
         |
         v
-Policy Engine
-  capability checks
-  environment rules
-  approval gates
-  action constraints
+Policy and audit boundary
+  capability checks, denials, append-only records, replay capsules
         |
         v
-Agent Harness
-  investigator
-  reconciler
-  payment ops assistant
-  fraud reviewer
-  compliance preparer
+Controlled agent harness
+  role agents, model gateway, tool broker, signed adapters
         |
         v
-CaseOps Board
-  event lifecycle
-  evidence
-  decisions
-  approvals
-  outcomes
+CaseOps board
+  case lifecycle, evidence, approvals, audit timeline
         |
         v
-Audit Journal
-  immutable event chain
-  replay capsules
-  exportable evidence
+Privileged action executor
+  disabled by default, approved mutations only
 ```
 
-## Technical Architecture
+## Phase 0 Runtime Spike
 
-### 1. Event Runtime
-
-The runtime processes financial events through isolated tiles.
-
-Core tiles:
+Current implementation status: the Zig supervisor runs the Phase 0 financial
+event spike in dev/test mode:
 
 ```text
-ingest_tile
-normalize_tile
-dedupe_tile
-entity_resolution_tile
-risk_signal_tile
-policy_tile
-agent_dispatch_tile
-audit_tile
-case_router_tile
-action_tile
+synthetic payment stream
+  -> tkings
+  -> tknorm
+  -> tkdedu
+  -> tkpoly
+  -> tkaudt
+
+tkrepl -> deterministic re-injection path
+tkmetr -> runtime metrics
+tkdiag -> process and queue diagnostics
 ```
 
-Each tile has:
+The spike proves:
 
-- a single responsibility
-- explicit input/output schema
-- bounded resources
-- isolated process boundary where appropriate
-- deterministic behavior
-- auditable event emission
-- replay support
+- bounded channel depths
+- stable event hashes
+- append-only audit records
+- deterministic replay comparison
+- visible backpressure and queue health
+- audited malformed-event rejection
+- crash-only supervisor behavior
+- no Solana validator tiles in the Tickoni topology
 
-### 2. Shared-Memory Event Pipeline
+The current implementation uses heap-backed in-process bounded queues. The
+next runtime hardening step is to replace those spike rings with the selected
+shared-memory backing while keeping the same tile identities and link answers.
 
-Tickoni uses a high-throughput pipeline inspired by Firedancer’s tile architecture.
+## Runtime Model
 
-The goal is to support:
+Tickoni follows Firedancer's topology discipline: tiles, links, workspaces,
+mapping modes, and queue depths are explicit. A design is not ready until each
+link can answer:
 
-- high event volume
-- low latency
-- predictable backpressure
-- deterministic replay
-- crash isolation
-- explicit performance measurement
+1. Which tile owns the state?
+2. Which workspace holds it?
+3. Which process maps it, and in what mode?
+4. Which fields are written concurrently, and by whom?
+5. What happens on overrun, restart, and shutdown?
+6. Which metrics or logs expose unhealthy behavior?
 
-Event flow:
+For the Phase 0 pipeline, the default ownership model is one producer per link
+and one owning tile for every mutable state object. Consumers read from bounded
+links and publish their own progress counters.
+
+### Phase 0 Tiles
+
+| Runtime ID | Logical name | Responsibility |
+| --- | --- | --- |
+| `tkings` | `ingest_tile` | Receive synthetic payment events, validate framing, assign source offsets, and apply ingress backpressure |
+| `tknorm` | `normalize_tile` | Convert source events into the canonical financial event schema |
+| `tkdedu` | `dedupe_tile` | Deduplicate events by idempotency key and content hash |
+| `tkpoly` | `policy_tile` | Evaluate versioned capability policy for runtime-visible decisions |
+| `tkaudt` | `audit_tile` | Own append-only hash-chain ordering and JSONL export |
+| `tkrepl` | `replay_tile` | Re-inject replay capsules with external effects disabled and report divergence |
+| `tkmetr` | `metric_tile` | Export queue, tile, and runtime metrics |
+| `tkdiag` | `diag_tile` | Export process, queue, crash, and supervisor diagnostics |
+
+### Link Shape
+
+Phase 0 links are implemented with this shape:
+
+| Link | Producer | Consumer | Reliability | Payload |
+| --- | --- | --- | --- | --- |
+| `tkings_tknorm` | `tkings` | `tknorm` | reliable until ingress backpressure trips | canonicalizable payment event |
+| `tknorm_tkdedu` | `tknorm` | `tkdedu` | reliable | normalized financial event |
+| `tkdedu_tkpoly` | `tkdedu` | `tkpoly` | reliable | deduplicated event decision input |
+| `tkpoly_tkaudt` | `tkpoly` | `tkaudt` | reliable | policy decision and event envelope |
+| `tkrepl_tkings` | `tkrepl` | `tkings` or replay entrypoint | reliable in replay mode | replay capsule event |
+| `*_tkmetr` | tile-local producers | `tkmetr` | unreliable where safe | metrics samples |
+| `*_tkdiag` | tile-local producers | `tkdiag` | unreliable where safe | diagnostics samples |
+
+Correctness-bearing event and audit links should prefer bounded reliable flow
+control. Telemetry links may be unreliable if loss is counted and visible.
+
+## Financial Event Schema
+
+The first schema should be intentionally small. It only needs enough structure
+to prove hashing, normalization, deduplication, policy decisions, and audit.
+
+Required fields:
 
 ```text
-processor_webhook
-  -> ingest_tile
-  -> normalize_tile
-  -> dedupe_tile
-  -> policy_tile
-  -> case_router_tile
-  -> agent_dispatch_tile
-  -> audit_tile
+source_system
+source_offset
+source_event_id
+event_type
+occurred_at_ns
+received_at_ns
+subject_id
+amount
+currency
+idempotency_key
+payload_hash
+schema_version
 ```
 
-### 3. Agent Harness
+The normalized event hash should be stable across process restarts and replay.
+Fields that depend on local runtime receipt, such as `received_at_ns`, must be
+handled explicitly so replay can distinguish source facts from runtime facts.
 
-Agents operate as controlled workers, not unrestricted actors.
+## Policy Boundary
 
-Each run carries an agent identity, role, case scope, and policy version.
-Money-impacting integrations stay behind the tool broker and privileged action
-boundary.
+Policy is a runtime control layer, not prompt guidance. Every meaningful action
+is checked against:
 
-Agent roles:
+- actor or service identity
+- event or case scope
+- environment
+- data classification
+- requested capability
+- policy version
+- action risk level
+- required approvals
+
+Phase 0 only needs enough policy machinery to prove allow, deny, and
+require-approval records. Full agent and tool policy arrives in Phase 2.
+
+Example:
+
+```yaml
+requested_action: create_case_candidate
+event_type: payment.failed
+environment: development
+decision: allow
+reason: phase0_non_mutating_runtime_event
+policy_version: policy_2026_06_01
+```
+
+## Audit Journal
+
+Tickoni's audit layer is a first-class system, not log text. `tkaudt` owns
+append-only ordering for material runtime events.
+
+Phase 0 audit records should include:
 
 ```text
-payment_exception_agent
-reconciliation_agent
-fraud_triage_agent
-compliance_case_agent
-risk_reviewer_agent
-security_reviewer_agent
+audit_event_id
+previous_hash
+record_hash
+timestamp_ns
+source_system
+source_offset
+source_event_id
+normalized_event_hash
+policy_version
+decision
+reason
+tile_id
+schema_version
 ```
 
-Agents can:
+Later phases add case IDs, agent IDs, model IDs, prompt hashes, tool calls,
+approval IDs, downstream action IDs, signatures, and evidence references.
+
+Large payloads should be content-addressed instead of duplicated into every
+audit record.
+
+## Replay
+
+Replay is a deterministic comparison path. It is not allowed to invoke
+privileged external mutations.
+
+Phase 0 replay must answer:
+
+- Did normalized event hashes match?
+- Did deduplication decisions match?
+- Did policy decisions match?
+- Did audit chain hashes match?
+- What was the first divergent event?
+
+Replay command concept:
+
+```bash
+tickoni replay capsule phase0-payment-001
+```
+
+Expected result shape:
+
+```text
+Replay: phase0-payment-001
+Event hashes: matched
+Dedup decisions: matched
+Policy decisions: matched
+Audit chain: matched
+
+Result: REPLAY MATCH
+```
+
+## Agent Harness
+
+Agents are Phase 2. They operate as controlled workers, not unrestricted actors.
+
+Agents may:
 
 - read permitted evidence
 - classify events
@@ -127,7 +253,7 @@ Agents can:
 - propose actions
 - request human review
 
-Agents cannot directly:
+Agents may not directly:
 
 - move money
 - post accounting ledger adjustments
@@ -138,13 +264,15 @@ Agents cannot directly:
 - access secrets
 - delete audit records
 
-### 4. Tool Broker
+Agent workers should be networkless. Model-provider network access belongs
+behind `tkmodl`. Tool access belongs behind `tktool` and signed `tkadpt`
+instances.
 
-All agent tool use goes through a tool broker.
+## Tool Broker And Adapters
 
-The broker normalizes model-native function calls and MCP-compatible tool
-requests into the same capability envelope. MCP is an integration protocol,
-not a trust boundary.
+The tool broker is Phase 2. It normalizes model-native function calls and
+MCP-compatible tool requests into the same capability envelope. MCP is an
+integration protocol, not a trust boundary.
 
 The broker enforces:
 
@@ -157,243 +285,44 @@ The broker enforces:
 - audit logging
 - policy checks
 
-Tool capabilities:
+Signed adapters expand integration reach without expanding agent authority.
 
-```text
-read_payment_event
-read_processor_log
-read_accounting_entry
-read_case_history
-draft_customer_response
-propose_ledger_adjustment
-route_case_to_queue
-request_human_approval
-```
+## CaseOps Board
 
-Restricted capabilities:
+The CaseOps Board is Phase 3. It is Tickoni's operational control plane, not a
+generic Kanban board.
 
-```text
-release_payout
-post_ledger_adjustment
-freeze_account
-approve_refund
-close_compliance_case
-```
+Each card represents a financial case backed by event data, evidence, agent
+actions, policy decisions, approvals, and audit records.
 
-Restricted capabilities require explicit policy and human approval, and may be disabled entirely in v1.
-
-### 5. Policy Engine
-
-Tickoni uses policy as the central control layer.
-
-Every meaningful action is checked against:
-
-- actor identity
-- agent or service identity
-- agent role
-- case type
-- environment
-- event severity
-- data classification
-- allowed capabilities
-- policy version
-- required approvals
-- action risk level
-- action or downstream-system scope
-
-Allowed policy decision:
-
-```yaml
-requested_action: propose_ledger_adjustment
-case_type: reconciliation_break
-agent: reconciliation_agent
-environment: production
-decision: allow
-reason: proposal_only_no_downstream_mutation
-policy_version: policy_2026_06_01
-```
-
-Denied policy decision:
-
-```yaml
-requested_action: release_payout
-case_type: suspicious_payout
-agent: fraud_triage_agent
-environment: production
-decision: deny
-reason: agent_cannot_release_funds
-policy_version: policy_2026_06_01
-```
-
-### 6. CaseOps Board
-
-The CaseOps Board is Tickoni’s operational control plane.
-
-It is not a generic Kanban board.
-
-Each card represents a financial case backed by event data, evidence, agent actions, policy decisions, approvals, and audit records.
-
-Default v1 columns:
+Default V1 columns:
 
 ```text
 New Event
-→ Enriched
-→ Agent Reviewed
-→ Policy Decision
-→ Human Review
-→ Action Proposed
-→ Resolved
-→ Audited
+-> Enriched
+-> Agent Reviewed
+-> Policy Decision
+-> Human Review
+-> Action Proposed
+-> Resolved
+-> Audited
 ```
 
-Case card:
+## Privileged Actions
 
-```yaml
-case_id: PAY-84721
-type: reconciliation_break
-amount: 184230.22
-currency: USD
-merchant: M_38291
-processor: stripe
-severity: high
+Privileged execution is last. Agents never receive direct authority to mutate
+money-adjacent systems.
 
-evidence:
-  processor_batch: hash://a11
-  accounting_entries: hash://b22
-  bank_statement: hash://c33
+`tkexec` may be added only after policy, audit, replay, approval, and adapter
+boundaries are already proven. For accounting ledger integrations such as
+TigerBeetle, only `tkexec` receives ledger network credentials. Replay uses
+deterministic mock connector results and never invokes production mutation.
 
-agent_findings:
-  likely_reason: duplicate_capture_reversed_after_batch_cutoff
-  confidence: 0.82
-
-policy:
-  allowed_actions:
-    - draft_correction
-    - route_finance_ops
-  denied_actions:
-    - post_ledger_adjustment
-    - release_funds
-
-audit:
-  replay_capsule: capsule://PAY-84721
-  event_chain: audit://PAY-84721
-```
-
-### 7. Audit Journal
-
-Tickoni’s audit layer is a first-class system, not a logging feature.
-
-Every meaningful event is recorded into an append-only, hash-chained audit
-journal.
-
-Audit records include:
-
-```text
-event_id
-previous_hash
-timestamp_ns
-source_system
-actor_id
-agent_id
-model_id
-prompt_hash
-tool_call_hash
-input_hash
-output_hash
-policy_version
-case_id
-capability
-decision
-approval_id
-downstream_action
-result_hash
-signature
-```
-
-Large payloads are stored in content-addressed storage:
-
-```text
-prompt bodies
-model responses
-tool outputs
-evidence bundles
-case files
-policy documents
-approval packets
-replay capsules
-```
-
-The audit system must answer:
-
-- what happened
-- why it happened
-- who or what caused it
-- what data was used
-- which policy allowed it
-- which actions were denied
-- who approved it
-- what changed downstream
-- whether it can be replayed
-
-### 8. Replay Capsules
-
-Every material case gets a replay capsule.
-
-A replay capsule contains:
-
-```text
-normalized event stream
-source event hashes
-case state
-policy version
-agent transcript
-tool outputs
-evidence snapshots
-approval records
-downstream action records
-expected outcome
-```
-
-Replay command concept:
-
-```bash
-tickoni replay case PAY-84721
-```
-
-Expected output:
-
-```text
-Replay: PAY-84721
-
-Event chain: verified
-Policy version: matched
-Evidence hashes: matched
-Agent tool calls: matched
-Decision path: matched
-Downstream action: matched
-
-Result: REPLAY MATCH
-```
-
-If replay diverges:
-
-```text
-Result: DIVERGED
-
-First divergent event:
-  audit_event_id: EVT-99182
-  expected_policy_decision: deny
-  actual_policy_decision: require_approval
-
-Reason:
-  policy version mismatch
-```
-
-### 9. Sandboxing
+## Sandboxing
 
 Tickoni avoids using Docker as the primary security model for the runtime.
-
-Docker may be useful for development and deployment packaging, but Tickoni’s core security model should be lower-level and explicit.
+Docker may be useful for development and packaging, but the runtime security
+model should be lower-level and explicit.
 
 Runtime isolation:
 
@@ -406,13 +335,23 @@ Runtime isolation:
 - bounded resources
 - crash-only process design
 
-Agent tool isolation:
+Agent and adapter isolation:
 
 - no production secrets by default
-- no direct database mutation
-- no direct financial action
+- no direct database mutation from agents
+- no direct financial action from agents
 - read-only access unless explicitly granted
 - writable temporary workspace only
-- tool-level capability tokens
+- capability-scoped envelopes
 - full tool-call logging
-- network access controlled per tool
+- network access controlled per tile or adapter
+
+## Related Docs
+
+- [Development](./development.md)
+- [Build](./build.md)
+- [Testing](./testing-tickoni.md)
+- [Observability](./observability.md)
+- [Telemetry](./telemetry.md)
+- [Security](./security.md)
+- [Contribution Guide](./contribution/tickoni.md)

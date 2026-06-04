@@ -26,6 +26,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     timeout-minutes: 30
     strategy:
       # We cannot possibly test everything on every commit.
@@ -56,7 +57,7 @@ jobs:
             deps-extras: "+dev"
             targets: "all integration-test tickoni"
             compiler: clang
-            compiler-version: 18.1.6
+            compiler-version: 15.0.6
             run-unit-tests: true
           - test-case: native
             machine: native

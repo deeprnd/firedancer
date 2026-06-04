@@ -17,7 +17,12 @@ V1 proves four infrastructure advantages:
 
 ## V1 Feature Set
 
-### P0: Runtime
+The feature set describes the full V1 product. The implementation order is the
+phase plan below: Phase 0 proves the runtime shape, Phase 1 processes real
+fintech-like events, Phase 2 attaches controlled agents, Phase 3 adds CaseOps,
+and Phase 4 packages realistic workflows.
+
+### Runtime: Phase 0/1
 
 - Zig-native event runtime
 - tile-based event pipeline
@@ -30,7 +35,11 @@ V1 proves four infrastructure advantages:
 - backpressure handling
 - runtime telemetry
 
-### P0: Isolation / Control Boundary
+Phase 0 uses a synthetic payment stream to prove bounded flow, event hashing,
+audit, replay, telemetry, and supervisor behavior. Case creation and the real
+ingestion API are Phase 1.
+
+### Isolation / Control Boundary: Phase 0/2
 
 - memory-isolated agent execution
 - no arbitrary shell access
@@ -42,7 +51,10 @@ V1 proves four infrastructure advantages:
 - sensitive-action boundaries
 - runtime enforcement independent of prompts
 
-### P0: Agent Harness
+Phase 0 should prove runtime isolation and sandbox failure behavior. Agent,
+adapter, and model isolation are Phase 2.
+
+### Agent Harness: Phase 2
 
 - model-provider abstraction
 - role-based agents
@@ -63,7 +75,7 @@ V1 proves four infrastructure advantages:
 - retry-loop limits
 - model usage attribution
 
-### P0: Policy
+### Policy: Phase 0/2
 
 - capability-based permission system
 - resource and downstream-system scopes
@@ -74,7 +86,10 @@ V1 proves four infrastructure advantages:
 - human approval requirement for money-impacting actions
 - denied-action logging
 
-### P0: Audit
+Phase 0 needs allow, deny, and require-approval records for runtime events.
+Agent, tool, model, and approval policy checks arrive in Phase 2 and Phase 3.
+
+### Audit: Phase 0/1/2
 
 - append-only audit journal
 - hash-chained audit records
@@ -85,7 +100,10 @@ V1 proves four infrastructure advantages:
 - replay capsule per material case
 - audit export as JSONL
 
-### P0: Inference Governance
+Phase 0 proves append-only event audit and replay comparison. Case capsules are
+Phase 1. Agent trajectories and model records are Phase 2.
+
+### Inference Governance: Phase 2
 
 - token accounting per case
 - token accounting per agent
@@ -97,7 +115,7 @@ V1 proves four infrastructure advantages:
 - cached context reuse
 - cost attribution by workflow
 
-### P1: Fintech Workflows
+### Fintech Workflows: Phase 4
 
 #### Payment Exceptions
 
@@ -126,7 +144,7 @@ V1 proves four infrastructure advantages:
 - recommend review queue
 - propose non-executing risk action
 
-### P1: CaseOps Board
+### CaseOps Board: Phase 3
 
 - case lifecycle board
 - event-backed cards
@@ -137,7 +155,7 @@ V1 proves four infrastructure advantages:
 - audit timeline
 - replay status indicator
 
-### P1: TigerBeetle FinanceDB Integration
+### TigerBeetle FinanceDB Integration: after Runtime And Policy Boundaries
 
 Goal: integrate TigerBeetle as the finance-native accounting ledger backend without
 weakening Tickoni's policy, isolation, audit, or replay boundaries.

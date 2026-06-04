@@ -4,14 +4,12 @@ on:
 
 jobs:
   check-cbmc:
-    runs-on: ubuntu-latest
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
+    runs-on: [self-hosted, X64]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
-      - name: Install CBMC
-        run: sudo apt-get install -y cbmc
 
       - name: Check Proofs
         run: |
