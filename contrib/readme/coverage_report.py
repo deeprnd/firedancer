@@ -152,12 +152,10 @@ def cmd_coverage_tk(kcov_dir: Path, output: Path, config: Path) -> int:
     # Use kcov's own percentage to avoid rounding discrepancies.
     pct = float(data.get("percent_covered", _pct(covered, total)))
 
-    summary = _build_summary(
-        lines_covered=covered,     lines_total=total,
-        branches_covered=covered,  branches_total=total,
-        functions_covered=covered, functions_total=total,
-    )
-    for m in ("lines", "statements", "branches", "functions"):
+    # kcov only measures line coverage. branches and functions are not tracked;
+    # leaving their totals at 0 causes _check_thresholds to report them as N/A.
+    summary = _build_summary(lines_covered=covered, lines_total=total)
+    for m in ("lines", "statements"):
         summary["total"][m]["pct"] = round(pct, 1)
 
     _write_summary(summary, output)

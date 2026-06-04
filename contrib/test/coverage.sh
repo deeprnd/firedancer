@@ -75,7 +75,11 @@ cmd_coverage_tk() {
   local summary="build/coverage/tk/coverage-summary.json"
   local config="contrib/test/coverage-tk.json"
 
-  run_step "build zig test binaries" zig build cov
+  # ReleaseSafe triggers DWARFv4 output (via LLVM backend), which kcov handles
+  # correctly across multiple CUs. Debug mode emits DWARFv5 with per-CU
+  # rnglists_base; kcov v44 only honours the first CU's base, silently dropping
+  # all subsequent user-code CUs from the coverage report.
+  run_step "build zig test binaries" zig build cov -Doptimize=ReleaseSafe
 
   mkdir -p "$cov_raw"
 
