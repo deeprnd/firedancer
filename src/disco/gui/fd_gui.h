@@ -353,6 +353,10 @@ struct fd_gui_leader_slot {
 
   fd_done_packing_t scheduler_stats[ 1 ];
 
+  /* The initial, maximum number of microblocks that could be packed
+     into this slot. */
+  ulong max_microblocks;
+
   uchar unbecame_leader: 1;
 };
 
@@ -585,7 +589,7 @@ typedef struct fd_gui_boot_progress fd_gui_boot_progress_t;
 
 struct fd_gui {
   fd_http_server_t * http;
-  fd_topo_t * topo;
+  fd_topo_t const * topo;
 
   ulong tile_cnt;
 
@@ -860,7 +864,7 @@ fd_gui_new( void *                shmem,
             int                   schedule_strategy,
             char const *          wfs_expected_bank_hash_cstr,
             ushort                expected_shred_version,
-            fd_topo_t *           topo,
+            fd_topo_t const *     topo,
             long                  now );
 
 fd_gui_t *
