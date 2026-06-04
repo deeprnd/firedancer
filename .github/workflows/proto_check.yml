@@ -21,6 +21,7 @@ permissions:
 
 jobs:
   proto-breaking-check:
+    if: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
     name: Check Protobuf Breaking Changes
     runs-on: ubuntu-latest
     steps:

@@ -9,6 +9,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test:
+    if: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
     timeout-minutes: 30
     strategy:
       # We cannot possibly test everything on every commit.
@@ -31,7 +32,7 @@ jobs:
             targets: "all integration-test fdctl firedancer"
             compiler: gcc
             compiler-version: 11.4.0
-            run-unit-tests: false
+            run-unit-tests: true
           - test-case: linux_clang_icelake
             machine: linux_clang_icelake
             label: icelake
@@ -40,7 +41,7 @@ jobs:
             targets: "all integration-test fdctl firedancer"
             compiler: clang
             compiler-version: 15.0.6
-            run-unit-tests: false
+            run-unit-tests: true
           - test-case: native
             machine: native
             label: 512G
@@ -49,8 +50,8 @@ jobs:
             targets: "all integration-test fdctl firedancer"
             compiler: gcc
             compiler-version: 12.4.0
-            run-unit-tests: false
-            run-integration-tests: false
+            run-unit-tests: true
+            run-integration-tests: true
     runs-on:
       labels: ${{ matrix.label }}
       group: fd-public-repo

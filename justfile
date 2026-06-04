@@ -24,6 +24,16 @@ build-tk:
 build-fd:
   make -j"$(nproc)" tickoni
 
+build-fd-gcc:
+  make -j"$(nproc)" BUILDDIR=fd-gcc CC=gcc-12 MACHINE=linux_gcc_x86_64 tickoni
+
+build-fd-clang:
+  make -j"$(nproc)" BUILDDIR=fd-clang CC=clang-18 MACHINE=linux_clang_x86_64 tickoni
+
+# Compile-only ARM lane matching the CI machine target; Firedancer runtime remains x86-64 Linux only.
+build-fd-arm:
+  make -j"$(nproc)" BUILDDIR=fd-arm CC=gcc-14 MACHINE=linux_gcc_neoverse_n1 tickoni
+
 build-fd-dev:
   make -j"$(nproc)" firedancer-dev
 

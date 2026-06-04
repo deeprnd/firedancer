@@ -5,9 +5,12 @@ on:
   workflow_dispatch:
 jobs:
   doxygen:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     timeout-minutes: 20
     name: Doxygen
-    runs-on: ubuntu-latest
+    runs-on:
+      labels: rocky9
+      group: fd-public-repo
     environment:
       name: doxygen
       url: ${{ vars.DOXYGEN_URL }}

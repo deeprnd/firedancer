@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   analyze:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     name: Analyze (${{ matrix.language }})
     runs-on:
       group: fd-public-repo-codeql
@@ -20,8 +21,8 @@ jobs:
           build-mode: manual
           compiler: clang
           machine: linux_clang_x86_64
-          compiler-version: 18.1.6
-          targets: tickoni
+          compiler-version: 15.0.6
+          targets: fddev firedancer-dev
           extras: rpath
     env:
       MACHINE: ${{ matrix.machine }}
@@ -30,6 +31,8 @@ jobs:
       CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
     steps:
       - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/submodule-init
 
       - uses: ./.github/actions/deps
         with:
@@ -40,6 +43,12 @@ jobs:
       - name: clean targets
         run: |
           make clean --silent >/dev/null
+      - uses: ./.github/actions/submodule
+        with:
+          machine: ${{ matrix.machine }}
+          compiler: ${{ matrix.compiler }}
+          compiler-version: ${{ matrix.compiler-version }}
+        if: ${{ contains(matrix.targets, 'fdctl') || contains(matrix.targets, 'fddev') }}
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:

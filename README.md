@@ -230,13 +230,17 @@ No black boxes.
 
 - [Overview](doc/overview.md)
 - [Architecture](doc/architecture.md)
+- [Development](doc/development.md)
 - [Workflows](doc/workflows.md)
+- [Build](doc/build.md)
+- [Build system](doc/build-system.md)
+- [Tickoni testing](doc/testing-tickoni.md)
+- [Firedancer-style testing](doc/testing.md)
 - [Observability](doc/observability.md)
+- [Telemetry](doc/telemetry.md)
 - [Security](doc/security.md)
 - [Audit and replay](doc/audit.md)
 - [Roadmap](doc/product/roadmap.md)
-- [Build](doc/build.md)
-- [Testing](doc/testing.md)
 
 ## License
 
