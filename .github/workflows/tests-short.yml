@@ -61,7 +61,7 @@ jobs:
         uses: ./.github/actions/setup-public-gh-runner
         with:
           zig: 'true'
-          apt-packages: 'kcov'
+          kcov: 'true'
 
       - name: Run coverage
         run: just test-cov-tk

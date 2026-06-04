@@ -75,7 +75,18 @@ runs:
       shell: bash
       run: |
         if [[ "${{ inputs.compiler-version }}" != "system" ]]; then
-          source /opt/${{ inputs.compiler }}/${{ inputs.compiler }}-${{ inputs.compiler-version }}/activate
+          activate_path="/opt/${{ inputs.compiler }}/${{ inputs.compiler }}-${{ inputs.compiler-version }}/activate"
+          if [[ -f "$activate_path" ]]; then
+            source "$activate_path"
+          else
+            if [[ "${{ inputs.compiler }}" == "clang" ]]; then
+              sudo apt-get install -y clang-${{ inputs.compiler-version }} clang++-${{ inputs.compiler-version }}
+            else
+              sudo apt-get install -y ${{ inputs.compiler }}-${{ inputs.compiler-version }} g++-${{ inputs.compiler-version }}
+            fi
+            sudo update-alternatives --install /usr/bin/${{ inputs.compiler }} ${{ inputs.compiler }} \
+              /usr/bin/${{ inputs.compiler }}-${{ inputs.compiler-version }} 100
+          fi
         fi
         CC='${{ inputs.compiler }}' \
         CXX='${{ inputs.compiler == 'gcc' && 'g++' || 'clang++' }}' \

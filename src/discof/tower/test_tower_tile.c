@@ -467,7 +467,7 @@ static void
 mock_confirmed( fd_tower_tile_t * ctx,
                ulong             slot,
                fd_hash_t const * block_id ) {
-  /* Create a votes_blk entry for (slot, block_id) if it doesn't
+  /* Create a votes_blk entry for(slot, block_id) if it doesn't
      already exist, then set stake high enough for DUPLICATE (>52%). */
 
   if( !fd_votes_query( ctx->votes, slot, block_id ) ) {

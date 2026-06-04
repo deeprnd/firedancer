@@ -93,11 +93,12 @@ pub const Supervisor = struct {
     }
 
     fn joinThreads(self: *Supervisor) void {
-        const crashed_tile = if (self.pipeline) |state| state.crashed_tile.load(.acquire) else -1;
         for (self.handles) |*h| {
             if (h.thread) |thread| {
                 thread.join();
                 h.thread = null;
+                // Read after join so the release-store in the tile thread is visible.
+                const crashed_tile = if (self.pipeline) |state| state.crashed_tile.load(.acquire) else -1;
                 if (crashed_tile >= 0 and @as(i32, @intCast(h.tile_idx)) == crashed_tile) {
                     h.state = .crashed;
                     h.exit_code = 1;

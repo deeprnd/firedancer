@@ -22,6 +22,10 @@ inputs:
     description: Install gitleaks
     required: false
     default: 'false'
+  kcov:
+    description: Build and install kcov from source
+    required: false
+    default: 'false'
   python-tools:
     description: Space-delimited Python packages to install with pip
     required: false
@@ -61,6 +65,25 @@ runs:
       run: |
         sudo apt-get update
         sudo apt-get install -y ${{ inputs.apt-packages }}
+
+    - name: Install kcov
+      if: inputs.kcov == 'true'
+      shell: bash
+      run: |
+        sudo apt-get install -y \
+          binutils-dev \
+          cmake \
+          libcurl4-openssl-dev \
+          libdw-dev \
+          libelf-dev \
+          libiberty-dev \
+          libssl-dev \
+          libstdc++-12-dev \
+          zlib1g-dev
+        git clone --depth 1 https://github.com/SimonKagstrom/kcov.git "$RUNNER_TEMP/kcov-src"
+        cmake -S "$RUNNER_TEMP/kcov-src" -B "$RUNNER_TEMP/kcov-build"
+        make -j$(nproc) -C "$RUNNER_TEMP/kcov-build"
+        sudo make -C "$RUNNER_TEMP/kcov-build" install
 
     - name: Install Gitleaks
       if: inputs.gitleaks == 'true'
