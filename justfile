@@ -89,6 +89,28 @@ test-all:
   @just test-integration-all
   @just test-e2e-all
 
+# ── Test: Coverage ─────────────────────────────────────────────────────────
+
+test-cov-fd:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  just mem-free || true
+  trap 'just mem-free' EXIT
+  want=$(free -g | awk '/^Mem:/{print int(($2 - 4) / 6) * 6}')
+  (( want > 0 )) && sudo src/util/shmem/fd_shmem_cfg alloc "$want" gigantic 0 >/dev/null 2>&1 || true
+  pages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/free_hugepages 2>/dev/null || echo 0)
+  sudo prlimit --pid $$ --memlock=unlimited
+  export TEST_OPTS=""
+  (( pages < 6 )) && export TEST_OPTS="--page-sz normal"
+  python3 contrib/readme/run-badged-command.py cov-fd "bash contrib/test/coverage.sh coverage-fd"
+
+test-cov-tk:
+  python3 contrib/readme/run-badged-command.py cov-tk "bash contrib/test/coverage.sh coverage-tk"
+
+test-cov-all:
+  @just test-cov-fd
+  @just test-cov-tk
+
 tests-all:
   @just build-all
   @just quality-check-all

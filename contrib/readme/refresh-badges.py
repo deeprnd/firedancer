@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Update README.md badge image tags between marker comments."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -15,12 +16,15 @@ BOOLEAN_SUCCESS = ("passing", "brightgreen")
 BOOLEAN_FAILURE = ("failing", "red")
 UNKNOWN = ("unknown", "lightgrey")
 
+# (alt_text, label, type, coverage_json_path | None)
 BADGE_SPECS = {
-    "build":       ("Build",              "build",              "boolean"),
-    "unit":        ("Unit Tests",         "unit tests",         "boolean"),
-    "integration": ("Integration Tests",  "integration tests",  "boolean"),
-    "quality":     ("Quality",            "quality",            "boolean"),
-    "security":    ("Security",           "security",           "boolean"),
+    "build":       ("Build",             "build",             "boolean",  None),
+    "unit":        ("Unit Tests",        "unit tests",        "boolean",  None),
+    "integration": ("Integration Tests", "integration tests", "boolean",  None),
+    "quality":     ("Quality",           "quality",           "boolean",  None),
+    "security":    ("Security",          "security",          "boolean",  None),
+    "cov-fd":      ("HFT Engine Coverage",        "engine coverage",      "coverage", REPO_ROOT / "build/coverage/fd/coverage-summary.json"),
+    "cov-tk":      ("AI Harness Coverage",        "harness coverage",     "coverage", REPO_ROOT / "build/coverage/tk/coverage-summary.json"),
 }
 
 
@@ -37,9 +41,39 @@ def build_badge(alt: str, label: str, message: str, color: str) -> str:
     return f'<img alt="{alt}" src="{url}" />'
 
 
+def _coverage_color(pct: float) -> str:
+    if pct < 60:
+        return "red"
+    if pct < 80:
+        return "orange"
+    if pct < 90:
+        return "yellowgreen"
+    return "brightgreen"
+
+
+def _read_coverage_pct(path: Path) -> float:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing coverage summary: {path}")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ValueError(f"Failed to parse {path}: {exc}") from exc
+    pct = data.get("total", {}).get("lines", {}).get("pct")
+    if not isinstance(pct, (int, float)):
+        raise ValueError(f"Invalid coverage summary format in {path}: expected total.lines.pct number")
+    return round(float(pct), 1)
+
+
 def badge_for_exit_code(alt: str, label: str, exit_code: int) -> str:
     message, color = BOOLEAN_SUCCESS if exit_code == 0 else BOOLEAN_FAILURE
     return build_badge(alt, label, message, color)
+
+
+def badge_for_coverage(alt: str, label: str, exit_code: int, cov_path: Path) -> str:
+    if exit_code != 0:
+        return build_badge(alt, label, BOOLEAN_FAILURE[0], BOOLEAN_FAILURE[1])
+    pct = _read_coverage_pct(cov_path)
+    return build_badge(alt, label, f"{pct:.1f}%", _coverage_color(pct))
 
 
 def badge_unknown(alt: str, label: str) -> str:
@@ -68,8 +102,11 @@ def update_readme_badge(name: str, exit_code: int) -> None:
         raise ValueError(f'Unknown badge "{name}". Expected one of: {", ".join(BADGE_SPECS)}')
 
     readme = README_PATH.read_text(encoding="utf-8")
-    alt, label, _ = BADGE_SPECS[name]
-    badge_line = badge_for_exit_code(alt, label, exit_code)
+    alt, label, badge_type, cov_path = BADGE_SPECS[name]
+    if badge_type == "coverage":
+        badge_line = badge_for_coverage(alt, label, exit_code, cov_path)
+    else:
+        badge_line = badge_for_exit_code(alt, label, exit_code)
     updated = replace_badge_block(readme, name, badge_line)
     README_PATH.write_text(updated, encoding="utf-8")
 
@@ -79,7 +116,7 @@ def update_readme_badge_unknown(name: str) -> None:
         raise ValueError(f'Unknown badge "{name}". Expected one of: {", ".join(BADGE_SPECS)}')
 
     readme = README_PATH.read_text(encoding="utf-8")
-    alt, label, _ = BADGE_SPECS[name]
+    alt, label, _badge_type, _cov_path = BADGE_SPECS[name]
     badge_line = badge_unknown(alt, label)
     updated = replace_badge_block(readme, name, badge_line)
     README_PATH.write_text(updated, encoding="utf-8")
@@ -87,7 +124,7 @@ def update_readme_badge_unknown(name: str) -> None:
 
 def reset_all_readme_badges() -> None:
     readme = README_PATH.read_text(encoding="utf-8")
-    for name, (alt, label, _) in BADGE_SPECS.items():
+    for name, (alt, label, _badge_type, _cov_path) in BADGE_SPECS.items():
         readme = replace_badge_block(readme, name, badge_unknown(alt, label))
     README_PATH.write_text(readme, encoding="utf-8")
 

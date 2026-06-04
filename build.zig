@@ -6,6 +6,9 @@
 /// Run Zig unit tests (separate from 'make run-unit-test'):
 ///   zig build test
 ///
+/// Install Zig test binaries for kcov coverage (used by just test-cov-tk):
+///   zig build cov
+///
 /// The existing GNUmakefile (C/Firedancer build) is unchanged.
 const std = @import("std");
 
@@ -81,4 +84,47 @@ pub fn build(b: *std.Build) void {
     });
     const sup_test = b.addTest(.{ .root_module = sup_mod });
     test_step.dependOn(&b.addRunArtifact(sup_test).step);
+
+    // ---------------------------------------------------------------------------
+    // Coverage step — install test binaries to zig-out/cov/ for kcov
+    // Run with: zig build cov
+    // Then: bash contrib/coverage.sh coverage-tk
+    // ---------------------------------------------------------------------------
+    const cov_step = b.step("cov", "Install Zig test binaries to zig-out/cov/ for kcov coverage");
+
+    for ([_][2][]const u8{
+        .{ "test-topology",         "src/tickoni/runtime/topology.zig" },
+        .{ "test-tile",             "src/tickoni/runtime/tile.zig" },
+        .{ "test-queue",            "src/tickoni/c_abi/queue.zig" },
+        .{ "test-sandbox",          "src/tickoni/c_abi/sandbox.zig" },
+        .{ "test-payment-pipeline", "src/tickoni/tiles/payment_pipeline.zig" },
+    }) |entry| {
+        const t = b.addTest(.{
+            .name = entry[0],
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(entry[1]),
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        cov_step.dependOn(&b.addInstallArtifact(t, .{
+            .dest_dir = .{ .override = .{ .custom = "cov" } },
+        }).step);
+    }
+
+    const sup_cov_test = b.addTest(.{
+        .name = "test-supervisor",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/app/tickoni/supervisor.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "runtime", .module = runtime_mod },
+                .{ .name = "tiles", .module = tiles_mod },
+            },
+        }),
+    });
+    cov_step.dependOn(&b.addInstallArtifact(sup_cov_test, .{
+        .dest_dir = .{ .override = .{ .custom = "cov" } },
+    }).step);
 }
