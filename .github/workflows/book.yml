@@ -55,7 +55,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-      deployment: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+      deployment: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     needs: build
     runs-on: ubuntu-latest
     name: Deploy

@@ -4,7 +4,7 @@ on:
 
 jobs:
   check-cbmc:
-    if: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     runs-on: [self-hosted, X64]
 
     steps:

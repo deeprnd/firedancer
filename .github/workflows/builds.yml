@@ -126,7 +126,7 @@ jobs:
     runs-on:
       labels: ${{ fromJSON(inputs.gcc_runner_labels) }}
       group: fd-public-repo
-    if: ${{ inputs.gcc != 'none' && vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+    if: ${{ inputs.gcc != 'none' && vars.SKIP_FIREDANCER_CI != 'true' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -189,7 +189,7 @@ SKIP_FIREDANCER_CI
     runs-on:
       labels: ${{ fromJSON(inputs.clang_runner_labels) }}
       group: fd-public-repo
-    if: ${{ inputs.clang != 'none' && vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+    if: ${{ inputs.clang != 'none' && vars.SKIP_FIREDANCER_CI != 'true' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -252,7 +252,7 @@ SKIP_FIREDANCER_CI
     runs-on:
       labels: ARM64
       group: fd-public-repo
-    if: ${{ inputs.build_arm && vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+    if: ${{ inputs.build_arm && vars.SKIP_FIREDANCER_CI != 'true' }}
     strategy:
       matrix:
         gcc_version: [12]

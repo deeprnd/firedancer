@@ -14,7 +14,7 @@ jobs:
     permissions:
       security-events: write
   builds_1:SKIP_FIREDANCER_CI
-    if: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/builds.yml
     with:
         # compiler,machine,target
@@ -45,7 +45,7 @@ jobs:
       verbose: true
       cid: 3
   builds_2:
-    if: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/builds.yml
     with:
       machine: linux_gcc_icelake
@@ -55,7 +55,7 @@ jobs:
       cid: 4
       gcc_runner_labels: '["self-hosted", "X64", "750G"]'
   builds_3:
-    if: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/builds.yml
     with:
       machine: linux_gcc_x86_64
@@ -65,7 +65,7 @@ jobs:
       cid: 5
       gcc_runner_labels: '["self-hosted", "X64", "750G"]'
   builds_4:
-    if: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/builds.yml
     with:
         # compiler,machine,target
@@ -78,7 +78,7 @@ jobs:
       cid: 6
       gcc_runner_labels: '["self-hosted", "X64", "750G"]'
   backtest:
-    if: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/backtest.yml
     with:
       script: DUMP_DIR=../dump src/flamenco/runtime/tests/run_backtest_all.sh

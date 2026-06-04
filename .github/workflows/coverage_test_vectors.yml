@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   coverage-test-vectors:
-    if: ${{ (github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch') && vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+    if: ${{ (github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch') && vars.SKIP_FIREDANCER_CI != 'true' }}
     name: Coverage Test Vectors
     runs-on:
       labels: icelake
@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 40
     environment:
       name: coverage-report
-      deployment: ${{ vars.TICKONI_SKIP_FIREDANCER_CI != 'true' }}
+      deployment: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     env:
       CC: clang
       CXX: clang++
