@@ -17,17 +17,37 @@ giving unrelated concepts the same tile identity.
 
 ## Current Repository State
 
-The current `tickoni` binary is still the full Firedancer validator application
-with a Tickoni runtime identity. Its main program lives in
-[`src/app/firedancer/main.c`](../../src/app/firedancer/main.c), and its topology
-lives in [`src/app/firedancer/topology.c`](../../src/app/firedancer/topology.c).
+The repository now has two Tickoni-relevant runtime paths:
+
+1. The compatibility `tickoni` validator binary is still derived from the full
+   Firedancer application. Its main program lives in
+   [`src/app/firedancer/main.c`](../../src/app/firedancer/main.c), and its
+   topology lives in
+   [`src/app/firedancer/topology.c`](../../src/app/firedancer/topology.c).
+2. The new Zig-native Tickoni scaffold exists under
+   [`src/app/tickoni/`](../../src/app/tickoni/) and
+   [`src/tickoni/`](../../src/tickoni/). It currently builds
+   `tickoni-supervisor` through [`build.zig`](../../build.zig).
 
 The legacy Frankendancer topology remains in
 [`src/app/fdctl/topology.c`](../../src/app/fdctl/topology.c). It is gated behind
 `FD_WITH_AGAVE=1` and is outside the canonical runtime path.
 
-There are currently no Zig source files in the repository. The Zig-native
-runtime described in [`roadmap.md`](roadmap.md) is still to be built.
+The Zig scaffold has moved past the Step 1 synthetic lifecycle. Phase 0 now
+runs a synthetic payment pipeline:
+
+```text
+tkings -> tknorm -> tkdedu -> tkpoly -> tkaudt
+tkrepl, tkmetr, tkdiag
+```
+
+That path starts, stops, and monitors Tickoni-owned non-Solana tiles in
+dev/test mode. It proves bounded in-process queues, stable event hashes,
+append-only audit hashing, deterministic replay comparison, runtime metrics,
+diagnostics, audited malformed-event rejection, and simulated sandbox failure
+behavior.
+It does not yet implement real shared-memory queues, sandboxed child processes,
+Phase 1 case routing, evidence storage, external ingestion, or agents.
 
 The inherited C topology ABI stores tile names in `char name[ 7UL ]`, so any
 tile name registered through that ABI is limited to six characters. The
@@ -116,7 +136,7 @@ under `src/tickoni/c_abi/`. Avoid adding Tickoni fields to
 
 ## Proposed Tickoni V1 Topology
 
-Use a new product tree:
+Use the product tree that is now being introduced:
 
 ```text
 src/app/tickoni/          Zig supervisor and CLI
@@ -126,6 +146,10 @@ src/tickoni/schema/       Financial events, cases, capabilities, audit envelopes
 src/tickoni/tiles/        Tickoni-owned tile implementations
 src/tickoni/connectors/   Signed adapter manifests and connector implementations
 ```
+
+`src/app/tickoni/`, `src/tickoni/runtime/`, `src/tickoni/c_abi/`, and
+`src/tickoni/tiles/` already exist. `schema/` and `connectors/` should be added
+only when Phase 0 and later phase work needs them.
 
 ### Runtime IDs
 
@@ -160,15 +184,17 @@ external event API
   -> tkings
   -> tknorm
   -> tkdedu
-  -> tkcase
+  -> tkpoly
+  -> tkaudt
 
-tkcase -> tkpoly -> tkdisp -> tkagnt      asynchronous investigation
+tkcase -> tkdisp -> tkagnt                asynchronous investigation, Phase 2+
 
 tkagnt -> tkmodl                    model calls
 tkagnt -> tktool -> tkadpt          capability-scoped reads and proposals
 tkapi  -> tkpoly -> tkexec          approved sensitive actions only
 
-all boundary events -> tkaudt -> tkevid
+all boundary events -> tkaudt
+Phase 1+ evidence  -> tkevid
 replay capsule      -> tkrepl -> deterministic pipeline with tkexec disabled
 all tile metrics    -> tkmetr
 ```
@@ -208,18 +234,25 @@ runtime no longer depends on it.
 
 ### Step 1: Establish the product boundary
 
-1. Create `src/app/tickoni/` and `src/tickoni/`.
-2. Build a Zig supervisor that starts a Tickoni-only topology.
-3. Add a narrow C ABI for the selected queue and sandbox primitives.
+Status: complete for the Step 1 boundary; retained here as compatibility
+context.
+
+1. `src/app/tickoni/` and `src/tickoni/` exist.
+2. The Zig supervisor starts a Tickoni-only topology in dev/test mode.
+3. Narrow C ABI declarations exist for selected queue and sandbox primitives,
+   but Phase 0 still uses in-process queues for the spike.
 4. Keep `src/app/firedancer/`, `src/disco/`, and `src/discof/` as
    upstream-compatible validator code.
 5. Move the canonical `tickoni` target to the new app only after the supervisor
-   can start, stop, and monitor a synthetic pipeline.
+   can start, stop, and monitor the product pipeline through the deprecation
+   window.
 
 Do not remove the temporary `firedancer -> tickoni` compatibility behavior
 before the deprecation window in [`roadmap.md`](roadmap.md) is complete.
 
 ### Step 2: Complete the Phase 0 spike
+
+Status: complete as an in-process spike.
 
 Implement:
 
@@ -231,6 +264,50 @@ tkmetr + tkdiag
 
 Use one synthetic payment stream. Prove stable event hashes, append-only audit,
 backpressure, replay comparison, and sandbox failure behavior.
+
+Implemented in [`src/tickoni/tiles/payment_pipeline.zig`](../../src/tickoni/tiles/payment_pipeline.zig),
+with the supervisor wiring in
+[`src/app/tickoni/supervisor.zig`](../../src/app/tickoni/supervisor.zig) and the
+static topology in
+[`src/tickoni/runtime/topology.zig`](../../src/tickoni/runtime/topology.zig).
+
+The current spike uses one synthetic payment stream. It proves:
+
+1. stable event hashes over canonical payment facts
+2. append-only audit records with a hash chain
+3. reliable bounded links and observable backpressure waits
+4. deterministic replay with external effects disabled
+5. audited malformed payment rejection
+6. duplicate detection by idempotency key and content hash
+7. allow and deny policy decisions
+8. simulated sandbox failure propagation to supervisor crash state
+9. `tkmetr` and `tkdiag` snapshots, including queue, drop, latency, and crash
+   fields
+
+The Firedancer-style topology answers for Phase 0 links are:
+
+| Link | Owner tile | Backing allocation | Mapping mode | Depth / MTU | Reliability | Overrun, restart, shutdown | Metrics and diagnostics |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `tkings -> tknorm` | `tkings` owns source offsets and writes the link; `tknorm` owns framing rejection. | Heap-backed bounded SPSC ring in `PaymentPipelineState`; future shared-memory workspace. | Single producer writes; single consumer reads; in-process thread mapping for spike. | 64 entries / 128-byte payment envelope. | Reliable until shutdown; producer backpressures when full. | Overrun increments wait pressure instead of dropping; restart regenerates from source offset; shutdown closes the link. | Produced, invalid, max depth, backpressure waits, latency hops, crash tile. |
+| `tknorm -> tkdedu` | `tknorm` owns canonical hash generation and malformed-drop decisions. | Heap-backed bounded SPSC ring in `PaymentPipelineState`; future shared-memory workspace. | Single producer writes normalized events or malformed-drop envelopes; single consumer reads. | 64 entries / 128-byte normalized event. | Reliable until shutdown. | Overrun backpressures normalization; restart recomputes stable hashes; shutdown drains then closes. | Normalized count, malformed-drop count, queue depth, waits, latency hops. |
+| `tkdedu -> tkpoly` | `tkdedu` owns idempotency key and content-hash memory. | Heap-backed bounded SPSC ring plus `tkdedu`-owned seen-key arrays. | Single producer writes dedupe decisions; single consumer reads. | 64 entries / 128-byte decision input. | Reliable until shutdown. | Overrun backpressures dedupe; restart rebuilds seen-key state from source order; shutdown drains then closes. | Duplicate count, queue depth, waits, latency hops. |
+| `tkpoly -> tkaudt` | `tkpoly` owns policy decision; `tkaudt` owns final ordering. | Heap-backed bounded SPSC ring in `PaymentPipelineState`; future audit workspace. | Single producer writes policy envelopes; single consumer appends. | 64 entries / 128-byte audit envelope. | Reliable until shutdown. | Overrun backpressures policy; restart re-evaluates policy version; shutdown drains then closes. | Allow, deny, duplicate-drop, audited count, queue depth, waits, latency hops. |
+| `tkaudt` audit log | `tkaudt` owns append-only sequence and hash chain. | Heap-backed fixed audit record array; future append-only file or shared audit workspace. | Only `tkaudt` writes; replay reads after audit completion. | Capacity equals configured event count. | Reliable; full audit allocation is a crash condition. | Full allocation marks `tkaudt` crashed and stops the runtime; restart replays from source facts; shutdown preserves completed records in memory for replay. | Audited count, audit hash, replay divergence, latency hops, crash tile. |
+| `tkrepl` replay path | `tkrepl` owns replay comparison and external-effects-disabled mode. | Reads completed audit records and regenerates deterministic synthetic events. | Replay reads audit after `tkaudt` signals completion; no producer mutates audit during compare. | Same event envelope as the main path. | Reliable comparison; reports divergence instead of mutating state. | Replay never invokes external effects; mismatch increments divergence count; shutdown exits after comparison or crash signal. | Replay checked, replay match, divergence count. |
+| `tkmetr` telemetry | `tkmetr` owns metric snapshots. | Atomic counters and queue-watermark reads in `PaymentPipelineState`. | All tiles publish counters; `tkmetr` reads snapshots. | No correctness queue in the spike. | Observational; future telemetry may be lossy with counted drops. | Shutdown takes a final snapshot. | Produced, normalized, invalid, duplicates, allowed, denied, audited, depth, waits, max latency hops. |
+| `tkdiag` diagnostics | `tkdiag` owns diagnostic snapshots. | Atomic crash, sandbox, audit, and replay fields in `PaymentPipelineState`. | Tiles publish diagnostics; `tkdiag` reads snapshots. | No correctness queue in the spike. | Observational; crash state is reliable. | Sandbox failure marks the owning tile crashed and requests runtime stop; shutdown takes a final snapshot. | Sandbox failures, crashed tile, audit count, replay status. |
+
+Before adding Phase 1 case routing or Phase 2 agents, replace the heap-backed
+spike rings with the selected shared-memory queue backing and keep these
+answers current:
+
+1. owner tile
+2. workspace or backing allocation
+3. producer and consumer mapping mode
+4. queue depth and MTU
+5. reliable or unreliable behavior
+6. overrun, restart, and shutdown behavior
+7. queue, drop, latency, and crash metrics
 
 ### Step 3: Complete the Phase 1 runtime
 

@@ -12,8 +12,8 @@ wrapper:
 
 - `just ...` as the repo-facing wrapper for common build and test flows
 - Firedancer-side builds and tests via `just build-fd`, `just build-fd-dev`,
-  and `just test-integration-fd`
-- `zig build ...` for the Tickoni Zig supervisor and Zig unit tests
+  and `just test-e2e-fd`
+- `zig build ...` for the Tickoni supervisor and harness unit tests
 
 Quick start
 -----------
@@ -45,7 +45,7 @@ Run the supervisor:
 zig build run -- start
 ```
 
-Run Zig unit tests:
+Run harness unit tests:
 
 ```bash
 just test-unit-tk
@@ -63,10 +63,10 @@ Build the Firedancer dev binary:
 just build-fd-dev
 ```
 
-Run Firedancer-side integration tests:
+Run Firedancer-side e2e/system tests:
 
 ```bash
-just test-integration-fd
+just test-e2e-fd
 ```
 
 Build the combined default surface:
@@ -125,7 +125,7 @@ Standalone Zig test roots:
   - src/tickoni/runtime/tile.zig
   - src/tickoni/c_abi/queue.zig
   - src/tickoni/c_abi/sandbox.zig
-  - src/tickoni/tiles/synthetic.zig
+  - src/tickoni/tiles/payment_pipeline.zig
 ```
 
 Structure
@@ -135,7 +135,7 @@ The current build graph in [build.zig](../build.zig) has three main parts:
 
 1. Shared modules:
    - `runtime` from `src/tickoni/runtime/runtime.zig`
-   - `tiles` from `src/tickoni/tiles/synthetic.zig`
+   - `tiles` from `src/tickoni/tiles/payment_pipeline.zig`
 2. Supervisor executable:
    - `src/app/tickoni/main.zig`
    - output binary: `tickoni-supervisor`
@@ -156,10 +156,12 @@ It does not replace:
 
 - `just build-fd`
 - `just build-fd-dev`
-- `just test-integration-fd`
+- `just test-e2e-fd`
 
 Those repo-facing commands are covered by the Firedancer-side build described in
-[Build System](./build-system.md).
+[Build System](./build-system.md). The reason the Firedancer Make
+`integration-test` target is surfaced as `just test-e2e-fd` is documented in
+[Testing](./testing.md).
 
 Instead, it builds the Tickoni-owned supervisor layer around the
 Firedancer-derived substrate. The `just` wrapper keeps that split
@@ -196,3 +198,12 @@ Use the Firedancer-side build when you are working on:
 - the runtime C substrate
 
 That workflow is documented in [Build System](./build-system.md).
+
+Related docs
+------------
+
+- [Development](./development.md)
+- [Testing](./testing-tickoni.md)
+- [Security](./security.md)
+- [Observability](./observability.md)
+- [Telemetry](./telemetry.md)

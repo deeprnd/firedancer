@@ -55,9 +55,10 @@ def release_lock() -> None:
     LOCK_PATH.unlink(missing_ok=True)
 
 
-def run_shell_command(command: str) -> int:
-    shell = os.environ.get("SHELL", "bash")
-    result = subprocess.run([shell, "-c", command])
+def run_command(argv: list) -> int:
+    print(f"[badge] exec: {argv}", file=sys.stderr)
+    result = subprocess.run(argv)
+    print(f"[badge] exit: {result.returncode}", file=sys.stderr)
     return result.returncode
 
 
@@ -65,9 +66,11 @@ def update_badge_with_lock(update_fn, badge_name: str, *args) -> int:
     status = 0
     acquire_lock()
     try:
+        print(f"[badge] update '{badge_name}' via {update_fn.__name__}{args}", file=sys.stderr)
         update_fn(badge_name, *args)
+        print(f"[badge] update '{badge_name}' ok", file=sys.stderr)
     except Exception as e:
-        print(str(e), file=sys.stderr)
+        print(f"[badge] update '{badge_name}' failed: {e}", file=sys.stderr)
         status = 1
     finally:
         release_lock()
@@ -77,11 +80,11 @@ def update_badge_with_lock(update_fn, badge_name: str, *args) -> int:
 def main() -> None:
     args = sys.argv[1:]
     if len(args) < 2:
-        print("Usage: run-badged-command.py <badge-name> <command>", file=sys.stderr)
+        print("Usage: run-badged-command.py <badge-name> <argv...>", file=sys.stderr)
         sys.exit(1)
 
     badge_name = args[0]
-    command = " ".join(args[1:])
+    command_argv = args[1:]
 
     def _cleanup(signum, frame):
         release_lock()
@@ -92,7 +95,7 @@ def main() -> None:
         signal.signal(sig, _cleanup)
 
     badge_status = update_badge_with_lock(update_readme_badge_unknown, badge_name)
-    command_status = run_shell_command(command)
+    command_status = run_command(command_argv)
     badge_status |= update_badge_with_lock(update_readme_badge, badge_name, command_status)
 
     sys.exit(command_status if command_status != 0 else badge_status)
