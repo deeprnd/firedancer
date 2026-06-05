@@ -8,3 +8,9 @@ title = "Gitleaks config for Firedancer (fd) source tree"
     '''src/tickoni''',
     '''src/app/tickoni''',
   ]
+  # C variable names ending in _b58 (base58 identifiers, not secrets);
+  # C sentinel/invalid values expressed as -1UL
+  regexes = [
+    '''\b\w+_b58\b''',
+    '''-1UL''',
+  ]
