@@ -415,6 +415,87 @@ Zig safety features are welcome, but they are not a substitute for topology
 discipline. A bounds check does not define ownership. An allocator does not
 define capacity. A type does not define process isolation.
 
+### No-Nos
+
+- No polyfills or compatibility shims that hide unsupported runtime targets.
+- No exotic dynamic instantiation based on runtime shape checks such as generic
+  `anyopaque` probing, tagless unions, or stringly-typed object dispatch.
+- No service-locator-style hidden resolution for tiles, storage handles,
+  model providers, adapters, policies, or capability catalogs.
+- No architecture-by-accident. If a helper starts owning state, external
+  authority, or lifecycle, it probably wants to be a tile or an explicit
+  module.
+- No lint, formatter, sanitizer, seccomp, or test bypasses as a substitute for
+  refactoring.
+- No direct agent-to-model, agent-to-financial-API, agent-to-TigerBeetle, or
+  UI-to-TigerBeetle paths.
+- No hidden mutable global registries for capabilities, adapters, model
+  providers, tile links, or storage backends.
+
+### Storage Access Boundaries
+
+- Markdown files are for memory, theses, policies, company notes, runbooks, and
+  human-authored operating context. They are read as context and must not be
+  treated as deterministic runtime truth unless versioned and captured into
+  audit or replay inputs.
+- DuckDB is for market data, analytics, backtests, research tables, and local
+  analytical projections. Do not use DuckDB as authoritative balances,
+  transfers, fills, or accounting state.
+- TigerBeetle is for balances, transfers, fills, accounting entries, and
+  approved ledger-style financial state. Access belongs behind `tkexec` or a
+  narrow executor-owned finance database module.
+- Runtime code, agents, UI/API handlers, model gateway code, and adapter code
+  should use explicit storage module APIs or tile messages. Do not scatter file
+  IO, SQL, DuckDB queries, or TigerBeetle calls across unrelated code.
+- If a needed operation is not exposed by the proper storage boundary, add or
+  extend that boundary instead of bypassing it.
+- Storage writes that affect policy, audit, replay, balances, transfers, fills,
+  or accounting must be tied to capability decisions and audit records.
+
+### HTTP Constants
+
+- Do not hardcode HTTP status codes, method strings, WebSocket paths, or
+  content-type strings throughout runtime or test code.
+- Prefer shared local constants or small typed enums for repeated HTTP methods,
+  status codes, route paths, content types, and WebSocket message types.
+- When wrapping Firedancer `fd_http_server`, use its method constants such as
+  `FD_HTTP_SERVER_METHOD_GET` and `FD_HTTP_SERVER_METHOD_POST` at the C ABI
+  edge, and expose a narrow Zig representation above that edge.
+- Keep route definitions for `tkapi` centralized. Tests should import route
+  constants or helpers instead of duplicating endpoint strings.
+- Apply this rule consistently in runtime code, integration tests, and
+  CaseOps/daemon test harnesses.
+
+### Casting And Type Safety
+
+- Avoid unsafe casts, especially pointer casts across tile, storage, or C ABI
+  boundaries.
+- Keep `anyopaque`, raw pointers, and `extern` layout details inside
+  `src/tickoni/c_abi` or the narrow runtime object that owns them.
+- Do not create candidate objects with unknown field types and then branch on
+  runtime type shape. If this seems necessary, fix the schema, tag, enum, or
+  boundary contract instead.
+- Prefer tagged unions, enums, explicit structs, and canonical decoders for
+  capability envelopes, audit records, adapter requests, and replay records.
+- If an unsafe cast is truly unavoidable, keep it local, document why the
+  layout is valid, add a test where possible, and flag it in the handoff.
+- Do not suppress compiler, sanitizer, lint, or static-analysis findings unless
+  explicitly approved.
+
+### Error Handling
+
+- Let errors bubble up through lower layers.
+- Catch errors only at the highest level that can add meaningful context or
+  convert them into the correct boundary behavior.
+- When catching, log with useful identifiers such as tile id, link name,
+  source offset, case id, capability id, policy version, request id, adapter id,
+  or replay capsule id, then rethrow unless the boundary intentionally
+  terminates or translates the error.
+- Do not swallow errors, downgrade policy denials into warnings, or continue
+  with partial topology, partial audit state, or unknown replay state.
+- Malformed input should become explicit rejection, metric, and audit behavior;
+  internal invariant failures should remain loud.
+
 ## Memory And Allocation
 
 Runtime allocations must be bounded by topology or startup configuration.
@@ -538,27 +619,239 @@ Rules:
 
 Do not add features that cannot explain how they appear in audit and replay.
 
-## Metrics And Diagnostics
+## Logging, Tracing, Metrics, And Diagnostics
+
+Telemetry is part of runtime correctness and operability, not a post-hoc
+feature. A change that affects service health, throughput, latency, progress,
+bounded failure classes, policy outcomes, audit append, replay comparison, or
+external boundary behavior should usually have a corresponding metric,
+diagnostic field, audit record, or log.
+
+Use the observability surfaces already in this repository:
+
+- Tickoni runtime snapshots in `PaymentPipelineState`, `tkmetr`, and `tkdiag`
+  for Phase 0.
+- Firedancer-style per-tile metrics, generated definitions, and shared metrics
+  memory under `src/disco/metrics` when moving toward production `tkmetr`.
+- Firedancer logging conventions and severity behavior at C substrate edges.
+- Startup and supervisor output in `src/app/tickoni` for effective topology and
+  lifecycle facts.
+- Audit records for material financial events, policy decisions, denials,
+  model/tool/adapter results, approvals, and replay-relevant facts.
+
+Do not invent a second telemetry stack, background exporter, tracing bootstrap,
+or metrics registry for convenience. If a new exporter or scrape endpoint is
+needed, route it through the Tickoni-owned telemetry plan and the `tkmetr` or
+`tkdiag` ownership model.
+
+### Logging
+
+Add logs on important execution paths where an operator needs a narrative fact
+that is not already obvious from counters:
+
+- major lifecycle decisions, startup, shutdown, restart, and crash-only exits,
+- effective topology, capacities, disabled phases, sandbox facts, and runtime
+  feature gates,
+- state transitions with external meaning,
+- idempotent skips and duplicate suppression,
+- reconciliation decisions,
+- audit append failures, replay divergence, and policy-boundary failures,
+- C ABI translation failures and substrate lifecycle errors.
+
+Include concrete identifiers where they help diagnose without creating log
+spam:
+
+- tile id and tile index,
+- link name, depth, MTU, producer, and consumer,
+- source offset, event id, case id, request id, replay capsule id,
+- capability id, policy version, decision, outcome, and budget id,
+- audit sequence and audit hash,
+- adapter id, table name, account, destination, venue, instrument, address, or
+  block/ledger identifier where relevant.
+
+Avoid vague logs such as "failed", "skipped", "bad state", or "invalid input"
+without the boundary and stable identifiers needed to act on them. Frequent
+steady-state events, backpressure, denials, duplicate skips, and malformed
+input classes should be counted and audited where appropriate; do not write one
+log line per hot-path fragment or per expected reject.
+
+When catching or translating errors, log useful boundary context and preserve
+the original error cause unless the boundary intentionally terminates,
+classifies, or translates it. Do not swallow errors, downgrade policy denials
+into generic warnings, or continue after unknown audit, topology, sandbox, or
+replay state.
+
+At Firedancer C edges, follow Firedancer logging expectations: use errors for
+operator-facing invalid configuration or unrecoverable substrate failures,
+warnings for unexpected but survivable conditions, and counters for frequent
+events. Do not call logger APIs from signal handlers or high-rate packet/event
+paths.
+
+### Tracing
+
+Tickoni does not currently ship a standalone OpenTelemetry bootstrap or local
+Tempo/Grafana stack. The current Phase 0 surface is in-memory metrics,
+diagnostics, and supervisor output. Future tracing should extend the owning
+tile, supervisor, `tkapi`, `tkmodl`, `tktool`, `tkadpt`, or `tkexec` boundary
+that already knows the operation outcome.
+
+Do not create a second tracing bootstrap path inside helper code. If tracing is
+introduced, it must be a Tickoni-owned runtime feature with explicit startup
+configuration, failure behavior, and tests. It must not be a hidden dependency
+of agents, adapters, model providers, or UI handlers.
+
+Keep operation names and span names stable and low-cardinality. Good names
+describe orchestration boundaries:
+
+- `tickoni-supervisor-start`
+- `tkings-ingest`
+- `tknorm-normalize`
+- `tkdedu-dedupe`
+- `tkpoly-evaluate`
+- `tkaudt-append`
+- `tkrepl-compare`
+- future `tkapi-request`, `tkmodl-request`, `tktool-call`, `tkadpt-request`,
+  and `tkexec-action`
+
+Do not put tx hashes, event IDs, account IDs, addresses, audit hashes, header
+hashes, table names, request IDs, case IDs, or raw error strings in span names.
+Put them in logs, audit records, evidence references, or bounded span
+attributes where the tracing implementation supports attributes safely.
+
+### Telemetry Metrics
 
 Every tile should expose enough state to determine whether it is healthy.
 
-Minimum useful counters:
+Minimum useful counters and gauges:
 
-- input fragments/events received
-- output fragments/events produced
-- malformed inputs
-- drops
-- queue lag
-- backpressure time
-- overruns
-- restart count
-- crash count
-- audit records produced, where relevant
-- replay divergences, where relevant
+- input fragments/events received,
+- output fragments/events produced,
+- malformed inputs,
+- duplicate or idempotent skips,
+- drops,
+- queue lag,
+- backpressure time or waits,
+- overruns,
+- restart count,
+- crash count,
+- audit records produced, where relevant,
+- policy decisions by bounded outcome, where relevant,
+- replay divergences, where relevant.
 
-Logs are for configuration errors, process lifecycle, and rare corruptions.
+Keep metrics registration explicit and near the orchestration boundary that
+owns the outcome. Good instrumentation points are:
+
+- supervisor startup, shutdown, restart, and crash handling,
+- tile input consumption and output production,
+- queue publish/consume overrun and backpressure handling,
+- event normalization and rejection,
+- dedupe decision,
+- policy decision,
+- audit append,
+- replay comparison,
+- future HTTP/WebSocket handlers where request outcomes are known,
+- future model, tool, adapter, and execution boundary calls.
+
+Do not instrument every helper method just to increase metric volume. Prefer
+the highest layer where the outcome is known and labels can remain bounded.
+
+Metric style rules:
+
+- Metric names must be stable and snake_case.
+- Counters should use names that read as monotonic event counts. Use `_total`
+  when exporting through Prometheus-style surfaces.
+- Duration histograms should end in `_seconds` when exported.
+- Match metric type to meaning: counter for monotonic counts, gauge for current
+  state, histogram for latency or size distributions.
+- Prefer clear tile or domain names. Current Phase 0 examples include
+  `produced`, `normalized`, `invalid`, `duplicates`, `allowed`, `denied`,
+  `audited`, `backpressure_waits`, `max_queue_depth`, and
+  `max_latency_hops`.
+- Metrics that represent durable state must update only after the relevant
+  audit append, database update, ledger mutation, or external submission path
+  succeeds.
+- Metrics must not imply a bounded in-memory queue is durable. Durability
+  begins only when the owning durable store or append-only audit path accepts
+  the data.
+
+Keep labels low-cardinality and bounded. Allowed future label shapes include:
+
+- `tile`
+- `link`
+- `stage`
+- `outcome`
+- `decision`
+- `failure_kind`
+- `capability`
+- `environment`
+- `method`
+- `route`
+- `status_code`
+
+Never put high-cardinality values in metric labels:
+
+- source event IDs,
+- payment IDs,
+- tx hashes,
+- block/header/audit hashes,
+- account IDs,
+- case IDs,
+- request IDs,
+- wallet, bank, processor, or trading addresses,
+- UUIDs,
+- raw exception messages,
+- stack traces,
+- arbitrary request paths,
+- prompt text,
+- raw model output.
+
+Put high-cardinality identifiers in audit records, logs, evidence stores, or
+trace attributes instead.
+
+### Diagnostics
+
+Diagnostics are the low-rate facts needed to operate the topology. They should
+answer what the supervisor actually built, which tile owns a failure, and
+whether the runtime is safe to keep running.
+
+Expose stable diagnostics for:
+
+- tile lifecycle state,
+- crashed tile identity,
+- sandbox failures,
+- queue saturation and overrun state,
+- final audit sequence and audit count,
+- replay checked/matched state,
+- effective topology values,
+- disabled phases and feature gates,
+- future model/tool/adapter/execution boundary health.
+
 Steady-state loss, backpressure, and denials should be metrics and audit data,
-not log spam.
+not log spam. Crash, corruption, unknown replay state, and impossible substrate
+conditions should be loud and tied to the owning tile or boundary.
+
+### Testing Telemetry
+
+Add tests for telemetry when behavior changes, not just to pad coverage:
+
+- unit tests for metric state transitions and bounded label mapping,
+- topology or supervisor tests for effective diagnostics,
+- replay/audit tests when new counters depend on audit or replay outcomes,
+- integration tests for future scrape endpoints or API telemetry exposure,
+  without brittle assertions on exposition ordering.
+
+Cover both happy paths and important edge cases:
+
+- success and error outcomes,
+- duplicate/idempotent close paths,
+- bounded error classification,
+- invalid or missing inputs normalized to stable outcomes,
+- crash-only teardown and replay divergence.
+
+When adding, renaming, or removing important runtime metrics, diagnostic fields,
+telemetry environment variables, or scrape endpoints, update
+`doc/telemetry.md`, `doc/observability.md`, or the relevant runtime README in
+the same change.
 
 ## Build And Tooling
 
@@ -584,6 +877,47 @@ Examples:
 
 If a tool does not apply to Tickoni yet, the `-tk` recipe may be a no-op in the
 justfile. Do not put skip stubs or fake success logic in implementation scripts.
+
+## Testing
+
+The testing guide for this repository is
+[`doc/testing-tickoni.md`](../testing-tickoni.md). Treat that document and the
+root `justfile` as the source of truth for current test layers and commands.
+
+Run the narrowest relevant test first, then broaden based on risk:
+
+- Tickoni Zig supervisor, topology, queue, sandbox, C ABI wrapper, or Phase 0
+  tile behavior: `just test-unit-tk`.
+- Firedancer-derived C substrate, Tango, Disco, Discof, Waltz HTTP, utility, or
+  C build integration behavior: `just test-unit-fd`.
+- Cross-boundary Tickoni/Firedancer changes: `just test-unit-all`.
+- Runtime topology, workspace setup, local process startup, or Firedancer dev
+  path behavior: `just test-e2e-fd`.
+- Broad local validation before risky handoff: `just test-all` or
+  `just tests-all`.
+
+Use test layers deliberately:
+
+- Unit tests should isolate the direct function, module, tile helper, queue
+  wrapper, or supervisor behavior under test.
+- Integration tests should keep Tickoni internals real and substitute only the
+  outside tool or harness boundary.
+- E2E/system tests should run the real local runtime toolchain and avoid
+  internal mocks.
+
+When changing runtime behavior, add or update tests for the behavior being
+claimed. Important paths include malformed input rejection, bounded queue
+behavior, duplicate/idempotent skips, policy allow/deny decisions, audit hash
+chaining, replay comparison, sandbox/crash diagnostics, metrics, and
+configuration validation.
+
+Do not remove, rename, or repurpose placeholder recipes such as
+`just test-integration-tk` or `just test-e2e-tk` unless the user explicitly
+asks for that migration. They keep the command shape stable while Tickoni grows
+real integration and e2e layers.
+
+If you do not run a relevant check, say that explicitly in the handoff and
+explain why.
 
 ## Phase Discipline
 

@@ -97,6 +97,107 @@ The supervisor currently supports only:
 - `start`
 - `status`
 
+## DevOps And Runtime Notes
+
+Active Tickoni runtime:
+
+- The active Tickoni workspace is `src/app/tickoni/` and `src/tickoni/`.
+- `tickoni-supervisor` is the active Zig supervisor runtime for current
+  Tickoni-owned work.
+- Current local runtime entrypoints are `zig build run -- status` and
+  `zig build run -- start`.
+- There is no active Tickoni Docker Compose runtime in this repository. The
+  checked-in container files under `contrib/containers/` are development or
+  packaging support, not the source of truth for local orchestration.
+
+Repository command policy:
+
+- Use `justfile` recipes as the repo-facing command surface.
+- Do not add Tickoni developer tooling targets to upstream Firedancer
+  Makefiles.
+- Keep GitHub Actions commands aligned with the active `justfile` recipes.
+- Avoid running broad aggregate recipes by default. Prefer the narrowest direct
+  validation needed for the change, such as `just test-unit-tk` or
+  `zig build test`, and leave `just test-all`, `just tests-all`,
+  `just quality-check-all`, and `just security-check-all` to the developer
+  unless they explicitly ask for full gates.
+
+### CLI Tooling Guidance
+
+- For new or refactored repository CLI tools, keep the public command surface
+  in the `justfile` unless the tool is an actual runtime binary such as
+  `tickoni-supervisor`.
+- For Tickoni runtime commands, prefer explicit Zig CLI handling in
+  `src/app/tickoni/` with clear `--help` or usage output and fail-closed input
+  validation.
+- Keep CLI command names explicit about intent and aligned with existing
+  `justfile` recipes, especially the `build-*`, `test-*`, `quality-*`, and
+  `security-*` naming families.
+- Extend existing `justfile` recipe conventions instead of introducing
+  parallel naming patterns. If renaming a recipe, preserve a compatibility
+  alias when practical.
+- Keep shell scripts scoped to one explicit operation or selector. Compose
+  multi-step workflows in named `justfile` recipes so the command surface
+  remains visible, overridable, and easy to audit.
+- Do not hide broad aggregate operations behind a single shell-script selector
+  such as `all` when the repository can express the sequence through named
+  `justfile` recipes.
+- Use concise human-facing terminal output, while keeping structured diagnostic
+  output machine-parseable where tools or CI need to consume it.
+- Validate required CLI inputs and environment preconditions up front, then
+  fail fast with clear actionable error messages.
+
+Configuration and runtime environment:
+
+- Tickoni does not currently have a checked-in runtime `.env.example` template.
+- If a new required runtime environment variable is added, production code must
+  fail closed when it is missing or malformed.
+- When adding a required runtime environment variable, update all of the
+  following in the same change when they exist:
+  - the owning Zig config or startup code,
+  - the relevant `.env.example` template,
+  - checked-in local `.env.*` files used for repo-local runtime or E2E flows,
+  - affected READMEs and docs,
+  - affected GitHub Actions workflow or action environment,
+  - affected test harness config layers.
+
+CI and retained Firedancer workflows:
+
+- CI automation lives in GitHub Actions workflows under `.github/workflows`.
+- Tickoni-owned short checks are centered on the active Zig harness and
+  `justfile` recipes.
+- Workflows guarded by `vars.SKIP_FIREDANCER_CI != 'true'` are retained
+  Firedancer workflows. They are kept for now to avoid unnecessary conflicts
+  with upstream Firedancer while Tickoni's own CI surface remains narrower.
+- Do not remove or rewrite retained Firedancer workflows as part of ordinary
+  Tickoni changes unless the task is explicitly about that migration.
+- CodeQL `justfile` recipes are currently no-ops as documented in
+  `doc/security.md`; do not silently add new CodeQL pull request hooks.
+
+Infrastructure safety:
+
+- Repository-managed infrastructure should be treated as high-risk.
+- Do not add new cloud mutation flows without explicit user guidance.
+- Any script or `just` recipe that can create, update, replace, delete,
+  destroy, or otherwise mutate cloud resources must default to dry-run
+  behavior.
+- Use the reverse opt-in flag `IS_NOT_DRY_RUN=true` for infrastructure changes
+  that actually mutate remote resources. Leaving the flag unset, empty, or set
+  to any other value must remain dry run.
+- When practical, provide separate dry-run and commit command paths, and make
+  the committing path visibly set `IS_NOT_DRY_RUN=true`.
+
+Useful current commands:
+
+- `just build-tk` builds the Tickoni Zig supervisor.
+- `just build-fd` builds the Firedancer-derived `tickoni` C binary.
+- `just test-unit-tk` runs Tickoni Zig unit tests.
+- `just quality-format-check-tk` checks Tickoni Zig formatting.
+- `just quality-format-fix-tk` formats Tickoni Zig source.
+- `just quality-lint-check-tk` runs Tickoni-owned lint checks.
+- `just security-gitleaks-check-tk` scans Tickoni-owned source for secrets.
+- `just security-sanitize-check-tk` runs the Tickoni sanitizer check path.
+
 ## Test
 
 Main test entrypoints:
