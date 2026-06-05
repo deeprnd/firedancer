@@ -1,0 +1,2 @@
+query: ImplicitIntegerTruncation.ql
+postprocess: InlineExpectationsTestQuery.ql
