@@ -4,6 +4,14 @@
 
 V1 should prove the category with a narrow, high-value harness.
 
+Product management documents:
+
+- V1 requirements: [`prd.md`](prd.md)
+- Phase gates: [`phase-plan.md`](phase-plan.md)
+- Epics, stories, and tasks: [`wbs.md`](wbs.md)
+- Tile topology: [`tile-plan.md`](tile-plan.md)
+- Financial capability model: [`capabilities.md`](capabilities.md)
+
 ### V1 Goal
 
 Build the first usable version of Tickoni as a high-throughput, isolated, cost-controlled, policy-gated AI harness for fintech event operations.
@@ -15,14 +23,21 @@ V1 proves four infrastructure advantages:
 3. inference spend governance
 4. forensic audit replay
 
+V1 also proves a product advantage that generic agent harnesses do not: agents
+are governed by finance-native authority envelopes. The runtime should be able
+to say that an agent may propose a payment retry, ledger correction, or US
+Information Technology trading action under specific amount, destination,
+frequency, and approval limits, not merely that the agent may call a tool.
+
 ## V1 Feature Set
 
 The feature set describes the full V1 product. The implementation order is the
-phase plan below: Phase 0 proves the runtime shape, Phase 1 processes real
-fintech-like events, Phase 2 attaches controlled agents, Phase 3 adds CaseOps,
-and Phase 4 packages realistic workflows.
+phase plan below: Phase 0 proves the runtime shape, Phase 1 proves the
+controlled end-to-end harness over stub payment and trading systems, Phase 2
+adds deterministic cases and evidence, Phase 3 adds external ingestion and
+CaseOps, and Phase 4 packages realistic workflows.
 
-### Runtime: Phase 0/1
+### Runtime: Phase 0/2/3
 
 - Zig-native event runtime
 - tile-based event pipeline
@@ -36,36 +51,43 @@ and Phase 4 packages realistic workflows.
 - runtime telemetry
 
 Phase 0 uses a synthetic payment stream to prove bounded flow, event hashing,
-audit, replay, telemetry, and supervisor behavior. Case creation and the real
-ingestion API are Phase 1.
+audit, replay, telemetry, supervisor behavior, and finance-native capability
+decisions. Phase 1 keeps synthetic and stub financial systems so audit,
+telemetry, destination allowlists, payment/trading/ledger authority envelopes,
+model integration, adapter calls, and approval boundaries are correct before
+external ingestion is introduced.
+Case creation is Phase 2. The real event ingestion API is Phase 3.
 
-### Isolation / Control Boundary: Phase 0/2
+### Isolation / Control Boundary: Phase 0/1/2
 
 - memory-isolated agent execution
 - no arbitrary shell access
 - no unrestricted syscalls from agent logic
 - no unrestricted network access
 - signed financial adapters only
-- capability-scoped execution
-- adapter permission manifests
+- finance-native capability-scoped execution
+- adapter manifests that declare financial objects, destinations, limits, and action classes
 - sensitive-action boundaries
 - runtime enforcement independent of prompts
 
-Phase 0 should prove runtime isolation and sandbox failure behavior. Agent,
-adapter, and model isolation are Phase 2.
+Phase 0 should prove runtime isolation and sandbox failure behavior. Phase 1
+proves agent, adapter, model, destination, and financial consequence isolation
+against stub payment and trading systems before any production connector is
+introduced.
 
-### Agent Harness: Phase 2
+### Agent Harness: Phase 1
 
 - model-provider abstraction
+- LLM server or local/dev model endpoint integration through `tkmodl`
 - role-based agents
 - payment exception agent
 - reconciliation agent
 - fraud triage agent
 - risk reviewer agent
-- controlled tool broker
+- controlled financial tool broker
 - model-native function-call and MCP-compatible tool envelopes
 - explicit agent identity context
-- tool-call audit
+- financial adapter-call and proposal audit
 - prompt/output capture
 - agent budget controls
 - per-agent token budgets
@@ -75,10 +97,12 @@ adapter, and model isolation are Phase 2.
 - retry-loop limits
 - model usage attribution
 
-### Policy: Phase 0/2
+### Financial Capability Policy: Phase 0/1/3
 
-- capability-based permission system
-- resource and downstream-system scopes
+- finance-native capability policy system
+- payment rail, ledger book, beneficiary, IBAN, wallet, account, venue, market, sector, and instrument scopes
+- amount, exposure, frequency, and holding-period limits
+- destination allowlists for banking, crypto, and trading paths
 - action allow/deny/approval decisions
 - policy versioning
 - environment separation
@@ -86,8 +110,11 @@ adapter, and model isolation are Phase 2.
 - human approval requirement for money-impacting actions
 - denied-action logging
 
-Phase 0 needs allow, deny, and require-approval records for runtime events.
-Agent, tool, model, and approval policy checks arrive in Phase 2 and Phase 3.
+Phase 0 needs allow, deny, and require-approval records for financial
+capability decisions. Phase 1 extends those checks to agent, model, proposal,
+and stub adapter calls, including trading proposal limits such as USD
+10,000/day in US Information Technology markets and no direct order execution.
+Human approval workflow UI arrives in Phase 3.
 
 ### Audit: Phase 0/1/2
 
@@ -100,10 +127,13 @@ Agent, tool, model, and approval policy checks arrive in Phase 2 and Phase 3.
 - replay capsule per material case
 - audit export as JSONL
 
-Phase 0 proves append-only event audit and replay comparison. Case capsules are
-Phase 1. Agent trajectories and model records are Phase 2.
+Phase 0 proves append-only event audit and replay comparison. Phase 1 makes the
+journal durable enough for end-to-end stub workflows and records agent
+trajectories, model records, adapter calls, finance-native capability decisions,
+destination/limit checks, telemetry, and replay inputs. Case capsules are Phase
+2.
 
-### Inference Governance: Phase 2
+### Inference Governance: Phase 1
 
 - token accounting per case
 - token accounting per agent
@@ -314,62 +344,72 @@ Exit criteria:
 - agent execution cannot access unauthorized capabilities
 - inference usage is measurable per event
 
-### Phase 1: V1 Runtime
+### Phase 1: Control-Plane Harness
 
-Goal: process real fintech-like events.
+Goal: prove a working end-to-end AI harness before external ingestion.
 
 Deliverables:
 
-- event ingestion API
-- financial event schema
-- tile pipeline
-- case creation
-- policy decision path
-- audit journal
-- replay capsule
-- runtime telemetry
+- durable audit export and hash-chain verification
+- runtime telemetry and diagnostics export
+- versioned finance-native capability envelopes
+- destination allowlist checks for stub bank, crypto, and trading destinations
+- amount, exposure, frequency, and approval-limit checks
+- allow, deny, and require-approval policy decisions
+- model gateway integration with one configured LLM backend or local/dev LLM server
+- controlled agent run path
+- financial tool broker
+- stub payment adapter
+- stub trading adapter
+- token, retry, and budget accounting
+- prompt, output, financial adapter-call, proposal, denial, destination-check, limit-check, and adapter-result audit records
+- replay with external mutation disabled
 
 Exit criteria:
 
-- events produce cases deterministically
-- case history is auditable
-- replay detects divergence
+- synthetic payment and trading events can run end to end
+- every model call, adapter call, and proposal is checked against a financial capability envelope
+- out-of-scope trading proposals, for example over USD 10,000/day or outside US Information Technology markets, are denied
+- direct trading order execution remains denied
+- denied and approval-required actions are audited
+- telemetry shows queue, policy, model, financial adapter, proposal, destination, limit, and approval behavior
+- replay detects divergence without invoking real external effects
 
-### Phase 2: Agent Harness
+### Phase 2: Deterministic Case Runtime
 
-Goal: attach controlled AI agents.
+Goal: turn stub workflows into deterministic, replayable case records.
 
 Deliverables:
 
-- model-provider abstraction
-- tool broker
-- role-based agents
-- capability manifests
-- prompt/tool audit capture
-- denied-action capture
-- agent budget controls
-- memory sandbox integration
-- model spend accounting
-- inference budgets
+- case router
+- evidence store
+- replay capsule format
+- case lifecycle events
+- case-scoped audit journal
+- content-addressed evidence records
+- deterministic case IDs
+- financial capability manifests for replacing stub adapters with signed adapters
+- case-scoped destination, limit, frequency, and approval policy derivation
+- memory sandbox integration for agent workers
 - model routing
 - context management
 - runaway-loop protection
 
 Exit criteria:
 
-- agent can investigate a case
-- agent cannot call forbidden tools
-- every tool call is audited
-- every output is attached to the case
-- agent cannot exceed assigned inference budget
-- agent cannot bypass capability boundary
+- events produce cases deterministically
+- agent outputs and adapter results attach to cases as evidence
+- case history is auditable
+- replay detects divergence for case state and evidence
+- agent cannot bypass capability boundary or exceed assigned budget
 
 ### Phase 3: CaseOps Board
 
-Goal: make operations usable.
+Goal: add real ingestion and make operations usable.
 
 Deliverables:
 
+- event ingestion API
 - board UI
 - case cards
 - evidence panel

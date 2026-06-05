@@ -50,6 +50,8 @@
   </tr>
 </table>
 
+![Tickoni](assets/banner.png)
+
 **High-throughput AI harness for agentic finance.**
 
 Fast runtime first. Agents second.
@@ -57,16 +59,27 @@ Fast runtime first. Agents second.
 Tickoni turns AI agents into controlled, observable execution units running on a high-performance event engine.
 
 For agentic finance, that means agents can inspect payment and accounting ledger
-events, call scoped tools, and prepare actions without receiving unrestricted
-control of a production system.
+events, prepare payment retries, propose ledger corrections, and recommend
+trading actions without receiving unrestricted control of a production system.
+
+Generic harnesses ask whether an agent can read a file, call a tool, open a
+browser, or run a shell command.
+
+Tickoni asks the financial questions:
+
+- Which payment rail, beneficiary, IBAN, wallet, broker account, or exchange is in scope?
+- Which ledger book, settlement batch, asset class, market, sector, side, and order type is allowed?
+- How much can the agent recommend or propose per case, day, month, destination, or instrument?
+- How frequently can it propose retries, transfers, corrections, or trades?
+- Which actions are observe-only, proposal-only, approval-required, or executable by a privileged path?
 
 Built for:
 
 - ⚡ speed
-- 🧱 isolation
-- 🛡️ controlled execution
-- 🔎 observability
-- 📜 auditability
+- 🧱 bounded financial authority
+- 🛡️ destination, limit, and approval controls
+- 🔎 case-level cost and consequence visibility
+- 📜 forensic evidence
 - ⏪ replay
 
 AI models are probabilistic.
@@ -81,13 +94,13 @@ Agents are getting more powerful.
 
 The runtimes around them are still mostly:
 
-prompt → tool call → response
+prompt → OS permission → tool call → response
 
-Tickoni treats AI execution as a systems problem.
+Tickoni treats AI execution as a financial control-plane problem.
 
 Every agent action becomes an event:
 
-event → policy → execution → audit → replay
+financial event → capability envelope → policy decision → proposal or execution path → evidence → replay
 
 The goal:
 
@@ -95,7 +108,8 @@ Know exactly:
 
 - what happened
 - why it happened
-- what changed
+- what financial consequence was proposed or attempted
+- which destination, limit, venue, account, or approval scope applied
 - how to reproduce it
 
 No mystery state.
@@ -106,15 +120,15 @@ No mystery state.
 | ---------------------- | ------------------------------------------------------------------------------------------------ |
 | ⚡ Execution Engine    | High-throughput event runtime forked from Firedancer's systems core and evolved for AI workloads |
 | 🧱 Tile Runtime        | Small isolated execution units communicating through explicit shared-memory channels             |
-| 🤖 Agent Harness       | Run AI agents as controlled workers with scoped capabilities instead of unrestricted access      |
-| 🛠️ Tool Broker         | Every tool call is authorized, executed, measured, and recorded                                  |
-| 🛡️ Capability Security | Agents receive explicit permissions instead of owning the environment                            |
-| 🔑 Agent Identity       | Every action is bound to an agent role, policy version, and capability scope                      |
-| 📜 Audit Engine        | Capture events, prompts, responses, tool calls, state transitions, failures, and decisions       |
+| 🤖 Agent Harness       | Run payment, reconciliation, fraud, risk, and trading agents as controlled financial operators   |
+| 🛠️ Financial Tool Broker | Every adapter call is checked against payment, ledger, trading, risk, destination, and limit scope |
+| 🛡️ Capability Security | Agents receive financial authority envelopes instead of broad tool or system access              |
+| 🔑 Agent Identity       | Every action is bound to an agent role, workflow, case, policy version, and capability scope      |
+| 📜 Evidence Engine      | Capture events, prompts, responses, adapter calls, proposals, approvals, failures, and decisions |
 | ⏪ Replay Capsules     | Reconstruct previous executions for debugging, testing, and verification                         |
-| 📊 Runtime Telemetry   | Monitor throughput, latency, queues, resources, tools, policies, and failures                    |
+| 📊 Runtime Telemetry   | Monitor throughput, latency, queues, resources, capabilities, policies, costs, and failures      |
 | 🔌 Model Agnostic      | Connect different model providers without coupling execution logic to the model                  |
-| 🧩 Extensible Runtime  | Add custom agents, tools, policies, and execution tiles                                          |
+| 🧩 Extensible Runtime  | Add custom agents, signed financial adapters, policy templates, and execution tiles              |
 
 ## Architecture
 
@@ -136,15 +150,16 @@ The runtime coordinates:
 
 - event flow
 - agent execution
-- tool scheduling
+- financial adapter scheduling
 - state transitions
 - resource boundaries
+- destination, exposure, and approval boundaries
 
 Everything is an event.
 
 Everything has ownership.
 
-## Isolation
+## Financial Control
 
 Tickoni follows a tile-based execution model.
 
@@ -161,17 +176,30 @@ Tiles communicate through shared-memory channels.
 
 Every interaction follows the same path:
 
-agent → capability check → tool execution → audit → replay
+agent → financial capability check → adapter/proposal path → evidence → replay
 
 Model-native function calls and MCP-compatible tools terminate at the same
 broker boundary. The runtime treats protocol compatibility as an integration
 surface, not as permission to bypass policy.
 
-Every tool call captures:
+Tickoni's capability model is finance-native. It can express constraints like:
+
+- payment retries only on approved rails and processors
+- ledger corrections as proposals, not postings
+- crypto transfers only to allowlisted wallets and networks
+- trading recommendations only for approved accounts, venues, sectors, and instruments
+- maximum notional per order, day, month, destination, customer, or portfolio
+- minimum order intervals and holding periods to prevent day-trading behavior
+- human approval before money-impacting execution
+
+Every financial adapter call or proposal captures:
 
 - input
 - output
-- permissions
+- financial capability
+- destination and scope
+- limits and frequency checks
+- approval state
 - execution metadata
 - timing
 - resource usage
@@ -193,11 +221,11 @@ Zig gives Tickoni:
 
 This keeps the message around the three pillars:
 
-throughput → control → isolation
+throughput → consequence control → replay
 
-## Audit & Replay
+## Evidence & Replay
 
-Execution history is structured data, not log text.
+Execution history is structured financial evidence, not log text.
 
 | Captured            | Purpose                                   |
 | ------------------- | ----------------------------------------- |
@@ -205,9 +233,10 @@ Execution history is structured data, not log text.
 | 🤖 Agent runs       | Track every agent decision                |
 | 🧠 Prompts          | Know exactly what context was provided    |
 | 💬 Model responses  | Inspect generated output                  |
-| 🛠️ Tool calls       | See every external interaction            |
-| 🛡️ Policy decisions | Verify why actions were allowed or denied |
-| 🔢 Token usage      | Measure cost of every execution           |
+| 🛠️ Adapter calls     | See every payment, ledger, trading, risk, or compliance interaction |
+| 🛡️ Policy decisions | Verify why actions were allowed, denied, or approval-required |
+| 💸 Financial scope   | Record destination, account, rail, market, sector, instrument, and limit checks |
+| 🔢 Token usage      | Measure cost by case, workflow, agent, and policy version |
 | ⏱️ Timing           | Track latency and bottlenecks             |
 | 💾 State changes    | Understand what changed                   |
 | ❌ Failures         | Debug broken execution paths              |
@@ -247,13 +276,12 @@ No black boxes.
 - [Workflows](doc/workflows.md)
 - [Build](doc/build.md)
 - [Build system](doc/build-system.md)
-- [Tickoni testing](doc/testing-tickoni.md)
-- [Firedancer-style testing](doc/testing.md)
+- [Testing](doc/testing-tickoni.md)
 - [Observability](doc/observability.md)
 - [Telemetry](doc/telemetry.md)
 - [Security](doc/security.md)
 - [Audit and replay](doc/audit.md)
-- [Roadmap](doc/product/roadmap.md)
+- [Roadmap](doc/position/roadmap.md)
 
 ## License
 
