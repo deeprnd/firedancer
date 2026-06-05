@@ -1,7 +1,4 @@
 include src/app/fdctl/with-version.mk
-FD_WITH_AGAVE ?= 0
-
-ifeq ($(FD_WITH_AGAVE),1)
 $(info Using FRANKENDANCER_VERSION=$(FIREDANCER_VERSION_CSTR) ($(FIREDANCER_CI_COMMIT)))
 $(shell echo "#define FDCTL_MAJOR_VERSION $(FIREDANCER_VERSION_MAJOR)"                          >  src/app/fdctl/version2.h)
 $(shell echo "#define FDCTL_MINOR_VERSION $(FIREDANCER_VERSION_MINOR)"                          >> src/app/fdctl/version2.h)
@@ -21,9 +18,12 @@ $(OBJDIR)/obj/app/fdctl/version.d: src/app/fdctl/version.h
 # Always generate a version file
 include src/app/fdctl/version.h
 
+# version
+$(call make-lib,fdctl_version)
+$(call add-objs,version,fdctl_version)
+
 ifdef FD_HAS_ALLOCA
 ifdef FD_HAS_DOUBLE
-ifdef FD_HAS_INT128
 ifdef FD_HAS_HOSTED
 
 $(OBJDIR)/obj/app/fdctl/config.o: src/app/fdctl/config/default.toml
@@ -37,11 +37,8 @@ ifdef FD_HAS_THREADS
 .PHONY: fdctl cargo-validator cargo-solana cargo-ledger-tool rust solana check-agave-hash
 
 # fdctl commands
+$(call add-objs,commands/run_agave,fd_fdctl)
 $(call add-objs,commands/set_identityh,fd_fdctl)
-
-# version
-$(call make-lib,fdctl_version)
-$(call add-objs,version,fdctl_version)
 
 $(call make-bin-rust,fdctl,main,fd_fdctl fdctl_shared fdctl_platform fd_discoh fd_disco fd_choreo agave_validator fd_flamenco fd_funk fd_quic fd_tls fd_reedsol fd_waltz fd_tango fd_ballet fd_util fdctl_version)
 
@@ -144,8 +141,4 @@ agave-ledger-tool: $(OBJDIR)/bin/agave-ledger-tool
 endif
 endif
 endif
-endif
-endif
-else
-$(info Skipping fdctl build (FD_WITH_AGAVE=0))
 endif
