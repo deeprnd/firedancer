@@ -16,11 +16,16 @@ endif
 # Always generate a version file
 include src/app/firedancer/version.h
 
+$(OBJDIR)/obj/app/firedancer/version.d: src/app/firedancer/version.h
+
+# version
+$(call make-lib,firedancer_version)
+$(call add-objs,version,firedancer_version)
+
 ifdef FD_HAS_HOSTED
 ifdef FD_HAS_THREADS
 ifdef FD_HAS_ALLOCA
 ifdef FD_HAS_DOUBLE
-ifdef FD_HAS_INT128
 ifdef FD_HAS_ZSTD
 
 $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/default.toml
@@ -29,7 +34,6 @@ $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/devnet.toml
 $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/mainnet.toml
 $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/testnet-jito.toml
 $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/mainnet-jito.toml
-$(OBJDIR)/obj/app/firedancer/version.d: src/app/firedancer/version.h
 
 # version (no external lib deps, always built)
 $(call make-lib,firedancer_version)
@@ -65,7 +69,6 @@ endif
 
 else
 $(warning firedancer build disabled due to lack of zstd)
-endif
 endif
 endif
 endif
