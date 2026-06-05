@@ -46,6 +46,16 @@ void literal_narrow(void) {
     (void)(x + y);
 }
 
+// ── ulong literal narrowing (patterns from real codebase) ─────────────────
+// e.g. `uchar x = 0UL` or `uchar x = 64UL` — ulong suffix makes this a
+// ulong→uchar implicit truncation.
+
+void ulong_literal_narrow(void) {
+    uchar a = 0UL;   // $ Alert
+    uchar b = 64UL;  // $ Alert
+    (void)(a + b);
+}
+
 // ── Function-call argument truncation ─────────────────────────────────────
 
 void takes_ushort(ushort x);

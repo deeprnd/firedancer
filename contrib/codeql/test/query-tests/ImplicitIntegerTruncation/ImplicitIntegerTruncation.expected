@@ -6,6 +6,8 @@
 | ImplicitIntegerTruncation.c:25:16:25:18 | big | Implicit truncation from unsigned long to unsigned int. |
 | ImplicitIntegerTruncation.c:44:16:44:16 | 3 | Implicit truncation from int to unsigned char. |
 | ImplicitIntegerTruncation.c:45:16:45:18 | 300 | Implicit truncation from int to unsigned short. |
-| ImplicitIntegerTruncation.c:54:18:54:20 | big | Implicit truncation from unsigned long to unsigned short. |
-| ImplicitIntegerTruncation.c:66:11:66:13 | big | Implicit truncation from unsigned long to unsigned short. |
-| ImplicitIntegerTruncation.c:67:11:67:13 | big | Implicit truncation from unsigned long to unsigned char. |
+| ImplicitIntegerTruncation.c:54:15:54:17 | 0 | Implicit truncation from unsigned long to unsigned char. |
+| ImplicitIntegerTruncation.c:55:15:55:18 | 64 | Implicit truncation from unsigned long to unsigned char. |
+| ImplicitIntegerTruncation.c:64:18:64:20 | big | Implicit truncation from unsigned long to unsigned short. |
+| ImplicitIntegerTruncation.c:76:11:76:13 | big | Implicit truncation from unsigned long to unsigned short. |
+| ImplicitIntegerTruncation.c:77:11:77:13 | big | Implicit truncation from unsigned long to unsigned char. |
