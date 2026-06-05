@@ -80,7 +80,7 @@ run_style_grep() {
 }
 
 our_changed_files() {
-  { git diff main...HEAD --diff-filter=AM --name-only
+  { git log --first-parent --no-merges --diff-filter=AM --name-only --format="" main..HEAD
     git diff --diff-filter=AM --name-only
     git diff --cached --diff-filter=AM --name-only
     git ls-files --others --exclude-standard; } | sort -u

@@ -1,11 +1,7 @@
-FD_WITH_AGAVE ?= 0
-
-ifeq ($(FD_WITH_AGAVE),1)
 ifdef FD_HAS_HOSTED
 ifdef FD_HAS_LINUX
 ifdef FD_HAS_ALLOCA
 ifdef FD_HAS_DOUBLE
-ifdef FD_HAS_INT128
 
 .PHONY: fddev run monitor
 
@@ -44,8 +40,4 @@ $(call run-integration-test,test_fddev)
 endif
 endif
 endif
-endif
-endif
-else
-$(info Skipping fddev build (FD_WITH_AGAVE=0))
 endif
