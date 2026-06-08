@@ -139,4 +139,3 @@ pub extern fn tk_audit_parse_protobuf(
     in_sz: usize,
     event: *Event,
 ) c_int;
-

@@ -655,7 +655,6 @@ test "Phase 0 rejects malformed payment framing" {
     try std.testing.expect(state.replay_match.load(.seq_cst));
 }
 
-
 test "sandbox failure records crash diagnostics and stops ingest" {
     var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 10, .queue_depth = 2, .sandbox_fail_at = 2 });
     defer state.deinit();

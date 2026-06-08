@@ -169,7 +169,6 @@ fn linkTickoniAuditCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
     step.root_module.addCSourceFiles(.{
         .files = &.{
             "src/tickoni/codec/audit_pb.c",
-            "src/ballet/pb/fd_pb_tokenize.c",
         },
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
     });
