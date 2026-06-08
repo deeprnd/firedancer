@@ -61,6 +61,7 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/runtime/tile.zig",
         "src/tickoni/c_abi/queue.zig",
         "src/tickoni/c_abi/sandbox.zig",
+        "src/tickoni/tiles/audit.zig",
         "src/tickoni/tiles/payment_pipeline.zig",
     }) |path| {
         const t_mod = b.createModule(.{
@@ -97,6 +98,7 @@ pub fn build(b: *std.Build) void {
         .{ "test-tile", "src/tickoni/runtime/tile.zig" },
         .{ "test-queue", "src/tickoni/c_abi/queue.zig" },
         .{ "test-sandbox", "src/tickoni/c_abi/sandbox.zig" },
+        .{ "test-audit", "src/tickoni/tiles/audit.zig" },
         .{ "test-payment-pipeline", "src/tickoni/tiles/payment_pipeline.zig" },
     }) |entry| {
         const t = b.addTest(.{
