@@ -22,6 +22,15 @@ capability model still powers the guardrails, but the product language is:
 - What changed after the trade?
 - Why was this trade resized or blocked?
 
+Secondary reviewers still matter:
+
+- engineering operators need queue, crash, budget, adapter, and replay evidence
+- risk, compliance, and partner reviewers need to inspect why a recommendation
+  or trade ticket was allowed, blocked, or approval-gated
+
+These reviewer needs should appear as proof and trust surfaces, not as the
+primary investor experience.
+
 ## Baseline
 
 Status: done.
@@ -270,7 +279,9 @@ Tasks:
 - V1.2.S3.T3: Enforce asset class, market, venue, sector, side, and order type scope.
 - V1.2.S3.T4: Enforce restricted-instrument denylist.
 - V1.2.S3.T5: Enforce same-day round-trip and minimum holding-period checks in demo fixture state.
-- V1.2.S3.T6: Return user-facing blocked reasons and resize suggestions.
+- V1.2.S3.T6: Enforce broker-account, market, exchange or venue, sector, and instrument allowlists for trade-ticket scope.
+- V1.2.S3.T7: Return user-facing blocked reasons and resize suggestions.
+- V1.2.S3.T8: Record destination, venue, and limit-check outcomes for later audit and replay proof.
 
 Acceptance:
 
@@ -278,6 +289,8 @@ Acceptance:
 - A USD 25,000 request is blocked or resized with max affordable amount and
   exact reasons.
 - Restricted instruments never reach paper execution.
+- Destination, venue, and limit failures are visible as trade-ticket evidence,
+  not only as logs.
 
 Implementation notes:
 
@@ -315,11 +328,15 @@ Tasks:
 - V1.2.S5.T3: Show blocked USD 25,000 trade with max affordable amount.
 - V1.2.S5.T4: Show rejected restricted instrument.
 - V1.2.S5.T5: Output a product-friendly ticket summary.
+- V1.2.S5.T6: Output audit-ready ticket evidence for the allowed trade,
+  oversized blocked trade, and restricted-instrument rejection.
 
 Acceptance:
 
 - An exec can watch one basket become a trade ticket, see buying power checks,
   place a paper trade, and see an oversized trade blocked with a helpful reason.
+- The demo produces a durable blocked-flow artifact that can be replayed without
+  live model, broker, market, trading, payment, or execution effects.
 
 ## V1.3: Portfolio Impact Loop
 
@@ -478,11 +495,17 @@ Tasks:
 - V1.6.T3: Include policy version, model/tool/adapter attribution, and capability envelope id.
 - V1.6.T4: Export a trade-decision record for partner review.
 - V1.6.T5: Show blocked trade reasons and policy scope in partner-facing language.
+- V1.6.T6: Show recommendation evidence, model usage, adapter behavior,
+  approval state, and replay status without requiring raw-log review.
+- V1.6.T7: Include destination checks, venue checks, limit checks, approval
+  decisions, denials, and adapter results in the partner proof view.
 
 Acceptance:
 
 - A partner can inspect how a recommendation became a ticket, why it was
   allowed or blocked, and how replay reproduces the decision.
+- A reviewer can understand the trade decision without reading raw audit JSONL
+  or tile logs.
 
 Product framing:
 
@@ -550,6 +573,65 @@ Every increment must answer:
 - What happens when an instrument is restricted?
 - Is execution paper-only, broker-sandbox, or disabled?
 - Which artifacts are needed for later partner trust?
+- Which demo command or script closes the increment?
+- Which fixture data is used for thesis, portfolio, market, model, tool, and
+  adapter boundaries?
+- Are policy decisions, destination checks, venue checks, and limit checks
+  visible in audit output where they apply?
+- Do metrics or diagnostics show queue, policy, model, tool, adapter, audit,
+  and replay state?
+- Can replay run without model, broker, payment, trading, or execution side
+  effects?
+- What intentional divergence or blocked-flow example proves failure behavior?
+
+### Increment Evidence Work Items
+
+Every increment should include these work items unless the increment explicitly
+does not touch that boundary:
+
+- G.T1: Add a documented local demo command or script.
+- G.T2: Add deterministic fixtures for the product flow and each model, tool,
+  adapter, market, and portfolio boundary it uses.
+- G.T3: Emit audit output for the material user flow.
+- G.T4: Show policy, destination, venue, and limit decisions in audit output
+  where they apply.
+- G.T5: Export metrics or diagnostics for queue, policy, model, tool, adapter,
+  audit, replay, and crash state.
+- G.T6: Run replay without external model, broker, payment, trading, or
+  execution side effects.
+- G.T7: Include at least one blocked-flow or intentional divergence fixture.
+- G.T8: Maintain a product demo checklist tied to the increment's user story.
+
+Acceptance:
+
+- Each increment closes with product behavior and proof artifacts, not only
+  implementation tasks.
+
+## V1 Non-Goals
+
+V1 should not include:
+
+- production live trading by default
+- margin trading
+- options, futures, leveraged ETFs, inverse ETFs, or complex derivatives
+- autonomous rebalancing
+- autonomous money movement
+- autonomous accounting ledger posting
+- autonomous account freezing
+- autonomous payout approval
+- autonomous compliance decisions
+- quant strategy generation
+- market-making
+- tax optimization
+- payment exception workflows
+- reconciliation workflows
+- fraud/risk triage workflows
+- compliance-console-first UX
+- open plugin marketplace
+- generic browser automation
+- arbitrary custom workflows
+- full enterprise RBAC
+- unbounded agent swarms
 
 ## Backlog: Carried-Forward Features From The Original Roadmap
 
@@ -572,6 +654,12 @@ Tasks:
 - B1.T4: Export runtime metrics for events, model calls, tool calls, guardrail checks, ticket decisions, paper orders, replay status, and crash state.
 - B1.T5: Export diagnostics for crashed tile id, last processed source offset, audit record count, last audit hash, replay checked, replay matched, and divergence count.
 - B1.T6: Add one local command that runs an investing demo and emits audit, metrics, diagnostics, and replay artifacts.
+- B1.T7: Expose backpressure and queue-depth diagnostics for investment demo
+  runs.
+- B1.T8: Audit source events, policy decisions, destination checks, limit
+  checks, model calls, tool calls, adapter calls, proposals, denials,
+  approval-required decisions, operator approvals, and adapter results where
+  those events exist.
 
 Acceptance:
 
@@ -592,7 +680,7 @@ Tasks:
 - B2.T4: Add optional local/dev LLM endpoint configuration.
 - B2.T5: Add provider enum scaffolding for OpenAI, Anthropic, Qwen, DeepSeek, local LLM server, and future local GPU.
 - B2.T6: Enforce context length, request size, retry limit, and per-run token budget.
-- B2.T7: Attribute model usage by thesis id, basket id, ticket id, account id, workflow, and policy version.
+- B2.T7: Attribute model usage by role, workflow, thesis id, basket id, ticket id, case or synthetic run id, account id, budget id, and policy version.
 - B2.T8: Carry explicit agent identity, role, workflow, account, and policy version on every thesis, basket, ticket, and thesis-health model request.
 - B2.T9: Bound agent runs with step limits, retry limits, cancellation, and budget-exhaustion stop states.
 
@@ -676,10 +764,15 @@ Tasks:
 - B6.T4: Add partner-facing timeline read endpoint for thesis, basket, ticket, guardrails, paper order, portfolio impact, and thesis drift.
 - B6.T5: Add replay status endpoint.
 - B6.T6: Add integration tests for valid, duplicate, malformed, oversized, unauthorized, and environment-mismatch requests.
+- B6.T7: Add an operator or partner review surface that shows recommendation
+  evidence, policy decision, model usage, adapter behavior, approval state, and
+  replay status without raw-log review.
 
 Acceptance:
 
 - A partner can integrate the thesis-to-trade flow without receiving direct access to model, tool, adapter, or executor internals.
+- A reviewer can inspect a demo trade decision end to end without reading tile
+  logs.
 
 ## B7: Approval And Execution Trust
 
@@ -698,10 +791,18 @@ Tasks:
 - B7.T6: Add privileged executor boundary for broker sandbox orders.
 - B7.T7: Add order read-back and order-status mismatch handling.
 - B7.T8: Add kill switch that blocks all sensitive execution capabilities immediately.
+- B7.T9: Add destination and venue allowlists for broker account, market,
+  exchange, sector, instrument, beneficiary, IBAN, wallet, or other sensitive
+  destination scopes.
+- B7.T10: Explicitly deny direct order placement, autonomous money movement,
+  autonomous ledger posting, account freezing, payout approval, and compliance
+  decisions outside an approved executor path.
 
 Acceptance:
 
 - No broker sandbox or live order can execute outside its account, instrument, amount, frequency, approval, and action-id scope.
+- Non-investment sensitive actions remain blocked even when they appear in
+  tool, adapter, or model-request form.
 
 ## B8: Non-Investment Workflow Shelf
 
@@ -719,6 +820,12 @@ Backlog items:
 - B8.T5: TigerBeetle accounting ledger connector behind `tkexec`.
 - B8.T6: Banking, crypto, payment, risk, and compliance adapters.
 - B8.T7: Maker-checker approval workflows for money movement and ledger posting.
+- B8.T8: Policy templates for payment, reconciliation, fraud/risk, banking
+  destination, crypto destination, and compliance workflows.
+- B8.T9: Demo adapter fixtures and replayable sample data for each shelved
+  workflow family.
+- B8.T10: Replay capsules for payment exception, reconciliation break, and
+  fraud/risk workflow demos.
 
 Acceptance:
 
@@ -740,8 +847,22 @@ Tasks:
 - B9.T6: Add adapter manifest validation before broker sandbox integration.
 - B9.T7: Add sample configs and sample outputs for thesis-to-basket, buying-power ticket, portfolio impact, and later partner trust flows.
 - B9.T8: Keep investment V1 non-goals visible in demo docs.
+- B9.T9: Add fail-closed validation tests for policy, model, adapter,
+  destination allowlist, amount limits, exposure limits, frequency limits, and
+  holding-period configuration.
+- B9.T10: Add audit JSONL samples with valid hash chains for the main demo and
+  blocked-flow demos.
+- B9.T11: Add metrics and diagnostics samples for each increment.
+- B9.T12: Add replay match samples and intentional divergence outputs.
+- B9.T13: Add case or thesis fixture sets and replay capsule samples.
+- B9.T14: Add API integration tests for external ingestion and partner review
+  endpoints when those endpoints exist.
+- B9.T15: Add approval and rejection audit samples when approval paths exist.
+- B9.T16: Keep phase or increment status updates tied to V1 success metrics.
 
 Acceptance:
 
 - Each increment has a local command and focused tests proving the investor flow,
   blocked paths, and no-bypass safety conditions.
+- Each increment has evidence artifacts strong enough for an engineering,
+  risk/compliance, or partner reviewer.

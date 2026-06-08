@@ -38,6 +38,10 @@ views into disciplined trades:
 - fintech demo user
 - trading operations reviewer in a sandbox account
 - founder/investor evaluating Tickoni as an agentic investing runtime
+- engineering operator validating queue, crash, budget, adapter, and replay
+  behavior
+- risk, compliance, or partner reviewer inspecting why a recommendation or
+  trade ticket was allowed, blocked, or approval-gated
 
 The user is not trying to audit an agent. The user is trying to make a better
 investment decision quickly, with confidence that the system will not let them
@@ -421,7 +425,11 @@ Carry forward:
 - incomplete-run marker
 - runtime metrics export
 - diagnostics export
+- backpressure, queue-depth, and crash diagnostics
 - replay verification from exported records
+- audit records for source events, policy decisions, destination checks, limit
+  checks, model calls, tool calls, adapter calls, proposals, denials,
+  approval-required decisions, operator approvals, and adapter results
 
 Product framing:
 
@@ -446,8 +454,8 @@ Carry forward:
 - context-size limits
 - retry-loop limits
 - per-run and per-agent token budgets
-- model usage attribution by thesis, basket, trade ticket, account, and policy
-  version
+- model usage attribution by role, workflow, thesis, basket, trade ticket,
+  case or synthetic run, account, budget, and policy version
 - explicit agent identity and role context
 - bounded agent runs with step, retry, and budget limits
 - `tktool` broker for model-native function calls and MCP-compatible tools
@@ -524,6 +532,9 @@ Carry forward:
 - audit/trust timeline reads
 - replay status endpoint
 - trade-decision export endpoint
+- operator review surface that shows recommendation evidence, policy decision,
+  model usage, adapter behavior, approval state, and replay status without
+  reading raw logs
 
 Product framing:
 
@@ -547,6 +558,11 @@ Carry forward:
 - privileged executor boundary
 - broker read-back and mismatch handling
 - kill switch
+- destination and venue allowlists for broker account, market, exchange, sector,
+  instrument, beneficiary, IBAN, wallet, or other sensitive destination scopes
+- explicit denial for direct order placement, autonomous money movement,
+  autonomous ledger posting, account freezing, payout approval, or compliance
+  decisions outside an approved executor path
 
 Product framing:
 
@@ -558,14 +574,16 @@ for your protection." For partners it is the execution control layer.
 Why it still matters:
 
 The old roadmap included payment exceptions, reconciliation breaks, fraud/risk
-triage, CaseOps, and TigerBeetle. Those are still plausible Tickoni businesses,
-but they are no longer the first investment-product path.
+triage, compliance case preparation, CaseOps, and TigerBeetle. Those are still
+plausible Tickoni businesses, but they are no longer the first investment
+product path.
 
 Carry forward as shelved or later product lines:
 
 - payment exception workflow
 - reconciliation break workflow
 - fraud/risk triage workflow
+- compliance case-preparation workflow
 - CaseOps operations board
 - TigerBeetle finance database integration
 - accounting ledger connector
@@ -573,6 +591,23 @@ Carry forward as shelved or later product lines:
 - policy templates for non-investment workflows
 - demo adapter fixtures and replayable sample data
 - replay capsules for each shelved workflow demo
+- non-investment event catalog for payment failures, settlement delays,
+  payout blocks, authorization declines, processor timeouts, refund failures,
+  capture failures, accounting mismatches, processor batch mismatches, bank
+  statement differences, suspected double captures, unmatched refunds,
+  settlement amount mismatches, velocity spikes, device clusters, chargeback
+  clusters, merchant risk alerts, suspicious payouts, account takeover signals,
+  AML alerts, KYC escalations, sanctions matches, transaction-monitoring
+  alerts, and unusual activity alerts
+- draft-only operator outputs such as merchant responses, investigator notes,
+  correction proposals, hold or review proposals, escalation packets,
+  compliance case narratives, missing-document classifications, and audit
+  packets
+- case lifecycle pattern: event arrives, ingest normalizes and dedupes, case is
+  created, policy assigns allowed capabilities, agent investigates through the
+  governed tool broker, audit records prompts/tools/outputs, draft-only action
+  is proposed, human approves or rejects, downstream response is sent only
+  after approval, replay capsule is generated, and case moves to audited
 
 Product framing:
 
@@ -592,6 +627,8 @@ Carry forward:
 - focused tests for each schema, guardrail, adapter, and replay path
 - forbidden shell, network, direct adapter, and direct execution tests
 - malformed envelope and malformed hook fail-closed tests
+- fail-closed validation for policy, model, adapter, destination allowlist, and
+  amount/exposure/frequency/holding-period limit configuration
 - provider configuration validation
 - adapter manifest validation
 - sample configs and sample outputs
@@ -626,6 +663,8 @@ Every V1 increment should close with:
   boundaries used by the demo
 - audit output for the material user flow
 - policy decisions visible in the audit output
+- destination checks and limit checks visible in the audit output where they
+  apply
 - metrics or diagnostics showing queue, policy, model, tool, adapter, audit,
   and replay state for the increment
 - replay running without model, broker, payment, trading, or execution side
@@ -682,12 +721,21 @@ V1 should not include:
 - margin trading
 - options, futures, leveraged ETFs, inverse ETFs, or complex derivatives
 - autonomous rebalancing
+- autonomous money movement
+- autonomous accounting ledger posting
+- autonomous account freezing
+- autonomous payout approval
+- autonomous compliance decisions
 - quant strategy generation
 - market-making
 - tax optimization
 - payment exception workflows
 - reconciliation workflows
 - fraud/risk triage workflows
+- compliance case-preparation workflows
 - compliance-console-first UX
 - open plugin marketplace
+- generic browser automation
+- arbitrary custom workflows
+- full enterprise RBAC
 - unbounded agent swarms
