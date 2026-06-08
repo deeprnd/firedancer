@@ -5,8 +5,8 @@
 Tickoni should lead with an investment experience, not an operations or
 governance console.
 
-The product should feel closer a modern AI investing
-copilot than to a SecOps platform:
+The product should feel closer to a modern AI investing copilot than to a
+SecOps platform:
 
 ```text
 I have a thesis.
@@ -400,6 +400,252 @@ Product framing:
 
 This is not the headline user experience. It is the enterprise trust layer that
 makes the investing product credible for partners.
+
+## Carried-Forward Platform Backlog
+
+The original roadmap and WBS contained important platform capabilities that are
+not part of the first investment wow. They should remain in the backlog so the
+investment product does not lose its Tickoni advantage.
+
+### P1: Durable Runtime Proof
+
+Why it still matters:
+
+The investing app needs durable proof when a partner asks, "why did this trade
+ticket pass or fail?"
+
+Carry forward:
+
+- durable audit JSONL export
+- hash-chain verification
+- incomplete-run marker
+- runtime metrics export
+- diagnostics export
+- replay verification from exported records
+
+Product framing:
+
+This supports trade-ticket proof and partner review. It should not be the main
+consumer experience.
+
+### P2: Model And Tool Governance
+
+Why it still matters:
+
+The thesis-to-basket experience depends on models and tools, but the agent must
+not gain direct model-provider, broker, adapter, shell, or unrestricted network
+access.
+
+Carry forward:
+
+- `tkmodl` model gateway
+- deterministic model stubs for demos
+- optional local/dev LLM backend
+- provider scaffolding for OpenAI, Anthropic, Qwen, DeepSeek, local LLM server,
+  and future local GPU
+- context-size limits
+- retry-loop limits
+- per-run and per-agent token budgets
+- model usage attribution by thesis, basket, trade ticket, account, and policy
+  version
+- explicit agent identity and role context
+- bounded agent runs with step, retry, and budget limits
+- `tktool` broker for model-native function calls and MCP-compatible tools
+
+Product framing:
+
+The user sees fast, bounded AI recommendations. Partners can inspect model and
+tool provenance later.
+
+### P3: Runtime Hooks
+
+Why it still matters:
+
+Investment actions need a consistent checkpoint model: thesis generated, basket
+created, ticket checked, paper order placed, portfolio updated, thesis drift
+detected.
+
+Carry forward:
+
+- canonical hook envelope
+- hook type registry
+- bounded hook links
+- `PreModelCall` and `PostModelCall`
+- `PreToolUse` and `PostToolUse`
+- `PreActionProposal` for trade tickets
+- approval hooks for later broker/live modes
+- replay hooks and first-divergence reporting
+- hook telemetry and diagnostics
+
+Product framing:
+
+Hooks are not visible as hooks in the app. They power "show me why this ticket
+was allowed, blocked, resized, or changed."
+
+### P4: Case, Evidence, And Replay Capsule
+
+Why it still matters:
+
+The investing product needs durable thesis history: what the user believed, why
+the basket was built, which evidence was used, how the ticket was sized, and
+what portfolio impact was expected.
+
+Carry forward:
+
+- deterministic case or thesis id
+- content-addressed evidence store
+- model output references
+- adapter result references
+- proposal/trade-ticket hashes
+- replay capsule per material thesis-to-trade flow
+- divergence report for changed policy, evidence, market fixture, model output,
+  or adapter output
+
+Product framing:
+
+This is "investment memory" and "trade decision history", not a CaseOps-first
+board.
+
+### P5: External Ingestion And Partner API
+
+Why it still matters:
+
+The investing product eventually needs APIs for account snapshots, portfolio
+events, market events, thesis creation, basket reads, ticket preview, and
+partner review.
+
+Carry forward:
+
+- authenticated financial event ingestion API
+- source identity and idempotency keys
+- accepted, duplicate, malformed, and rejected responses
+- case/thesis list and detail endpoints
+- evidence reads
+- audit/trust timeline reads
+- replay status endpoint
+- trade-decision export endpoint
+
+Product framing:
+
+This should serve the investing UI and partners, not become a generic operations
+board first.
+
+### P6: Approval And Execution Trust
+
+Why it still matters:
+
+Paper trading can be user-clicked early. Broker sandbox and live trading need a
+stricter execution path.
+
+Carry forward:
+
+- immutable proposal or trade-ticket hash
+- approval state for sensitive or live execution modes
+- approval expiry and revocation
+- signed action envelope
+- deterministic action id
+- privileged executor boundary
+- broker read-back and mismatch handling
+- kill switch
+
+Product framing:
+
+For consumers this appears as paper/live mode, order confirmation, and "blocked
+for your protection." For partners it is the execution control layer.
+
+### P7: Non-Investment Workflow Shelf
+
+Why it still matters:
+
+The old roadmap included payment exceptions, reconciliation breaks, fraud/risk
+triage, CaseOps, and TigerBeetle. Those are still plausible Tickoni businesses,
+but they are no longer the first investment-product path.
+
+Carry forward as shelved or later product lines:
+
+- payment exception workflow
+- reconciliation break workflow
+- fraud/risk triage workflow
+- CaseOps operations board
+- TigerBeetle finance database integration
+- accounting ledger connector
+- payment, crypto, risk, and compliance adapters
+- policy templates for non-investment workflows
+- demo adapter fixtures and replayable sample data
+- replay capsules for each shelved workflow demo
+
+Product framing:
+
+Do not delete the ideas. Do not let them distract from thesis-to-trade V1.
+
+### P8: Build, Quality, Security, And Release Hygiene
+
+Why it still matters:
+
+The investing product will touch trade tickets, account state, and broker
+sandboxes. Quality and security gates cannot be deferred until after the demo
+works.
+
+Carry forward:
+
+- local increment gate commands
+- focused tests for each schema, guardrail, adapter, and replay path
+- forbidden shell, network, direct adapter, and direct execution tests
+- malformed envelope and malformed hook fail-closed tests
+- provider configuration validation
+- adapter manifest validation
+- sample configs and sample outputs
+- documented demo commands
+- audit JSONL samples with valid hash chains
+- metrics and diagnostics samples
+- replay match samples and intentional divergence tests
+- case or thesis fixture sets
+- replay capsule samples
+- case or thesis divergence test output
+- API integration tests for external ingestion and partner review endpoints
+- approval and rejection audit samples where approval paths exist
+- product demo checklist tied to V1 success metrics
+- phase/increment status updates
+- V1 non-goals visible in demo materials
+
+Product framing:
+
+This keeps thesis-to-trade demos credible and prevents impressive demos from
+accidentally teaching the wrong safety model.
+
+## Increment Evidence Gates
+
+The old phase plan had useful delivery gates. Keep the evidence discipline, but
+attach it to each vertical product increment instead of running a waterfall
+sequence.
+
+Every V1 increment should close with:
+
+- a documented demo command or script
+- fixture data for the thesis, portfolio, market, model, tool, and adapter
+  boundaries used by the demo
+- audit output for the material user flow
+- policy decisions visible in the audit output
+- metrics or diagnostics showing queue, policy, model, tool, adapter, audit,
+  and replay state for the increment
+- replay running without model, broker, payment, trading, or execution side
+  effects
+- at least one intentional divergence or blocked-flow example
+- a product demo checklist that ties the evidence to the increment's user story
+
+Additional gates by increment:
+
+- V1.1 closes when thesis-to-basket output is reproducible from fixtures and
+  rejected instruments explain their scope failure.
+- V1.2 closes when an affordable paper trade and an oversized blocked trade
+  both produce durable trade-ticket evidence.
+- V1.3 closes when before/after portfolio impact and thesis drift state can be
+  replayed from captured inputs.
+- V1.4 closes only when broker sandbox behavior can be substituted by replay
+  capsules and read-back mismatch handling is demonstrated.
+- V1.6 closes when the trust export can show audit timeline, replay status,
+  policy version, model/tool/adapter attribution, and approval state without
+  reading logs.
 
 ## Capability Depth Backlog
 

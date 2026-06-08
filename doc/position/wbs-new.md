@@ -12,7 +12,8 @@ thesis -> basket -> buying-power checked trade ticket -> paper trade
        -> portfolio impact -> thesis monitoring
 ```
 
-The user-facing product should feel like an AI-native investing app, closer to trading platform, than to a governance console. Tickoni's finance-native
+The user-facing product should feel like an AI-native investing app, closer to
+a trading platform than to a governance console. Tickoni's finance-native
 capability model still powers the guardrails, but the product language is:
 
 - Can I afford this trade?
@@ -549,3 +550,198 @@ Every increment must answer:
 - What happens when an instrument is restricted?
 - Is execution paper-only, broker-sandbox, or disabled?
 - Which artifacts are needed for later partner trust?
+
+## Backlog: Carried-Forward Features From The Original Roadmap
+
+The investment roadmap intentionally pushes audit, replay, CaseOps, payment,
+reconciliation, and fraud/risk work behind the first wow features. The features
+below came from the original `roadmap.md` and `wbs.md` and should remain
+visible. Pull them forward only when they strengthen the investing product.
+
+## B1: Durable Runtime Proof
+
+Product use:
+
+Partner asks why a trade ticket was allowed, blocked, or resized.
+
+Tasks:
+
+- B1.T1: Export trade-decision audit records as JSONL in append order.
+- B1.T2: Verify the audit hash chain for a thesis-to-ticket run.
+- B1.T3: Mark audit output incomplete on crash shutdown.
+- B1.T4: Export runtime metrics for events, model calls, tool calls, guardrail checks, ticket decisions, paper orders, replay status, and crash state.
+- B1.T5: Export diagnostics for crashed tile id, last processed source offset, audit record count, last audit hash, replay checked, replay matched, and divergence count.
+- B1.T6: Add one local command that runs an investing demo and emits audit, metrics, diagnostics, and replay artifacts.
+
+Acceptance:
+
+- A partner can receive a durable proof bundle for one thesis-to-ticket flow.
+
+## B2: Model Gateway And Inference Governance
+
+Product use:
+
+Thesis generation and basket explanation use AI, but the investing product must
+have bounded cost and no direct provider access from agents.
+
+Tasks:
+
+- B2.T1: Define model request and response envelopes for thesis, basket, ticket explanation, and thesis health outputs.
+- B2.T2: Route all model requests through `tkmodl`.
+- B2.T3: Add deterministic model stubs for V1 demos.
+- B2.T4: Add optional local/dev LLM endpoint configuration.
+- B2.T5: Add provider enum scaffolding for OpenAI, Anthropic, Qwen, DeepSeek, local LLM server, and future local GPU.
+- B2.T6: Enforce context length, request size, retry limit, and per-run token budget.
+- B2.T7: Attribute model usage by thesis id, basket id, ticket id, account id, workflow, and policy version.
+- B2.T8: Carry explicit agent identity, role, workflow, account, and policy version on every thesis, basket, ticket, and thesis-health model request.
+- B2.T9: Bound agent runs with step limits, retry limits, cancellation, and budget-exhaustion stop states.
+
+Acceptance:
+
+- No thesis, basket, ticket, or thesis-health model call can bypass `tkmodl`.
+
+## B3: Financial Tool Broker And Adapter Boundary
+
+Product use:
+
+The AI can ask for portfolio, market, instrument, and paper-trade actions, but
+all such requests become finance-native tool/adapter requests.
+
+Tasks:
+
+- B3.T1: Normalize model-native function calls and MCP-compatible tool calls into typed investment requests.
+- B3.T2: Define adapter requests for portfolio read, market event read, instrument catalog read, ticket preview, paper order submit, and order-status read-back.
+- B3.T3: Validate the finance-native capability envelope before adapter routing.
+- B3.T4: Deny malformed, unsupported, out-of-scope, or over-limit tool requests before adapter execution.
+- B3.T5: Keep adapter credentials and broker sandbox credentials out of agent state.
+- B3.T6: Add tests proving direct adapter access fails closed.
+
+Acceptance:
+
+- The investing agent cannot read portfolio state, market fixtures, instrument data, or paper execution state except through `tktool` and `tkadpt`.
+
+## B4: Runtime Hooks For Investment Actions
+
+Product use:
+
+The app needs to explain why a basket, ticket, paper order, portfolio update, or
+thesis drift event happened.
+
+Tasks:
+
+- B4.T1: Define a canonical hook envelope for investment actions.
+- B4.T2: Add hook types for thesis created, basket generated, ticket previewed, ticket blocked, ticket resized, paper order submitted, portfolio impact computed, thesis card created, drift detected, and rebalance suggested.
+- B4.T3: Add `PreModelCall` and `PostModelCall` hooks.
+- B4.T4: Add `PreToolUse` and `PostToolUse` hooks.
+- B4.T5: Add `PreActionProposal` for trade tickets and rebalance suggestions.
+- B4.T6: Add bounded hook links and route hooks to policy, audit, metrics, diagnostics, and replay.
+- B4.T7: Add hook telemetry for counts, latency, denials, resize decisions, budget denials, and replay divergence.
+
+Acceptance:
+
+- Every material investment action can be explained through hook-derived records without showing hook mechanics to the user.
+
+## B5: Case, Evidence, And Replay Capsule As Thesis History
+
+Product use:
+
+The user and partner can reconstruct how a thesis became a basket, ticket,
+paper order, and portfolio state.
+
+Tasks:
+
+- B5.T1: Define deterministic thesis id or case id derivation from account, user, thesis text hash, and created sequence.
+- B5.T2: Define content-addressed evidence records for model outputs, instrument facts, market-event fixtures, portfolio snapshots, ticket previews, paper order results, and thesis drift events.
+- B5.T3: Store evidence hashes on thesis cards and trade tickets.
+- B5.T4: Define replay capsule schema for source thesis, normalized intent, basket, ticket, guardrail decisions, model outputs, tool outputs, adapter fixtures, paper execution result, portfolio impact, and thesis state.
+- B5.T5: Replay the thesis-to-trade flow without live model, market, broker, or adapter effects.
+- B5.T6: Report first divergence by thesis hash, basket hash, ticket hash, policy version, evidence hash, model output hash, adapter output hash, or portfolio state hash.
+
+Acceptance:
+
+- A thesis-to-trade flow can be replayed from captured inputs and reports the first divergence.
+
+## B6: Partner API And Review Surface
+
+Product use:
+
+Brokerage or fintech partners need APIs to inspect accounts, thesis cards,
+trade decisions, proof artifacts, and replay status.
+
+Tasks:
+
+- B6.T1: Add authenticated API for thesis creation, basket read, ticket preview, paper order submit, portfolio read, thesis status read, and trade-decision export.
+- B6.T2: Validate source identity, idempotency key, account id, event timestamp, payload size, and required financial fields.
+- B6.T3: Return accepted, duplicate, malformed, or rejected responses.
+- B6.T4: Add partner-facing timeline read endpoint for thesis, basket, ticket, guardrails, paper order, portfolio impact, and thesis drift.
+- B6.T5: Add replay status endpoint.
+- B6.T6: Add integration tests for valid, duplicate, malformed, oversized, unauthorized, and environment-mismatch requests.
+
+Acceptance:
+
+- A partner can integrate the thesis-to-trade flow without receiving direct access to model, tool, adapter, or executor internals.
+
+## B7: Approval And Execution Trust
+
+Product use:
+
+Paper execution is allowed early. Broker sandbox and live execution need
+approval and signed execution controls.
+
+Tasks:
+
+- B7.T1: Hash-bind trade tickets and rebalance suggestions.
+- B7.T2: Add approval state for broker sandbox or live execution modes when configured.
+- B7.T3: Add approval granted, rejected, expired, and revoked records.
+- B7.T4: Add signed action envelope for approved broker sandbox orders.
+- B7.T5: Add deterministic action id and idempotency key.
+- B7.T6: Add privileged executor boundary for broker sandbox orders.
+- B7.T7: Add order read-back and order-status mismatch handling.
+- B7.T8: Add kill switch that blocks all sensitive execution capabilities immediately.
+
+Acceptance:
+
+- No broker sandbox or live order can execute outside its account, instrument, amount, frequency, approval, and action-id scope.
+
+## B8: Non-Investment Workflow Shelf
+
+Product use:
+
+These were part of the original fintech-operations roadmap. Keep them visible
+as later product lines, not part of investment V1.
+
+Backlog items:
+
+- B8.T1: Payment exception workflow: failed payment evidence, retry recommendation, retry proposal, customer/merchant draft.
+- B8.T2: Reconciliation break workflow: ledger mismatch evidence, discrepancy explanation, correction proposal.
+- B8.T3: Fraud/risk triage workflow: suspicious activity evidence, severity classification, review queue recommendation.
+- B8.T4: CaseOps operations board for non-investing workflows.
+- B8.T5: TigerBeetle accounting ledger connector behind `tkexec`.
+- B8.T6: Banking, crypto, payment, risk, and compliance adapters.
+- B8.T7: Maker-checker approval workflows for money movement and ledger posting.
+
+Acceptance:
+
+- These remain documented as later work and do not dilute the V1 thesis-to-trade product.
+
+## B9: Build, Quality, Security, And Release Hygiene
+
+Product use:
+
+Investment demos must be impressive without weakening Tickoni's safety claim.
+
+Tasks:
+
+- B9.T1: Add one local verification command per investment increment.
+- B9.T2: Keep Zig harness tests wired through `zig build test`.
+- B9.T3: Add focused tests for thesis schema, instrument catalog, basket generation, portfolio fixtures, trade tickets, guardrails, paper execution, thesis cards, and drift rules.
+- B9.T4: Add security tests for forbidden shell access, forbidden direct network access, forbidden direct adapter access, and forbidden direct execution paths as soon as each path exists.
+- B9.T5: Add fail-closed tests for malformed capability envelopes, malformed hooks, unknown providers, missing allowlists, invalid limits, environment mismatch, and unsupported instruments.
+- B9.T6: Add adapter manifest validation before broker sandbox integration.
+- B9.T7: Add sample configs and sample outputs for thesis-to-basket, buying-power ticket, portfolio impact, and later partner trust flows.
+- B9.T8: Keep investment V1 non-goals visible in demo docs.
+
+Acceptance:
+
+- Each increment has a local command and focused tests proving the investor flow,
+  blocked paths, and no-bypass safety conditions.
