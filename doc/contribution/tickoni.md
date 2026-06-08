@@ -125,6 +125,43 @@ Not allowed:
 When in doubt, add a narrow wrapper in `src/tickoni/c_abi` or a Tickoni-owned
 module, not a product hook in upstream C.
 
+### Reusing Firedancer Code Well
+
+Reuse more of Firedancer by reusing real substrate paths, not by copying one
+convenient header and faking the rest of the environment around it.
+
+Rules:
+
+- keep `src/tickoni/c_abi` narrow: Zig `extern` declarations, layout checks,
+  and small wrappers that preserve C ownership semantics
+- put Tickoni-owned schema, codec, export, and domain logic in Tickoni-owned
+  modules such as `src/tickoni/codec`, not under `src/tickoni/c_abi`
+- use `src/tickoni/c_abi/queue.zig` and `src/tickoni/c_abi/sandbox.zig` as
+  the expected shape for Firedancer-facing bindings
+- do not add business-adjacent C implementation under the ABI folder just
+  because Zig calls it through `extern`
+- prefer existing Firedancer-native primitives before introducing new third-
+  party substrate, but reuse them through explicit ownership boundaries
+- if a Firedancer helper path pulls in logging, asserts, SIMD assumptions, or
+  runtime symbols, either link the real Firedancer substrate deliberately or
+  drop to a more explicit lower-level path
+- prefer portable wire/token paths when the convenience inline/helper path
+  drags in hidden runtime dependencies that do not belong at the boundary
+- do not fake Firedancer log/runtime symbols in product integration code just
+  to satisfy linkage; that is a temporary test shim at best, not a healthy
+  architectural shape
+- treat sanitizer disables, alignment exceptions, and one-off compile defines
+  in bridge code as integration smell; they usually mean the chosen reuse path
+  is too implicit or owns too much
+- keep binary encoding, readable export, replay transforms, and audit-domain
+  schema ownership together in the owning Tickoni module, then keep the ABI
+  layer mechanical and thin
+
+If the bridge starts needing symbol stubs, build exceptions, or ownership that
+cannot be explained in one sentence, stop and move the logic back into a
+Tickoni-owned module. The goal is to reuse Firedancer substrate faithfully,
+not to hide new product code behind the ABI membrane.
+
 ### Zig To C Action Diagram
 
 Zig owns product semantics and tile lifecycle. C owns retained low-level

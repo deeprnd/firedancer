@@ -534,7 +534,7 @@ fn BoundedQueue(comptime T: type) type {
     };
 }
 
-const tkaudt_tile_id: [6]u8 = "tkaudt".*;
+const tkpoly_tile_id: [6]u8 = "tkpoly".*;
 
 fn buildPolicyDecisionEvent(
     seq: u64,
@@ -553,7 +553,7 @@ fn buildPolicyDecisionEvent(
         .schema_version = audit.audit_schema_version,
         .seq = seq,
         .source_offset = raw.source_offset,
-        .tile_id = tkaudt_tile_id,
+        .tile_id = tkpoly_tile_id,
         .logical_actor_id = 0,
         .policy_version = [_]u8{0} ** 32,
         .capability_envelope_id = 0,

@@ -30,34 +30,34 @@ They do not replace the runtime.
 ```text
 ┌────────────────────┐      ┌──────────────────────┐      ┌─────────────────────┐
 │      Next.js       │<────>│   Zig CaseOps API    │<────>│  Markdown + DuckDB  │
-│ CaseOps operator UI│      │  tkapi HTTP + WS     │      │ memory + analytics │
+│ CaseOps operator UI│      │  tkapi HTTP + WS     │      │ memory + analytics  │
 └────────────────────┘      └──────────┬───────────┘      └─────────────────────┘
                                        │
                                        v
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Tickoni AI-harness tiles                           │
-│                                                                             │
-│  tkapi                                                                       │
-│    CaseOps API tile: board reads, evidence reads, approvals, audit timeline  │
-│                                                                             │
-│  tkings -> tknorm -> tkdedu -> tkcase -> tkpoly -> tkaudt                   │
-│    ingestion, normalization, dedupe, deterministic cases, policy, audit      │
-│                                                                             │
-│  tkdisp -> tkagnt -> tkmodl                                                  │
-│    bounded agent runs and governed model access                              │
-│                                                                             │
-│  tkagnt -> tktool -> tkadpt                                                  │
-│    finance-native tool broker and signed/stub adapters                       │
-│                                                                             │
-│  tkrepl, tkmetr, tkdiag, future tkexec                                       │
-│    replay, metrics, diagnostics, approved privileged execution               │
-└───────────────────────────────┬─────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                         Tickoni AI-harness tiles                              │
+│                                                                               │
+│  tkapi                                                                        │
+│    CaseOps API tile: board reads, evidence reads, approvals, audit timeline   │
+│                                                                               │
+│  tkings -> tknorm -> tkdedu -> tkcase -> tkpoly -> tkaudt                     │
+│    ingestion, normalization, dedupe, deterministic cases, policy, audit       │
+│                                                                               │
+│  tkdisp -> tkagnt -> tkmodl                                                   │
+│    bounded agent runs and governed model access                               │
+│                                                                               │
+│  tkagnt -> tktool -> tkadpt                                                   │
+│    finance-native tool broker and signed/stub adapters                        │
+│                                                                               │
+│  tkrepl, tkmetr, tkdiag, future tkexec                                        │
+│    replay, metrics, diagnostics, approved privileged execution                │
+└───────────────────────────────┬───────────────────────────────────────────────┘
                                 │
-┌───────────────────────────────┴─────────────────────────────────────────────┐
-│                    Firedancer infrastructure tiles/substrate                 │
-│  tango queues, topology, workspaces, sandbox, metric/diag, fd_http_server,   │
-│  bounded polling, tile-local networking, seccomp/Landlock, crash-only model  │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────┴───────────────────────────────────────────────┐
+│                    Firedancer infrastructure tiles/substrate                  │
+│  tango queues, topology, workspaces, sandbox, metric/diag, fd_http_server,    │
+│  bounded polling, tile-local networking, seccomp/Landlock, crash-only model   │
+└───────────────────────────────────────────────────────────────────────────────┘
 
 Governed external systems:
 
@@ -85,10 +85,7 @@ tile lifecycle, sandboxing, low-overhead metric and diagnostic paths,
 and crash-only behavior. Tickoni should reuse or wrap Firedancer infra tiles
 and primitives where they are generic.
 
-The boundary is semantic, not mechanical. Firedancer validator tiles and Solana
-schemas are not Tickoni framework tiles, but their infrastructure patterns are
-the reason Tickoni can position itself as an ultra-TPS financial event harness
-instead of a normal web backend with agents attached.
+Tickoni reuses generic Firedancer tiles and infrastructure primitives, but Solana validator tiles and Solana schemas are not Tickoni framework concepts. That generic Firedancer reuse is what lets Tickoni position itself as an ultra-TPS financial event harness instead of a normal web backend with agents attached.
 
 The **Tickoni AI-harness tiles** own financial correctness. Financial events
 enter `tkings`, become canonical in `tknorm`, are deduplicated in `tkdedu`,
@@ -328,6 +325,33 @@ approval IDs, downstream action IDs, signatures, and evidence references.
 
 Large payloads should be content-addressed instead of duplicated into every
 audit record.
+
+### Why Binary And JSONL Both Exist
+
+Tickoni needs two audit encodings because one format is optimized for runtime
+correctness and replay discipline, while the other is optimized for operator
+inspection and durable export.
+
+Binary audit encoding is the canonical machine format inside the runtime and
+replay path. It gives `tkaudt` and `tkrepl` a fixed field order, explicit
+record length, early schema-version check, and skip-forward behavior for
+unknown future records. That keeps hashing, append ordering, and replay
+comparison independent of parser quirks, map key ordering, whitespace, or
+string formatting. Binary is for deterministic transport and storage of the
+typed audit record itself.
+
+JSONL is the durable text export and operator-facing interchange format. It is
+for append-only files, inspection, debugging, offline analysis, and simple
+tooling such as `jq`, `rg`, and spreadsheet or notebook import. The JSONL line
+keeps the same schema-versioned fields as the binary record, but in a form a
+human or generic log-processing tool can read without Tickoni-specific binary
+decoders.
+
+These formats do not serve different truths. They are two encodings of the same
+typed audit record. The binary form is the runtime canonical form. The JSONL
+form is the readable export form. Hashing rules, especially the exclusion of
+`timestamp_ns` from `record_hash`, must remain consistent across both so replay
+and export inspection describe the same event chain.
 
 ## Replay
 

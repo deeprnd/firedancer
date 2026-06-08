@@ -22,10 +22,18 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const audit_cabi_mod = b.addModule("audit_cabi", .{
+        .root_source_file = b.path("src/tickoni/c_abi/audit_codec.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const tiles_mod = b.addModule("tiles", .{
         .root_source_file = b.path("src/tickoni/tiles/payment_pipeline.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "audit_cabi", .module = audit_cabi_mod },
+        },
     });
 
     // Supervisor executable.
@@ -42,6 +50,7 @@ pub fn build(b: *std.Build) void {
         .name = "tickoni-supervisor",
         .root_module = main_mod,
     });
+    linkTickoniAuditCodec(b, exe);
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -68,8 +77,18 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path(path),
             .target = target,
             .optimize = optimize,
+            .imports = if (std.mem.eql(u8, path, "src/tickoni/tiles/audit.zig") or
+                std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline.zig"))
+                &.{.{ .name = "audit_cabi", .module = audit_cabi_mod }}
+            else
+                &.{},
         });
         const t = b.addTest(.{ .root_module = t_mod });
+        if (std.mem.eql(u8, path, "src/tickoni/tiles/audit.zig") or
+            std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline.zig"))
+        {
+            linkTickoniAuditCodec(b, t);
+        }
         test_step.dependOn(&b.addRunArtifact(t).step);
     }
 
@@ -84,6 +103,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const sup_test = b.addTest(.{ .root_module = sup_mod });
+    linkTickoniAuditCodec(b, sup_test);
     test_step.dependOn(&b.addRunArtifact(sup_test).step);
 
     // ---------------------------------------------------------------------------
@@ -107,8 +127,18 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path(entry[1]),
                 .target = target,
                 .optimize = optimize,
+                .imports = if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit.zig") or
+                    std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline.zig"))
+                    &.{.{ .name = "audit_cabi", .module = audit_cabi_mod }}
+                else
+                    &.{},
             }),
         });
+        if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit.zig") or
+            std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline.zig"))
+        {
+            linkTickoniAuditCodec(b, t);
+        }
         cov_step.dependOn(&b.addInstallArtifact(t, .{
             .dest_dir = .{ .override = .{ .custom = "cov" } },
         }).step);
@@ -126,7 +156,22 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    linkTickoniAuditCodec(b, sup_cov_test);
     cov_step.dependOn(&b.addInstallArtifact(sup_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
+}
+
+fn linkTickoniAuditCodec(b: *std.Build, step: *std.Build.Step.Compile) void {
+    step.root_module.link_libc = true;
+    step.root_module.addIncludePath(b.path("src"));
+    step.root_module.addCSourceFiles(.{
+        .files = &.{
+            "src/tickoni/codec/audit_pb.c",
+            "src/tickoni/codec/audit_json.c",
+            "src/ballet/pb/fd_pb_tokenize.c",
+            "src/ballet/json/cJSON.c",
+        },
+        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+    });
 }
