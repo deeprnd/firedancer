@@ -47,7 +47,9 @@ append-only audit hashing, deterministic replay comparison, runtime metrics,
 diagnostics, audited malformed-event rejection, and simulated sandbox failure
 behavior.
 It does not yet implement real shared-memory queues, sandboxed child processes,
-Phase 1 case routing, evidence storage, external ingestion, or agents.
+durable audit storage, production telemetry export, a full capability envelope,
+model integration, stub financial adapters, case routing, evidence storage,
+external ingestion, or agents.
 
 The inherited C topology ABI stores tile names in `char name[ 7UL ]`, so any
 tile name registered through that ABI is limited to six characters. The
@@ -155,23 +157,23 @@ only when Phase 0 and later phase work needs them.
 
 | Runtime ID | Logical name | Phase | Responsibility |
 | --- | --- | --- | --- |
-| `tkings` | `ingest_tile` | Phase 0 | Receive the event ingestion API stream, validate framing, assign source offsets, and apply ingress backpressure |
+| `tkings` | `ingest_tile` | Phase 0 | Receive the configured event source, synthetic or external, validate framing, assign source offsets, and apply ingress backpressure |
 | `tknorm` | `normalize_tile` | Phase 0 | Convert adapter-specific input into the canonical financial event schema |
 | `tkdedu` | `dedupe_tile` | Phase 0 | Deduplicate canonical financial events by stable idempotency key and content hash |
-| `tkcase` | `case_router_tile` | Phase 1 | Deterministically create or update cases and emit case lifecycle transitions |
-| `tkpoly` | `policy_tile` | Phase 0 | Evaluate versioned capability policy and emit allow, deny, or require-approval decisions |
+| `tkcase` | `case_router_tile` | Phase 2 | Deterministically create or update cases and emit case lifecycle transitions |
+| `tkpoly` | `policy_tile` | Phase 0 | Evaluate versioned finance-native capability policy, including destination allowlists, amount/exposure/frequency limits, and allow, deny, or require-approval decisions |
 | `tkaudt` | `audit_tile` | Phase 0 | Own append-only hash-chain ordering and JSONL export |
-| `tkevid` | `evidence_tile` | Phase 1 | Store and retrieve content-addressed evidence blobs |
+| `tkevid` | `evidence_tile` | Phase 2 | Store and retrieve content-addressed evidence blobs |
 | `tkrepl` | `replay_tile` | Phase 0 | Re-inject replay capsules with external effects disabled and report divergence |
 | `tkmetr` | `metric_tile` | Phase 0 | Export Tickoni runtime metrics |
 | `tkdiag` | `diag_tile` | Phase 0 | Export process, queue, and crash diagnostics |
-| `tkdisp` | `agent_dispatch_tile` | Phase 2 | Schedule bounded agent runs by role, case, priority, and remaining budget |
-| `tkagnt` | `agent_worker_tile` | Phase 2 | Run memory-isolated role agents without direct shell, unrestricted syscall, or unrestricted network access |
-| `tkmodl` | `model_gateway_tile` | Phase 2 | Own model-provider network access, routing, context limits, retry limits, token accounting, and spend caps |
-| `tktool` | `tool_broker_tile` | Phase 2 | Normalize model-native function calls and MCP requests, validate capability-scoped envelopes, and route approved requests to signed adapters |
-| `tkadpt` | `adapter_tile` | Phase 2 | Run a signed, manifest-scoped adapter with narrowly allowed network access |
+| `tkdisp` | `agent_dispatch_tile` | Phase 1 | Schedule bounded stub agent runs by role, synthetic case, priority, and remaining budget |
+| `tkagnt` | `agent_worker_tile` | Phase 1 | Run memory-isolated role agents without direct shell, unrestricted syscall, or unrestricted network access |
+| `tkmodl` | `model_gateway_tile` | Phase 1 | Own model-provider or LLM-server network access, in-process GPU inference, routing, context limits, retry limits, token accounting, and spend caps. Supported providers: OpenAI, Anthropic (Claude), Qwen, DeepSeek, and a configured local/dev LLM endpoint. |
+| `tktool` | `tool_broker_tile` | Phase 1 | Normalize model-native function calls and MCP requests into finance-native adapter or proposal envelopes, validate capability scope, and route approved requests to signed or stub adapters |
+| `tkadpt` | `adapter_tile` | Phase 1 | Run a signed, manifest-scoped financial adapter or local stub adapter with narrowly allowed destinations, rails, accounts, venues, instruments, and network access |
 | `tkapi` | `caseops_api_tile` | Phase 3 | Serve CaseOps board queries, evidence reads, approvals, and audit timeline reads |
-| `tkexec` | `action_executor_tile` | Phase 4 / TigerBeetle P1 | Execute only approved, signed downstream mutations; own privileged accounting ledger credentials |
+| `tkexec` | `action_executor_tile` | Phase 4 / TigerBeetle P1 | Execute only approved, signed downstream financial mutations within destination, amount, frequency, and approval scope; own privileged accounting ledger credentials |
 
 `tkagnt` and `tkadpt` are tile classes and may have multiple instances. Start
 with one instance of each needed role or adapter and scale only after queue
@@ -180,29 +182,44 @@ metrics justify it.
 ### Event Flow
 
 ```text
-external event API
+configured event source
   -> tkings
   -> tknorm
   -> tkdedu
   -> tkpoly
   -> tkaudt
 
-tkcase -> tkdisp -> tkagnt                asynchronous investigation, Phase 2+
+tkdisp -> tkagnt                          stub investigation, Phase 1
+tkcase -> tkdisp -> tkagnt                case-scoped investigation, Phase 2+
 
 tkagnt -> tkmodl                    model calls
-tkagnt -> tktool -> tkadpt          capability-scoped reads and proposals
+tkagnt -> tktool -> tkadpt          finance-capability-scoped reads and proposals
 tkapi  -> tkpoly -> tkexec          approved sensitive actions only
 
 all boundary events -> tkaudt
-Phase 1+ evidence  -> tkevid
+Phase 2+ evidence  -> tkevid
 replay capsule      -> tkrepl -> deterministic pipeline with tkexec disabled
 all tile metrics    -> tkmetr
 ```
 
-AI is not part of the deterministic event critical path. A case can be created,
-audited, and replayed before an agent runs. Model outputs and external adapter
-results are captured as evidence and substituted from the capsule during
-forensic replay.
+AI is not part of the deterministic event critical path. In Phase 2 and later,
+a case can be created, audited, and replayed before an agent runs. Model
+outputs and external adapter results are captured as evidence and substituted
+from the capsule during forensic replay.
+
+Financial capability semantics are owned by
+[`capabilities.md`](capabilities.md). Tiles enforce that product contract:
+
+- `tkpoly` decides whether a financial capability envelope is allowed, denied,
+  approval-required, evidence-required, or escalated.
+- `tktool` converts model-native function calls and MCP requests into
+  finance-native requests such as `payment_retry.propose`,
+  `ledger_correction.propose`, and `trading_order.propose`.
+- `tkadpt` executes only adapter calls that stay inside the approved financial
+  scope, such as payment rail, beneficiary, IBAN hash, wallet, broker account,
+  venue, sector, instrument, amount, and frequency limits.
+- `tkexec` remains disabled until approved execution phases and must never
+  execute outside signed proposal, policy, approval, and destination scope.
 
 ## Existing Tile Decisions
 
@@ -230,59 +247,52 @@ runtime no longer depends on it.
 | `resolh`, `resolv` | Exclude. Solana lookup resolution is unrelated to financial entity enrichment. | Add a new `tkenty` enrichment tile only when a workflow requires it |
 | `solcap` | Exclude. It captures Solana execution state. | `tkaudt`, `tkevid`, `tkrepl` |
 
-## Implementation Sequence
+## Tile Delivery Status
 
-### Step 1: Establish the product boundary
+### Product boundary
 
-Status: complete for the Step 1 boundary; retained here as compatibility
-context.
+Status: complete for the current boundary.
+
+Tile-relevant facts:
 
 1. `src/app/tickoni/` and `src/tickoni/` exist.
 2. The Zig supervisor starts a Tickoni-only topology in dev/test mode.
-3. Narrow C ABI declarations exist for selected queue and sandbox primitives,
-   but Phase 0 still uses in-process queues for the spike.
-4. Keep `src/app/firedancer/`, `src/disco/`, and `src/discof/` as
-   upstream-compatible validator code.
-5. Move the canonical `tickoni` target to the new app only after the supervisor
-   can start, stop, and monitor the product pipeline through the deprecation
-   window.
+3. Narrow C ABI declarations exist for selected queue and sandbox primitives.
+4. Phase 0 still maps tiles to in-process threads and heap-backed queues.
+5. The temporary `firedancer -> tickoni` compatibility behavior remains outside
+   the product tile topology until the deprecation window in
+   [`roadmap.md`](roadmap.md) is complete.
 
-Do not remove the temporary `firedancer -> tickoni` compatibility behavior
-before the deprecation window in [`roadmap.md`](roadmap.md) is complete.
+### Phase 0 topology
 
-### Step 2: Complete the Phase 0 spike
+Status: complete as an in-process tile spike.
 
-Status: complete as an in-process spike.
-
-Implement:
+Implemented topology:
 
 ```text
 tkings -> tknorm -> tkdedu -> tkpoly -> tkaudt
-tkrepl -> deterministic re-injection
-tkmetr + tkdiag
+tkrepl
+tkmetr
+tkdiag
 ```
 
-Use one synthetic payment stream. Prove stable event hashes, append-only audit,
-backpressure, replay comparison, and sandbox failure behavior.
-
-Implemented in [`src/tickoni/tiles/payment_pipeline.zig`](../../src/tickoni/tiles/payment_pipeline.zig),
-with the supervisor wiring in
+Implemented in
+[`src/tickoni/tiles/payment_pipeline.zig`](../../src/tickoni/tiles/payment_pipeline.zig),
+with supervisor wiring in
 [`src/app/tickoni/supervisor.zig`](../../src/app/tickoni/supervisor.zig) and the
 static topology in
 [`src/tickoni/runtime/topology.zig`](../../src/tickoni/runtime/topology.zig).
 
-The current spike uses one synthetic payment stream. It proves:
+Tile behaviors proven by the Phase 0 topology:
 
-1. stable event hashes over canonical payment facts
-2. append-only audit records with a hash chain
-3. reliable bounded links and observable backpressure waits
-4. deterministic replay with external effects disabled
-5. audited malformed payment rejection
-6. duplicate detection by idempotency key and content hash
-7. allow and deny policy decisions
-8. simulated sandbox failure propagation to supervisor crash state
-9. `tkmetr` and `tkdiag` snapshots, including queue, drop, latency, and crash
-   fields
+1. `tkings` owns synthetic source offsets and ingress backpressure.
+2. `tknorm` owns canonical payment normalization and malformed-event rejection.
+3. `tkdedu` owns idempotency and content-hash duplicate memory.
+4. `tkpoly` owns allow, deny, malformed-drop, and duplicate-drop decisions.
+5. `tkaudt` owns append-only audit ordering and hash chaining.
+6. `tkrepl` owns deterministic replay comparison with external effects disabled.
+7. `tkmetr` owns runtime metric snapshots.
+8. `tkdiag` owns crash, sandbox, audit, and replay diagnostics.
 
 The Firedancer-style topology answers for Phase 0 links are:
 
@@ -297,9 +307,9 @@ The Firedancer-style topology answers for Phase 0 links are:
 | `tkmetr` telemetry | `tkmetr` owns metric snapshots. | Atomic counters and queue-watermark reads in `PaymentPipelineState`. | All tiles publish counters; `tkmetr` reads snapshots. | No correctness queue in the spike. | Observational; future telemetry may be lossy with counted drops. | Shutdown takes a final snapshot. | Produced, normalized, invalid, duplicates, allowed, denied, audited, depth, waits, max latency hops. |
 | `tkdiag` diagnostics | `tkdiag` owns diagnostic snapshots. | Atomic crash, sandbox, audit, and replay fields in `PaymentPipelineState`. | Tiles publish diagnostics; `tkdiag` reads snapshots. | No correctness queue in the spike. | Observational; crash state is reliable. | Sandbox failure marks the owning tile crashed and requests runtime stop; shutdown takes a final snapshot. | Sandbox failures, crashed tile, audit count, replay status. |
 
-Before adding Phase 1 case routing or Phase 2 agents, replace the heap-backed
-spike rings with the selected shared-memory queue backing and keep these
-answers current:
+Before the topology leaves the in-process spike, replace the heap-backed rings
+with the selected shared-memory queue backing and keep these link answers
+current:
 
 1. owner tile
 2. workspace or backing allocation
@@ -309,29 +319,39 @@ answers current:
 6. overrun, restart, and shutdown behavior
 7. queue, drop, latency, and crash metrics
 
-### Step 3: Complete the Phase 1 runtime
+### Future tile additions
 
-Add `tkcase` and `tkevid`, replace the synthetic source with the financial event
-ingestion API, and define the replay capsule format. Prove deterministic case
-creation, auditable case history, and replay divergence detection.
+Phase 1 adds control-plane tiles around the Phase 0 stream:
 
-### Step 4: Add the controlled agent harness
+```text
+tkdisp -> tkagnt -> tkmodl
+tkagnt -> tktool -> tkadpt
+```
 
-Implement `tkdisp`, `tkagnt`, `tkmodl`, `tktool`, and `tkadpt`. Keep model
-network access in `tkmodl`; keep agent workers networkless. Require signed
-adapter manifests before an adapter process starts. Normalize MCP and
-model-native function calls into the same identity-scoped capability envelope.
-Record prompts, outputs,
-tool calls, denials, token usage, retries, and budget exhaustion in `tkaudt`.
+Phase 2 adds deterministic case and evidence tiles:
 
-### Step 5: Add CaseOps and privileged actions
+```text
+tkcase
+tkevid
+```
 
-Implement `tkapi` for the board and approval workflow. Add `tkexec` only for
-approved actions. For TigerBeetle, only `tkexec` receives accounting ledger network
-credentials. Replay substitutes deterministic mock connector results and
-never invokes `tkexec`.
+Phase 3 adds the CaseOps API tile:
 
-### Step 6: Reduce synchronization debt
+```text
+tkapi
+```
+
+Phase 4 may add privileged execution:
+
+```text
+tkexec
+```
+
+The product work, acceptance criteria, and delivery sequencing for those phases
+live in [`wbs.md`](wbs.md) and [`phase-plan.md`](phase-plan.md). This document
+only records tile identity, ownership, and topology.
+
+## Tile Synchronization Debt
 
 Once the new product topology is canonical:
 
@@ -366,12 +386,17 @@ V1 has the right tile shape when:
 2. Every Tickoni tile has a `tk*` runtime ID and a Tickoni-owned source path.
 3. Agent workers have no direct shell or unrestricted network access.
 4. Model access is isolated behind `tkmodl`.
-5. Tool use is isolated behind `tktool` and signed `tkadpt` instances.
-6. Privileged accounting ledger posting is isolated behind disabled-by-default
-   `tkexec`.
-7. Every material event, denial, model call, tool call, approval, and external
-   result is appended through `tkaudt`.
-8. Replay can execute with external mutation disabled and report divergence.
-9. Queue depth and backpressure are visible through `tkmetr`.
-10. The validator mirror can be synchronized without editing Tickoni product
+5. Tool use is isolated behind `tktool` and converted into finance-native
+   adapter or proposal requests before reaching signed `tkadpt` instances.
+6. Financial capabilities enforce destination allowlists, amount/exposure
+   limits, frequency limits, and approval state according to
+   [`capabilities.md`](capabilities.md).
+7. Privileged accounting ledger posting, money movement, crypto transfer, and
+   trading order placement are isolated behind disabled-by-default `tkexec`.
+8. Every material event, denial, model call, adapter call, proposal, approval,
+   destination/limit/frequency check, and external result is appended through
+   `tkaudt`.
+9. Replay can execute with external mutation disabled and report divergence.
+10. Queue depth and backpressure are visible through `tkmetr`.
+11. The validator mirror can be synchronized without editing Tickoni product
     tiles.
