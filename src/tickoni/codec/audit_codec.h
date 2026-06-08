@@ -126,6 +126,11 @@ uint64_t
 tk_audit_record_hash( tk_audit_event_t const * event );
 
 int
+tk_audit_peek_binary_len( void const * in,
+                          size_t       in_sz,
+                          size_t *     out_total_len );
+
+int
 tk_audit_format_protobuf( void *                    out,
                           size_t                    out_sz,
                           tk_audit_event_t const *  event,

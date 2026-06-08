@@ -121,6 +121,12 @@ pub const Event = extern struct {
 
 pub extern fn tk_audit_record_hash(event: *const Event) u64;
 
+pub extern fn tk_audit_peek_binary_len(
+    in: [*]const u8,
+    in_sz: usize,
+    out_total_len: *usize,
+) c_int;
+
 pub extern fn tk_audit_format_protobuf(
     out: [*]u8,
     out_sz: usize,
@@ -134,9 +140,3 @@ pub extern fn tk_audit_parse_protobuf(
     event: *Event,
 ) c_int;
 
-pub extern fn tk_audit_format_jsonl(
-    out: [*]u8,
-    out_sz: usize,
-    event: *const Event,
-    written: *usize,
-) c_int;

@@ -585,6 +585,17 @@ tk_audit_format_protobuf( void *                   out,
 }
 
 int
+tk_audit_peek_binary_len( void const * in,
+                          size_t       in_sz,
+                          size_t *     out_total_len ) {
+  if( FD_UNLIKELY( in_sz<sizeof(uint32_t) ) ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+  uint32_t body_len;
+  memcpy( &body_len, in, sizeof(uint32_t) );
+  *out_total_len = sizeof(uint32_t) + (size_t)body_len;
+  return TK_AUDIT_CODEC_OK;
+}
+
+int
 tk_audit_parse_protobuf( void const *       in,
                          size_t             in_sz,
                          tk_audit_event_t * event ) {
