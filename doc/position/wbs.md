@@ -119,6 +119,11 @@ Acceptance:
 
 - A Phase 1 demo run produces a JSONL file whose full hash chain verifies.
 
+Tech debt:
+- JSON fixture pinning (T4 partial): The WBS says "pinned JSON test — assert the exact JSON string produced by the serializer." Binary bytes are pinned and verified. The JSON codec (audit_json.c) is implemented but tk_audit_format_jsonl is not called from any test in audit.zig. The binary round-trip covers correctness, but the JSON path has no pinned test on this branch. This is acceptable for E1.S1 since audit_json.c is wired for E1.S2 (durable export), but worth tracking.
+- audit_json.c is compiled via libfd_ballet? No — it's in src/tickoni/codec/ and is not yet added to build.zig. It will need to be added when E1.S2 wires the JSONL export path.
+
+
 ### E1.S3: Replay input capture
 
 As an auditor, I need replay inputs captured at every nondeterministic boundary

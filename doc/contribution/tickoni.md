@@ -162,6 +162,51 @@ cannot be explained in one sentence, stop and move the logic back into a
 Tickoni-owned module. The goal is to reuse Firedancer substrate faithfully,
 not to hide new product code behind the ABI membrane.
 
+### Firedancer Utility Reuse
+
+Default to Firedancer. When a Firedancer utility covers a need, call it through
+a C extern even at FFI cost. Do not write Tickoni-owned helpers that duplicate
+what Firedancer already provides.
+
+The reuse boundary is wide. Everything outside Solana validator semantics is
+in scope:
+
+- `src/util/bits` — `fd_ulong_load_*` and `fd_uint_load_*` for unaligned
+  integer loads, `fd_ulong_bswap` and `fd_uint128_bswap` for byte reversal,
+  `fd_ulong_hash` for integer bijections, and all other bit utilities
+- `src/util/cstr` — `fd_cstr_ncpy`, `fd_cstr_printf`, `fd_cstr_to_*` for
+  string handling and number formatting
+- `src/util/math` and `src/util/hist` — fixed-point arithmetic, statistics
+- `src/util/io` and `src/util/log` — structured IO and the `fd_log_*` family
+- `src/ballet/siphash13` — `fd_siphash13` for streaming hash (current audit
+  hash function)
+- `src/ballet/sha256`, `src/ballet/sha512`, `src/ballet/keccak` — for
+  content-addressed audit evidence and any future crypto needs
+- `src/ballet/pb` — `fd_pb_encoder` and `fd_pb_tokenize` for protobuf
+  encoding and decoding
+- `src/waltz/http` — `fd_http_server` for the `tkapi` tile HTTP/WebSocket
+  surface
+- `src/tango` — mcache, dcache, and workspace queue substrate
+
+The only exclusion is Solana-specific substrate: consensus, gossip, RPC wire
+formats, account/slot/epoch/leader-schedule structs, vote program logic, SVM
+execution, and validator-only tile identities. Those carry Solana semantics
+that do not belong in Tickoni financial event processing.
+
+When evaluating whether to write a helper:
+
+1. Check `src/util` and `src/ballet` first. If the function exists there, use
+   it via C extern, even if the Zig stdlib has an equivalent.
+2. If the operation belongs to codec framing, encoding, or parsing, implement
+   it in the owning C codec file alongside the format and parse functions that
+   share the same frame boundary knowledge. Then call it from Zig as an extern.
+3. Write a Tickoni-owned helper only when the need is genuinely Tickoni-
+   specific and nothing in Firedancer covers it. Add a comment naming the
+   Firedancer function checked and why it does not apply.
+4. Do not wrap a Firedancer function in a Zig function that adds no behavior.
+   Call the extern directly, or inline the `@bitCast` / `std.mem.readInt` at
+   the call site if it truly requires no C at all.
+
 ### Zig To C Action Diagram
 
 Zig owns product semantics and tile lifecycle. C owns retained low-level
@@ -1021,6 +1066,9 @@ Before merging Tickoni runtime work, check:
 10. Can replay reproduce or compare the behavior without external mutation?
 11. Did the change avoid adding Tickoni product logic to upstream Firedancer
     paths?
+12. Does new utility code check `src/util` and `src/ballet` first? If a
+    Firedancer function covers the need, is it called as a C extern rather than
+    reimplemented in Zig?
 
 If the answer to any of these is "not yet", finish the design before adding
 more code.
