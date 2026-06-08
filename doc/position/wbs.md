@@ -20,9 +20,9 @@ the product narrative and it is not the tile topology reference.
 | Phase | Gate | Required outcome |
 | --- | --- | --- |
 | Phase 0 | Technical spike | Synthetic payment pipeline proves bounded flow, audit hashing, replay, telemetry snapshots, and crash diagnostics |
-| Phase 1 | Control-plane harness | Stub payment and trading workflows run end to end through audit, telemetry, finance-native capabilities, destination allowlists, model gateway, financial tool broker, and stub adapters |
-| Phase 2 | Deterministic case runtime | Stub workflows produce deterministic cases, evidence records, replay capsules, and case divergence reports |
-| Phase 3 | External ingestion and CaseOps | Real ingestion API and operator board expose case review, audit timeline, replay status, and approval workflow |
+| Phase 1 | Control-plane harness | Stub payment and trading workflows run end to end through audit, telemetry, finance-native capabilities, destination allowlists, runtime hooks, model gateway, financial tool broker, and stub adapters |
+| Phase 2 | Deterministic case runtime | Stub workflows produce deterministic cases, evidence records, hook-derived replay capsules, and case divergence reports |
+| Phase 3 | External ingestion and CaseOps | Real ingestion API and operator board expose case review, hook-derived audit timeline, replay status, and approval workflow |
 | Phase 4 | Workflow pack | Payment exception, reconciliation, and fraud/risk demos are policy-gated, auditable, and replayable |
 
 ## Epic Summary
@@ -30,13 +30,13 @@ the product narrative and it is not the tile topology reference.
 | Epic | Phase | Description |
 | --- | --- | --- |
 | E0 | Phase 0 | Complete and maintain the Tickoni-only runtime spike |
-| E1 | Phase 1 | Durable audit and replay foundation |
-| E2 | Phase 1 | Telemetry and diagnostics export |
+| E1 | Phase 1 | Durable audit, runtime hook contract, and replay foundation |
+| E2 | Phase 1 | Telemetry and diagnostics export, including hook behavior |
 | E3 | Phase 1 | Finance-native capability envelopes and policy decisions |
-| E4 | Phase 1 | Model gateway and inference governance |
-| E5 | Phase 1 | Agent, financial tool broker, and stub financial adapters |
-| E6 | Phase 2 | Deterministic cases and evidence |
-| E7 | Phase 3 | External ingestion API and CaseOps board |
+| E4 | Phase 1 | Model gateway, policy-gated model hooks, and inference governance |
+| E5 | Phase 1 | Agent hook bus, financial tool broker, and stub financial adapters |
+| E6 | Phase 2 | Deterministic cases, evidence, and hook replay capsules |
+| E7 | Phase 3 | External ingestion API, hook timeline, and CaseOps board |
 | E8 | Phase 4 | Fintech workflow pack |
 | E9 | All phases | Build, quality, security, and release hygiene |
 
@@ -142,6 +142,45 @@ Acceptance:
 - Replay of a Phase 1 stub workflow completes without model, adapter, payment,
   trading, or execution side effects.
 
+### E1.S4: Runtime hook contract and registry
+
+As a Tickoni runtime maintainer, I need one canonical hook envelope and typed
+registry so agent, model, tool, adapter, policy, proposal, approval, and replay
+events cannot become unstructured logs.
+
+Tasks:
+
+- E1.S4.T1: Define `HookEnvelope` fields for hook event id, hook type, timestamp, case id, run id, actor type, actor id, agent id, workflow, environment, policy version, capability, risk level, input hash, output hash, previous audit hash, and schema version.
+- E1.S4.T2: Add optional fields for model id, tool name, adapter id, approval id, proposal id, downstream action id, token usage, latency, resource usage, and error code.
+- E1.S4.T3: Add a versioned hook type enum for agent lifecycle, model, tool, adapter, proposal, approval, case, replay, and future privileged execution hooks.
+- E1.S4.T4: Define required fields per hook type and reject unknown or incomplete hook types before audit ingestion.
+- E1.S4.T5: Add deterministic serialization and stable hook hash tests across process restarts.
+- E1.S4.T6: Audit malformed hook rejections without advancing case state.
+
+Acceptance:
+
+- Identical hook inputs produce identical hook hashes, malformed hooks fail
+  closed, and every accepted material hook can be converted into a typed audit
+  record.
+
+### E1.S5: Hook-to-audit integration
+
+As an auditor, I need material hooks to become hash-chained audit records with
+content-addressed payload references.
+
+Tasks:
+
+- E1.S5.T1: Let `tkaudt` accept validated hook envelopes and assign audit event ids.
+- E1.S5.T2: Link each hook-derived audit record with `previous_hash` and compute `record_hash`.
+- E1.S5.T3: Store prompt, model response, tool input, tool output, adapter output, and evidence payloads by content address rather than duplicating sensitive payloads into every audit row.
+- E1.S5.T4: Export hook-derived audit records as JSONL.
+- E1.S5.T5: Extend hash-chain verification to validate hook schema version, required fields, content-addressed references, and policy decision presence.
+
+Acceptance:
+
+- Hash-chain verification detects tampering, missing content-addressed payloads,
+  and hook records without required policy decisions.
+
 ## E2: Telemetry And Diagnostics Export
 
 Phase: 1.
@@ -195,6 +234,25 @@ Acceptance:
 
 - A simulated sandbox failure produces a diagnostic record that names the failed
   tile and reason.
+
+### E2.S4: Hook telemetry and diagnostics
+
+As an operator, I need hook-level metrics and diagnostics so model, tool,
+adapter, policy, approval, and replay behavior are visible without reading
+internal tile state.
+
+Tasks:
+
+- E2.S4.T1: Add metrics for hook count by type, policy allow/deny/approval counts, model calls, tool calls, adapter latency, token usage by case and agent, budget denials, approval-required decisions, and replay divergence.
+- E2.S4.T2: Add diagnostics for hook queue depth, hook queue overrun, hook validation failure, audit write failure, policy timeout, adapter timeout, and model timeout.
+- E2.S4.T3: Include tile id, hook type, workflow, role, policy version, and case/run id where applicable.
+- E2.S4.T4: Add timing breakdowns for total agent duration, model time, tool/adapter time, policy time, approval wait time, idle time, and replay time.
+- E2.S4.T5: Export hook telemetry through `tkmetr` and hook diagnostics through `tkdiag`.
+
+Acceptance:
+
+- A Phase 1 stub run emits hook metrics and diagnostics that show cost, latency,
+  queue pressure, denials, approvals, and replay divergence.
 
 ## E3: Finance-Native Capability Envelopes And Policy
 
@@ -261,6 +319,24 @@ Acceptance:
 - Tests cover budget exhaustion and runaway-loop prevention without external
   model calls.
 
+### E3.S4: Hook policy failure behavior
+
+As an operator, I need hook failures to be safe by default so audit or policy
+outages cannot silently allow unaudited financial actions.
+
+Tasks:
+
+- E3.S4.T1: Deny action by default if a policy-bearing hook cannot be evaluated.
+- E3.S4.T2: Block privileged or money-adjacent action if a required audit hook cannot be written.
+- E3.S4.T3: Allow telemetry-only hook loss only when the loss is counted and visible.
+- E3.S4.T4: Report replay comparison failures as replay divergence, not as successful replay.
+- E3.S4.T5: Document hook failure modes in the phase gate notes.
+
+Acceptance:
+
+- Material model, tool, adapter, proposal, approval, and future execution paths
+  cannot proceed when required policy or audit hooks fail.
+
 ## E4: Model Gateway And Inference Governance
 
 Phase: 1.
@@ -316,6 +392,28 @@ Tasks:
 Acceptance:
 
 - Misconfigured model identifiers fail closed before any outbound call.
+
+### E4.S4: Policy-gated model hooks
+
+As a platform operator, I need every model call to pass through `PreModelCall`
+and `PostModelCall` so model routing, prompt capture, context limits, token
+budgets, retry loops, and replay substitution are enforced before provider
+access.
+
+Tasks:
+
+- E4.S4.T1: Require `tkagnt` to emit `PreModelCall` before any `tkmodl` request.
+- E4.S4.T2: Include case id, agent id, model route, requested model, prompt hash, context hash, estimated input tokens, remaining case budget, remaining agent budget, retry count, and policy version in `PreModelCall`.
+- E4.S4.T3: Let `tkpoly` return allow, deny, or require-approval for model hooks.
+- E4.S4.T4: Prevent denied model calls from reaching `tkmodl` and audit the denial.
+- E4.S4.T5: Emit `PostModelCall` with model id, provider id, request hash, response hash, input tokens, output tokens, total tokens, latency, finish reason, and cost estimate.
+- E4.S4.T6: Emit model failure, budget exceeded, and replay-substitution hooks when those states occur.
+- E4.S4.T7: Update case and agent budgets from accepted model hook records.
+
+Acceptance:
+
+- No model provider or local/dev LLM server can be called unless the matching
+  model hooks were policy-checked and audit-recorded.
 
 ## E5: Agent, Financial Tool Broker, And Stub Financial Adapters
 
@@ -399,6 +497,66 @@ Acceptance:
   approval for valid proposals, and prove direct execution is denied and
   audited.
 
+### E5.S5: Bounded hook bus and dispatcher
+
+As a systems engineer, I need hook events to move over bounded links so hooks
+preserve Tickoni's backpressure, ownership, and failure model.
+
+Tasks:
+
+- E5.S5.T1: Define reliable bounded hook links for `tkagnt_hook`, `tkmodl_hook`, `tktool_hook`, and `tkadpt_hook`.
+- E5.S5.T2: Define producer, consumer, depth, MTU, overrun behavior, restart behavior, shutdown behavior, and health metrics for each correctness-bearing hook link.
+- E5.S5.T3: Add a hook dispatcher that accepts validated hook envelopes.
+- E5.S5.T4: Route policy-bearing hooks to `tkpoly`, audit-bearing hooks to `tkaudt`, metrics hooks to `tkmetr`, diagnostics hooks to `tkdiag`, and replay hooks to `tkrepl`.
+- E5.S5.T5: Ensure the dispatcher has no model, adapter, ledger, trading, payment, or unrestricted network access.
+- E5.S5.T6: Add saturation tests for hook queues.
+
+Acceptance:
+
+- Hook dispatch preserves bounded flow control, reports queue pressure, and
+  cannot bypass the owning policy, audit, metrics, diagnostics, or replay tiles.
+
+### E5.S6: Policy-gated tool and adapter hooks
+
+As a security engineer, I need model-native function calls, MCP-compatible
+requests, and financial adapter calls to terminate at the same `tktool`
+boundary and emit policy-checked hooks.
+
+Tasks:
+
+- E5.S6.T1: Normalize tool calls into capability envelopes with tool name, tool protocol, adapter id, capability, case scope, financial object scope, destination scope, amount, currency, frequency key, and risk level.
+- E5.S6.T2: Reject invalid tool arguments before adapter execution and audit the rejection.
+- E5.S6.T3: Emit `PreToolUse` before every `tktool` execution and route it through `tkpoly`.
+- E5.S6.T4: Prevent denied tool calls from reaching `tkadpt` and pause approval-required calls.
+- E5.S6.T5: Emit `PostToolUse` with tool name, adapter id, input hash, output hash, latency, result status, error code, and evidence reference.
+- E5.S6.T6: Content-address adapter outputs and link them to case evidence.
+- E5.S6.T7: Prove agents have no direct adapter credentials or unrestricted network path to stub payment or trading adapters.
+
+Acceptance:
+
+- Allowed, denied, approval-required, and failed tool/adapter calls are visible
+  in the audit chain, and direct adapter access attempts fail closed.
+
+### E5.S7: Finance-native proposal hooks
+
+As a finance operations user, I need money-adjacent agent outputs represented
+as immutable proposals that can be reviewed, approved, rejected, expired, and
+replayed.
+
+Tasks:
+
+- E5.S7.T1: Define proposal schema with proposal id, case id, agent id, workflow, proposed action, financial object, destination, amount, currency, limit scope, frequency scope, required approval role, expiry, proposal hash, and policy version.
+- E5.S7.T2: Emit `PreActionProposal` before any proposal becomes valid.
+- E5.S7.T3: Check action class, amount limit, destination allowlist, frequency limit, approval requirement, environment, and case scope.
+- E5.S7.T4: Deny out-of-scope proposals and mark valid money-adjacent proposals as approval-required, not executable.
+- E5.S7.T5: Hash-bind proposals so approvals and future execution reference the exact proposal content and policy version.
+- E5.S7.T6: Keep superseded proposal versions auditable instead of mutating proposal content.
+
+Acceptance:
+
+- No proposal appears as valid unless `PreActionProposal` was policy-checked,
+  audit-recorded, and hash-bound to immutable proposal content.
+
 ## E6: Deterministic Cases And Evidence
 
 Phase: 2.
@@ -442,15 +600,19 @@ replayed without external effects.
 
 Tasks:
 
-- E6.S3.T1: Define replay capsule schema for source events, policy decisions, model outputs, tool responses, adapter fixtures, and evidence hashes.
+- E6.S3.T1: Define replay capsule schema for source event hashes, normalized event hashes, case id, case state hashes, policy version/hash, agent run id, model request/response hashes, tool call hashes, adapter result hashes, proposal hashes, approval records, evidence hashes, and expected final state hash.
 - E6.S3.T2: Export capsule from completed case history.
 - E6.S3.T3: Re-run case logic from capsule.
-- E6.S3.T4: Report divergence by case transition, audit record, evidence hash, or boundary response.
+- E6.S3.T4: Regenerate `PreModelCall`, `PostModelCall`, `PreToolUse`, `PostToolUse`, proposal, approval, and replay hooks in replay mode.
+- E6.S3.T5: Substitute recorded model outputs and deterministic adapter fixtures instead of calling external model providers, payment APIs, trading APIs, or execution systems.
+- E6.S3.T6: Report the first divergence by case transition, audit record, hook hash, evidence hash, prompt/context hash, policy version, or boundary response.
+- E6.S3.T7: Fail replay if a live model provider, live adapter, or privileged mutation path is called.
 
 Acceptance:
 
-- Replay can detect changed case state, changed evidence, and missing boundary
-  responses.
+- Replay can detect changed case state, changed evidence, changed hook sequence,
+  changed policy, and missing boundary responses without invoking external
+  effects.
 
 ## E7: External Ingestion And CaseOps
 
@@ -506,6 +668,25 @@ Acceptance:
 
 - An operator can review a demo case end to end and approve or reject a
   proposed action.
+
+### E7.S4: Approval hooks and audit timeline
+
+As an operator and auditor, I need approval-required actions and hook-derived
+audit records to become reviewable CaseOps state.
+
+Tasks:
+
+- E7.S4.T1: Emit `ApprovalRequested` for approval-required proposals with approval id, proposal id, case id, required role, requesting agent, policy version, and expiry.
+- E7.S4.T2: Emit `ApprovalGranted`, `ApprovalRejected`, and `ApprovalExpired` with approver identity, role, timestamp, reason, approval scope, expiry, and proposal hash.
+- E7.S4.T3: Block rejected or expired approvals from any future execution path.
+- E7.S4.T4: Expose pending approvals through the CaseOps API and show them on the case card.
+- E7.S4.T5: Build an audit timeline that shows hook events in order and groups them by ingestion, agent run, model calls, tool calls, policy decisions, proposals, approvals, and replay.
+- E7.S4.T6: Add timeline filtering by hook type and JSONL audit-slice export.
+
+Acceptance:
+
+- Denied, approval-required, approved, rejected, expired, and replay-divergent
+  hook events are visible in CaseOps and exported in audit order.
 
 ## E8: Fintech Workflow Pack
 
@@ -602,3 +783,48 @@ Acceptance:
 
 - A new developer can run the current phase demo and inspect audit, telemetry,
   policy, and replay output from documented commands.
+
+### E9.S4: Hook-based integration tests
+
+Tasks:
+
+- E9.S4.T1: Add golden-path payment exception test that ingests a synthetic `payment.failed` event, runs the payment exception agent, reads permitted evidence, calls the stub payment adapter, creates an approval-required retry proposal, records hook events in the audit timeline, and replays successfully.
+- E9.S4.T2: Add denied trading proposal test that proposes an action above the daily limit, emits `PreActionProposal`, receives a `tkpoly` denial, creates no execution path, records the denial in audit JSONL, and reproduces the denial in replay.
+- E9.S4.T3: Add direct execution bypass test that proves the agent has no credentials or network path for direct adapter access, emits diagnostic and audit denial events, and produces no adapter result.
+- E9.S4.T4: Add replay divergence test that matches a baseline case, modifies policy version or evidence hash, reports the first divergent hook, exits non-zero, and includes expected and actual hook hashes.
+
+Acceptance:
+
+- The phase gates prove no model call, tool call, adapter call, proposal, or
+  privileged path can bypass required hooks, policy decisions, and audit
+  records.
+
+### E9.S5: Developer hook configuration and docs
+
+Tasks:
+
+- E9.S5.T1: Add declarative hook config fields for material, requires-policy, requires-audit, replay-required, and telemetry-only behavior.
+- E9.S5.T2: Reject invalid hook config at startup, including material hooks without audit and privileged hooks without policy.
+- E9.S5.T3: Include hook config version in audit records.
+- E9.S5.T4: Add a development hook JSONL sink for local inspection that cannot replace `tkaudt` for material hooks and is clearly marked non-authoritative.
+- E9.S5.T5: Document hook types, required and optional fields, policy-gated hooks, audit-required hooks, and examples for model calls, tool calls, adapter calls, proposals, approvals, and replay divergence.
+
+Acceptance:
+
+- Developers can inspect hook streams locally and build valid adapters without
+  turning hooks into arbitrary plugin execution or bypassing authoritative audit.
+
+### E9.S6: Future privileged execution hook contract
+
+Tasks:
+
+- E9.S6.T1: Define disabled-by-default `PrePrivilegedAction` and `PostPrivilegedAction` schemas for future `tkexec` work.
+- E9.S6.T2: Include approved action id, proposal id, approval id, executor id, destination, amount, idempotency key, expected result hash, policy version/hash, and replay-safe mock mode fields.
+- E9.S6.T3: Require valid approval references for any future privileged action hook.
+- E9.S6.T4: Add a disabled executor stub that accepts approved mock actions only, emits privileged action hooks, and cannot reach production systems.
+- E9.S6.T5: Deny and audit attempts to use the executor without approval.
+
+Acceptance:
+
+- V1 can test the future execution audit shape without enabling autonomous money
+  movement, ledger posting, trading execution, or production connector access.

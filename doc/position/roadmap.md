@@ -133,6 +133,66 @@ trajectories, model records, adapter calls, finance-native capability decisions,
 destination/limit checks, telemetry, and replay inputs. Case capsules are Phase
 2.
 
+### Runtime Hooks: Phase 1/2/3
+
+Runtime hooks are the mandatory checkpoints that make the agent harness
+policy-gated, auditable, and replay-addressable. They are not optional log
+callbacks.
+
+Design principle:
+
+```text
+Every agent action is a hook event.
+Every hook event has an envelope.
+Every envelope is policy-evaluated.
+Every policy result is audit-recorded.
+Every audit record is hash-chained.
+Every material case can be replayed.
+Every privileged effect is outside the agent.
+```
+
+Phase 1 introduces the canonical hook envelope, typed hook registry, bounded
+hook links, and hook-to-audit integration for model calls, tool calls, adapter
+calls, and action proposals. Phase 2 binds hook sequences into deterministic
+case evidence and replay capsules. Phase 3 exposes the hook-derived audit
+timeline, approvals, and replay status in CaseOps.
+
+Required hook families:
+
+- agent lifecycle hooks for run start, completion, failure, cancellation, and
+  budget exhaustion
+- model hooks for `PreModelCall`, `PostModelCall`, denials, budget exhaustion,
+  and replay substitution
+- tool and adapter hooks for `PreToolUse`, `PostToolUse`, denials,
+  approval-required decisions, adapter start, completion, and failure
+- proposal hooks for `PreActionProposal`, `PostActionProposal`, denials,
+  approval-required proposals, expiry, and supersession
+- approval hooks for request, grant, rejection, expiry, and revocation
+- case hooks for creation, state change, evidence attachment, findings, policy
+  decisions, and replay capsule sealing
+- replay hooks for replay start, matched hooks, divergence, and completion
+- future privileged execution hooks for pre-check, post-result, denial,
+  failure, and reconciliation
+
+Normal agent investigation should flow through hooks in this order:
+
+```text
+financial event
+  -> tkings -> tknorm -> tkdedu -> tkcase -> tkpoly -> tkaudt
+  -> tkdisp -> tkagnt
+
+tkagnt emits agent lifecycle hooks
+tkagnt -> PreModelCall -> tkpoly -> tkaudt -> tkmodl -> PostModelCall
+tkagnt -> PreToolUse -> tkpoly -> tkaudt -> tktool -> tkadpt -> PostToolUse
+tkagnt -> PreActionProposal -> tkpoly -> tkaudt -> CaseOps proposal
+CaseOps -> ApprovalRequested / ApprovalGranted / ApprovalRejected -> tkaudt
+```
+
+Replay regenerates the hook sequence with external effects disabled. Model,
+tool, adapter, approval, proposal, and future execution outputs are substituted
+from captured records or deterministic fixtures, and the first divergent hook
+hash is reported.
+
 ### Inference Governance: Phase 1
 
 - token accounting per case
@@ -258,6 +318,10 @@ Tickoni v1 is successful if it can demonstrate:
 11. agent execution cannot escape capability boundaries
 12. every case has measurable inference cost
 13. runaway agent loops are prevented by runtime controls
+14. no model call can occur without `PreModelCall` and `PostModelCall` hooks
+15. no tool, adapter, or proposal path can bypass policy and audit hooks
+16. replay can compare hook sequences and report the first divergence
+17. denied and approval-required actions are as visible as allowed actions
 
 ## Completed Foundation Story: Tickoni Runtime Cutover
 
