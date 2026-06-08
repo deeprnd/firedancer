@@ -655,16 +655,6 @@ test "Phase 0 rejects malformed payment framing" {
     try std.testing.expect(state.replay_match.load(.seq_cst));
 }
 
-test "formatJsonl exports one append-only record line" {
-    var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 1, .queue_depth = 1 });
-    defer state.deinit();
-    try runOneSequentialForTest(&state, syntheticPayment(state.config, 0));
-
-    var buf: [audit.max_jsonl_len]u8 = undefined;
-    const line = try audit.formatJsonl(&buf, state.audit.records[0]);
-    try std.testing.expect(std.mem.startsWith(u8, line, "{\"schema_version\":1,"));
-    try std.testing.expect(std.mem.endsWith(u8, line, "}\n"));
-}
 
 test "sandbox failure records crash diagnostics and stops ingest" {
     var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 10, .queue_depth = 2, .sandbox_fail_at = 2 });

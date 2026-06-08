@@ -119,6 +119,8 @@ pub const Event = extern struct {
     payload: Payload,
 };
 
+pub extern fn tk_audit_record_hash(event: *const Event) u64;
+
 pub extern fn tk_audit_format_protobuf(
     out: [*]u8,
     out_sz: usize,

@@ -15,6 +15,7 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const fd_lib_dir = b.option([]const u8, "fd-lib-dir", "Firedancer lib dir (default: build/native/gcc/lib)") orelse "build/native/gcc/lib";
 
     // Shared modules used by both the exe and test binaries.
     const runtime_mod = b.addModule("runtime", .{
@@ -50,7 +51,7 @@ pub fn build(b: *std.Build) void {
         .name = "tickoni-supervisor",
         .root_module = main_mod,
     });
-    linkTickoniAuditCodec(b, exe);
+    linkTickoniAuditCodec(b, exe, fd_lib_dir);
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -87,7 +88,7 @@ pub fn build(b: *std.Build) void {
         if (std.mem.eql(u8, path, "src/tickoni/tiles/audit.zig") or
             std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline.zig"))
         {
-            linkTickoniAuditCodec(b, t);
+            linkTickoniAuditCodec(b, t, fd_lib_dir);
         }
         test_step.dependOn(&b.addRunArtifact(t).step);
     }
@@ -103,7 +104,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const sup_test = b.addTest(.{ .root_module = sup_mod });
-    linkTickoniAuditCodec(b, sup_test);
+    linkTickoniAuditCodec(b, sup_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(sup_test).step);
 
     // ---------------------------------------------------------------------------
@@ -137,7 +138,7 @@ pub fn build(b: *std.Build) void {
         if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline.zig"))
         {
-            linkTickoniAuditCodec(b, t);
+            linkTickoniAuditCodec(b, t, fd_lib_dir);
         }
         cov_step.dependOn(&b.addInstallArtifact(t, .{
             .dest_dir = .{ .override = .{ .custom = "cov" } },
@@ -156,22 +157,24 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    linkTickoniAuditCodec(b, sup_cov_test);
+    linkTickoniAuditCodec(b, sup_cov_test, fd_lib_dir);
     cov_step.dependOn(&b.addInstallArtifact(sup_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
 }
 
-fn linkTickoniAuditCodec(b: *std.Build, step: *std.Build.Step.Compile) void {
+fn linkTickoniAuditCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
     step.root_module.addCSourceFiles(.{
         .files = &.{
             "src/tickoni/codec/audit_pb.c",
-            "src/tickoni/codec/audit_json.c",
             "src/ballet/pb/fd_pb_tokenize.c",
-            "src/ballet/json/cJSON.c",
         },
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
     });
+    step.root_module.addLibraryPath(b.path(fd_lib_dir));
+    step.root_module.linkSystemLibrary("fd_util", .{});
+    step.root_module.linkSystemLibrary("fd_ballet", .{});
+    step.root_module.linkSystemLibrary("stdc++", .{});
 }

@@ -1,15 +1,105 @@
 #include "audit_codec.h"
 
-#include "../../util/log/fd_log.h"
-#undef FD_CRIT
-#undef FD_LOG_WARNING
-#define FD_CRIT(c,...) do { if( FD_UNLIKELY( !(c) ) ) __builtin_trap(); } while(0)
-#define FD_LOG_WARNING(a) ((void)0)
-
 #include "../../ballet/pb/fd_pb_encode.h"
 #include "../../ballet/pb/fd_pb_tokenize.h"
+#include "../../ballet/siphash13/fd_siphash13.h"
 
 #include <string.h>
+
+/* k0/k1 are fixed constants baked into the audit schema v1.
+   Changing them invalidates all existing audit logs. */
+#define TK_AUDIT_HASH_K0 (0x0000544455414B54UL) /* "TKAUDT\0\0" LE */
+#define TK_AUDIT_HASH_K1 (1UL)                  /* schema version  */
+
+#define TK_HASH(ptr,sz) fd_siphash13_append( sip, (uchar const *)(ptr), (sz) )
+
+uint64_t
+tk_audit_record_hash( tk_audit_event_t const * event ) {
+  fd_siphash13_t _sip[1];
+  fd_siphash13_t * sip = fd_siphash13_init( _sip, TK_AUDIT_HASH_K0, TK_AUDIT_HASH_K1 );
+
+  TK_HASH( &event->header.schema_version,          sizeof(uint16_t) );
+  TK_HASH( &event->header.seq,                     sizeof(uint64_t) );
+  TK_HASH( &event->header.source_offset,           sizeof(uint64_t) );
+  TK_HASH(  event->header.tile_id,                 6UL              );
+  TK_HASH( &event->header.logical_actor_id,        sizeof(uint64_t) );
+  TK_HASH(  event->header.policy_version,          32UL             );
+  TK_HASH(  event->header.capability_envelope_id_le, 16UL           );
+  TK_HASH( &event->header.prev_hash,               sizeof(uint64_t) );
+  TK_HASH( &event->record_type,                    sizeof(uint8_t)  );
+
+  switch( event->record_type ) {
+    case 0U:
+      TK_HASH( event->payload.source_event.source_system, 16UL           );
+      TK_HASH( event->payload.source_event.event_type,    32UL           );
+      TK_HASH( &event->payload.source_event.raw_hash,     sizeof(uint64_t) );
+      break;
+    case 1U:
+      TK_HASH( &event->payload.normalization.source_event_hash, sizeof(uint64_t) );
+      TK_HASH( &event->payload.normalization.normalized_hash,   sizeof(uint64_t) );
+      TK_HASH( event->payload.normalization.canonical_event_type, 32UL           );
+      break;
+    case 2U:
+      TK_HASH( &event->payload.policy_decision.outcome,          sizeof(uint8_t)  );
+      TK_HASH( &event->payload.policy_decision.rule_id,          sizeof(uint32_t) );
+      TK_HASH( event->payload.policy_decision.failed_scope_dim,  32UL             );
+      TK_HASH( &event->payload.policy_decision.source_event_hash,sizeof(uint64_t) );
+      break;
+    case 3U:
+      TK_HASH( event->payload.model_call.model_id,              32UL             );
+      TK_HASH( &event->payload.model_call.prompt_hash,           sizeof(uint64_t) );
+      TK_HASH( &event->payload.model_call.response_hash,         sizeof(uint64_t) );
+      TK_HASH( &event->payload.model_call.token_estimate,        sizeof(uint32_t) );
+      TK_HASH( &event->payload.model_call.retry_count,           sizeof(uint8_t)  );
+      break;
+    case 4U:
+      TK_HASH( event->payload.financial_adapter_call.adapter_id,     16UL             );
+      TK_HASH( &event->payload.financial_adapter_call.request_hash,  sizeof(uint64_t) );
+      TK_HASH( &event->payload.financial_adapter_call.response_hash, sizeof(uint64_t) );
+      TK_HASH( &event->payload.financial_adapter_call.fixture_id,    sizeof(uint32_t) );
+      break;
+    case 5U:
+      TK_HASH( event->payload.proposal.proposal_type,  32UL             );
+      TK_HASH( &event->payload.proposal.proposal_hash, sizeof(uint64_t) );
+      TK_HASH( &event->payload.proposal.approval_state,sizeof(uint8_t)  );
+      break;
+    case 6U:
+      TK_HASH( event->payload.destination_check.destination_type,   16UL             );
+      TK_HASH( &event->payload.destination_check.allowlist_version, sizeof(uint32_t) );
+      TK_HASH( &event->payload.destination_check.outcome,           sizeof(uint8_t)  );
+      break;
+    case 7U:
+      TK_HASH( &event->payload.limit_check.limit_type, sizeof(uint8_t)  );
+      TK_HASH( &event->payload.limit_check.value,      sizeof(int64_t)  );
+      TK_HASH( &event->payload.limit_check.limit,      sizeof(int64_t)  );
+      TK_HASH( &event->payload.limit_check.outcome,    sizeof(uint8_t)  );
+      break;
+    case 8U:
+      TK_HASH( event->payload.approval_required.action_class,  32UL             );
+      TK_HASH( event->payload.approval_required.approval_path, 32UL             );
+      TK_HASH( &event->payload.approval_required.proposal_hash,sizeof(uint64_t) );
+      break;
+    case 9U:
+      TK_HASH( event->payload.denial.action_class,    32UL             );
+      TK_HASH( &event->payload.denial.reason_code,    sizeof(uint32_t) );
+      TK_HASH( event->payload.denial.failed_scope_dim,32UL             );
+      break;
+    case 10U:
+      TK_HASH( &event->payload.telemetry_checkpoint.metric_set_hash,        sizeof(uint64_t) );
+      TK_HASH( &event->payload.telemetry_checkpoint.source_offset_watermark,sizeof(uint64_t) );
+      break;
+    case 11U:
+      TK_HASH( &event->payload.replay_result.capsule_id,         sizeof(uint64_t) );
+      TK_HASH( &event->payload.replay_result.divergences,        sizeof(uint64_t) );
+      TK_HASH( &event->payload.replay_result.first_divergent_seq,sizeof(uint64_t) );
+      break;
+    default: break;
+  }
+
+  return fd_siphash13_fini( sip );
+}
+
+#undef TK_HASH
 
 #define TK_AUDIT_FIELD_SCHEMA_VERSION           (1U)
 #define TK_AUDIT_FIELD_RECORD_TYPE              (2U)
