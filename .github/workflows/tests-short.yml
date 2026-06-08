@@ -44,6 +44,8 @@ jobs:
         with:
           zig: 'true'
 
+      - uses: ./.github/actions/build-fd-tk-libs
+
       - name: Run test suite
         run: just test-unit-tk
 
@@ -62,6 +64,8 @@ jobs:
         with:
           zig: 'true'
           kcov: 'true'
+
+      - uses: ./.github/actions/build-fd-tk-libs
 
       - name: Run coverage
         run: just test-cov-tk

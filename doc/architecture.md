@@ -17,6 +17,124 @@ AI is not part of the deterministic event critical path. A financial event must
 be ingestible, normalized, audited, and replayable before any agent investigates
 the resulting case.
 
+## System Layers
+
+Tickoni has a Firedancer infrastructure layer and a Tickoni AI-harness layer.
+The TPS claim comes from running financial event processing on Firedancer's
+core tile infrastructure: bounded shared-memory queues, explicit topology,
+workspaces, sandboxed tile processes, low-overhead metrics, and tile-local
+network services. The web application, storage systems, agent daemon, LLM
+server, TigerBeetle, and trading APIs are attached systems around that runtime.
+They do not replace the runtime.
+
+```text
+┌────────────────────┐      ┌──────────────────────┐      ┌─────────────────────┐
+│      Next.js       │<────>│   Zig CaseOps API    │<────>│  Markdown + DuckDB  │
+│ CaseOps operator UI│      │  tkapi HTTP + WS     │      │ memory + analytics  │
+└────────────────────┘      └──────────┬───────────┘      └─────────────────────┘
+                                       │
+                                       v
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                         Tickoni AI-harness tiles                              │
+│                                                                               │
+│  tkapi                                                                        │
+│    CaseOps API tile: board reads, evidence reads, approvals, audit timeline   │
+│                                                                               │
+│  tkings -> tknorm -> tkdedu -> tkcase -> tkpoly -> tkaudt                     │
+│    ingestion, normalization, dedupe, deterministic cases, policy, audit       │
+│                                                                               │
+│  tkdisp -> tkagnt -> tkmodl                                                   │
+│    bounded agent runs and governed model access                               │
+│                                                                               │
+│  tkagnt -> tktool -> tkadpt                                                   │
+│    finance-native tool broker and signed/stub adapters                        │
+│                                                                               │
+│  tkrepl, tkmetr, tkdiag, future tkexec                                        │
+│    replay, metrics, diagnostics, approved privileged execution                │
+└───────────────────────────────┬───────────────────────────────────────────────┘
+                                │
+┌───────────────────────────────┴───────────────────────────────────────────────┐
+│                    Firedancer infrastructure tiles/substrate                  │
+│  tango queues, topology, workspaces, sandbox, metric/diag, fd_http_server,    │
+│  bounded polling, tile-local networking, seccomp/Landlock, crash-only model   │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+Governed external systems:
+
+  tkmodl  <────>  LLM server / model providers
+                   local OpenAI-compatible server, OpenAI, Anthropic,
+                   Qwen, DeepSeek, future local GPU inference
+
+  daemon  <────>  local agent CLIs on the operator/developer machine
+                   Claude Code, Codex, GitHub Copilot CLI, OpenCode, OpenClaw,
+                   Hermes, Gemini, Pi, Cursor Agent, Kimi, Kiro CLI
+
+  tkadpt  <────>  financial read/proposal APIs
+                   payment processors, crypto venues, broker or stock-exchange
+                   gateways, risk systems, compliance systems
+
+  tkexec  <────>  approved mutation backends
+                   TigerBeetle balances, transfers, fills, accounting,
+                   approved payment/trading execution
+```
+
+The **Firedancer infrastructure layer** is the systems layer Tickoni reuses for
+ultra-throughput execution: `src/tango` queues, topology/workspace discipline,
+tile lifecycle, sandboxing, low-overhead metric and diagnostic paths,
+`fd_http_server` for tile-local HTTP/WebSocket service, bounded polling loops,
+and crash-only behavior. Tickoni should reuse or wrap Firedancer infra tiles
+and primitives where they are generic.
+
+Tickoni reuses generic Firedancer tiles and infrastructure primitives, but Solana validator tiles and Solana schemas are not Tickoni framework concepts. That generic Firedancer reuse is what lets Tickoni position itself as an ultra-TPS financial event harness instead of a normal web backend with agents attached.
+
+The **Tickoni AI-harness tiles** own financial correctness. Financial events
+enter `tkings`, become canonical in `tknorm`, are deduplicated in `tkdedu`,
+become deterministic cases in `tkcase`, are policy-checked by `tkpoly`, and
+are ordered into the audit chain by `tkaudt`. Agent, model, tool, adapter,
+replay, metrics, diagnostics, and future execution paths are additional tiles
+on top of the same engine substrate.
+
+The **Zig CaseOps API** is the HTTP/WebSocket control-plane edge implemented
+inside Tickoni. It should serve ingestion and CaseOps APIs, authenticate
+clients, fan out live state, and coordinate operator approvals, but it must not
+own normalization, deduplication, policy decisions, model access, adapter
+access, or financial execution. Those stay with the owning Tickoni tiles.
+
+The **Markdown memory/policy store** holds human-authored operating context:
+memory, theses, policies, company notes, runbooks, and case narratives. These
+files are useful context for agents and operators, but they are not
+deterministic runtime truth by themselves.
+
+The **DuckDB analytics store** holds market data, analytics, backtests,
+research tables, local projections, and investigation datasets. It is optimized
+for analytical reads and reproducible research, not authoritative balances or
+money movement.
+
+The **TigerBeetle finance database** holds balances, transfers, fills,
+accounting entries, and approved ledger-style financial state. Agents, the UI,
+and non-executor tiles do not connect to TigerBeetle directly. `tkexec` owns
+approved execution after policy, audit, replay, and human approval are already
+proven.
+
+The **LLM server and model providers** are external inference backends. Agents
+do not call them directly. `tkmodl` owns configured endpoints, model allowlists,
+timeouts, context limits, retry limits, token accounting, budget enforcement,
+request/response audit, and replay substitution.
+
+The **Agent Daemon** runs on the operator or developer machine and launches
+approved local agent CLIs or SDKs. It is useful for integrating Claude Code,
+Codex, GitHub Copilot CLI, OpenCode, OpenClaw, Hermes, Gemini, Pi, Cursor
+Agent, Kimi, Kiro CLI, or similar tools, but it is not a trust boundary. The
+daemon receives scoped work and returns auditable outputs; it does not receive
+database credentials, model credentials, ledger credentials, trading keys, or
+raw authority over the runtime.
+
+The **trading, crypto, payment, risk, and compliance APIs** sit behind
+`tkadpt` for reads and proposals, and behind future `tkexec` for approved
+mutations. A trading agent may recommend or propose within market, venue,
+instrument, sector, amount, frequency, and approval limits. It must not place
+orders directly.
+
 ## Product Shape
 
 ```text
@@ -25,8 +143,8 @@ Financial event streams
         |
         v
 Tickoni event runtime
-  Zig + Firedancer-style tile pipeline
-  bounded queues, deterministic processing, explicit ownership
+  Zig AI-harness tiles on Firedancer infrastructure
+  ultra-TPS bounded queues, deterministic processing, explicit ownership
         |
         v
 Policy and audit boundary
@@ -207,6 +325,33 @@ approval IDs, downstream action IDs, signatures, and evidence references.
 
 Large payloads should be content-addressed instead of duplicated into every
 audit record.
+
+### Why Binary And JSONL Both Exist
+
+Tickoni needs two audit encodings because one format is optimized for runtime
+correctness and replay discipline, while the other is optimized for operator
+inspection and durable export.
+
+Binary audit encoding is the canonical machine format inside the runtime and
+replay path. It gives `tkaudt` and `tkrepl` a fixed field order, explicit
+record length, early schema-version check, and skip-forward behavior for
+unknown future records. That keeps hashing, append ordering, and replay
+comparison independent of parser quirks, map key ordering, whitespace, or
+string formatting. Binary is for deterministic transport and storage of the
+typed audit record itself.
+
+JSONL is the durable text export and operator-facing interchange format. It is
+for append-only files, inspection, debugging, offline analysis, and simple
+tooling such as `jq`, `rg`, and spreadsheet or notebook import. The JSONL line
+keeps the same schema-versioned fields as the binary record, but in a form a
+human or generic log-processing tool can read without Tickoni-specific binary
+decoders.
+
+These formats do not serve different truths. They are two encodings of the same
+typed audit record. The binary form is the runtime canonical form. The JSONL
+form is the readable export form. Hashing rules, especially the exclusion of
+`timestamp_ns` from `record_hash`, must remain consistent across both so replay
+and export inspection describe the same event chain.
 
 ## Replay
 

@@ -15,12 +15,41 @@ Where other harnesses focus on agent productivity, coding, or general automation
 * financial event throughput
 * deterministic processing
 * regulated operations
+* finance-native permissioning
 * bounded inference spend
 * per-case model cost attribution
 * audit-grade provenance
 * replayable decisions
 * policy-controlled agent actions
 * safe handling of money-adjacent workflows
+
+Generic harnesses usually ask infrastructure questions:
+
+* Can the agent read this file?
+* Can the agent call this tool?
+* Can the agent open a browser?
+* Can the agent access the network?
+* Can the agent execute a shell command?
+
+Those questions matter, but they are not the buyer's hardest problem in
+financial operations.
+
+Tickoni asks financial-control questions:
+
+* Which beneficiary, IBAN, wallet, account, or trading venue is in scope?
+* Which payment rail, currency, country, processor, or settlement batch is allowed?
+* Which asset class, market, exchange, instrument, sector, side, and order type is allowed?
+* How much can the agent recommend, propose, or prepare per event, case, day, and month?
+* How frequently can it propose a retry, transfer, ledger correction, or trade?
+* Which actions are observe-only, proposal-only, approval-required, or executable by a privileged path?
+* Which human role must approve the action, and when does the approval expire?
+
+The value proposition is that Tickoni governs the consequence, not just the
+computer resource. It does not stop at "can this agent call a trading tool?"
+It can express "this agent may propose, but not place, US equity and ETF orders
+on NYSE or NASDAQ, in the Information Technology sector, up to USD 10,000 per
+day, with a one-hour minimum proposal interval, no same-day round trips, and
+human approval before execution."
 
 ### Market Layer
 
@@ -314,6 +343,53 @@ freeze_account
 
 Dangerous actions should be denied by default and require policy plus approval.
 
+The capability model should resemble banking, brokerage, payments, treasury,
+fraud, and compliance permissions, not operating-system permissions. A
+capability is not simply "agent may use adapter X." It is a scoped financial
+authority envelope:
+
+```text
+agent role
+workflow
+case or customer scope
+financial object
+permitted action class
+destination allowlist
+amount and exposure limits
+frequency limits
+approval requirements
+audit and replay obligations
+```
+
+Examples:
+
+```text
+payment_retry.propose
+  rail: card, ACH, SEPA
+  max amount: USD 25,000
+  max retry count: 2
+  execution: approval required
+
+ledger_correction.propose
+  book: payments clearing
+  legal entity: demo_us
+  max correction: USD 10,000
+  posting: denied to agents
+
+trading_order.propose
+  markets: US
+  venues: NYSE, NASDAQ
+  asset classes: equity, ETF
+  sector: Information Technology
+  max notional: USD 10,000/day
+  frequency: minimum 60 minutes between proposals
+  round trip: same-day round trips denied
+  execution: approval required through privileged executor
+```
+
+This is the category difference. Generic agent platforms govern access to tools.
+Tickoni governs permission to create financial consequences.
+
 ## 3. Agentic Finance Interoperability
 
 Tickoni should support agentic finance integrations without making autonomy the
@@ -471,7 +547,8 @@ Tickoni should be compared against agent harnesses on four dimensions:
 | Dimension | Generic agent harnesses | Tickoni |
 |---|---|---|
 | Speed | Human-scale task automation | High-throughput financial event processing |
-| Isolation | Docker, VM, or OS-level sandboxing | Memory sandboxing plus capability-scoped financial adapters |
+| Isolation | Docker, VM, or OS-level sandboxing | Memory sandboxing plus consequence-scoped financial adapters |
+| Permissions | Tool, file, shell, browser, or network permissions | Payment, ledger, trading, risk, destination, limit, frequency, and approval permissions |
 | Spend governance | Session or provider-level token visibility | Per-case budgets, routing, caching, attribution, and hard caps |
 | Audit replay | Logs, traces, or task history | Forensic replay journal with policy decisions and approvals |
 
