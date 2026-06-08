@@ -71,6 +71,9 @@ jobs:
         with:
           zig: 'true'
 
+      - name: Build Firedancer C libs
+        run: make -j$(nproc) build/native/gcc/lib/libfd_util.a build/native/gcc/lib/libfd_ballet.a
+
       - name: Run build
         run: just build-tk
 
