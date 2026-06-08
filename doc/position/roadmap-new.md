@@ -397,6 +397,7 @@ Adds:
 - replay capsule
 - policy version
 - model/tool/adapter attribution
+- actor, agent, tool, and invocation-protocol attribution
 - approval state where required
 - exportable trade-decision record
 
@@ -422,6 +423,9 @@ Carry forward:
 
 - durable audit JSONL export
 - hash-chain verification
+- signed audit records
+- stable audit event id and nanosecond timestamp
+- previous-hash linkage per audit event
 - incomplete-run marker
 - runtime metrics export
 - diagnostics export
@@ -430,6 +434,9 @@ Carry forward:
 - audit records for source events, policy decisions, destination checks, limit
   checks, model calls, tool calls, adapter calls, proposals, denials,
   approval-required decisions, operator approvals, and adapter results
+- audit fields for case or thesis id, actor type, actor id, agent identity,
+  model id, action, tool name, invocation protocol, input hash, output hash,
+  policy version, policy decision, capability, result, and signature
 
 Product framing:
 
@@ -451,11 +458,33 @@ Carry forward:
 - optional local/dev LLM backend
 - provider scaffolding for OpenAI, Anthropic, Qwen, DeepSeek, local LLM server,
   and future local GPU
+- model identifier format that selects a configured backend, such as
+  `openai:*`, `anthropic:*`, `qwen:*`, `deepseek:*`, `llm-server:*`, or
+  `stub:*`
+- fail-closed handling for unknown, disabled, or unconfigured model identifiers
+- provider configuration for base URL, API key or optional local key, endpoint
+  URL, timeout, model allowlist, GGUF weight path, context size, and CUDA
+  setting where applicable
+- local GPU inference isolated behind `tkmodl`; agents never own GPU, weight,
+  or local inference access directly
 - context-size limits
 - retry-loop limits
 - per-run and per-agent token budgets
+- per-run, per-role, and per-case or synthetic-run model-call limits
+- max-output-token limits
+- loop step limits
+- budget-exhaustion stop state
+- budget exhaustion audited as a policy-relevant event
 - model usage attribution by role, workflow, thesis, basket, trade ticket,
   case or synthetic run, account, budget, and policy version
+- model request fields for actor id, role, workflow, case or synthetic run id,
+  policy version, model identifier, budget id, max output tokens, retry limit,
+  and context limit
+- model audit fields for request id, backend category, prompt or prompt
+  reference, response or response reference, token usage, retry count, latency,
+  policy decision id, budget id, and replay substitution id
+- replay substitution from captured model output or deterministic fixture
+  without cloud API, local LLM server, or GPU calls
 - explicit agent identity and role context
 - bounded agent runs with step, retry, and budget limits
 - `tktool` broker for model-native function calls and MCP-compatible tools
@@ -502,10 +531,19 @@ Carry forward:
 
 - deterministic case or thesis id
 - content-addressed evidence store
+- replay capsule id
+- ordered event-hash references
+- policy version and policy hash references
+- agent role, transcript hash, and tool-call hash references
 - model output references
 - adapter result references
+- evidence references for processor logs, accounting entries, case history, or
+  their investment equivalents such as market fixtures, portfolio snapshots,
+  ticket previews, and paper-order results
 - proposal/trade-ticket hashes
 - replay capsule per material thesis-to-trade flow
+- expected replay outcome, including final state, proposed action when present,
+  and expected policy result
 - divergence report for changed policy, evidence, market fixture, model output,
   or adapter output
 
