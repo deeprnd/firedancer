@@ -71,6 +71,8 @@ jobs:
         with:
           zig: 'true'
 
+      - uses: ./.github/actions/build-fd-tk-libs
+
       - name: Run build
         run: just build-tk
 

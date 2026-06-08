@@ -38,7 +38,7 @@ Firedancer metrics infrastructure lives in:
 Architecture and expected tile ownership are documented in:
 
 - `doc/architecture.md`
-- `doc/product/tile-plan.md`
+- `doc/position/tile-plan.md`
 
 ## Phase 0 Metrics
 

@@ -6,6 +6,7 @@
 /// append-only audit ordering, deterministic replay, metrics, diagnostics, and
 /// crash-only failure propagation.
 const std = @import("std");
+const audit = @import("audit.zig");
 
 pub const PolicyDecision = enum(u8) {
     allow,
@@ -41,16 +42,6 @@ pub const PaymentMessage = struct {
     pipeline_hops: u8 = 0,
     duplicate: bool = false,
     decision: PolicyDecision = .allow,
-};
-
-pub const AuditRecord = struct {
-    seq: u64,
-    source_offset: u64,
-    idempotency_key: u64,
-    event_hash: u64,
-    decision: PolicyDecision,
-    prev_hash: u64,
-    audit_hash: u64,
 };
 
 pub const MetricSnapshot = struct {
@@ -386,22 +377,6 @@ pub fn stableEventHash(raw: RawPayment) u64 {
     return h;
 }
 
-pub fn formatAuditJsonl(buf: []u8, record: AuditRecord) ![]u8 {
-    return std.fmt.bufPrint(
-        buf,
-        "{{\"seq\":{d},\"source_offset\":{d},\"idempotency_key\":{d},\"event_hash\":{d},\"decision\":\"{s}\",\"prev_hash\":{d},\"audit_hash\":{d}}}\n",
-        .{
-            record.seq,
-            record.source_offset,
-            record.idempotency_key,
-            record.event_hash,
-            @tagName(record.decision),
-            record.prev_hash,
-            record.audit_hash,
-        },
-    );
-}
-
 fn validFraming(raw: RawPayment) bool {
     if (raw.malformed) return false;
     if (!std.mem.eql(u8, &raw.currency, "USD")) return false;
@@ -427,13 +402,13 @@ fn deterministicReplayDivergences(state: *PaymentPipelineState) u64 {
                 .allow;
         };
 
-        const expected = buildAuditRecord(expected_seq, raw, event_hash, decision, prev_hash);
+        const expected = buildPolicyDecisionEvent(expected_seq, raw, event_hash, decision, prev_hash);
         if (expected_seq >= state.audit.count) {
             divergences += 1;
-        } else if (!auditRecordEql(expected, state.audit.records[@intCast(expected_seq)])) {
+        } else if (!audit.auditEventsEql(expected, state.audit.records[@intCast(expected_seq)])) {
             divergences += 1;
         }
-        prev_hash = expected.audit_hash;
+        prev_hash = expected.header.record_hash;
         expected_seq += 1;
     }
 
@@ -454,41 +429,6 @@ fn replayDuplicate(config: PaymentPipelineConfig, offset: u64, key: u64, hash: u
         if (raw.idempotency_key == key and stableEventHash(raw) == hash) return true;
     }
     return false;
-}
-
-fn auditRecordEql(a: AuditRecord, b: AuditRecord) bool {
-    return a.seq == b.seq and
-        a.source_offset == b.source_offset and
-        a.idempotency_key == b.idempotency_key and
-        a.event_hash == b.event_hash and
-        a.decision == b.decision and
-        a.prev_hash == b.prev_hash and
-        a.audit_hash == b.audit_hash;
-}
-
-fn buildAuditRecord(seq: u64, raw: RawPayment, event_hash: u64, decision: PolicyDecision, prev_hash: u64) AuditRecord {
-    var record = AuditRecord{
-        .seq = seq,
-        .source_offset = raw.source_offset,
-        .idempotency_key = raw.idempotency_key,
-        .event_hash = event_hash,
-        .decision = decision,
-        .prev_hash = prev_hash,
-        .audit_hash = 0,
-    };
-    record.audit_hash = auditHash(record);
-    return record;
-}
-
-fn auditHash(record: AuditRecord) u64 {
-    var h = audit_seed;
-    hashU64(&h, record.seq);
-    hashU64(&h, record.source_offset);
-    hashU64(&h, record.idempotency_key);
-    hashU64(&h, record.event_hash);
-    hashU64(&h, @intFromEnum(record.decision));
-    hashU64(&h, record.prev_hash);
-    return h;
 }
 
 fn hashU64(h: *u64, value: u64) void {
@@ -594,13 +534,49 @@ fn BoundedQueue(comptime T: type) type {
     };
 }
 
+const tkpoly_tile_id: [6]u8 = "tkpoly".*;
+
+fn buildPolicyDecisionEvent(
+    seq: u64,
+    raw: RawPayment,
+    event_hash: u64,
+    decision: PolicyDecision,
+    prev_hash: u64,
+) audit.AuditEvent {
+    const outcome: audit.PolicyOutcome = switch (decision) {
+        .allow => .allow,
+        .deny => .deny,
+        .malformed_drop => .malformed_drop,
+        .duplicate_drop => .duplicate_drop,
+    };
+    return audit.buildEvent(.{
+        .schema_version = audit.audit_schema_version,
+        .seq = seq,
+        .source_offset = raw.source_offset,
+        .tile_id = tkpoly_tile_id,
+        .logical_actor_id = 0,
+        .policy_version = [_]u8{0} ** 32,
+        .capability_envelope_id = 0,
+        .timestamp_ns = 0,
+        .prev_hash = prev_hash,
+        .record_hash = 0,
+    }, .{
+        .policy_decision = .{
+            .outcome = outcome,
+            .rule_id = 0,
+            .failed_scope_dim = [_]u8{0} ** 32,
+            .source_event_hash = event_hash,
+        },
+    });
+}
+
 const AuditLog = struct {
-    records: []AuditRecord,
+    records: []audit.AuditEvent,
     count: usize = 0,
     prev_hash: u64 = audit_seed,
 
     fn init(allocator: std.mem.Allocator, capacity: usize) !AuditLog {
-        return .{ .records = try allocator.alloc(AuditRecord, capacity) };
+        return .{ .records = try allocator.alloc(audit.AuditEvent, capacity) };
     }
 
     fn deinit(self: *AuditLog, allocator: std.mem.Allocator) void {
@@ -609,11 +585,16 @@ const AuditLog = struct {
 
     fn append(self: *AuditLog, msg: PaymentMessage) error{AuditFull}!void {
         if (self.count >= self.records.len) return error.AuditFull;
-
-        const record = buildAuditRecord(@intCast(self.count), msg.raw, msg.event_hash, msg.decision, self.prev_hash);
-        self.records[self.count] = record;
+        const event = buildPolicyDecisionEvent(
+            @intCast(self.count),
+            msg.raw,
+            msg.event_hash,
+            msg.decision,
+            self.prev_hash,
+        );
+        self.records[self.count] = event;
         self.count += 1;
-        self.prev_hash = record.audit_hash;
+        self.prev_hash = event.header.record_hash;
     }
 };
 
@@ -670,19 +651,8 @@ test "Phase 0 rejects malformed payment framing" {
     try std.testing.expectEqual(@as(u64, 1), state.invalid.load(.seq_cst));
     try std.testing.expectEqual(@as(u64, 0), state.normalized.load(.seq_cst));
     try std.testing.expectEqual(@as(u64, 1), state.audited.load(.seq_cst));
-    try std.testing.expectEqual(PolicyDecision.malformed_drop, state.audit.records[0].decision);
+    try std.testing.expectEqual(audit.PolicyOutcome.malformed_drop, state.audit.records[0].payload.policy_decision.outcome);
     try std.testing.expect(state.replay_match.load(.seq_cst));
-}
-
-test "formatAuditJsonl exports one append-only record line" {
-    var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 1, .queue_depth = 1 });
-    defer state.deinit();
-    try runOneSequentialForTest(&state, syntheticPayment(state.config, 0));
-
-    var buf: [256]u8 = undefined;
-    const line = try formatAuditJsonl(&buf, state.audit.records[0]);
-    try std.testing.expect(std.mem.startsWith(u8, line, "{\"seq\":0,"));
-    try std.testing.expect(std.mem.endsWith(u8, line, "}\n"));
 }
 
 test "sandbox failure records crash diagnostics and stops ingest" {

@@ -73,5 +73,8 @@ jobs:
           gitleaks: ${{ matrix.gitleaks }}
           zig: ${{ matrix.zig }}
 
+      - if: matrix.zig == 'true'
+        uses: ./.github/actions/build-fd-tk-libs
+
       - name: Run check
         run: ${{ matrix.command }}

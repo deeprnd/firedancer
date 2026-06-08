@@ -1,0 +1,705 @@
+/// Canonical audit record schema for Tickoni tiles.
+///
+/// Every material boundary event is a typed AuditEvent so replay and
+/// investigation do not depend on logs or UI state.
+const std = @import("std");
+const audit_codec = @import("audit_cabi");
+
+pub const audit_schema_version: u16 = 1;
+
+pub const max_binary_len: usize = 256;
+
+pub const PolicyOutcome = enum(u8) {
+    allow,
+    deny,
+    require_approval,
+    malformed_drop,
+    duplicate_drop,
+    escalate,
+    require_more_evidence,
+};
+
+pub const LimitType = enum(u8) {
+    amount,
+    frequency,
+    holding_period,
+    per_day,
+    per_month,
+};
+
+pub const RecordType = enum(u8) {
+    source_event = 0,
+    normalization = 1,
+    policy_decision = 2,
+    model_call = 3,
+    financial_adapter_call = 4,
+    proposal = 5,
+    destination_check = 6,
+    limit_check = 7,
+    approval_required = 8,
+    denial = 9,
+    telemetry_checkpoint = 10,
+    replay_result = 11,
+};
+
+pub const SourceEventPayload = struct {
+    source_system: [16]u8,
+    event_type: [32]u8,
+    raw_hash: u64,
+};
+
+pub const NormalizationPayload = struct {
+    source_event_hash: u64,
+    normalized_hash: u64,
+    canonical_event_type: [32]u8,
+};
+
+pub const PolicyDecisionPayload = struct {
+    outcome: PolicyOutcome,
+    rule_id: u32,
+    failed_scope_dim: [32]u8,
+    source_event_hash: u64,
+};
+
+pub const ModelCallPayload = struct {
+    model_id: [32]u8,
+    prompt_hash: u64,
+    response_hash: u64,
+    token_estimate: u32,
+    retry_count: u8,
+};
+
+pub const FinancialAdapterCallPayload = struct {
+    adapter_id: [16]u8,
+    request_hash: u64,
+    response_hash: u64,
+    fixture_id: u32,
+};
+
+pub const ProposalPayload = struct {
+    proposal_type: [32]u8,
+    proposal_hash: u64,
+    approval_state: u8,
+};
+
+pub const DestinationCheckPayload = struct {
+    destination_type: [16]u8,
+    allowlist_version: u32,
+    outcome: PolicyOutcome,
+};
+
+pub const LimitCheckPayload = struct {
+    limit_type: LimitType,
+    value: i64,
+    limit: i64,
+    outcome: PolicyOutcome,
+};
+
+pub const ApprovalRequiredPayload = struct {
+    action_class: [32]u8,
+    approval_path: [32]u8,
+    proposal_hash: u64,
+};
+
+pub const DenialPayload = struct {
+    action_class: [32]u8,
+    reason_code: u32,
+    failed_scope_dim: [32]u8,
+};
+
+pub const TelemetryCheckpointPayload = struct {
+    metric_set_hash: u64,
+    source_offset_watermark: u64,
+};
+
+pub const ReplayResultPayload = struct {
+    capsule_id: u64,
+    divergences: u64,
+    first_divergent_seq: u64,
+};
+
+pub const Header = struct {
+    schema_version: u16,
+    seq: u64,
+    source_offset: u64,
+    tile_id: [6]u8,
+    logical_actor_id: u64,
+    policy_version: [32]u8,
+    capability_envelope_id: u128,
+    timestamp_ns: u64,
+    prev_hash: u64,
+    record_hash: u64,
+};
+
+pub const AuditEvent = struct {
+    header: Header,
+    payload: Payload,
+
+    pub const Payload = union(RecordType) {
+        source_event: SourceEventPayload,
+        normalization: NormalizationPayload,
+        policy_decision: PolicyDecisionPayload,
+        model_call: ModelCallPayload,
+        financial_adapter_call: FinancialAdapterCallPayload,
+        proposal: ProposalPayload,
+        destination_check: DestinationCheckPayload,
+        limit_check: LimitCheckPayload,
+        approval_required: ApprovalRequiredPayload,
+        denial: DenialPayload,
+        telemetry_checkpoint: TelemetryCheckpointPayload,
+        replay_result: ReplayResultPayload,
+    };
+};
+
+pub const ParsedBinary = struct {
+    event: AuditEvent,
+    consumed_len: usize,
+};
+
+pub fn buildEvent(header_without_hash: Header, payload: AuditEvent.Payload) AuditEvent {
+    var event = AuditEvent{ .header = header_without_hash, .payload = payload };
+    event.header.record_hash = computeRecordHash(event);
+    return event;
+}
+
+pub fn computeRecordHash(event: AuditEvent) u64 {
+    const codec_event = toCodecEvent(event);
+    return audit_codec.tk_audit_record_hash(&codec_event);
+}
+
+pub fn auditEventsEql(a: AuditEvent, b: AuditEvent) bool {
+    var ah = a.header;
+    var bh = b.header;
+    ah.timestamp_ns = 0;
+    bh.timestamp_ns = 0;
+    return std.meta.eql(ah, bh) and std.meta.eql(a.payload, b.payload);
+}
+
+pub fn checkSchemaVersion(version: u16) error{UnknownSchemaVersion}!void {
+    if (version > audit_schema_version) return error.UnknownSchemaVersion;
+}
+
+pub fn parseRecordType(tag: u8) error{UnknownRecordType}!RecordType {
+    inline for (@typeInfo(RecordType).@"enum".fields) |field| {
+        if (field.value == tag) return @field(RecordType, field.name);
+    }
+    return error.UnknownRecordType;
+}
+
+pub fn peekBinaryLen(input: []const u8) error{UnexpectedEof}!usize {
+    var total_len: usize = 0;
+    if (audit_codec.tk_audit_peek_binary_len(input.ptr, input.len, &total_len) != audit_codec.status_ok)
+        return error.UnexpectedEof;
+    return total_len;
+}
+
+pub fn formatBinary(buf: []u8, event: AuditEvent) ![]u8 {
+    if (buf.len < @sizeOf(u32)) return error.NoSpaceLeft;
+    var codec_event = toCodecEvent(event);
+    var body_len: usize = 0;
+    switch (audit_codec.tk_audit_format_protobuf(
+        buf[@sizeOf(u32)..].ptr,
+        buf.len - @sizeOf(u32),
+        &codec_event,
+        &body_len,
+    )) {
+        audit_codec.status_ok => {},
+        audit_codec.status_no_space => return error.NoSpaceLeft,
+        else => return error.InvalidBinaryRecord,
+    }
+    if (body_len > std.math.maxInt(u32)) return error.RecordTooLarge;
+    std.mem.writeInt(u32, buf[0..@sizeOf(u32)], @intCast(body_len), .little);
+    return buf[0 .. @sizeOf(u32) + body_len];
+}
+
+pub fn parseBinary(input: []const u8) !ParsedBinary {
+    const consumed_len = try peekBinaryLen(input);
+    if (input.len < consumed_len) return error.UnexpectedEof;
+    var codec_event: audit_codec.Event = undefined;
+    switch (audit_codec.tk_audit_parse_protobuf(
+        input[@sizeOf(u32)..consumed_len].ptr,
+        consumed_len - @sizeOf(u32),
+        &codec_event,
+    )) {
+        audit_codec.status_ok => {},
+        audit_codec.status_invalid_protobuf => return error.InvalidBinaryRecord,
+        else => return error.InvalidBinaryRecord,
+    }
+    const event = try fromCodecEvent(codec_event);
+    return .{ .event = event, .consumed_len = consumed_len };
+}
+
+fn toCodecEvent(event: AuditEvent) audit_codec.Event {
+    return .{
+        .header = .{
+            .schema_version = event.header.schema_version,
+            .seq = event.header.seq,
+            .source_offset = event.header.source_offset,
+            .tile_id = event.header.tile_id,
+            .logical_actor_id = event.header.logical_actor_id,
+            .policy_version = event.header.policy_version,
+            .capability_envelope_id_le = @bitCast(event.header.capability_envelope_id),
+            .timestamp_ns = event.header.timestamp_ns,
+            .prev_hash = event.header.prev_hash,
+            .record_hash = event.header.record_hash,
+        },
+        .record_type = @intFromEnum(std.meta.activeTag(event.payload)),
+        .payload = payloadToCodec(event.payload),
+    };
+}
+
+fn fromCodecEvent(codec_event: audit_codec.Event) !AuditEvent {
+    try checkSchemaVersion(codec_event.header.schema_version);
+    const record_type = try parseRecordType(codec_event.record_type);
+    const payload = try payloadFromCodec(record_type, codec_event.payload);
+    return validateParsedEvent(.{
+        .header = .{
+            .schema_version = codec_event.header.schema_version,
+            .seq = codec_event.header.seq,
+            .source_offset = codec_event.header.source_offset,
+            .tile_id = codec_event.header.tile_id,
+            .logical_actor_id = codec_event.header.logical_actor_id,
+            .policy_version = codec_event.header.policy_version,
+            .capability_envelope_id = @bitCast(codec_event.header.capability_envelope_id_le),
+            .timestamp_ns = codec_event.header.timestamp_ns,
+            .prev_hash = codec_event.header.prev_hash,
+            .record_hash = codec_event.header.record_hash,
+        },
+        .payload = payload,
+    });
+}
+
+fn payloadToCodec(payload: AuditEvent.Payload) audit_codec.Payload {
+    return switch (payload) {
+        .source_event => |p| .{ .source_event = .{
+            .source_system = p.source_system,
+            .event_type = p.event_type,
+            .raw_hash = p.raw_hash,
+        } },
+        .normalization => |p| .{ .normalization = .{
+            .source_event_hash = p.source_event_hash,
+            .normalized_hash = p.normalized_hash,
+            .canonical_event_type = p.canonical_event_type,
+        } },
+        .policy_decision => |p| .{ .policy_decision = .{
+            .outcome = @intFromEnum(p.outcome),
+            .rule_id = p.rule_id,
+            .failed_scope_dim = p.failed_scope_dim,
+            .source_event_hash = p.source_event_hash,
+        } },
+        .model_call => |p| .{ .model_call = .{
+            .model_id = p.model_id,
+            .prompt_hash = p.prompt_hash,
+            .response_hash = p.response_hash,
+            .token_estimate = p.token_estimate,
+            .retry_count = p.retry_count,
+        } },
+        .financial_adapter_call => |p| .{ .financial_adapter_call = .{
+            .adapter_id = p.adapter_id,
+            .request_hash = p.request_hash,
+            .response_hash = p.response_hash,
+            .fixture_id = p.fixture_id,
+        } },
+        .proposal => |p| .{ .proposal = .{
+            .proposal_type = p.proposal_type,
+            .proposal_hash = p.proposal_hash,
+            .approval_state = p.approval_state,
+        } },
+        .destination_check => |p| .{ .destination_check = .{
+            .destination_type = p.destination_type,
+            .allowlist_version = p.allowlist_version,
+            .outcome = @intFromEnum(p.outcome),
+        } },
+        .limit_check => |p| .{ .limit_check = .{
+            .limit_type = @intFromEnum(p.limit_type),
+            .value = p.value,
+            .limit = p.limit,
+            .outcome = @intFromEnum(p.outcome),
+        } },
+        .approval_required => |p| .{ .approval_required = .{
+            .action_class = p.action_class,
+            .approval_path = p.approval_path,
+            .proposal_hash = p.proposal_hash,
+        } },
+        .denial => |p| .{ .denial = .{
+            .action_class = p.action_class,
+            .reason_code = p.reason_code,
+            .failed_scope_dim = p.failed_scope_dim,
+        } },
+        .telemetry_checkpoint => |p| .{ .telemetry_checkpoint = .{
+            .metric_set_hash = p.metric_set_hash,
+            .source_offset_watermark = p.source_offset_watermark,
+        } },
+        .replay_result => |p| .{ .replay_result = .{
+            .capsule_id = p.capsule_id,
+            .divergences = p.divergences,
+            .first_divergent_seq = p.first_divergent_seq,
+        } },
+    };
+}
+
+fn payloadFromCodec(record_type: RecordType, payload: audit_codec.Payload) !AuditEvent.Payload {
+    return switch (record_type) {
+        .source_event => .{ .source_event = .{
+            .source_system = payload.source_event.source_system,
+            .event_type = payload.source_event.event_type,
+            .raw_hash = payload.source_event.raw_hash,
+        } },
+        .normalization => .{ .normalization = .{
+            .source_event_hash = payload.normalization.source_event_hash,
+            .normalized_hash = payload.normalization.normalized_hash,
+            .canonical_event_type = payload.normalization.canonical_event_type,
+        } },
+        .policy_decision => .{ .policy_decision = .{
+            .outcome = try parseEnumByValue(PolicyOutcome, payload.policy_decision.outcome),
+            .rule_id = payload.policy_decision.rule_id,
+            .failed_scope_dim = payload.policy_decision.failed_scope_dim,
+            .source_event_hash = payload.policy_decision.source_event_hash,
+        } },
+        .model_call => .{ .model_call = .{
+            .model_id = payload.model_call.model_id,
+            .prompt_hash = payload.model_call.prompt_hash,
+            .response_hash = payload.model_call.response_hash,
+            .token_estimate = payload.model_call.token_estimate,
+            .retry_count = payload.model_call.retry_count,
+        } },
+        .financial_adapter_call => .{ .financial_adapter_call = .{
+            .adapter_id = payload.financial_adapter_call.adapter_id,
+            .request_hash = payload.financial_adapter_call.request_hash,
+            .response_hash = payload.financial_adapter_call.response_hash,
+            .fixture_id = payload.financial_adapter_call.fixture_id,
+        } },
+        .proposal => .{ .proposal = .{
+            .proposal_type = payload.proposal.proposal_type,
+            .proposal_hash = payload.proposal.proposal_hash,
+            .approval_state = payload.proposal.approval_state,
+        } },
+        .destination_check => .{ .destination_check = .{
+            .destination_type = payload.destination_check.destination_type,
+            .allowlist_version = payload.destination_check.allowlist_version,
+            .outcome = try parseEnumByValue(PolicyOutcome, payload.destination_check.outcome),
+        } },
+        .limit_check => .{ .limit_check = .{
+            .limit_type = try parseEnumByValue(LimitType, payload.limit_check.limit_type),
+            .value = payload.limit_check.value,
+            .limit = payload.limit_check.limit,
+            .outcome = try parseEnumByValue(PolicyOutcome, payload.limit_check.outcome),
+        } },
+        .approval_required => .{ .approval_required = .{
+            .action_class = payload.approval_required.action_class,
+            .approval_path = payload.approval_required.approval_path,
+            .proposal_hash = payload.approval_required.proposal_hash,
+        } },
+        .denial => .{ .denial = .{
+            .action_class = payload.denial.action_class,
+            .reason_code = payload.denial.reason_code,
+            .failed_scope_dim = payload.denial.failed_scope_dim,
+        } },
+        .telemetry_checkpoint => .{ .telemetry_checkpoint = .{
+            .metric_set_hash = payload.telemetry_checkpoint.metric_set_hash,
+            .source_offset_watermark = payload.telemetry_checkpoint.source_offset_watermark,
+        } },
+        .replay_result => .{ .replay_result = .{
+            .capsule_id = payload.replay_result.capsule_id,
+            .divergences = payload.replay_result.divergences,
+            .first_divergent_seq = payload.replay_result.first_divergent_seq,
+        } },
+    };
+}
+
+fn parseFixedAsciiBytes(comptime N: usize, value: []const u8) ![N]u8 {
+    if (value.len > N) return error.StringTooLong;
+    var out = [_]u8{0} ** N;
+    for (value, 0..) |byte, idx| {
+        if (byte < 0x20 or byte > 0x7e) return error.InvalidStringByte;
+        out[idx] = byte;
+    }
+    return out;
+}
+
+fn validateParsedEvent(event: AuditEvent) !AuditEvent {
+    const expected_hash = computeRecordHash(event);
+    if (expected_hash != event.header.record_hash) return error.InvalidRecordHash;
+    return event;
+}
+
+fn parseEnumByValue(comptime T: type, value: anytype) error{ UnknownRecordType, UnknownEnumValue }!T {
+    inline for (@typeInfo(T).@"enum".fields) |field| {
+        if (field.value == value) return @field(T, field.name);
+    }
+    if (T == RecordType) return error.UnknownRecordType;
+    return error.UnknownEnumValue;
+}
+
+const FixtureSpec = struct {
+    event: AuditEvent,
+    expected_hash: u64,
+    expected_binary_len: usize,
+    expected_binary_bytes: []const u8,
+};
+
+fn fixtureHeader(
+    seq: u64,
+    source_offset: u64,
+    tile_id: []const u8,
+    logical_actor_id: u64,
+    policy_version: []const u8,
+    capability_envelope_id: u128,
+    timestamp_ns: u64,
+    prev_hash: u64,
+) Header {
+    return .{
+        .schema_version = audit_schema_version,
+        .seq = seq,
+        .source_offset = source_offset,
+        .tile_id = parseFixedAsciiBytes(6, tile_id) catch unreachable,
+        .logical_actor_id = logical_actor_id,
+        .policy_version = parseFixedAsciiBytes(32, policy_version) catch unreachable,
+        .capability_envelope_id = capability_envelope_id,
+        .timestamp_ns = timestamp_ns,
+        .prev_hash = prev_hash,
+        .record_hash = 0,
+    };
+}
+
+fn makeFixtures() [12]FixtureSpec {
+    const headers = [_]Header{
+        fixtureHeader(1, 10, "tkings", 1001, "policy_ingress_v1", 1, 111, 500),
+        fixtureHeader(2, 11, "tknorm", 1002, "policy_norm_v1", 2, 222, 501),
+        fixtureHeader(3, 12, "tkpoly", 1003, "policy_poly_v1", 3, 333, 502),
+        fixtureHeader(4, 13, "tkmodl", 1004, "policy_model_v1", 4, 444, 503),
+        fixtureHeader(5, 14, "tkadpt", 1005, "policy_adpt_v1", 5, 555, 504),
+        fixtureHeader(6, 15, "tkagnt", 1006, "policy_prop_v1", 6, 666, 505),
+        fixtureHeader(7, 16, "tkpoly", 1007, "policy_dest_v1", 7, 777, 506),
+        fixtureHeader(8, 17, "tkpoly", 1008, "policy_limt_v1", 8, 888, 507),
+        fixtureHeader(9, 18, "tkpoly", 1009, "policy_aprv_v1", 9, 999, 508),
+        fixtureHeader(10, 19, "tkpoly", 1010, "policy_deny_v1", 10, 1110, 509),
+        fixtureHeader(11, 20, "tkmetr", 1011, "policy_metr_v1", 11, 1221, 510),
+        fixtureHeader(12, 21, "tkrepl", 1012, "policy_repl_v1", 12, 1332, 511),
+    };
+
+    const events = [_]AuditEvent{
+        buildEvent(headers[0], .{ .source_event = .{
+            .source_system = parseFixedAsciiBytes(16, "feed_alpha") catch unreachable,
+            .event_type = parseFixedAsciiBytes(32, "payment_exception") catch unreachable,
+            .raw_hash = 9001,
+        } }),
+        buildEvent(headers[1], .{ .normalization = .{
+            .source_event_hash = 9001,
+            .normalized_hash = 9002,
+            .canonical_event_type = parseFixedAsciiBytes(32, "payment.normalized") catch unreachable,
+        } }),
+        buildEvent(headers[2], .{ .policy_decision = .{
+            .outcome = .require_approval,
+            .rule_id = 42,
+            .failed_scope_dim = parseFixedAsciiBytes(32, "amount_limit") catch unreachable,
+            .source_event_hash = 9002,
+        } }),
+        buildEvent(headers[3], .{ .model_call = .{
+            .model_id = parseFixedAsciiBytes(32, "gpt_local_stub") catch unreachable,
+            .prompt_hash = 9100,
+            .response_hash = 9101,
+            .token_estimate = 512,
+            .retry_count = 2,
+        } }),
+        buildEvent(headers[4], .{ .financial_adapter_call = .{
+            .adapter_id = parseFixedAsciiBytes(16, "broker_demo") catch unreachable,
+            .request_hash = 9200,
+            .response_hash = 9201,
+            .fixture_id = 7,
+        } }),
+        buildEvent(headers[5], .{ .proposal = .{
+            .proposal_type = parseFixedAsciiBytes(32, "trading_order.propose") catch unreachable,
+            .proposal_hash = 9300,
+            .approval_state = 1,
+        } }),
+        buildEvent(headers[6], .{ .destination_check = .{
+            .destination_type = parseFixedAsciiBytes(16, "broker_account") catch unreachable,
+            .allowlist_version = 8,
+            .outcome = .allow,
+        } }),
+        buildEvent(headers[7], .{ .limit_check = .{
+            .limit_type = .per_day,
+            .value = 1200,
+            .limit = 1000,
+            .outcome = .deny,
+        } }),
+        buildEvent(headers[8], .{ .approval_required = .{
+            .action_class = parseFixedAsciiBytes(32, "payment_retry.propose") catch unreachable,
+            .approval_path = parseFixedAsciiBytes(32, "maker_checker") catch unreachable,
+            .proposal_hash = 9300,
+        } }),
+        buildEvent(headers[9], .{ .denial = .{
+            .action_class = parseFixedAsciiBytes(32, "trading_order.place") catch unreachable,
+            .reason_code = 17,
+            .failed_scope_dim = parseFixedAsciiBytes(32, "environment") catch unreachable,
+        } }),
+        buildEvent(headers[10], .{ .telemetry_checkpoint = .{
+            .metric_set_hash = 9400,
+            .source_offset_watermark = 41,
+        } }),
+        buildEvent(headers[11], .{ .replay_result = .{
+            .capsule_id = 9500,
+            .divergences = 3,
+            .first_divergent_seq = 9,
+        } }),
+    };
+
+    return .{
+        .{
+            .event = events[0],
+            .expected_hash = 5334138954386442855,
+            .expected_binary_len = 115,
+            .expected_binary_bytes = &.{ 0x6F, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x00, 0x18, 0x01, 0x20, 0x0A, 0x2A, 0x06, 0x74, 0x6B, 0x69, 0x6E, 0x67, 0x73, 0x30, 0xE9, 0x07, 0x3A, 0x11, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x69, 0x6E, 0x67, 0x72, 0x65, 0x73, 0x73, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x6F, 0x50, 0xF4, 0x03, 0x58, 0xE7, 0x94, 0x9C, 0xB6, 0xE1, 0xE3, 0xAA, 0x83, 0x4A, 0x62, 0xA2, 0x80, 0x80, 0x80, 0x00, 0x0A, 0x0A, 0x66, 0x65, 0x65, 0x64, 0x5F, 0x61, 0x6C, 0x70, 0x68, 0x61, 0x12, 0x11, 0x70, 0x61, 0x79, 0x6D, 0x65, 0x6E, 0x74, 0x5F, 0x65, 0x78, 0x63, 0x65, 0x70, 0x74, 0x69, 0x6F, 0x6E, 0x18, 0xA9, 0x46 },
+        },
+        .{
+            .event = events[1],
+            .expected_hash = 687536181503956794,
+            .expected_binary_len = 105,
+            .expected_binary_bytes = &.{ 0x65, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x01, 0x18, 0x02, 0x20, 0x0B, 0x2A, 0x06, 0x74, 0x6B, 0x6E, 0x6F, 0x72, 0x6D, 0x30, 0xEA, 0x07, 0x3A, 0x0E, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x6E, 0x6F, 0x72, 0x6D, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0xDE, 0x01, 0x50, 0xF5, 0x03, 0x58, 0xBA, 0xAE, 0x96, 0xE6, 0xBA, 0xD0, 0xA7, 0xC5, 0x09, 0x62, 0x9A, 0x80, 0x80, 0x80, 0x00, 0x08, 0xA9, 0x46, 0x10, 0xAA, 0x46, 0x1A, 0x12, 0x70, 0x61, 0x79, 0x6D, 0x65, 0x6E, 0x74, 0x2E, 0x6E, 0x6F, 0x72, 0x6D, 0x61, 0x6C, 0x69, 0x7A, 0x65, 0x64 },
+        },
+        .{
+            .event = events[2],
+            .expected_hash = 2343529048530967501,
+            .expected_binary_len = 100,
+            .expected_binary_bytes = &.{ 0x60, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x02, 0x18, 0x03, 0x20, 0x0C, 0x2A, 0x06, 0x74, 0x6B, 0x70, 0x6F, 0x6C, 0x79, 0x30, 0xEB, 0x07, 0x3A, 0x0E, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x70, 0x6F, 0x6C, 0x79, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0xCD, 0x02, 0x50, 0xF6, 0x03, 0x58, 0xCD, 0xB7, 0xFD, 0xD3, 0x8C, 0xE8, 0xF8, 0xC2, 0x20, 0x62, 0x95, 0x80, 0x80, 0x80, 0x00, 0x08, 0x02, 0x10, 0x2A, 0x1A, 0x0C, 0x61, 0x6D, 0x6F, 0x75, 0x6E, 0x74, 0x5F, 0x6C, 0x69, 0x6D, 0x69, 0x74, 0x20, 0xAA, 0x46 },
+        },
+        .{
+            .event = events[3],
+            .expected_hash = 9348858478567441182,
+            .expected_binary_len = 108,
+            .expected_binary_bytes = &.{ 0x68, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x03, 0x18, 0x04, 0x20, 0x0D, 0x2A, 0x06, 0x74, 0x6B, 0x6D, 0x6F, 0x64, 0x6C, 0x30, 0xEC, 0x07, 0x3A, 0x0F, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x6D, 0x6F, 0x64, 0x65, 0x6C, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0xBC, 0x03, 0x50, 0xF7, 0x03, 0x58, 0x9E, 0x86, 0xA5, 0xF3, 0x8F, 0xA8, 0xF4, 0xDE, 0x81, 0x01, 0x62, 0x9B, 0x80, 0x80, 0x80, 0x00, 0x0A, 0x0E, 0x67, 0x70, 0x74, 0x5F, 0x6C, 0x6F, 0x63, 0x61, 0x6C, 0x5F, 0x73, 0x74, 0x75, 0x62, 0x10, 0x8C, 0x47, 0x18, 0x8D, 0x47, 0x20, 0x80, 0x04, 0x28, 0x02 },
+        },
+        .{
+            .event = events[4],
+            .expected_hash = 8966421440037456976,
+            .expected_binary_len = 100,
+            .expected_binary_bytes = &.{ 0x60, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x04, 0x18, 0x05, 0x20, 0x0E, 0x2A, 0x06, 0x74, 0x6B, 0x61, 0x64, 0x70, 0x74, 0x30, 0xED, 0x07, 0x3A, 0x0E, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x61, 0x64, 0x70, 0x74, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0xAB, 0x04, 0x50, 0xF8, 0x03, 0x58, 0xD0, 0x98, 0x84, 0xBF, 0xB2, 0x99, 0xC8, 0xB7, 0x7C, 0x62, 0x95, 0x80, 0x80, 0x80, 0x00, 0x0A, 0x0B, 0x62, 0x72, 0x6F, 0x6B, 0x65, 0x72, 0x5F, 0x64, 0x65, 0x6D, 0x6F, 0x10, 0xF0, 0x47, 0x18, 0xF1, 0x47, 0x20, 0x07 },
+        },
+        .{
+            .event = events[5],
+            .expected_hash = 7724507680433079684,
+            .expected_binary_len = 107,
+            .expected_binary_bytes = &.{ 0x67, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x05, 0x18, 0x06, 0x20, 0x0F, 0x2A, 0x06, 0x74, 0x6B, 0x61, 0x67, 0x6E, 0x74, 0x30, 0xEE, 0x07, 0x3A, 0x0E, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x70, 0x72, 0x6F, 0x70, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x9A, 0x05, 0x50, 0xF9, 0x03, 0x58, 0x84, 0x8B, 0xF6, 0xA7, 0xF2, 0xD9, 0xBD, 0x99, 0x6B, 0x62, 0x9C, 0x80, 0x80, 0x80, 0x00, 0x0A, 0x15, 0x74, 0x72, 0x61, 0x64, 0x69, 0x6E, 0x67, 0x5F, 0x6F, 0x72, 0x64, 0x65, 0x72, 0x2E, 0x70, 0x72, 0x6F, 0x70, 0x6F, 0x73, 0x65, 0x10, 0xD4, 0x48, 0x18, 0x01 },
+        },
+        .{
+            .event = events[6],
+            .expected_hash = 11968303200201203335,
+            .expected_binary_len = 100,
+            .expected_binary_bytes = &.{ 0x60, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x06, 0x18, 0x07, 0x20, 0x10, 0x2A, 0x06, 0x74, 0x6B, 0x70, 0x6F, 0x6C, 0x79, 0x30, 0xEF, 0x07, 0x3A, 0x0E, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x64, 0x65, 0x73, 0x74, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x89, 0x06, 0x50, 0xFA, 0x03, 0x58, 0x87, 0xBD, 0xA7, 0xE1, 0x98, 0x8B, 0xFD, 0x8B, 0xA6, 0x01, 0x62, 0x94, 0x80, 0x80, 0x80, 0x00, 0x0A, 0x0E, 0x62, 0x72, 0x6F, 0x6B, 0x65, 0x72, 0x5F, 0x61, 0x63, 0x63, 0x6F, 0x75, 0x6E, 0x74, 0x10, 0x08, 0x18, 0x00 },
+        },
+        .{
+            .event = events[7],
+            .expected_hash = 9594552197376279551,
+            .expected_binary_len = 90,
+            .expected_binary_bytes = &.{ 0x56, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x07, 0x18, 0x08, 0x20, 0x11, 0x2A, 0x06, 0x74, 0x6B, 0x70, 0x6F, 0x6C, 0x79, 0x30, 0xF0, 0x07, 0x3A, 0x0E, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x6C, 0x69, 0x6D, 0x74, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0xF8, 0x06, 0x50, 0xFB, 0x03, 0x58, 0xFF, 0x87, 0xBA, 0xFC, 0xBA, 0xCC, 0xAC, 0x93, 0x85, 0x01, 0x62, 0x8A, 0x80, 0x80, 0x80, 0x00, 0x08, 0x03, 0x10, 0xB0, 0x09, 0x18, 0xE8, 0x07, 0x20, 0x01 },
+        },
+        .{
+            .event = events[8],
+            .expected_hash = 7463280816050324954,
+            .expected_binary_len = 120,
+            .expected_binary_bytes = &.{ 0x74, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x08, 0x18, 0x09, 0x20, 0x12, 0x2A, 0x06, 0x74, 0x6B, 0x70, 0x6F, 0x6C, 0x79, 0x30, 0xF1, 0x07, 0x3A, 0x0E, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x61, 0x70, 0x72, 0x76, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0xE7, 0x07, 0x50, 0xFC, 0x03, 0x58, 0xDA, 0x8B, 0xAB, 0xDD, 0xC2, 0xCB, 0xB9, 0xC9, 0x67, 0x62, 0xA9, 0x80, 0x80, 0x80, 0x00, 0x0A, 0x15, 0x70, 0x61, 0x79, 0x6D, 0x65, 0x6E, 0x74, 0x5F, 0x72, 0x65, 0x74, 0x72, 0x79, 0x2E, 0x70, 0x72, 0x6F, 0x70, 0x6F, 0x73, 0x65, 0x12, 0x0D, 0x6D, 0x61, 0x6B, 0x65, 0x72, 0x5F, 0x63, 0x68, 0x65, 0x63, 0x6B, 0x65, 0x72, 0x18, 0xD4, 0x48 },
+        },
+        .{
+            .event = events[9],
+            .expected_hash = 2273216233812743884,
+            .expected_binary_len = 115,
+            .expected_binary_bytes = &.{ 0x6F, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x09, 0x18, 0x0A, 0x20, 0x13, 0x2A, 0x06, 0x74, 0x6B, 0x70, 0x6F, 0x6C, 0x79, 0x30, 0xF2, 0x07, 0x3A, 0x0E, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x64, 0x65, 0x6E, 0x79, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0xD6, 0x08, 0x50, 0xFD, 0x03, 0x58, 0xCC, 0xAD, 0xBD, 0x90, 0xEE, 0xC3, 0x85, 0xC6, 0x1F, 0x62, 0xA4, 0x80, 0x80, 0x80, 0x00, 0x0A, 0x13, 0x74, 0x72, 0x61, 0x64, 0x69, 0x6E, 0x67, 0x5F, 0x6F, 0x72, 0x64, 0x65, 0x72, 0x2E, 0x70, 0x6C, 0x61, 0x63, 0x65, 0x10, 0x11, 0x1A, 0x0B, 0x65, 0x6E, 0x76, 0x69, 0x72, 0x6F, 0x6E, 0x6D, 0x65, 0x6E, 0x74 },
+        },
+        .{
+            .event = events[10],
+            .expected_hash = 15826855321602201614,
+            .expected_binary_len = 85,
+            .expected_binary_bytes = &.{ 0x51, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x0A, 0x18, 0x0B, 0x20, 0x14, 0x2A, 0x06, 0x74, 0x6B, 0x6D, 0x65, 0x74, 0x72, 0x30, 0xF3, 0x07, 0x3A, 0x0E, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x6D, 0x65, 0x74, 0x72, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0xC5, 0x09, 0x50, 0xFE, 0x03, 0x58, 0x8E, 0xB0, 0xE6, 0xDC, 0xF8, 0xA1, 0x92, 0xD2, 0xDB, 0x01, 0x62, 0x85, 0x80, 0x80, 0x80, 0x00, 0x08, 0xB8, 0x49, 0x10, 0x29 },
+        },
+        .{
+            .event = events[11],
+            .expected_hash = 11385209391964570511,
+            .expected_binary_len = 87,
+            .expected_binary_bytes = &.{ 0x53, 0x00, 0x00, 0x00, 0x08, 0x01, 0x10, 0x0B, 0x18, 0x0C, 0x20, 0x15, 0x2A, 0x06, 0x74, 0x6B, 0x72, 0x65, 0x70, 0x6C, 0x30, 0xF4, 0x07, 0x3A, 0x0E, 0x70, 0x6F, 0x6C, 0x69, 0x63, 0x79, 0x5F, 0x72, 0x65, 0x70, 0x6C, 0x5F, 0x76, 0x31, 0x42, 0x10, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0xB4, 0x0A, 0x50, 0xFF, 0x03, 0x58, 0x8F, 0x87, 0xF5, 0xEB, 0xED, 0xF3, 0x98, 0x80, 0x9E, 0x01, 0x62, 0x87, 0x80, 0x80, 0x80, 0x00, 0x08, 0x9C, 0x4A, 0x10, 0x03, 0x18, 0x09 },
+        },
+    };
+}
+
+test "computeRecordHash excludes timestamp_ns" {
+    const header = fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0);
+    const payload = AuditEvent.Payload{ .policy_decision = .{
+        .outcome = .allow,
+        .rule_id = 1,
+        .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
+        .source_event_hash = 2,
+    } };
+    var header_with_timestamp = header;
+    header_with_timestamp.timestamp_ns = 999_999;
+    const e0 = buildEvent(header, payload);
+    const e1 = buildEvent(header_with_timestamp, payload);
+    try std.testing.expectEqual(e0.header.record_hash, e1.header.record_hash);
+}
+
+test "hash chain mutation changes downstream records" {
+    const first = buildEvent(fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0), .{ .policy_decision = .{
+        .outcome = .allow,
+        .rule_id = 1,
+        .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
+        .source_event_hash = 3,
+    } });
+    var second_header = fixtureHeader(1, 1, "tkpoly", 0, "policy", 0, 0, first.header.record_hash);
+    const second = buildEvent(second_header, .{ .policy_decision = .{
+        .outcome = .allow,
+        .rule_id = 1,
+        .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
+        .source_event_hash = 3,
+    } });
+
+    const mutated_first = buildEvent(fixtureHeader(0, 9, "tkpoly", 0, "policy", 0, 0, 0), .{ .policy_decision = .{
+        .outcome = .allow,
+        .rule_id = 1,
+        .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
+        .source_event_hash = 3,
+    } });
+    second_header.prev_hash = mutated_first.header.record_hash;
+    const mutated_second = buildEvent(second_header, second.payload);
+
+    try std.testing.expect(first.header.record_hash != mutated_first.header.record_hash);
+    try std.testing.expect(second.header.record_hash != mutated_second.header.record_hash);
+}
+
+test "binary and json fixtures are pinned and round-trip" {
+    const fixtures = makeFixtures();
+    for (fixtures) |fixture| {
+        try std.testing.expectEqual(fixture.expected_hash, fixture.event.header.record_hash);
+
+        var binary_buf: [max_binary_len]u8 = undefined;
+        const binary = try formatBinary(&binary_buf, fixture.event);
+        try std.testing.expectEqual(fixture.expected_binary_len, binary.len);
+        try std.testing.expectEqualSlices(u8, fixture.expected_binary_bytes, binary);
+        try std.testing.expectEqual(binary.len, try peekBinaryLen(binary));
+
+        const parsed_binary = try parseBinary(binary);
+        try std.testing.expectEqual(binary.len, parsed_binary.consumed_len);
+        try std.testing.expect(auditEventsEql(fixture.event, parsed_binary.event));
+    }
+}
+
+test "parseBinary rejects future schema version" {
+    const fixture = makeFixtures()[0];
+    var binary_buf: [max_binary_len]u8 = undefined;
+    const binary = try formatBinary(&binary_buf, fixture.event);
+    binary[@sizeOf(u32) + 1] = audit_schema_version + 1;
+    try std.testing.expectError(error.UnknownSchemaVersion, parseBinary(binary));
+}
+
+test "parseBinary rejects unknown record type" {
+    const fixture = makeFixtures()[0];
+    var binary_buf: [max_binary_len]u8 = undefined;
+    const binary = try formatBinary(&binary_buf, fixture.event);
+    binary[@sizeOf(u32) + 3] = 15;
+    try std.testing.expectError(error.UnknownRecordType, parseBinary(binary));
+}
+
+test "parseBinary rejects truncated record" {
+    const fixture = makeFixtures()[0];
+    var binary_buf: [max_binary_len]u8 = undefined;
+    const binary = try formatBinary(&binary_buf, fixture.event);
+    try std.testing.expectError(error.UnexpectedEof, parseBinary(binary[0 .. binary.len - 1]));
+}

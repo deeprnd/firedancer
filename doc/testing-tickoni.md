@@ -67,17 +67,43 @@ shell scripts.
 `contrib/readme/run-badged-command.py`, so the README status badges reflect the
 same aggregate commands developers use locally.
 
-## Command Selection
+## Test Selection Rules
 
-Use the narrowest relevant command first:
+Run the narrowest relevant set first, then broaden when risk is high. The
+current test task source of truth is the repository root `justfile`; run these
+commands from the repository root unless noted otherwise.
 
-- Tickoni Zig runtime, topology, queue, sandbox, supervisor, or payment pipeline
-  change: `just test-unit-tk`
-- Firedancer C runtime change: `just test-unit-fd`
-- Firedancer-side integration/e2e behavior: `just test-e2e-fd`
-- quality-only change: `just quality-check-all`
-- security-tooling change: `just security-check-all`
-- full local gate: `just tests-all`
+- Tickoni Zig supervisor, topology, tile lifecycle, queue wrapper, sandbox
+  wrapper, or Phase 0 payment pipeline change: `just test-unit-tk`
+- Tickoni coverage-sensitive change: `just test-cov-tk`
+- Firedancer-derived C infrastructure, Tango, Disco, Discof, Waltz HTTP,
+  utility, or Tickoni C build integration change: `just test-unit-fd`
+- Firedancer coverage-sensitive change: `just test-cov-fd`
+- Cross-boundary Tickoni/Firedancer unit-impacting change:
+  `just test-unit-all`
+- Runtime topology, workspace setup, local process startup, Firedancer dev path,
+  or e2e/system behavior change: `just test-e2e-fd`
+- Cross-cutting local runtime validation: `just test-all`
+- Broad coverage validation: `just test-cov-all`
+- Full repository validation with build, quality, security, and tests:
+  `just tests-all`
+
+Current placeholder test recipes are intentionally kept in the `justfile` so the
+command shape remains stable while Tickoni-specific integration and e2e layers
+are still being built:
+
+- `just test-integration-fd`
+- `just test-integration-tk`
+- `just test-e2e-tk`
+
+Do not remove, rename, or repurpose these placeholders as part of ordinary
+focused changes unless the user explicitly asks for that migration. When a
+change may affect behavior that is currently covered only by the Firedancer
+runtime path, or before broad handoff on risky work, run:
+
+- `just test-e2e-fd`
+
+If you do not run a relevant check, say so explicitly in the handoff.
 
 ## Layer Boundaries And Mocking
 
@@ -228,16 +254,65 @@ stable as real Tickoni integration coverage is added.
 
 ## Quality And Security Gates
 
-Broad validation commands:
+Preferred validation commands in order:
 
-- `just quality-check-all`
-- `just security-check-all`
+- `just quality-format-check-tk` validates `zig fmt --check` for the
+  Tickoni-owned Zig source trees.
+- `just quality-format-check-fd` validates trailing whitespace for changed
+  non-Tickoni-owned paths, including Firedancer-derived C, docs, and scripts.
+- `just quality-format-check-all` runs both formatting lanes.
+- If formatting fails, prefer `just quality-format-fix-tk`,
+  `just quality-format-fix-fd`, or `just quality-format-fix-all`, then only
+  apply targeted manual formatting if automatic fixing still leaves failures.
+- `just quality-lint-check-tk` runs Tickoni-owned lint checks.
+- `just quality-lint-check-fd` runs Firedancer-derived lint checks and
+  `shellcheck` when that tool is installed.
+- `just quality-lint-check-all` runs both lint lanes.
+- `just quality-check-all` runs the main repository quality bundle:
+  format-check all lanes, then lint-check all lanes.
+- `just security-gitleaks-check-all` scans the current Tickoni and
+  Firedancer-owned source scopes for secret leaks.
+- `just security-codeql-check-all` runs the configured CodeQL recipe variants.
+  Some current variants are no-op placeholders while local setup is blocked or
+  not yet wired.
+- `just security-seccomp-check-all` runs the configured seccomp recipe variants.
+  Current placeholder components are documented in [Security](./security.md).
+- `just security-proof-check-all` runs proof-related checks for the lanes that
+  currently expose them.
+- `just security-sanitize-check-all` runs sanitizer-oriented checks, including
+  Tickoni `ReleaseSafe` Zig tests and the Firedancer sanitizer path.
+- `just security-check-all` runs the full repository security bundle:
+  CodeQL, gitleaks, seccomp, proof, and sanitizer checks.
+- `just test-unit-tk` runs Tickoni Zig harness unit tests.
+- `just test-unit-fd` runs Firedancer-derived C unit tests through the
+  repository wrapper that manages huge-page setup and normal-page fallback.
+- `just test-unit-all` runs both unit lanes.
+- `just test-integration-all` currently runs placeholder integration lanes so
+  the aggregate command shape remains stable.
+- `just test-e2e-fd` runs the Firedancer-derived local runtime integration-test
+  build and execution path, surfaced as this repo's e2e/system lane.
+- `just test-e2e-all` runs the Firedancer e2e/system lane plus the current
+  Tickoni e2e placeholder.
+- `just test-cov-tk` runs Tickoni harness coverage.
+- `just test-cov-fd` runs Firedancer-derived C coverage with reduced
+  parallelism for local and CI memory limits.
+- `just test-cov-all` runs both coverage lanes.
+- `just test-all` runs the broad test bundle: unit, integration, and e2e.
+- `just tests-all` runs the full local handoff gate: build, quality, security,
+  and tests.
+
+For broad changes, use:
+
 - `just test-all`
+
+For full handoff validation when build, quality, security, and runtime risk are
+all in scope, use:
+
 - `just tests-all`
 
-`quality-check-all` covers formatting and lint checks. `security-check-all`
-covers CodeQL, gitleaks, seccomp, proof, and sanitizer recipe variants, with
-current no-op components documented in [Security](./security.md).
+If you skip a relevant gate because it is too expensive, needs unavailable
+local tools, or requires host privileges such as huge-page or memlock setup,
+call that out explicitly in the handoff.
 
 ## Related Docs
 
