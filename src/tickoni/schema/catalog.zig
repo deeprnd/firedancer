@@ -9,6 +9,16 @@
 /// Restricted instruments (leveraged ETFs, inverse ETFs, manual denylist) carry
 /// a non-none RestrictionReason so basket construction can reject them with a
 /// clear message before they appear in a candidate list.
+///
+/// Schema version: catalog_schema_version below.  When S3 basket construction
+/// produces audit records, it must stamp the catalog version that was consulted
+/// so replay can detect catalog drift.  Incrementing catalog_schema_version
+/// signals a compatibility break in InstrumentEntry layout or fixture content.
+///
+/// Canonical encoding: binary protobuf via fd_pb_encoder, following the audit
+/// codec pattern in src/tickoni/codec/audit_pb.c.  Encoding is not yet
+/// implemented; this comment marks the planned format so the schema is not
+/// extended incompatibly before it is defined.
 const std = @import("std");
 const thesis = @import("thesis.zig");
 
@@ -17,6 +27,11 @@ pub const Market = thesis.Market;
 pub const Venue = thesis.Venue;
 pub const SectorTheme = thesis.SectorTheme;
 pub const RiskPreference = thesis.RiskPreference;
+
+/// Schema version for the instrument catalog.
+/// Increment when InstrumentEntry layout or fixture content changes in a way
+/// that would alter basket construction or audit records.
+pub const catalog_schema_version: u16 = 1;
 
 pub const max_ticker_len: usize = 8;
 pub const max_name_len: usize = 48;
@@ -53,12 +68,12 @@ pub const ThemeSet = packed struct(u8) {
     pub fn has(self: ThemeSet, theme: SectorTheme) bool {
         return switch (theme) {
             .ai_infrastructure => self.ai_infrastructure,
-            .semiconductors    => self.semiconductors,
-            .cloud             => self.cloud,
-            .cyber_security    => self.cyber_security,
-            .broad_market      => self.broad_market,
-            .dividends         => self.dividends,
-            .cash_like         => self.cash_like,
+            .semiconductors => self.semiconductors,
+            .cloud => self.cloud,
+            .cyber_security => self.cyber_security,
+            .broad_market => self.broad_market,
+            .dividends => self.dividends,
+            .cash_like => self.cash_like,
         };
     }
 };
@@ -94,9 +109,14 @@ pub const InstrumentEntry = struct {
 };
 
 // ---------------------------------------------------------------------------
-// Comptime helpers (mirrors textBuf in thesis.zig)
+// Comptime helpers
 // ---------------------------------------------------------------------------
 
+/// Fill a [max_ticker_len]u8 buffer with s, zero-padded.
+///
+/// fd_cstr_ncpy from src/util/cstr covers string copy at runtime, but this
+/// helper is called in comptime const initializers where C externs cannot be
+/// evaluated.  A Zig for-loop is the only comptime-safe copy path here.
 fn tickerBuf(comptime s: []const u8) [max_ticker_len]u8 {
     if (s.len > max_ticker_len) @compileError("ticker exceeds max_ticker_len");
     var buf = [_]u8{0} ** max_ticker_len;
@@ -104,6 +124,11 @@ fn tickerBuf(comptime s: []const u8) [max_ticker_len]u8 {
     return buf;
 }
 
+/// Fill a [max_name_len]u8 buffer with s, zero-padded.
+///
+/// fd_cstr_ncpy from src/util/cstr covers string copy at runtime, but this
+/// helper is called in comptime const initializers where C externs cannot be
+/// evaluated.  A Zig for-loop is the only comptime-safe copy path here.
 fn nameBuf(comptime s: []const u8) [max_name_len]u8 {
     if (s.len > max_name_len) @compileError("name exceeds max_name_len");
     var buf = [_]u8{0} ** max_name_len;
@@ -125,18 +150,18 @@ fn mkEntry(
     restr_reason: RestrictionReason,
 ) InstrumentEntry {
     return .{
-        .ticker             = tickerBuf(ticker_s),
-        .ticker_len         = @intCast(ticker_s.len),
-        .name               = nameBuf(name_s),
-        .name_len           = @intCast(name_s.len),
-        .asset_class        = ac,
-        .market             = mkt,
-        .venue              = vnue,
-        .sector             = sec,
-        .themes             = themes,
-        .risk_tier          = risk,
-        .expense_ratio_bps  = er_bps,
-        .restricted         = restr,
+        .ticker = tickerBuf(ticker_s),
+        .ticker_len = @intCast(ticker_s.len),
+        .name = nameBuf(name_s),
+        .name_len = @intCast(name_s.len),
+        .asset_class = ac,
+        .market = mkt,
+        .venue = vnue,
+        .sector = sec,
+        .themes = themes,
+        .risk_tier = risk,
+        .expense_ratio_bps = er_bps,
+        .restricted = restr,
         .restriction_reason = restr_reason,
     };
 }
@@ -147,109 +172,37 @@ fn mkEntry(
 
 pub const catalog = [_]InstrumentEntry{
     // --- Semiconductors / AI infrastructure equities ---
-    mkEntry("NVDA", "NVIDIA Corporation",
-        .equity, .us, .nasdaq, .semiconductors,
-        .{ .ai_infrastructure = true, .semiconductors = true },
-        .high, 0, false, .none),
-    mkEntry("AMD", "Advanced Micro Devices Inc.",
-        .equity, .us, .nasdaq, .semiconductors,
-        .{ .ai_infrastructure = true, .semiconductors = true },
-        .high, 0, false, .none),
-    mkEntry("AVGO", "Broadcom Inc.",
-        .equity, .us, .nasdaq, .semiconductors,
-        .{ .ai_infrastructure = true, .semiconductors = true },
-        .moderate, 0, false, .none),
-    mkEntry("MSFT", "Microsoft Corporation",
-        .equity, .us, .nasdaq, .cloud,
-        .{ .ai_infrastructure = true, .cloud = true },
-        .moderate, 0, false, .none),
+    mkEntry("NVDA", "NVIDIA Corporation", .equity, .us, .nasdaq, .semiconductors, .{ .ai_infrastructure = true, .semiconductors = true }, .high, 0, false, .none),
+    mkEntry("AMD", "Advanced Micro Devices Inc.", .equity, .us, .nasdaq, .semiconductors, .{ .ai_infrastructure = true, .semiconductors = true }, .high, 0, false, .none),
+    mkEntry("AVGO", "Broadcom Inc.", .equity, .us, .nasdaq, .semiconductors, .{ .ai_infrastructure = true, .semiconductors = true }, .moderate, 0, false, .none),
+    mkEntry("MSFT", "Microsoft Corporation", .equity, .us, .nasdaq, .cloud, .{ .ai_infrastructure = true, .cloud = true }, .moderate, 0, false, .none),
     // --- AI infrastructure ETFs ---
-    mkEntry("BOTZ", "Global X Robotics & AI ETF",
-        .etf, .us, .nasdaq, .ai_infrastructure,
-        .{ .ai_infrastructure = true },
-        .moderate, 68, false, .none),
-    mkEntry("SOXX", "iShares Semiconductor ETF",
-        .etf, .us, .nasdaq, .semiconductors,
-        .{ .ai_infrastructure = true, .semiconductors = true },
-        .high, 35, false, .none),
+    mkEntry("BOTZ", "Global X Robotics & AI ETF", .etf, .us, .nasdaq, .ai_infrastructure, .{ .ai_infrastructure = true }, .moderate, 68, false, .none),
+    mkEntry("SOXX", "iShares Semiconductor ETF", .etf, .us, .nasdaq, .semiconductors, .{ .ai_infrastructure = true, .semiconductors = true }, .high, 35, false, .none),
     // --- Cloud ---
-    mkEntry("AMZN", "Amazon.com Inc.",
-        .equity, .us, .nasdaq, .cloud,
-        .{ .ai_infrastructure = true, .cloud = true },
-        .moderate, 0, false, .none),
-    mkEntry("WCLD", "WisdomTree Cloud Computing ETF",
-        .etf, .us, .nasdaq, .cloud,
-        .{ .cloud = true },
-        .moderate, 45, false, .none),
+    mkEntry("AMZN", "Amazon.com Inc.", .equity, .us, .nasdaq, .cloud, .{ .ai_infrastructure = true, .cloud = true }, .moderate, 0, false, .none),
+    mkEntry("WCLD", "WisdomTree Cloud Computing ETF", .etf, .us, .nasdaq, .cloud, .{ .cloud = true }, .moderate, 45, false, .none),
     // --- Cyber security ---
-    mkEntry("PANW", "Palo Alto Networks Inc.",
-        .equity, .us, .nasdaq, .cyber_security,
-        .{ .cyber_security = true },
-        .high, 0, false, .none),
-    mkEntry("CRWD", "CrowdStrike Holdings Inc.",
-        .equity, .us, .nasdaq, .cyber_security,
-        .{ .cyber_security = true },
-        .high, 0, false, .none),
-    mkEntry("HACK", "ETFMG Prime Cyber Security ETF",
-        .etf, .us, .nyse, .cyber_security,
-        .{ .cyber_security = true },
-        .moderate, 60, false, .none),
-    mkEntry("CIBR", "First Trust NASDAQ Cybersecurity ETF",
-        .etf, .us, .nasdaq, .cyber_security,
-        .{ .cyber_security = true },
-        .moderate, 60, false, .none),
+    mkEntry("PANW", "Palo Alto Networks Inc.", .equity, .us, .nasdaq, .cyber_security, .{ .cyber_security = true }, .high, 0, false, .none),
+    mkEntry("CRWD", "CrowdStrike Holdings Inc.", .equity, .us, .nasdaq, .cyber_security, .{ .cyber_security = true }, .high, 0, false, .none),
+    mkEntry("HACK", "ETFMG Prime Cyber Security ETF", .etf, .us, .nyse, .cyber_security, .{ .cyber_security = true }, .moderate, 60, false, .none),
+    mkEntry("CIBR", "First Trust NASDAQ Cybersecurity ETF", .etf, .us, .nasdaq, .cyber_security, .{ .cyber_security = true }, .moderate, 60, false, .none),
     // --- Broad market ---
-    mkEntry("SPY", "SPDR S&P 500 ETF Trust",
-        .etf, .us, .nyse, .broad_market,
-        .{ .broad_market = true },
-        .low, 9, false, .none),
-    mkEntry("IVV", "iShares Core S&P 500 ETF",
-        .etf, .us, .nasdaq, .broad_market,
-        .{ .broad_market = true },
-        .low, 3, false, .none),
-    mkEntry("VOO", "Vanguard S&P 500 ETF",
-        .etf, .us, .nyse, .broad_market,
-        .{ .broad_market = true },
-        .low, 3, false, .none),
-    mkEntry("VTI", "Vanguard Total Stock Market ETF",
-        .etf, .us, .nyse, .broad_market,
-        .{ .broad_market = true },
-        .low, 3, false, .none),
+    mkEntry("SPY", "SPDR S&P 500 ETF Trust", .etf, .us, .nyse, .broad_market, .{ .broad_market = true }, .low, 9, false, .none),
+    mkEntry("IVV", "iShares Core S&P 500 ETF", .etf, .us, .nasdaq, .broad_market, .{ .broad_market = true }, .low, 3, false, .none),
+    mkEntry("VOO", "Vanguard S&P 500 ETF", .etf, .us, .nyse, .broad_market, .{ .broad_market = true }, .low, 3, false, .none),
+    mkEntry("VTI", "Vanguard Total Stock Market ETF", .etf, .us, .nyse, .broad_market, .{ .broad_market = true }, .low, 3, false, .none),
     // --- Dividends ---
-    mkEntry("VYM", "Vanguard High Dividend Yield ETF",
-        .etf, .us, .nyse, .dividends,
-        .{ .dividends = true },
-        .low, 6, false, .none),
-    mkEntry("DVY", "iShares Select Dividend ETF",
-        .etf, .us, .nasdaq, .dividends,
-        .{ .dividends = true },
-        .low, 38, false, .none),
+    mkEntry("VYM", "Vanguard High Dividend Yield ETF", .etf, .us, .nyse, .dividends, .{ .dividends = true }, .low, 6, false, .none),
+    mkEntry("DVY", "iShares Select Dividend ETF", .etf, .us, .nasdaq, .dividends, .{ .dividends = true }, .low, 38, false, .none),
     // --- Cash-like ---
-    mkEntry("SHV", "iShares Short Treasury Bond ETF",
-        .etf, .us, .nasdaq, .cash_like,
-        .{ .cash_like = true },
-        .low, 15, false, .none),
-    mkEntry("SGOV", "iShares 0-3 Month Treasury Bond ETF",
-        .etf, .us, .nyse, .cash_like,
-        .{ .cash_like = true },
-        .low, 9, false, .none),
-    mkEntry("BIL", "SPDR Bloomberg 1-3 Month T-Bill ETF",
-        .etf, .us, .nyse, .cash_like,
-        .{ .cash_like = true },
-        .low, 14, false, .none),
+    mkEntry("SHV", "iShares Short Treasury Bond ETF", .etf, .us, .nasdaq, .cash_like, .{ .cash_like = true }, .low, 15, false, .none),
+    mkEntry("SGOV", "iShares 0-3 Month Treasury Bond ETF", .etf, .us, .nyse, .cash_like, .{ .cash_like = true }, .low, 9, false, .none),
+    mkEntry("BIL", "SPDR Bloomberg 1-3 Month T-Bill ETF", .etf, .us, .nyse, .cash_like, .{ .cash_like = true }, .low, 14, false, .none),
     // --- Restricted: leveraged and inverse ETFs (T3) ---
-    mkEntry("SOXL", "Direxion Daily Semiconductor Bull 3X ETF",
-        .leveraged_etf, .us, .nyse, .semiconductors,
-        .{ .ai_infrastructure = true, .semiconductors = true },
-        .high, 77, true, .leveraged_etf),
-    mkEntry("SOXS", "Direxion Daily Semiconductor Bear 3X ETF",
-        .inverse_etf, .us, .nyse, .semiconductors,
-        .{ .semiconductors = true },
-        .high, 92, true, .inverse_etf),
-    mkEntry("BULZ", "MicroSectors FANG 3X Bull Leveraged ETN",
-        .leveraged_etf, .us, .nyse, .ai_infrastructure,
-        .{ .ai_infrastructure = true },
-        .high, 95, true, .leveraged_etf),
+    mkEntry("SOXL", "Direxion Daily Semiconductor Bull 3X ETF", .leveraged_etf, .us, .nyse, .semiconductors, .{ .ai_infrastructure = true, .semiconductors = true }, .high, 77, true, .leveraged_etf),
+    mkEntry("SOXS", "Direxion Daily Semiconductor Bear 3X ETF", .inverse_etf, .us, .nyse, .semiconductors, .{ .semiconductors = true }, .high, 92, true, .inverse_etf),
+    mkEntry("BULZ", "MicroSectors FANG 3X Bull Leveraged ETN", .leveraged_etf, .us, .nyse, .ai_infrastructure, .{ .ai_infrastructure = true }, .high, 95, true, .leveraged_etf),
 };
 
 // ---------------------------------------------------------------------------
@@ -315,6 +268,10 @@ pub fn filterByVenue(venue: Venue, out: []*const InstrumentEntry) usize {
 }
 
 /// Returns a pointer to the catalog entry matching ticker, or null if not found.
+///
+/// Uses std.mem.eql for byte-equality comparison.  src/util/cstr provides
+/// fd_cstr_ncpy, fd_cstr_printf, and fd_cstr_to_* for copy and formatting but
+/// no string equality function, so std.mem.eql is the correct path here.
 pub fn lookupByTicker(ticker: []const u8) ?*const InstrumentEntry {
     for (0..catalog.len) |i| {
         const e = &catalog[i];
@@ -433,7 +390,8 @@ test "filterByTheme: unknown theme with no matches returns 0" {
 test "filterByTheme: every returned entry has the requested theme bit set" {
     const themes_to_check = [_]SectorTheme{
         .ai_infrastructure, .semiconductors, .cloud,
-        .cyber_security, .broad_market, .dividends, .cash_like,
+        .cyber_security,    .broad_market,   .dividends,
+        .cash_like,
     };
     var out: [catalog.len]*const InstrumentEntry = undefined;
     for (themes_to_check) |theme| {
