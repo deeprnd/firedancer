@@ -73,6 +73,7 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/c_abi/sandbox.zig",
         "src/tickoni/tiles/audit.zig",
         "src/tickoni/tiles/payment_pipeline.zig",
+        "src/tickoni/schema/thesis.zig",
     }) |path| {
         const t_mod = b.createModule(.{
             .root_source_file = b.path(path),
@@ -121,6 +122,7 @@ pub fn build(b: *std.Build) void {
         .{ "test-sandbox", "src/tickoni/c_abi/sandbox.zig" },
         .{ "test-audit", "src/tickoni/tiles/audit.zig" },
         .{ "test-payment-pipeline", "src/tickoni/tiles/payment_pipeline.zig" },
+        .{ "test-thesis", "src/tickoni/schema/thesis.zig" },
     }) |entry| {
         const t = b.addTest(.{
             .name = entry[0],
