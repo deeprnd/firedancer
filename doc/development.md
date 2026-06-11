@@ -68,7 +68,7 @@ Tickoni-owned Zig supervisor:
 just build-tk
 ```
 
-Firedancer-derived `tickoni` C binary:
+Firedancer C binary:
 
 ```bash
 just build-fd
@@ -174,16 +174,10 @@ Configuration and runtime environment:
 
 CI and retained Firedancer workflows:
 
-- CI automation lives in GitHub Actions workflows under `.github/workflows`.
-- Tickoni-owned short checks are centered on the active Zig harness and
-  `justfile` recipes.
-- Workflows guarded by `vars.SKIP_FIREDANCER_CI != 'true'` are retained
-  Firedancer workflows. They are kept for now to avoid unnecessary conflicts
-  with upstream Firedancer while Tickoni's own CI surface remains narrower.
-- Do not remove or rewrite retained Firedancer workflows as part of ordinary
-  Tickoni changes unless the task is explicitly about that migration.
-- CodeQL `justfile` recipes are currently no-ops as documented in
-  `doc/security.md`; do not silently add new CodeQL pull request hooks.
+CI automation lives in GitHub Actions under `.github/workflows`. Tickoni-owned
+workflows target the active Zig harness and `justfile` recipes. Upstream
+Firedancer workflows are retained but skipped via `vars.SKIP_FIREDANCER_CI`.
+See [CI](./ci.md) for workflow details and contributor constraints.
 
 Infrastructure safety:
 
@@ -201,7 +195,7 @@ Infrastructure safety:
 Useful current commands:
 
 - `just build-tk` builds the Tickoni Zig supervisor.
-- `just build-fd` builds the Firedancer-derived `tickoni` C binary.
+- `just build-fd` builds the Firedancer C binary.
 - `just test-unit-tk` runs Tickoni Zig unit tests.
 - `just quality-format-check-tk` checks Tickoni Zig formatting.
 - `just quality-format-fix-tk` formats Tickoni Zig source.
@@ -333,5 +327,6 @@ Generated outputs are checked into the repository.
 - [Build](./build.md)
 - [Build System](./build-system.md)
 - [Architecture](./architecture.md)
+- [CI](./ci.md)
 - [Security](./security.md)
 - [Observability](./observability.md)
