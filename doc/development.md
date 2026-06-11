@@ -49,6 +49,17 @@ The wider install includes optional extras for protobuf generators, math
 generators, simulation helpers, Solana helpers, and agave-cluster CLI
 dependencies.
 
+Install the repository-managed Git hooks:
+
+```bash
+git config core.hooksPath .githooks
+chmod +x .githooks/commit-msg
+```
+
+This configures `core.hooksPath` to `.githooks` so the tracked `commit-msg`
+hook can strip and reject `Co-Authored-By: Claude` trailers before a commit is
+created.
+
 ## Build
 
 Tickoni-owned Zig supervisor:
