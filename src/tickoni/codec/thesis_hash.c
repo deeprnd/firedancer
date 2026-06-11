@@ -43,3 +43,35 @@ tk_thesis_input_hash( uint16_t              user_text_len,
 
   return fd_siphash13_fini( sip );
 }
+
+/* Hash keys for the basket schema.
+   TK_BASKET_HASH_K0 encodes "TKBSKT\0\0" in little-endian.
+   Changing either constant invalidates all existing basket content hashes. */
+#define TK_BASKET_HASH_K0 (0x00005454534B424BUL) /* "TKBSKT\0\0" LE */
+#define TK_BASKET_HASH_K1 ((ulong)TK_BASKET_SCHEMA_VERSION)
+
+uint64_t
+tk_basket_hash( uint64_t         thesis_id,
+                uint16_t         catalog_schema_version,
+                uint8_t          instrument_count,
+                uint8_t  const * tickers,
+                uint32_t const * weight_bps,
+                int64_t  const * alloc_cents ) {
+  fd_siphash13_t _sip[1];
+  fd_siphash13_t * sip = fd_siphash13_init( _sip, TK_BASKET_HASH_K0, TK_BASKET_HASH_K1 );
+
+  uint16_t ver = TK_BASKET_SCHEMA_VERSION;
+  TK_HASH( &ver,                   sizeof(uint16_t) );
+  TK_HASH( &thesis_id,             sizeof(uint64_t) );
+  TK_HASH( &catalog_schema_version, sizeof(uint16_t) );
+  TK_HASH( &instrument_count,      sizeof(uint8_t)  );
+  /* Per-instrument composition: ticker (zero-padded stride), weight_bp, alloc_cents. */
+  ulong stride = TK_BASKET_MAX_TICKER_LEN;
+  for( uint8_t i = 0; i < instrument_count; i++ ) {
+    TK_HASH( tickers + (ulong)i * stride, stride           );
+    TK_HASH( weight_bps + i,              sizeof(uint32_t) );
+    TK_HASH( alloc_cents + i,             sizeof(int64_t)  );
+  }
+
+  return fd_siphash13_fini( sip );
+}

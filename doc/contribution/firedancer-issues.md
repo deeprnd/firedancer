@@ -24,7 +24,7 @@ predicate included(Location loc) {
   loc.getFile().getRelativePath().prefix(4) = "src/"
 }
 ```
-In codeqL database source files have paths relative to the test project directory, like ReturnZeroForPointer.c with no directory prefix. 
+In codeqL database source files have paths relative to the test project directory, like ReturnZeroForPointer.c with no directory prefix.
 The included() predicate returns false for all of them, so every query that calls included() produces zero results in tests. Every // $ Alert annotation reports Missing result: Alert.
 
 This was introduced in commit f31473534 ("codeql: only analyse src/"). The affected queries added included() in commit c5a16bb74 without updating the .expected files or accounting for the test database path structure.
@@ -54,7 +54,7 @@ The following info is useful to collect:
 - name of main network interface
 - device drivers (bonding, mlx5, etc)
 - PCIe ID of physical interfaces
-- XDP feature flags (driver mode? zero copy? native bond?) 
+- XDP feature flags (driver mode? zero copy? native bond?)
 - kernel version
 - number of routes
 - number of neighbors
@@ -91,14 +91,14 @@ The util/tmpl files use 3 concurrency patterns:
 - spin-lock based mutex/rwlock
 - atomic CAS/fetch-add with acquire/release semantics
 
-Currently, templates use a mix of x86-TSO via compiler fences and volatile memory accesses, and the ancient GCC `__sync` API. 
+Currently, templates use a mix of x86-TSO via compiler fences and volatile memory accesses, and the ancient GCC `__sync` API.
 
 C11 atomics are a clean replacement for the above two, and have two benefits:
-- Correctness: ThreadSanitizer support, easier to review (reasonably well specified memory models), which helps find issues in buggy users even if the template code itself is correct 
+- Correctness: ThreadSanitizer support, easier to review (reasonably well specified memory models), which helps find issues in buggy users even if the template code itself is correct
 - portability to weak memory models (doesn't really matter)
 
-The changes required are fairly minimal. 
-- Users of the existing `FD_ATOMIC` API would switch to `__atomic` which is the same API with an additional memory ordering argument (relaxed, acquire/release, seq-cst) 
+The changes required are fairly minimal.
+- Users of the existing `FD_ATOMIC` API would switch to `__atomic` which is the same API with an additional memory ordering argument (relaxed, acquire/release, seq-cst)
 - Compiler fences are replaced with atomic_thread_fence or acquire/release accesses on synchronization words
 
 Trivial for pool_para, map_chain_para, and map_slot_para
@@ -161,15 +161,15 @@ Reverted in 4.1:
 - `vote_only_retransmitter_signed_fec_sets`
 
 Cleaned up in 4.1:
-- [ ] `increase_cpi_account_info_limit` @topointon-jump 
--  [ ] `provide_instruction_data_offset_in_vm_r2` @topointon-jump 
-- [ ] `vote_state_v4` @0x0ece 
-- [ ] `disable_deploy_of_alloc_free_syscall` @topointon-jump 
-- [ ] `static_instruction_limit` @topointon-jump 
-- [ ] `require_static_nonce_account` @kbhargava-jump 
-- [ ] `enable_secp256r1_precompile` @0x0ece 
-- [ ] `raise_account_cu_limit` @topointon-jump 
-- [ ] `relax_intrabatch_account_locks` @topointon-jump 
+- [ ] `increase_cpi_account_info_limit` @topointon-jump
+-  [ ] `provide_instruction_data_offset_in_vm_r2` @topointon-jump
+- [ ] `vote_state_v4` @0x0ece
+- [ ] `disable_deploy_of_alloc_free_syscall` @topointon-jump
+- [ ] `static_instruction_limit` @topointon-jump
+- [ ] `require_static_nonce_account` @kbhargava-jump
+- [ ] `enable_secp256r1_precompile` @0x0ece
+- [ ] `raise_account_cu_limit` @topointon-jump
+- [ ] `relax_intrabatch_account_locks` @topointon-jump
 - [x] `enforce_fixed_fec_set`
 
 ---
@@ -197,7 +197,7 @@ Firedancer does not support increase_tx_account_lock_limit yet due to a wrong ha
 - **Updated:** 2026-05-22
 - **Labels:** Priority: Low
 
-fd_stem.c can yield torn reads / corrupt fields to during_frag, this affects net_shred and net_repair in particular. 
+fd_stem.c can yield torn reads / corrupt fields to during_frag, this affects net_shred and net_repair in particular.
 
 As a workaround, stem was changed to do 32-byte atomic descriptor load/store on x86.
 
@@ -255,8 +255,8 @@ Full Firedancer's replay tile gates the fd_became_leader_t publication through m
 - **Assignees:** emwang-jump
 
 after repairing far for a while, replay gets stuck,
-shred is backpressured on shred->repair link 
-repair tile is 100% busy 
+shred is backpressured on shred->repair link
+repair tile is 100% busy
 
 <img width="983" height="786" alt="Image" src="https://github.com/user-attachments/assets/99d81a48-b1b3-46c6-bc6d-0386b09ec8c1" />
 
@@ -284,7 +284,7 @@ INFO    2026-05-12 22:39:04.603247929 GMT+00 3361353:3361406 ripatel:tsfra2-ossd
 
 ```
 $ tail -f /tmp/validator.log | pv -l >/dev/null
- 971k 0:00:26 [32.6k/s] 
+ 971k 0:00:26 [32.6k/s]
 ```
 
 ---
@@ -350,10 +350,10 @@ hugetlbfs.c(168): RUN: `mount -t hugetlbfs none /mnt/.fd/.gigantic -o pagesize=1
 - **Updated:** 2026-05-15
 - **Labels:** Priority: Low
 
-Firedancer only "mixes in" hard forks into bank hash on startup (after snapshot load), but not during runtime. 
+Firedancer only "mixes in" hard forks into bank hash on startup (after snapshot load), but not during runtime.
 This breaks startup from a snapshot with a hard fork scheduled in the future.
 
-This is a very minor conformance issue. Scheduling "hard fork" entries in the future is something not typically done. 
+This is a very minor conformance issue. Scheduling "hard fork" entries in the future is something not typically done.
 
 (Reported by several ImmuneFi audit contest participants)
 
@@ -544,33 +544,33 @@ Tracking issue for Agave 4.1 features.
 - [x] 4.1 Snapshot Parsing: @topointon-jump https://github.com/firedancer-io/firedancer/pull/9853
 
 **Runtime**
-- [x] `loader_v3_minimum_extend_program_size` - https://github.com/firedancer-io/firedancer/pull/9945 @mjain-jump 
+- [x] `loader_v3_minimum_extend_program_size` - https://github.com/firedancer-io/firedancer/pull/9945 @mjain-jump
   - [x] Corpus
   - [ ] Ledger
 - [x] `direct_account_pointers_in_program_input` - https://github.com/firedancer-io/firedancer/pull/9690 @topointon-jump
   - [ ] Corpus
   - [x] Ledger
-- [x] `enable_sha512_syscall` - https://github.com/solana-foundation/solana-improvement-documents/pull/512 @drubin-fd @0x0ece 
+- [x] `enable_sha512_syscall` - https://github.com/solana-foundation/solana-improvement-documents/pull/512 @drubin-fd @0x0ece
   - [x] Corpus
   - [ ] Ledger
-- [x] `limit_instruction_accounts` - https://github.com/solana-foundation/solana-improvement-documents/pull/406 @topointon-jump 
+- [x] `limit_instruction_accounts` - https://github.com/solana-foundation/solana-improvement-documents/pull/406 @topointon-jump
   - [ ] Corpus
   - [x] Ledger
-- [x] `disable_sbpf_v0_v1_v2_deployment` - https://github.com/firedancer-io/firedancer/pull/9732 @0x0ece 
+- [x] `disable_sbpf_v0_v1_v2_deployment` - https://github.com/firedancer-io/firedancer/pull/9732 @0x0ece
   - [x] Corpus
   - [x] Ledger
-- [x] `define_ltds_fee_only_semantics` - https://github.com/firedancer-io/firedancer/pull/9947 @topointon-jump 
+- [x] `define_ltds_fee_only_semantics` - https://github.com/firedancer-io/firedancer/pull/9947 @topointon-jump
   - [ ] Corpus
   - [x] Ledger
 
 **In-Protocol Block Revenue Distribution**
-- [x] `commission_rate_in_basis_points` - https://github.com/solana-foundation/solana-improvement-documents/pull/291 @mjain-jump 
+- [x] `commission_rate_in_basis_points` - https://github.com/solana-foundation/solana-improvement-documents/pull/291 @mjain-jump
   - [x] Corpus
   - [x] Ledger
 
 **Alpenglow**
 
-- [x] `bls_pubkey_management_in_vote_account` - @0x0ece @drubin-fd 
+- [x] `bls_pubkey_management_in_vote_account` - @0x0ece @drubin-fd
   - [x] Corpus
   - [x] Ledger
 - [x] `validator_admission_ticket` - @ibhatt-jumptrading https://github.com/firedancer-io/firedancer/issues/9240
@@ -768,7 +768,7 @@ This seems to be more noticeable on nodes far away (geographically).
 
 ---
 
-## #8951 — gossip: handle larger # of accounts for wfs 
+## #8951 — gossip: handle larger # of accounts for wfs
 - **URL:** https://github.com/firedancer-io/firedancer/issues/8951
 - **Created:** 2026-03-18 by @ibhatt-jumptrading
 - **Updated:** 2026-03-31
@@ -795,7 +795,7 @@ This seems to be more noticeable on nodes far away (geographically).
 - **Assignees:** emwang-jump
 
 the FEC data flow now goes shred->repair->replay again, which re-introduces a possible issue from awhile ago
-where is replay is far behind repair, this could cause backpressure which slows down the shred ingest pipeline. 
+where is replay is far behind repair, this could cause backpressure which slows down the shred ingest pipeline.
 
 Investigate the average # FECs per mainnet block and size repair_out for that * either the average catchup distance from an incremental snapshot OR some supported threshold (like 4096 slots behind) if the memory usage isn't too high.
 
@@ -869,7 +869,7 @@ Backtest configs include a ton of redundant config items like this.
 
 This should just be default configuration:
 - Select best snapshot locally available on disk, don't attempt to download snapshots
-- Disable gossip by default (run without a gossip tile) 
+- Disable gossip by default (run without a gossip tile)
 - Sane defaults for layout
 - Enable lthash verification
 
@@ -1154,7 +1154,7 @@ example:
 ```
 NOTICE  01-12 22:47:13.702699 3146064 0    backt:0 src/discof/backtest/fd_backtest_tile.c(347): Bank hash matches! slot=387057973, hash=5XnAhmuUtGNGdwCmPDmuxX8qT35xPeAd5Rxdmw4zXxwz (switch 0.00 ms, begin 0.53 ms, exec  64.35 ms, finish 0.20 ms)
 NOTICE  01-12 22:47:16.808957 3146064 0    backt:0 src/discof/backtest/fd_backtest_tile.c(347): Bank hash matches! slot=387057974, hash=9fV82umVgEvjpNi7DbJc9sUMKuY6n1C2fdULPeC3eeGb (switch 0.00 ms, begin 3053.12 ms, exec  52.94 ms, finish 0.19 ms)
-NOTICE  01-12 22:47:16.866901 3146064 0    backt:0 src/discof/backtest/fd_backtest_tile.c(347): Bank hash matches! slot=387057975, hash=8Wgsh5TtqFbMP7aVQUmuWa9S6M1B3zk1g3Yi8rwnzvkz (switch 0.00 ms, begin 0.53 ms, exec  57.19 ms, finish 
+NOTICE  01-12 22:47:16.866901 3146064 0    backt:0 src/discof/backtest/fd_backtest_tile.c(347): Bank hash matches! slot=387057975, hash=8Wgsh5TtqFbMP7aVQUmuWa9S6M1B3zk1g3Yi8rwnzvkz (switch 0.00 ms, begin 0.53 ms, exec  57.19 ms, finish
 ```
 exec looks fine but not before that
 
@@ -1245,7 +1245,7 @@ pcap for above (rename to remove .txt extension due to github limitation): [out.
 
 ## Workaround
 
-Wipe the `~/.firedancer` directory and restart. May need to repeat this several times 
+Wipe the `~/.firedancer` directory and restart. May need to repeat this several times
 
 ## Reproduction Steps
 
@@ -1275,7 +1275,7 @@ _(truncated)_
 
 ## Summary
 
-Firedancer leader slots are skipped by agave validators with `InvalidBlock(TooFewTicks)` when running in local clusters configured with low-power PoH mode (`hashes_per_tick=None`). Confirmed by @ptaffet-jump 
+Firedancer leader slots are skipped by agave validators with `InvalidBlock(TooFewTicks)` when running in local clusters configured with low-power PoH mode (`hashes_per_tick=None`). Confirmed by @ptaffet-jump
 
 ## Environment
 - Firedancer version: v0.8 (263f8fd1b0e82cfeae34db8065218056fcf6cb7e), v0.805
@@ -1321,7 +1321,7 @@ Setting `hashes_per_tick` to a specific value (e.g., 62500) in genesis resolves 
 
 ## Expected Behavior
 
-Firedancer should correctly emit the required number of ticks for 
+Firedancer should correctly emit the required number of ticks for
 
 _(truncated)_
 
@@ -1345,7 +1345,7 @@ E.g. an operator might operate DDoS-protected reverse proxies (continuity) as a 
 - **Updated:** 2026-03-24
 - **Assignees:** jvarela-jump
 
-Allow the Firedancer voter to failover across multiple TPU endpoints if a validator advertises multiple TPU ports in gossip. 
+Allow the Firedancer voter to failover across multiple TPU endpoints if a validator advertises multiple TPU ports in gossip.
 
 TBD how to implement the failover policy? (keep 1 conn or N conns open? what determines a conn failure? priority? etc)
 
@@ -1399,7 +1399,7 @@ Some forms of crashes (e.g. FD_LOG_CRIT) result in buffered debug info getting l
 - **Assignees:** ripatel-fd
 
 - [ ] Clean up the parallel compression algorithm in snapmk and refactor it into reusable components.
-- [ ] Switch from the current custom framing format to pzstd framing (makes it much easier for Agave to support the same optimization) 
+- [ ] Switch from the current custom framing format to pzstd framing (makes it much easier for Agave to support the same optimization)
 - [ ] Remove out-of-order block processing / parallel signal bits
 
 ---
@@ -1523,7 +1523,7 @@ for Frankendancer.
 - **Created:** 2025-11-06 by @ripatel-fd
 - **Updated:** 2025-11-14
 
-It is a bit silly that we're creating a log file when running `--help` 
+It is a bit silly that we're creating a log file when running `--help`
 
 ```
 $ build/native/gcc/bin/firedancer-dev snapshot-load --help
@@ -1545,7 +1545,7 @@ Flags:
 - **Created:** 2025-11-04 by @HGuillemet
 - **Updated:** 2025-11-14
 
-There is a confusion in `resolv` `after_frag` between slot and block height. 
+There is a confusion in `resolv` `after_frag` between slot and block height.
 Example: A transaction received during slot S referencing the blockhash of slot S-153 should not expire if 4 slots were skipped in-between (which is common), because the block height difference is 149 only.
 The result is that many transactions are wrongly ignored by a leader if there were skips during last 151 slots.
 
@@ -1553,9 +1553,9 @@ The result is that many transactions are wrongly ignored by a leader if there we
 
 A similar check is done in [pack](https://github.com/firedancer-io/firedancer/blob/e97dd839818a30be7a22a3c1c28bcfcaa567e192/src/disco/pack/fd_pack_tile.c#L37-L41), but this time including some arbitrary margin to cope with block height/slot difference.
 
-* A simple fix would be to replace 151 in `resolv` with this `TRANSACTION_LIFETIME_SLOTS` constant, but it's not satisfactory. 
+* A simple fix would be to replace 151 in `resolv` with this `TRANSACTION_LIFETIME_SLOTS` constant, but it's not satisfactory.
 
-* I would personally remove these imperfect expiration checks in both `resolv` and `pack` and rely only on checks done in `bank`. 
+* I would personally remove these imperfect expiration checks in both `resolv` and `pack` and rely only on checks done in `bank`.
 If these checks are security barriers, then they don't hold long. An attacker could clutter pack with transactions that won't land using other ways. During normal operation, transactions not being forwarded anymore, the number of expired txs is not high.
 
 * Another option is to have `bank` send the true block height along with the block hash and use it for expiration checks.
@@ -1599,7 +1599,7 @@ ERR     10-30 17:51:39.225898 685181 13   snapin:0 src/util/log/fd_log.c(1036): 
 - **Created:** 2025-10-30 by @ripatel-fd
 - **Updated:** 2026-01-14
 
-The snapshot loader topology is pretty complex now (7 different tiles, >7 link kinds, many more objects) 
+The snapshot loader topology is pretty complex now (7 different tiles, >7 link kinds, many more objects)
 
 We have 3 nearly identical constructors of this topology in topology.c, backtest.c, and snapshot-load.c.
 Deduplicate them
@@ -1713,7 +1713,7 @@ Add integration test that ensures that a CI ledger failure has a non-zero return
 - **Updated:** 2026-01-14
 - **Assignees:** cali-jumptrading
 
-Extend the snapshot tile arguments (in topo) to support a 'manifest only' mode. 
+Extend the snapshot tile arguments (in topo) to support a 'manifest only' mode.
 
 The manifest only mode should shut down snapshot tiles as soon as the manifest was published.
 
@@ -1733,7 +1733,7 @@ But we should either fix these build errors, or early fail clearly stating that 
 
 Reproducer:
 ```
-gcc version 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04) 
+gcc version 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04)
 ```
 (clean) build with
 ```
@@ -1779,7 +1779,7 @@ _(truncated)_
 - **Updated:** 2026-03-17
 - **Assignees:** ptaffet-jump
 
-Running `fddev` with the following config and a bundle test service causes pack to flood the local chain with crank transactions. 
+Running `fddev` with the following config and a bundle test service causes pack to flood the local chain with crank transactions.
 
 ```
 [tiles.bundle]
@@ -1813,18 +1813,18 @@ https://github.com/jito-labs/mev-protos/commit/46ead86a13a55a0ef2c139db96a8ee93b
 TLDR: Solana snapshot/RocksDB ledgers used for regression testing lack information required for clients to determine if their software version (feature gate set) is able to replay. This is due to missing feature accounts for activated (and optionally hardcoded) features.
 
 Solana typically uses feature program accounts to signal activations of features (breaking protocol changes).
-Live clusters keep an invariant that a feature account is created before the corresponding feature is activated. 
+Live clusters keep an invariant that a feature account is created before the corresponding feature is activated.
 
 When restoring execution state from a snapshot, these feature accounts determine which features get reactivated.
 
-Additionally, Agave and Firedancer have a concept of feature "hardcoding" or "cleanup". 
+Additionally, Agave and Firedancer have a concept of feature "hardcoding" or "cleanup".
 When a feature is "cleaned up" on a client version, that client loses the ability to execute blocks with that feature _deactivated_.
 
 A client can check whether it is compatible with a specific ledger is as follows:
 - Ensure that all "cleaned up" features on a client version have activated feature accounts on the ledger being replayed
 - Ensure that all other activated feature accounts on that ledger are known/supported on the client version
 
-The issue arises when a feature gets "cleaned up" but a feature account does not get created. This is currently the case due to bugs in the agave-ledger-tool "create-snapshot" command: `activate-feature` is not supported, and https://github.com/anza-xyz/agave/issues/7087 
+The issue arises when a feature gets "cleaned up" but a feature account does not get created. This is currently the case due to bugs in the agave-ledger-tool "create-snapshot" command: `activate-feature` is not supported, and https://github.com/anza-xyz/agave/issues/7087
 
 Older versions might still think they are compatible (there are no activated feature accounts that the old client does not support), but would encounter bank hash mismatches when replaying. It is preferable to crash cleanly than to emit a rogue BHM.
 
@@ -1835,7 +1835,7 @@ Older versions might still think they are compatible (there are no activated fea
 - **Created:** 2025-07-10 by @ripatel-fd
 - **Updated:** 2025-11-14
 
-Most of our operators use Ubuntu, would be nice to have a proper flamegraph solution for Debian. 
+Most of our operators use Ubuntu, would be nice to have a proper flamegraph solution for Debian.
 the `perf script flamegraph` package seems to be Fedora only
 
 ---
@@ -1846,7 +1846,7 @@ the `perf script flamegraph` package seems to be Fedora only
 - **Updated:** 2026-03-31
 - **Assignees:** ripatel-fd
 
-sock, xdp, and ibeth tiles redundantly look for hardcoded link names and port numbers. 
+sock, xdp, and ibeth tiles redundantly look for hardcoded link names and port numbers.
 To make the network stack parts more reusable, they should just map port numbers to RX/TX topo link IDs.
 
 ---
@@ -1870,7 +1870,7 @@ fd_quic_conn_tx();
 However, it results in additional complexity like [fd_quic_tx_enc_level](https://github.com/firedancer-io/firedancer/blob/eece8113f6c2cb70d1e24d91976e15148fbed67d/src/waltz/quic/fd_quic.c#L823), which is error prone.
 
 Consider generating response frames ASAP in the RX handler instead.
-Doing that reduces code complexity and could reduce state size. 
+Doing that reduces code complexity and could reduce state size.
 Some tests currently assume that the RX handler never issues TX callbacks, that will have to be fixed.
 
 ---
@@ -2053,12 +2053,12 @@ src/app/fdctl/config.c(590): running as uid 1009, but config specifies uid 1003
 - **Updated:** 2026-04-06
 - **Assignees:** ripatel-fd
 
-The net tile currently accepts traffic for all dst IPs. 
+The net tile currently accepts traffic for all dst IPs.
 Should be filtered according to route table, possibly with rp_filter.
 
 Implementation notes:
 - [ ] Add a new fib4 containing only local routes  (fib_local)
-- [ ] Add optional fib4 filter for reverse path (eliminate local routes that don't meet criteria for rp_filter) 
+- [ ] Add optional fib4 filter for reverse path (eliminate local routes that don't meet criteria for rp_filter)
 - [ ] Add config option for reverse path filter
 - [ ] Install fib_local to RX path
 
@@ -2130,7 +2130,7 @@ Only `fdctl run` should require a `--config` flag. All auxiliary commands should
 - **Updated:** 2026-06-10
 - **Labels:** quic
 
-Spec says we should immediately ACK if there's a packet number gap. We don't do that yet. 
+Spec says we should immediately ACK if there's a packet number gap. We don't do that yet.
 
 ```
 In order to assist loss detection at the sender, an endpoint SHOULD generate and send an ACK frame without delay when it receives an ack-eliciting packet either:
@@ -2312,7 +2312,7 @@ Create a minimal reproducible example for the memcpy sz==0 bug and report it to 
 
 **Problem**
 
-Joining shared memory objects of a production fdctl instance is excessively difficult. 
+Joining shared memory objects of a production fdctl instance is excessively difficult.
 
 Object discovery currently involves recreating all setup steps (parsing a config file, constructing the topology, and simulating tile initialization code to recover object offsets). It also breaks across different versions.
 
@@ -2355,7 +2355,7 @@ Some developers prefer Intel assembly syntax, when using `make asm` to review ge
 - **Updated:** 2025-11-14
 - **Labels:** linting, Priority: Low
 
-Implicit integer conversions to a shorter type, such as ulong to ushort, can cause compile failures. 
+Implicit integer conversions to a shorter type, such as ulong to ushort, can cause compile failures.
 
 Under `-Werror=all`, GCC 8.3 does not even allow `uchar x[2] = {3,4}`; (3 gets promoted to int, then converted to char)
 
@@ -2407,12 +2407,12 @@ And should thus be fixed.
 - **Updated:** 2025-11-14
 - **Labels:** security, Priority: Low
 
-`map_remove` doesn't validate that `entry` (still) is a valid entry in the map. 
+`map_remove` doesn't validate that `entry` (still) is a valid entry in the map.
 Removing an entry twice can lead to an underflow of `key_cnt` and passing an invalid entry can lead to an OOB write.
 
 Current callers seem fine, but I think the quic connection / stream handling code is complex enough that a double free of a connection or stream entry could happen.
 
-I think validating the entry and crashing if it's invalid would be a nice defense-in-depth addition. 
+I think validating the entry and crashing if it's invalid would be a nice defense-in-depth addition.
 
 ```
 static inline void
@@ -2439,12 +2439,12 @@ MAP_(remove)( MAP_T * map,
 In fd_mux_tile (src/disco/mux/fd_mux.c), it appears a compromised tile could cause an out-of-bounds read in another tile (e.g. if you achieved remote code execution the quic tile, you may be able to make the verify tile read out-of-bounds memory):
 
 ```
-ulong depth    = fd_mcache_depth( this_in->mcache ); min_in_depth = fd_ulong_min( min_in_depth, depth );  
-if( FD_UNLIKELY( depth > UINT_MAX ) ) { FD_LOG_WARNING(( "in_mcache[%lu] too deep", in_idx )); return 1; }  
-this_in->depth = (uint)depth;  
-this_in->idx   = (uint)in_idx;  
-this_in->seq   = fd_mcache_seq_query( this_in_sync ); /* FIXME: ALLOW OPTION FOR MANUAL SPECIFICATION? */  
-this_in->mline = this_in->mcache + fd_mcache_line_idx( this_in->seq, this_in->depth );  
+ulong depth    = fd_mcache_depth( this_in->mcache ); min_in_depth = fd_ulong_min( min_in_depth, depth );
+if( FD_UNLIKELY( depth > UINT_MAX ) ) { FD_LOG_WARNING(( "in_mcache[%lu] too deep", in_idx )); return 1; }
+this_in->depth = (uint)depth;
+this_in->idx   = (uint)in_idx;
+this_in->seq   = fd_mcache_seq_query( this_in_sync ); /* FIXME: ALLOW OPTION FOR MANUAL SPECIFICATION? */
+this_in->mline = this_in->mcache + fd_mcache_line_idx( this_in->seq, this_in->depth );
 ```
 The depth variable is set from the underlying shared memory for the input workspace. Note there's a bounds check to ensure that the depth is less than UINT_MAX (4GB). The fd_mcache_line_idx function can return a value between [0,depth). Since the workspace shared memory mapping is 1GB (e.g. for fd1_quic_verify.wksp), this looks like it could result in an mline value that points out of bounds.
 
@@ -2459,9 +2459,9 @@ In certain scenarios, OOB read issues like this may lead to cross-tile informati
 - **Labels:** perf, fdctl
 - **Assignees:** ripatel-fd
 
-Relates to #2297 
+Relates to #2297
 
-A default configuration Fedora 40 will clumsily schedule ksoftirqd processes onto the same CPUs as Firedancer tiles. 
+A default configuration Fedora 40 will clumsily schedule ksoftirqd processes onto the same CPUs as Firedancer tiles.
 
 This is mostly not noticeable but can lead to sporadic drops in performance at high packet rates (>15Mpps)
 
@@ -2481,7 +2481,7 @@ On i40e (Intel X710 class NICs), the AF_XDP kernel side running in ksoftirqd is 
 fd_xsk can forward at least ~28Mpps from 3 AF_XDP rings to an mcache on one EPYC 7502P core.
 But the kernel requires about ~3 cores running ksoftirqd to fill the same AF_XDP rings from the network device queues.
 
-Therefore, a 1:1 mapping between tiles and rings is wasteful. 
+Therefore, a 1:1 mapping between tiles and rings is wasteful.
 And reducing the ring count can lead to performance issues because of insufficient ksoftirqd time.
 
 ---
@@ -2492,9 +2492,9 @@ And reducing the ring count can lead to performance issues because of insufficie
 - **Updated:** 2026-04-06
 - **Labels:** Priority: Low
 
-Any tile with a fixed CPU assignment will use 100% time share of that CPU. 
+Any tile with a fixed CPU assignment will use 100% time share of that CPU.
 
-This can cause issues if a IRQ/soft-IRQ is scheduled on the same core. 
+This can cause issues if a IRQ/soft-IRQ is scheduled on the same core.
 irqbalance seems to be not very smart and occasionally reassigns net channels on Firedancer-reserved CPUs even if there are lots of other CPUs free.
 
 We should start by printing a warning to the user if the smp_affinity mask is set incorrectly.
@@ -2520,7 +2520,7 @@ Running the fdctl binary from disk will map certain sections of memory shared wi
 
 fd_keyguard does not verify that the pre-image of Merkle shreds is valid and unambiguous with other inputs.
 
-The shred tile could thus sign 
+The shred tile could thus sign
 - gossip pings
 - repair pings
 - any arbitrary 32 byte message
@@ -2567,7 +2567,7 @@ Audit link and buffer sizes to ensure everything is minimal for 1M.
 
 Use memfd_secret to store the node's private key
 
-Not supported on all kernels, so needs a fallback 
+Not supported on all kernels, so needs a fallback
 
 https://lwn.net/Articles/865256/
 
@@ -2650,7 +2650,7 @@ Will let us reduce core count by sharing core for non-perf critical tiles
 
 **Problem**
 
-Spotting build failures in CI log is currently like finding a needle in the haystack due to high build parallelism. 
+Spotting build failures in CI log is currently like finding a needle in the haystack due to high build parallelism.
 
 **Suggested Fix**
 
@@ -2667,11 +2667,11 @@ Consider using [problem matchers](https://github.com/actions/toolkit/blob/main/d
 - **Labels:** security, Priority: High
 - **Assignees:** ripatel-fd
 
-Our CI configuration does not test for uninitialized reads. 
+Our CI configuration does not test for uninitialized reads.
 MemorySanitizer is a highly accurate tool for detecting such.
-Unlike the other sanitizers, it requires special setup however. 
+Unlike the other sanitizers, it requires special setup however.
 
-Namely, we have to build a custom libc++ with MSan instrumentation, and then a custom Clang toolchain. 
+Namely, we have to build a custom libc++ with MSan instrumentation, and then a custom Clang toolchain.
 
 - [ ] Add MSan build config
 - [ ] Add documentation how to create an MSan-capable LLVM build and how to instrument Firedancer with it
@@ -2753,7 +2753,7 @@ Since all links are now specified in the topology, we can automatically bounds c
 #6  0x0000000006233ad0 in fd_log_private_cleanup () at src/util/log/fd_log.c:922
 #7  0x00007f513354126c in __run_exit_handlers () from /lib64/libc.so.6
 #8  0x00007f51335413a0 in exit () from /lib64/libc.so.6
-#9  0x000000000623397e in fd_log_private_2 (level=4, now=1697739996844136477, file=0xf13ac5f "src/app/fdctl/topology.c", line=225, func=0xf13b2f0 <__func__.32139> "fd_topo_workspace_fill", 
+#9  0x000000000623397e in fd_log_private_2 (level=4, now=1697739996844136477, file=0xf13ac5f "src/app/fdctl/topology.c", line=225, func=0xf13b2f0 <__func__.32139> "fd_topo_workspace_fill",
     msg=0x7f5134a25070 "workspace footprint 18446744073555893248 not aligned to page size 0") at src/util/log/fd_log.c:864
 #10 0x00000000060f39b7 in fd_topo_workspace_fill (topo=0x7ffe5ebc3bd0, wksp=0x7ffe5ebc3be8, mode=0) at src/app/fdctl/topology.c:225
 #11 0x00000000060f3db2 in fd_topo_fill (topo=0x7ffe5ebc3bd0, mode=0) at src/app/fdctl/topology.c:266
