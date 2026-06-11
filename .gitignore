@@ -89,3 +89,7 @@ zig-out/
 # LLMs
 .claude
 .codex
+
+# Version derive
+src/util/fd_version_generated.h
+src/util/fd_version_generated1.h

@@ -6,7 +6,6 @@
 #include "../../../util/net/fd_ip4.h"
 #include "../../../util/net/fd_udp.h"
 
-#include <assert.h> /* assert */
 #include <stdalign.h> /* alignof */
 #include <errno.h>
 #include <fcntl.h> /* fcntl */
@@ -164,8 +163,7 @@ privileged_init( fd_topo_t const *      topo,
   struct sockaddr_in * batch_sa   = FD_SCRATCH_ALLOC_APPEND( l, alignof(struct sockaddr_in), STEM_BURST*sizeof(struct sockaddr_in) );
   struct mmsghdr *     batch_msg  = FD_SCRATCH_ALLOC_APPEND( l, alignof(struct mmsghdr),     STEM_BURST*sizeof(struct mmsghdr)     );
   uchar *              tx_scratch = FD_SCRATCH_ALLOC_APPEND( l, FD_CHUNK_ALIGN,              tx_scratch_footprint()                );
-
-  assert( scratch==ctx );
+  FD_DCHECK_CRIT( scratch==ctx, "invalid layout" );
 
   fd_memset( ctx,       0, sizeof(fd_sock_tile_t)                );
   fd_memset( batch_iov, 0, STEM_BURST*sizeof(struct iovec)       );
@@ -475,7 +473,7 @@ flush_tx_batch( fd_sock_tile_t * ctx ) {
     int remain   = (int)batch_cnt - j;
     int send_cnt = sendmmsg( ctx->tx_sock, ctx->batch_msg + j, (uint)remain, MSG_DONTWAIT );
     if( send_cnt>=0 ) {
-      ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCK_ERR_V_NO_ERROR_IDX ]++;
+      ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCKET_ERROR_V_NO_ERROR_IDX ]++;
     }
     if( FD_UNLIKELY( send_cnt < remain ) ) {
       ctx->metrics.tx_drop_cnt++;
@@ -483,22 +481,22 @@ flush_tx_batch( fd_sock_tile_t * ctx ) {
         switch( errno ) {
         case EAGAIN:
         case ENOBUFS:
-          ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCK_ERR_V_SLOW_IDX ]++;
+          ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCKET_ERROR_V_SLOW_IDX ]++;
           break;
         case EPERM:
-          ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCK_ERR_V_PERM_IDX ]++;
+          ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCKET_ERROR_V_PERMISSION_IDX ]++;
           break;
         case ENETUNREACH:
         case EHOSTUNREACH:
-          ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCK_ERR_V_UNREACH_IDX ]++;
+          ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCKET_ERROR_V_UNREACHABLE_IDX ]++;
           break;
         case ENONET:
         case ENETDOWN:
         case EHOSTDOWN:
-          ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCK_ERR_V_DOWN_IDX ]++;
+          ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCKET_ERROR_V_DOWN_IDX ]++;
           break;
         default:
-          ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCK_ERR_V_OTHER_IDX ]++;
+          ctx->metrics.sys_sendmmsg_cnt[ FD_METRICS_ENUM_SOCKET_ERROR_V_OTHER_IDX ]++;
           /* log with NOTICE, since flushing has a significant negative performance impact */
           FD_LOG_NOTICE(( "sendmmsg failed (%i-%s)", errno, fd_io_strerror( errno ) ));
         }
@@ -591,7 +589,7 @@ during_frag( fd_sock_tile_t * ctx,
   ulong msg_sz = sizeof(fd_udp_hdr_t) + payload_sz;
 
   ulong batch_idx = ctx->batch_cnt;
-  assert( batch_idx<STEM_BURST );
+  FD_DCHECK_CRIT( batch_idx<STEM_BURST, "flow control error" );
   struct mmsghdr *     msg  = ctx->batch_msg + batch_idx;
   struct sockaddr_in * sa   = ctx->batch_sa  + batch_idx;
   struct iovec   *     iov  = ctx->batch_iov + batch_idx;
@@ -690,13 +688,13 @@ after_credit( fd_sock_tile_t *    ctx,
 
 static void
 metrics_write( fd_sock_tile_t * ctx ) {
-  FD_MCNT_SET( SOCK, SYSCALLS_RECVMMSG,       ctx->metrics.sys_recvmmsg_cnt     );
-  FD_MCNT_ENUM_COPY( SOCK, SYSCALLS_SENDMMSG, ctx->metrics.sys_sendmmsg_cnt     );
-  FD_MCNT_SET( SOCK, RX_PKT_CNT,              ctx->metrics.rx_pkt_cnt           );
-  FD_MCNT_SET( SOCK, TX_PKT_CNT,              ctx->metrics.tx_pkt_cnt           );
-  FD_MCNT_SET( SOCK, TX_DROP_CNT,             ctx->metrics.tx_drop_cnt          );
-  FD_MCNT_SET( SOCK, TX_BYTES_TOTAL,          ctx->metrics.tx_bytes_total       );
-  FD_MCNT_SET( SOCK, RX_BYTES_TOTAL,          ctx->metrics.rx_bytes_total       );
+  FD_MCNT_SET( SOCK, SYSCALL_RX,              ctx->metrics.sys_recvmmsg_cnt     );
+  FD_MCNT_ENUM_COPY( SOCK, SYSCALL_TX,        ctx->metrics.sys_sendmmsg_cnt     );
+  FD_MCNT_SET( SOCK, PKT_RX,                  ctx->metrics.rx_pkt_cnt           );
+  FD_MCNT_SET( SOCK, PKT_TX,                  ctx->metrics.tx_pkt_cnt           );
+  FD_MCNT_SET( SOCK, PKT_TX_FAILED,          ctx->metrics.tx_drop_cnt          );
+  FD_MCNT_SET( SOCK, PKT_TX_BYTES,            ctx->metrics.tx_bytes_total       );
+  FD_MCNT_SET( SOCK, PKT_RX_BYTES,            ctx->metrics.rx_bytes_total       );
 }
 
 static ulong

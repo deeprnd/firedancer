@@ -16,8 +16,7 @@
 struct fd_configf {
   struct {
     ulong max_accounts;
-    ulong file_size_gib;
-    ulong mean_account_footprint;
+    ulong cache_size_gib;
   } accounts;
 
   struct {
@@ -33,7 +32,6 @@ struct fd_configf {
     ulong max_live_slots;
     int   fixed_fec_sets;
     ulong max_fork_width;
-    ulong concurrent_account_limit;
 
     struct {
       ulong heap_size_mib;
@@ -289,6 +287,10 @@ struct fd_config {
       char frontend_release_channel[ 16 ];
       int  frontend_release_channel_enum;
     } gui;
+
+    struct {
+      ulong partition_size_gib;
+    } accdb;
   } development;
 
   struct {
@@ -343,10 +345,12 @@ struct fd_config {
     } bundle;
 
     struct {
-      uint max_pending_transactions;
-      int  use_consumed_cus;
-      char schedule_strategy[ 16 ];
-      int  schedule_strategy_enum;
+      uint  max_pending_transactions;
+      int   use_consumed_cus;
+      char  schedule_strategy[ 16 ];
+      int   schedule_strategy_enum;
+      ulong account_blocklist_cnt;
+      char  account_blocklist[ FD_PACK_ACCT_BLOCKLIST_MAX ][ FD_BASE58_ENCODED_32_SZ ];
     } pack;
 
     struct {
@@ -450,7 +454,8 @@ fd_config_load( int           is_firedancer,
                 char const *  user_config,
                 ulong         user_config_sz,
                 char const *  user_config_path,
-                fd_config_t * config );
+                fd_config_t * config,
+                int           dev );
 
 /* Create a memfd and write the raw underlying bytes of the provided
    config struct into it.  On success returns a file descriptor

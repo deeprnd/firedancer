@@ -36,6 +36,8 @@
 #include <termios.h>
 #include <errno.h>
 
+extern action_t fd_action_repair;
+
 struct fd_location_info {
   ulong ip4_addr;         /* for map key convenience */
   char location[ 128 ];
@@ -160,7 +162,7 @@ repair_load_manifest( fd_topo_t *  topo,
       aligned_alloc( fd_ssmanifest_parser_align(), fd_ssmanifest_parser_footprint() ) ) );
   FD_TEST( parser );
   fd_ssmanifest_parser_init( parser, manifest );
-  int parser_err = fd_ssmanifest_parser_consume( parser, buf, buf_sz, NULL, NULL );
+  int parser_err = fd_ssmanifest_parser_consume( parser, buf, buf_sz );
   FD_TEST( parser_err!=FD_SSMANIFEST_PARSER_ADVANCE_ERROR );
   FD_TEST( fd_ssmanifest_parser_fini( parser )==FD_SSMANIFEST_PARSER_ADVANCE_DONE );
   free( parser );
@@ -721,58 +723,58 @@ print_tile_metrics( volatile ulong * shred_metrics,
                     long    last_print_ts,
                     long    now ) {
   char buf2[ 64 ];
-  ulong rcvd = shred_metrics [ MIDX( COUNTER, SHRED,  SHRED_REPAIR_RCV ) ];
-  ulong sent = repair_metrics[ MIDX( COUNTER, REPAIR, SENT_PKT_TYPES_NEEDED_WINDOW ) ] +
-                repair_metrics[ MIDX( COUNTER, REPAIR, SENT_PKT_TYPES_NEEDED_HIGHEST_WINDOW ) ] +
-                repair_metrics[ MIDX( COUNTER, REPAIR, SENT_PKT_TYPES_NEEDED_ORPHAN ) ];
+  ulong rcvd = shred_metrics [ MIDX( COUNTER, SHRED,  SHRED_REPAIR_RX ) ];
+  ulong sent = repair_metrics[ MIDX( COUNTER, REPAIR, REQUEST_TX_NEEDED_WINDOW ) ] +
+                repair_metrics[ MIDX( COUNTER, REPAIR, REQUEST_TX_NEEDED_HIGHEST_WINDOW ) ] +
+                repair_metrics[ MIDX( COUNTER, REPAIR, REQUEST_TX_NEEDED_ORPHAN ) ];
   printf(" Requests received: (%lu/%lu) %.1f%% \n", rcvd, sent, (double)rcvd / (double)sent * 100.0 );
   printf( " +---------------+--------------+\n" );
   printf( " | Request Type  | Count        |\n" );
   printf( " +---------------+--------------+\n" );
-  printf( " | Orphan        | %s |\n", fmt_count( buf2, repair_metrics[ MIDX( COUNTER, REPAIR, SENT_PKT_TYPES_NEEDED_ORPHAN         ) ] ) );
-  printf( " | HighestWindow | %s |\n", fmt_count( buf2, repair_metrics[ MIDX( COUNTER, REPAIR, SENT_PKT_TYPES_NEEDED_HIGHEST_WINDOW ) ] ) );
-  printf( " | Index         | %s |\n", fmt_count( buf2, repair_metrics[ MIDX( COUNTER, REPAIR, SENT_PKT_TYPES_NEEDED_WINDOW         ) ] ) );
+  printf( " | Orphan        | %s |\n", fmt_count( buf2, repair_metrics[ MIDX( COUNTER, REPAIR, REQUEST_TX_NEEDED_ORPHAN         ) ] ) );
+  printf( " | HighestWindow | %s |\n", fmt_count( buf2, repair_metrics[ MIDX( COUNTER, REPAIR, REQUEST_TX_NEEDED_HIGHEST_WINDOW ) ] ) );
+  printf( " | Index         | %s |\n", fmt_count( buf2, repair_metrics[ MIDX( COUNTER, REPAIR, REQUEST_TX_NEEDED_WINDOW         ) ] ) );
   printf( " +---------------+--------------+\n" );
   printf( " Send Pkt Rate: %s pps\n",  fmt_count( buf2, (ulong)((sent - *last_sent_cnt)*1e9L / (now - last_print_ts) ) ) );
   *last_sent_cnt = sent;
 
   /* Sum overrun across all net tiles connected to repair_net */
-  ulong total_overrun = repair_net_links[0][ MIDX( COUNTER, LINK, OVERRUN_POLLING_FRAG_COUNT ) ]; /* coarse double counting prevention */
+  ulong total_overrun = repair_net_links[0][ MIDX( COUNTER, LINK, FRAG_POLLING_OVERRUN ) ]; /* coarse double counting prevention */
   ulong total_consumed = 0UL;
   for( ulong i = 0UL; i < net_tile_cnt; i++ ) {
     volatile ulong * ovar_net_metrics = repair_net_links[i];
-    total_overrun  += ovar_net_metrics[ MIDX( COUNTER, LINK, OVERRUN_READING_FRAG_COUNT ) ];
-    total_consumed += ovar_net_metrics[ MIDX( COUNTER, LINK, CONSUMED_COUNT ) ]; /* consumed is incremented after after_frag is called */
+    total_overrun  += ovar_net_metrics[ MIDX( COUNTER, LINK, FRAG_READING_OVERRUN ) ];
+    total_consumed += ovar_net_metrics[ MIDX( COUNTER, LINK, FRAG_CONSUMED ) ]; /* consumed is incremented after after_frag is called */
   }
   printf( " Outgoing requests overrun:  %s\n", fmt_count( buf2, total_overrun  ) );
   printf( " Outgoing requests consumed: %s\n", fmt_count( buf2, total_consumed ) );
 
-  total_overrun  = net_shred_links[0][ MIDX( COUNTER, LINK, OVERRUN_READING_FRAG_COUNT ) ];
+  total_overrun  = net_shred_links[0][ MIDX( COUNTER, LINK, FRAG_READING_OVERRUN ) ];
   total_consumed = 0UL;
   for( ulong i = 0UL; i < net_tile_cnt; i++ ) {
     volatile ulong * ovar_net_metrics = net_shred_links[i];
-    total_overrun  += ovar_net_metrics[ MIDX( COUNTER, LINK, OVERRUN_READING_FRAG_COUNT ) ];
-    total_consumed += ovar_net_metrics[ MIDX( COUNTER, LINK, CONSUMED_COUNT ) ]; /* shred frag filtering happens manually in after_frag, so no need to index every shred_tile. */
+    total_overrun  += ovar_net_metrics[ MIDX( COUNTER, LINK, FRAG_READING_OVERRUN ) ];
+    total_consumed += ovar_net_metrics[ MIDX( COUNTER, LINK, FRAG_CONSUMED ) ]; /* shred frag filtering happens manually in after_frag, so no need to index every shred_tile. */
   }
 
   printf( " Incoming shreds overrun:    %s\n", fmt_count( buf2, total_overrun ) );
   printf( " Incoming shreds consumed:   %s\n", fmt_count( buf2, total_consumed ) );
 
   print_histogram_buckets( repair_metrics,
-                            MIDX( HISTOGRAM, REPAIR, RESPONSE_LATENCY ),
+                            MIDX( HISTOGRAM, REPAIR, RESPONSE_LATENCY_NANOS ),
                             FD_METRICS_CONVERTER_NONE,
-                            FD_METRICS_HISTOGRAM_REPAIR_RESPONSE_LATENCY_MIN,
-                            FD_METRICS_HISTOGRAM_REPAIR_RESPONSE_LATENCY_MAX,
+                            FD_METRICS_HISTOGRAM_REPAIR_RESPONSE_LATENCY_NANOS_MIN,
+                            FD_METRICS_HISTOGRAM_REPAIR_RESPONSE_LATENCY_NANOS_MAX,
                             "Response Latency" );
 
-  printf(" Repair Peers: %lu\n", repair_metrics[ MIDX( COUNTER, REPAIR, REQUEST_PEERS ) ] );
+  printf(" Repair Peers: %lu\n", repair_metrics[ MIDX( COUNTER, REPAIR, PEER_REQUESTED ) ] );
   printf(" Shreds rejected (no stakes): %lu\n", shred_metrics[ MIDX( COUNTER, SHRED, SHRED_PROCESSED ) ] );
   /* Print histogram buckets similar to Prometheus format */
   print_histogram_buckets( repair_metrics,
-                          MIDX( HISTOGRAM, REPAIR, SLOT_COMPLETE_TIME ),
+                          MIDX( HISTOGRAM, REPAIR, SLOT_COMPLETE_DURATION_SECONDS ),
                           FD_METRICS_CONVERTER_SECONDS,
-                          FD_METRICS_HISTOGRAM_REPAIR_SLOT_COMPLETE_TIME_MIN,
-                          FD_METRICS_HISTOGRAM_REPAIR_SLOT_COMPLETE_TIME_MAX,
+                          FD_METRICS_HISTOGRAM_REPAIR_SLOT_COMPLETE_DURATION_SECONDS_MIN,
+                          FD_METRICS_HISTOGRAM_REPAIR_SLOT_COMPLETE_DURATION_SECONDS_MAX,
                           "Slot Complete Time" );
 
 #define DIFFX(METRIC) repair_metrics[ MIDX( COUNTER, TILE, METRIC ) ] - repair_metrics_prev[ MIDX( COUNTER, TILE, METRIC ) ]
@@ -790,11 +792,11 @@ print_tile_metrics( volatile ulong * shred_metrics,
 #undef DIFFX
   fflush( stdout );
 
-  printf( " Block failed insert: %lu\n", repair_metrics[ MIDX( COUNTER, REPAIR, BLK_FAILED_INSERT ) ] );
-  printf( " Block evicted: %lu\n", repair_metrics[ MIDX( COUNTER, REPAIR, BLK_EVICTED ) ] );
-  printf( " slot evicted: %lu\n", repair_metrics[ MIDX( GAUGE, REPAIR, SLOT_EVICTED ) ] );
-  printf( " slot evicted by: %lu\n", repair_metrics[ MIDX( GAUGE, REPAIR, SLOT_EVICTED_BY ) ] );
-  printf( " slot failed insert: %lu\n", repair_metrics[ MIDX( GAUGE, REPAIR, SLOT_FAILED_INSERT ) ] );
+  printf( " Block failed insert: %lu\n", repair_metrics[ MIDX( COUNTER, REPAIR, BLOCK_INSERT_FAILED ) ] );
+  printf( " Block evicted: %lu\n", repair_metrics[ MIDX( COUNTER, REPAIR, BLOCK_EVICTED ) ] );
+  printf( " slot evicted: %lu\n", repair_metrics[ MIDX( GAUGE, REPAIR, SLOT_LAST_EVICTED ) ] );
+  printf( " slot evicted by: %lu\n", repair_metrics[ MIDX( GAUGE, REPAIR, SLOT_LAST_EVICTION_CAUSE ) ] );
+  printf( " slot failed insert: %lu\n", repair_metrics[ MIDX( GAUGE, REPAIR, SLOT_LAST_INSERT_FAILED ) ] );
   for( ulong i=0UL; i<FD_METRICS_TOTAL_SZ/sizeof(ulong); i++ ) repair_metrics_prev[ i ] = repair_metrics[ i ];
 }
 
@@ -938,8 +940,8 @@ repair_cmd_fn_catchup( args_t *   args,
     int catchup_finished = 0;
     if( FD_UNLIKELY( now - last_print > 1e9L ) ) {
       print_tile_metrics( shred_metrics, repair_metrics, repair_metrics_prev, repair_net_links, net_shred_links, net_cnt, &last_sent, last_print, now );
-      ulong slots_behind = turbine_slot0 > repair_metrics[ MIDX( GAUGE, REPAIR, REPAIRED_SLOTS ) ] ? turbine_slot0 - repair_metrics[ MIDX( GAUGE, REPAIR, REPAIRED_SLOTS ) ] : 0;
-      printf(" Repaired slots: %lu/%lu  (slots behind: %lu)\n", repair_metrics[ MIDX( GAUGE, REPAIR, REPAIRED_SLOTS ) ], turbine_slot0, slots_behind );
+      ulong slots_behind = turbine_slot0 > repair_metrics[ MIDX( GAUGE, REPAIR, SLOT_HIGHEST_REPAIRED ) ] ? turbine_slot0 - repair_metrics[ MIDX( GAUGE, REPAIR, SLOT_HIGHEST_REPAIRED ) ] : 0;
+      printf(" Repaired slots: %lu/%lu  (slots behind: %lu)\n", repair_metrics[ MIDX( GAUGE, REPAIR, SLOT_HIGHEST_REPAIRED ) ], turbine_slot0, slots_behind );
       if( turbine_slot0 && !slots_behind ) {
         catchup_finished = 1;
       }
@@ -1006,7 +1008,7 @@ repair_cmd_fn_eqvoc( args_t *   args,
   int confirmed = 0;
   for(;;) {
     /* publish a confirmation on tower_out */
-    if( FD_UNLIKELY( !confirmed && repair_metrics[ MIDX( GAUGE, REPAIR, REPAIRED_SLOTS ) ] != 0 ) ) {
+    if( FD_UNLIKELY( !confirmed && repair_metrics[ MIDX( GAUGE, REPAIR, SLOT_HIGHEST_REPAIRED ) ] != 0 ) ) {
       fd_tower_slot_confirmed_t * msg = fd_chunk_to_laddr( tower_out_mem, tower_out_chunk );
       FD_LOG_NOTICE(( "publishing confirmation for slot %lu", msg->slot ));
       fd_mcache_publish( tower_out_mcache, tower_out_link->depth, 0, FD_TOWER_SIG_SLOT_CONFIRMED, tower_out_chunk, sizeof(fd_tower_slot_confirmed_t), 0, 0, 0 );
@@ -1332,114 +1334,12 @@ repair_cmd_fn_peers( args_t *   args,
 }
 
 
-static const char * HELP =
-  "\n\n"
-  "usage: repair [-h] {catchup,forest,inflight,requests,waterfall,peers,metrics} ...\n"
-  "\n"
-  "positional arguments:\n"
-  "  {catchup,forest,inflight,requests,waterfall,peers,metrics}\n"
-  "    catchup             runs Firedancer with a reduced topology that only repairs slots until catchup\n"
-  "    eqvoc               tests equivocation detection & repair path\n"
-  "    forest              prints the repair forest\n"
-  "    inflight            prints the inflight repairs\n"
-  "    requests            prints the queued repair requests\n"
-  "    waterfall           prints a waterfall diagram of recent slot completion times and response latencies\n"
-  "    peers               prints list of slow and fast repair peers\n"
-  "    metrics             prints repair tile metrics in a digestible format\n"
-  "\n"
-  "optional arguments:\n"
-  "  -h, --help            show this help message and exit\n";
 
-static const char * CATCHUP_HELP =
-  "\n\n"
-  "usage: repair catchup [-h] [--manifest-path MANIFEST_PATH] [--iptable-path IPTABLE_PATH] [--sort-by-slot]\n"
-  "\n"
-  "required arguments:\n"
-  "  --manifest-path MANIFEST_PATH\n"
-  "                        path to manifest file\n"
-  "\n"
-  "optional arguments:\n"
-  "  -h, --help            show this help message and exit\n"
-  "  --iptable-path IPTABLE_PATH\n"
-  "                        path to iptable file\n"
-  "  --sort-by-slot        sort results by slot\n";
-
-static const char * EQVOC_HELP =
-  "\n\n"
-  "usage: repair eqvoc [-h] [--manifest-path MANIFEST_PATH] \n"
-  "\n"
-  "optional arguments:\n"
-  "  -h, --help            show this help message and exit\n";
-
-static const char * FOREST_HELP =
-  "\n\n"
-  "usage: repair forest [-h]\n"
-  "\n"
-  "optional arguments:\n"
-  "  -h, --help            show this help message and exit\n"
-  "  --slot SLOT           specific forest slot to drill into\n";
-
-static const char * INFLIGHT_HELP =
-  "\n\n"
-  "usage: repair inflight [-h]\n"
-  "\n"
-  "optional arguments:\n"
-  "  -h, --help            show this help message and exit";
-
-static const char * REQUESTS_HELP =
-  "\n\n"
-  "usage: repair requests [-h]\n"
-  "\n"
-  "optional arguments:\n"
-  "  -h, --help            show this help message and exit\n";
-
-static const char * WATERFALL_HELP =
-  "\n\n"
-  "usage: repair waterfall [-h] [--iptable IPTABLE_PATH] [--sort-by-slot]\n"
-  "\n"
-  "optional arguments:\n"
-  "  -h, --help            show this help message and exit\n"
-  "  --iptable IPTABLE_PATH\n"
-  "                        path to iptable file\n"
-  "  --sort-by-slot        sort results by slot\n";
-
-static const char * PEERS_HELP =
-  "\n\n"
-  "usage: repair peers [-h]\n"
-  "\n"
-  "optional arguments:\n"
-  "  -h, --help            show this help message and exit\n";
-
-static const char * METRICS_HELP =
-  "\n\n"
-  "usage: repair metrics [-h] --config CONFIG_PATH\n"
-  "\n"
-  "optional arguments:\n"
-  "  -h, --help            show this help message and exit\n";
-
-void
-repair_cmd_help( char const * arg ) {
-  if      ( FD_LIKELY( !arg                        ) ) FD_LOG_NOTICE(( "%s", HELP           ));
-  else if ( FD_LIKELY( !strcmp( arg, "catchup"   ) ) ) FD_LOG_NOTICE(( "%s", CATCHUP_HELP   ));
-  else if ( FD_LIKELY( !strcmp( arg, "eqvoc"     ) ) ) FD_LOG_NOTICE(( "%s", EQVOC_HELP     ));
-  else if ( FD_LIKELY( !strcmp( arg, "forest"    ) ) ) FD_LOG_NOTICE(( "%s", FOREST_HELP    ));
-  else if ( FD_LIKELY( !strcmp( arg, "inflight"  ) ) ) FD_LOG_NOTICE(( "%s", INFLIGHT_HELP  ));
-  else if ( FD_LIKELY( !strcmp( arg, "requests"  ) ) ) FD_LOG_NOTICE(( "%s", REQUESTS_HELP  ));
-  else if ( FD_LIKELY( !strcmp( arg, "waterfall" ) ) ) FD_LOG_NOTICE(( "%s", WATERFALL_HELP ));
-  else if ( FD_LIKELY( !strcmp( arg, "peers"     ) ) ) FD_LOG_NOTICE(( "%s", PEERS_HELP     ));
-  else if ( FD_LIKELY( !strcmp( arg, "metrics"   ) ) ) FD_LOG_NOTICE(( "%s", METRICS_HELP   ));
-  else                                                 FD_LOG_NOTICE(( "%s", HELP           ));
-}
 
 void
 repair_cmd_args( int *    pargc,
                  char *** pargv,
                  args_t * args ) {
-
-  /* help */
-
-  args->repair.help = fd_env_strip_cmdline_contains( pargc, pargv, "--help" );
-  args->repair.help = args->repair.help || fd_env_strip_cmdline_contains( pargc, pargv, "-h" );
 
   /* positional arg */
 
@@ -1448,6 +1348,8 @@ repair_cmd_args( int *    pargc,
     args->repair.help = 1;
     return;
   }
+  (*pargc)--;
+  (*pargv)++;
 
   /* required args */
 
@@ -1462,8 +1364,6 @@ repair_cmd_args( int *    pargc,
   if( FD_UNLIKELY( !strcmp( args->repair.pos_arg, "catchup" ) && !manifest_path ) ) {
     args->repair.help = 1;
     return;
-  } else {
-    (*pargc)--;
   }
 
   fd_cstr_fini( fd_cstr_append_cstr_safe( fd_cstr_init( args->repair.manifest_path ), manifest_path, sizeof(args->repair.manifest_path)-1UL ) );
@@ -1477,7 +1377,7 @@ repair_cmd_fn( args_t *   args,
               config_t * config ) {
 
   if( args->repair.help ) {
-    repair_cmd_help( args->repair.pos_arg );
+    fd_action_help_print( &fd_action_repair );
     return;
   }
 
@@ -1489,12 +1389,36 @@ repair_cmd_fn( args_t *   args,
   else if( !strcmp( args->repair.pos_arg, "waterfall" ) ) repair_cmd_fn_waterfall( args, config );
   else if( !strcmp( args->repair.pos_arg, "peers"     ) ) repair_cmd_fn_peers    ( args, config );
   else if( !strcmp( args->repair.pos_arg, "metrics"   ) ) repair_cmd_fn_metrics  ( args, config );
-  else                                                    repair_cmd_help( NULL );
+  else                                                    fd_action_help_print( &fd_action_repair );
+}
+
+static void
+repair_args_help( fd_action_help_t * help ) {
+  fd_action_help_arg( help, "catchup",         NULL,     "Run a reduced topology that only repairs slots until catchup.\n"
+                                                         "Requires --manifest-path; accepts --iptable and --sort-by-slot" );
+  fd_action_help_arg( help, "eqvoc",           NULL,     "Test equivocation detection and the repair path" );
+  fd_action_help_arg( help, "forest",          NULL,     "Print the repair forest.  Accepts --slot to drill into a slot" );
+  fd_action_help_arg( help, "inflight",        NULL,     "Print the inflight repairs" );
+  fd_action_help_arg( help, "requests",        NULL,     "Print the queued repair requests" );
+  fd_action_help_arg( help, "waterfall",       NULL,     "Print a waterfall diagram of recent slot completion times and\n"
+                                                         "response latencies.  Accepts --iptable and --sort-by-slot" );
+  fd_action_help_arg( help, "peers",           NULL,     "Print the list of slow and fast repair peers" );
+  fd_action_help_arg( help, "metrics",         NULL,     "Print repair tile metrics in a digestible format" );
+  fd_action_help_arg( help, "--manifest-path", "<path>", "Path to manifest file (required by catchup)" );
+  fd_action_help_arg( help, "--iptable",       "<path>", "Path to iptable file (catchup, waterfall)" );
+  fd_action_help_arg( help, "--slot",          "<slot>", "Specific forest slot to drill into (forest)" );
+  fd_action_help_arg( help, "--sort-by-slot",  NULL,     "Sort results by slot (catchup, waterfall)" );
 }
 
 action_t fd_action_repair = {
-  .name = "repair",
-  .args = repair_cmd_args,
-  .fn   = repair_cmd_fn,
-  .perm = dev_cmd_perm,
+  .name        = "repair",
+  .args        = repair_cmd_args,
+  .fn          = repair_cmd_fn,
+  .perm        = dev_cmd_perm,
+  .description = "Spawn a reduced topology for inspecting and profiling the repair tile",
+  .detail      = "Boots a smaller Firedancer topology focused on the repair tile and runs the\n"
+                 "requested subcommand to drive or inspect repair behavior.  Pick one of the\n"
+                 "subcommands below.",
+  .usage       = "repair <catchup|eqvoc|forest|inflight|requests|waterfall|peers|metrics> [OPTIONS]",
+  .args_help   = repair_args_help,
 };

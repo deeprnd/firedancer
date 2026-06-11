@@ -6,10 +6,12 @@
 #include "generated/txn.pb.h"
 #include "generated/bundle.pb.h"
 #include "generated/vm.pb.h"
+#include "generated/vm_serialization.pb.h"
+#include "generated/cost.pb.h"
 #include "generated/elf.pb.h"
+#include "generated/shred.pb.h"
 
 #include "../fd_executor_err.h"
-#include <assert.h>
 
 /*
  * fixtures
@@ -61,7 +63,9 @@ static int
 _diff_txn_acct( fd_exec_test_acct_state_t * expected,
                 fd_exec_test_acct_state_t * actual ) {
   /* AcctState -> address (This must hold true when calling this function!) */
-  assert( fd_memeq( expected->address, actual->address, sizeof(fd_pubkey_t) ) );
+  if( FD_UNLIKELY( !fd_memeq( expected->address, actual->address, sizeof(fd_pubkey_t) ) ) ) {
+    FD_LOG_CRIT(( "diff algorithm error" ));
+  }
 
   /* AcctState -> lamports */
   if( expected->lamports != actual->lamports ) {
@@ -396,5 +400,67 @@ fd_solfuzz_pb_elf_loader_fixture( fd_solfuzz_runner_t * runner,
 
   // Cleanup
   pb_release( &fd_exec_test_elf_loader_fixture_t_msg, fixture );
+  return ok;
+}
+
+int
+fd_solfuzz_pb_shred_fixture( fd_solfuzz_runner_t * runner,
+                             uchar const *         in,
+                             ulong                 in_sz ) {
+  fd_exec_test_shred_parse_fixture_t fixture[1] = {0};
+  if( !sol_compat_decode_lenient( &fixture, in, in_sz, &fd_exec_test_shred_parse_fixture_t_msg ) ) {
+    FD_LOG_WARNING(( "Invalid shred fixture." ));
+    return 0;
+  }
+
+  fd_spad_push( runner->spad );
+  void * output = NULL;
+  fd_solfuzz_pb_execute_wrapper( runner, &fixture->input, &output, fd_solfuzz_pb_shred_run );
+  int ok = sol_compat_cmp_binary_strict( output, &fixture->output, &fd_exec_test_shred_parse_effects_t_msg, runner->spad );
+  fd_spad_pop( runner->spad );
+
+  pb_release( &fd_exec_test_shred_parse_fixture_t_msg, fixture );
+  return ok;
+}
+
+int
+fd_solfuzz_pb_vm_serialize_fixture( fd_solfuzz_runner_t * runner,
+                                    uchar const *         in,
+                                    ulong                 in_sz ) {
+  // Decode fixture
+  fd_exec_test_vm_serialization_fixture_t fixture[1] = {0};
+  if( !sol_compat_decode_lenient( &fixture, in, in_sz, &fd_exec_test_vm_serialization_fixture_t_msg ) ) {
+    FD_LOG_WARNING(( "Invalid vm serialization fixture." ));
+    return 0;
+  }
+
+  fd_spad_push( runner->spad );
+  void * output = NULL;
+  fd_solfuzz_pb_execute_wrapper( runner, &fixture->input, &output, fd_solfuzz_pb_vm_serialize_run );
+  int ok = sol_compat_cmp_binary_strict( output, &fixture->output, &fd_exec_test_vm_serialization_effects_t_msg, runner->spad );
+  fd_spad_pop( runner->spad );
+
+  pb_release( &fd_exec_test_vm_serialization_fixture_t_msg, fixture );
+  return ok;
+}
+
+int
+fd_solfuzz_pb_cost_fixture( fd_solfuzz_runner_t * runner,
+                            uchar const *         in,
+                            ulong                 in_sz ) {
+  // Decode fixture
+  fd_exec_test_cost_fixture_t fixture[1] = {0};
+  if( !sol_compat_decode_lenient( &fixture, in, in_sz, &fd_exec_test_cost_fixture_t_msg ) ) {
+    FD_LOG_WARNING(( "Invalid cost fixture." ));
+    return 0;
+  }
+
+  fd_spad_push( runner->spad );
+  void * output = NULL;
+  fd_solfuzz_pb_execute_wrapper( runner, &fixture->input, &output, fd_solfuzz_pb_cost_run );
+  int ok = sol_compat_cmp_binary_strict( output, &fixture->output, &fd_exec_test_cost_result_t_msg, runner->spad );
+  fd_spad_pop( runner->spad );
+
+  pb_release( &fd_exec_test_cost_fixture_t_msg, fixture );
   return ok;
 }

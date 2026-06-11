@@ -47,22 +47,7 @@
 #endif /* defined(__FreeBSD__) */
 
 #include "../tile/fd_tile_private.h"
-
-#ifdef __has_include
-#if __has_include("../../app/fdctl/version.h")
-#include "../../app/fdctl/version.h"
-#endif
-#endif
-
-#ifndef FDCTL_MAJOR_VERSION
-#define FDCTL_MAJOR_VERSION 0
-#endif
-#ifndef FDCTL_MINOR_VERSION
-#define FDCTL_MINOR_VERSION 0
-#endif
-#ifndef FDCTL_PATCH_VERSION
-#define FDCTL_PATCH_VERSION 0
-#endif
+#include "../fd_version.h"
 
 #ifdef FD_BUILD_INFO
 FD_IMPORT_CSTR( fd_log_build_info, FD_BUILD_INFO );
@@ -848,9 +833,11 @@ fd_log_private_1( int          level,
       /* 7 */ TEXT_RED TEXT_BOLD TEXT_UNDERLINE TEXT_BLINK "EMERG  " TEXT_NORMAL
     };
     char * now_short_cstr = now_cstr+5; now_short_cstr[21] = '\0'; /* Lop off the year, ns resolution and timezone */
+    char const * stem = strrchr( file, '/' );
+    char const * file_name = stem ? stem+1 : file;
     fd_log_private_fprintf_0( fd_log_private_stderr_fileno, "%s %s %-6lu %-4s %-4s %s(%i): %s\n",
                               fd_log_private_colorize ? color_level_cstr[level] : level_cstr[level],
-                              now_short_cstr, tid,cpu,thread, file, line, msg );
+                              now_short_cstr, tid,cpu,thread, file_name, line, msg );
   }
 
   if( level<fd_log_level_flush() ) return;
@@ -885,20 +872,6 @@ fd_log_private_2( int          level,
     exit(1); /* atexit will call fd_log_private_cleanup implicitly */
   }
 
-  abort();
-}
-
-void
-fd_log_private_raw_2( char const * file,
-                      int          line,
-                      char const * func,
-                      char const * msg ) {
-  fd_log_private_fprintf_0( fd_log_private_stderr_fileno, "%s(%i)[%s]: %s\n", file, line, func, msg );
-# if defined(__linux__)
-  syscall( SYS_exit_group, 1 );
-# else
-  exit(1);
-# endif
   abort();
 }
 
@@ -1006,9 +979,9 @@ fd_log_private_open_path( int          cmdline,
     char tag[ FD_LOG_WALLCLOCK_CSTR_BUF_SZ ];
     fd_log_wallclock_cstr( fd_log_wallclock(), tag );
     for( ulong b=0UL; tag[b]; b++ ) if( tag[b]==' ' || tag[b]=='-' || tag[b]=='.' || tag[b]==':' ) tag[b] = '_';
-    ulong len; fd_cstr_printf( fd_log_private_path, 1024UL, &len, "/tmp/fd-%i.%i.%i_%lu_%s_%s_%s",
-                              FDCTL_MAJOR_VERSION, FDCTL_MINOR_VERSION, FDCTL_PATCH_VERSION,
-                              fd_log_group_id(), fd_log_user(), fd_log_host(), tag );
+    ulong len; fd_cstr_printf( fd_log_private_path, 1024UL, &len, "/tmp/fd-%lu.%lu.%lu_%lu_%s_%s_%s",
+                               fd_major_version, fd_minor_version, fd_patch_version,
+                               fd_log_group_id(), fd_log_user(), fd_log_host(), tag );
     if( len==1023UL ) { fd_log_private_fprintf_0( STDERR_FILENO, "default log path too long; unable to boot\n" ); exit(1); }
   }
   else if( log_path_sz==1UL    ) fd_log_private_path[0] = '\0'; /* User disabled */

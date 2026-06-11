@@ -10,7 +10,6 @@
 #include "fd_execrp.h"
 #include "fd_rdisp.h"
 #include "fd_sched.h"
-#include "../../ballet/block/fd_microblock.h"
 #include "../../ballet/bmtree/fd_bmtree.h"
 #include "../../ballet/sha256/fd_sha256.h"
 #include "../../flamenco/txn/fd_txn_generate.h"
@@ -1364,7 +1363,13 @@ run_lane_policy_case( uchar const * data,
   FD_TEST( fd_sched_is_drained( sched ) );
 
   state = fd_sched_get_state_cstr( sched );
-  FD_TEST( strstr( state, "active_idx ULONG_MAX, staged_bitset 1," ) );
+  /* Block 6 finished its start-of-block work but, being an empty
+     partial block, has nothing more to dispatch, so it is deactivated
+     (active_bank_idx==ULONG_MAX) while staying staged on its lane
+     (staged_bitset 1). */
+  char expect_active[ 64 ];
+  fd_cstr_printf( expect_active, sizeof(expect_active), NULL, "active_idx %lu, staged_bitset 1,", ULONG_MAX );
+  FD_TEST( strstr( state, expect_active ) );
 
   fd_sched_delete( fd_sched_leave( sched ) );
   free( mem );
