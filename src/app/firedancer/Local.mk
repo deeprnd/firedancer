@@ -11,11 +11,7 @@ $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/mainnet.toml
 $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/testnet-jito.toml
 $(OBJDIR)/obj/app/firedancer/config.o: src/app/firedancer/config/mainnet-jito.toml
 
-# version (no external lib deps, always built)
-$(call make-lib,firedancer_version)
-$(call add-objs,version,firedancer_version)
-
-.PHONY: tickoni firedancer
+.PHONY: firedancer
 
 # firedancer core
 $(call add-objs,topology,fd_firedancer)
