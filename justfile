@@ -64,7 +64,7 @@ test-unit-tk:
   zig build test
 
 test-unit-all:
-  python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-fd && just test-unit-tk"
+  python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
 
 test-e2e-fd:
   make -j"$(nproc)" integration-test && make run-integration-test
