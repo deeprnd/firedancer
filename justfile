@@ -64,7 +64,7 @@ test-unit-tk:
   zig build test
 
 test-unit-all:
-  python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-fd && just test-unit-tk"
+  python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
 
 test-e2e-fd:
   make -j"$(nproc)" integration-test && make run-integration-test
@@ -229,8 +229,12 @@ security-check-all:
 
 # ── Memory (hugepages) ─────────────────────────────────────────────────────
 
-mem-init:
-  sudo src/util/shmem/fd_shmem_cfg init 0700 "$USER" ""
+mem-init mode="0700" user="":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  owner="{{user}}"
+  if [ -z "$owner" ]; then owner="$USER"; fi
+  sudo src/util/shmem/fd_shmem_cfg init {{mode}} "$owner" ""
 
 mem-query:
   sudo src/util/shmem/fd_shmem_cfg query
@@ -252,3 +256,6 @@ mem-alloc-auto numa="0":
 
 mem-free page_type="gigantic" numa="0":
   sudo src/util/shmem/fd_shmem_cfg free {{page_type}} {{numa}}
+  sync
+  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+  sudo sh -c 'echo 1 > /proc/sys/vm/compact_memory'
