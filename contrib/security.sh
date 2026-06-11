@@ -41,7 +41,7 @@ cmd_codeql_check_fd() {
   run_step "codeql pack download" codeql pack download codeql/cpp-queries
   rm -rf build/codeql-db
   run_step "codeql database create" \
-    bash -c 'BUILDDIR=codeql codeql database create --language=c-cpp --command="make -j tickoni" build/codeql-db'
+    bash -c 'BUILDDIR=codeql codeql database create --language=c-cpp --command="make -j$(nproc) firedancer" build/codeql-db'
   run_step "codeql database analyze" \
     codeql database analyze \
       build/codeql-db \
@@ -75,7 +75,7 @@ cmd_proof_check_fd() {
 cmd_sanitize_check_fd() {
   if [ ! -d "build/clang-asan-ubsan" ]; then
     run_step "clang asan+ubsan build" \
-      make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" tickoni
+      make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" firedancer
   fi
   run_step "clang asan+ubsan check" \
     make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" check
