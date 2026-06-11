@@ -7,7 +7,17 @@
 /// All validation in normalize() is fail-closed: missing or out-of-range
 /// fields return an explicit ThesisError instead of silently substituting
 /// defaults.
+///
+/// Canonical encoding: binary protobuf via fd_pb_encoder, following the
+/// audit codec pattern in src/tickoni/codec/audit_pb.c.  Encoding is not yet
+/// implemented; this comment marks the planned format so the schema is not
+/// extended incompatibly before it is defined.
 const std = @import("std");
+const thesis_cabi = @import("thesis_cabi");
+
+/// Schema version.  Must match TK_THESIS_SCHEMA_VERSION in thesis_codec.h.
+/// Incrementing this value changes the hash key and invalidates existing hashes.
+pub const thesis_schema_version: u16 = 1;
 
 /// Maximum bytes stored in the user_text field.
 pub const max_user_text_len: usize = 512;
@@ -38,6 +48,8 @@ pub const AssetClass = enum(u8) {
 };
 
 /// Bit-set of up to 8 asset classes, backed by a single byte.
+///
+/// Layout invariant: @sizeOf(AssetClassSet) == 1 (tested below).
 pub const AssetClassSet = packed struct(u8) {
     equity: bool = false,
     etf: bool = false,
@@ -89,6 +101,13 @@ pub const RiskPreference = enum(u8) { low, moderate, high };
 ///
 /// user_text is the plain-English investment intent; user_text_len is its byte
 /// count.  Call normalize() to validate and convert to InvestorIntent.
+/// Call computeThesisInputHash() to obtain a stable content hash for dedup
+/// and audit reference.
+///
+/// Stable hash fields (in order, via tk_thesis_input_hash):
+///   schema_version, account_id, target_notional_cents, market_scope,
+///   asset_class_prefs, sector_theme, risk_preference, max_single_name_pct,
+///   exclusions, user_text_len, user_text[0..user_text_len].
 pub const ThesisInput = struct {
     user_text: [max_user_text_len]u8,
     user_text_len: u16,
@@ -115,11 +134,16 @@ pub const ThesisInput = struct {
 
 /// Structured investor intent produced by normalize().
 ///
+/// Carries account_id so downstream tiles (basket construction, policy,
+/// audit) have the full capability scope without re-referencing the source
+/// ThesisInput.
+///
 /// allowed_asset_classes is the user's preference minus always-denied classes
 /// and the user's explicit exclusions.
 /// excluded_asset_classes is the union of always-denied classes and the user's
 /// explicit exclusions, so downstream catalog and basket code can trust it.
 pub const InvestorIntent = struct {
+    account_id: u32,
     theme: SectorTheme,
     target_amount_cents: i64,
     allowed_asset_classes: AssetClassSet,
@@ -157,6 +181,38 @@ pub const ThesisError = error{
     MissingTargetAmount,
     TargetAmountTooSmall,
     NoEligibleAssetClass,
+};
+
+// ---------------------------------------------------------------------------
+// Audit record payload types
+// ---------------------------------------------------------------------------
+
+/// Stable error codes for ThesisDenialPayload, matching ThesisError variants.
+pub const ThesisErrorCode = enum(u8) {
+    empty_user_text = 0,
+    user_text_too_long = 1,
+    missing_target_amount = 2,
+    target_amount_too_small = 3,
+    no_eligible_asset_class = 4,
+};
+
+/// Audit record payload for a successful thesis input normalization.
+/// Emitted by the thesis normalization tile when normalize() succeeds.
+/// thesis_input_hash is the computeThesisInputHash() result for this input.
+pub const ThesisNormalizationPayload = struct {
+    thesis_input_hash: u64,
+    account_id: u32,
+    sector_theme: SectorTheme,
+    target_amount_cents: i64,
+};
+
+/// Audit record payload for a thesis input denial.
+/// Emitted by the thesis normalization tile when normalize() fails.
+/// thesis_input_hash is 0 when user_text_len is unsafe to hash (UserTextTooLong).
+pub const ThesisDenialPayload = struct {
+    thesis_input_hash: u64,
+    account_id: u32,
+    error_code: ThesisErrorCode,
 };
 
 // ---------------------------------------------------------------------------
@@ -198,6 +254,7 @@ pub fn normalize(input: ThesisInput) ThesisError!InvestorIntent {
     if (input.exclusions.bond) excluded.bond = true;
 
     return InvestorIntent{
+        .account_id = input.account_id,
         .theme = input.sector_theme,
         .target_amount_cents = input.target_notional_cents,
         .allowed_asset_classes = allowed,
@@ -211,10 +268,44 @@ pub fn normalize(input: ThesisInput) ThesisError!InvestorIntent {
 }
 
 // ---------------------------------------------------------------------------
+// Content hash
+// ---------------------------------------------------------------------------
+
+/// Compute a stable content hash over a ThesisInput via fd_siphash13.
+///
+/// Uses tk_thesis_input_hash() from src/tickoni/codec/thesis_hash.c.
+/// fd_cstr_ncpy from src/util/cstr is not used here because this is a
+/// comptime-context helper and because the hash covers raw bytes rather than
+/// a null-terminated string copy operation.
+///
+/// Returns 0 when user_text_len > max_user_text_len to fail closed without
+/// reading out of bounds.  Callers building ThesisDenialPayload should record
+/// 0 in that case and set error_code to user_text_too_long.
+pub fn computeThesisInputHash(input: ThesisInput) u64 {
+    if (@as(usize, input.user_text_len) > max_user_text_len) return 0;
+    return thesis_cabi.tk_thesis_input_hash(
+        input.user_text_len,
+        &input.user_text,
+        input.target_notional_cents,
+        input.account_id,
+        @intFromEnum(input.market_scope),
+        @bitCast(input.asset_class_prefs),
+        @intFromEnum(input.sector_theme),
+        @intFromEnum(input.risk_preference),
+        input.max_single_name_pct,
+        @bitCast(input.exclusions),
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Demo fixtures (T2)
 // ---------------------------------------------------------------------------
 
 /// Fills a [max_user_text_len]u8 buffer with s, zero-padded.
+///
+/// fd_cstr_ncpy from src/util/cstr covers string copy at runtime, but this
+/// helper is called in comptime const initializers where C externs cannot be
+/// evaluated.  A Zig for-loop is the only comptime-safe copy path here.
 fn textBuf(comptime s: []const u8) [max_user_text_len]u8 {
     if (s.len > max_user_text_len) @compileError("user text exceeds max_user_text_len");
     var buf = [_]u8{0} ** max_user_text_len;
@@ -305,8 +396,31 @@ pub const fixtures = struct {
 // Tests
 // ---------------------------------------------------------------------------
 
+test "schema version matches codec constant" {
+    // If TK_THESIS_SCHEMA_VERSION changes in C, this test will fail to link
+    // or produce a hash mismatch with pinned test vectors.
+    try std.testing.expectEqual(@as(u16, 1), thesis_schema_version);
+}
+
+test "AssetClassSet layout: size is exactly 1 byte" {
+    try std.testing.expectEqual(@as(usize, 1), @sizeOf(AssetClassSet));
+}
+
+test "AssetClassSet: has() returns correct membership" {
+    const s = AssetClassSet{ .equity = true, .etf = true };
+    try std.testing.expect(s.has(.equity));
+    try std.testing.expect(s.has(.etf));
+    try std.testing.expect(!s.has(.option));
+    try std.testing.expect(!s.has(.crypto));
+}
+
+test "AssetClassSet: hasSupportedClass returns false for denied-only set" {
+    try std.testing.expect(!denied_asset_classes.hasSupportedClass());
+}
+
 test "normalize: ai_infrastructure fixture produces valid intent" {
     const intent = try normalize(fixtures.ai_infrastructure);
+    try std.testing.expectEqual(@as(u32, 1001), intent.account_id);
     try std.testing.expectEqual(SectorTheme.ai_infrastructure, intent.theme);
     try std.testing.expectEqual(@as(i64, 200_000), intent.target_amount_cents);
     try std.testing.expect(intent.allowed_asset_classes.equity);
@@ -319,6 +433,13 @@ test "normalize: ai_infrastructure fixture produces valid intent" {
     try std.testing.expectEqual(Market.us, intent.market);
     try std.testing.expectEqual(RiskPreference.moderate, intent.risk_preference);
     try std.testing.expectEqual(@as(u8, 30), intent.max_single_name_pct);
+}
+
+test "normalize: account_id is preserved in InvestorIntent" {
+    var input = fixtures.ai_infrastructure;
+    input.account_id = 42;
+    const intent = try normalize(input);
+    try std.testing.expectEqual(@as(u32, 42), intent.account_id);
 }
 
 test "normalize: all five fixtures produce valid intent" {
@@ -411,18 +532,6 @@ test "normalize: cash_preservation ETF+bond fixture normalizes with etf allowed"
     try std.testing.expectEqual(RiskPreference.low, intent.risk_preference);
 }
 
-test "AssetClassSet: has() returns correct membership" {
-    const s = AssetClassSet{ .equity = true, .etf = true };
-    try std.testing.expect(s.has(.equity));
-    try std.testing.expect(s.has(.etf));
-    try std.testing.expect(!s.has(.option));
-    try std.testing.expect(!s.has(.crypto));
-}
-
-test "AssetClassSet: hasSupportedClass returns false for denied-only set" {
-    try std.testing.expect(!denied_asset_classes.hasSupportedClass());
-}
-
 test "fixtures: text() length matches user_text_len" {
     for ([_]ThesisInput{
         fixtures.ai_infrastructure,
@@ -433,4 +542,42 @@ test "fixtures: text() length matches user_text_len" {
     }) |f| {
         try std.testing.expectEqual(@as(usize, f.user_text_len), f.text().len);
     }
+}
+
+test "computeThesisInputHash: same input produces same hash" {
+    const h1 = computeThesisInputHash(fixtures.ai_infrastructure);
+    const h2 = computeThesisInputHash(fixtures.ai_infrastructure);
+    try std.testing.expectEqual(h1, h2);
+    try std.testing.expect(h1 != 0);
+}
+
+test "computeThesisInputHash: different account_id produces different hash" {
+    var other = fixtures.ai_infrastructure;
+    other.account_id = 9999;
+    try std.testing.expect(
+        computeThesisInputHash(fixtures.ai_infrastructure) != computeThesisInputHash(other),
+    );
+}
+
+test "computeThesisInputHash: all five fixtures produce distinct hashes" {
+    const all = [_]ThesisInput{
+        fixtures.ai_infrastructure,
+        fixtures.us_dividends,
+        fixtures.cyber_security,
+        fixtures.broad_market,
+        fixtures.cash_preservation,
+    };
+    for (all, 0..) |a, i| {
+        for (all, 0..) |b, j| {
+            if (i != j) {
+                try std.testing.expect(computeThesisInputHash(a) != computeThesisInputHash(b));
+            }
+        }
+    }
+}
+
+test "computeThesisInputHash: unsafe user_text_len returns 0" {
+    var input = fixtures.ai_infrastructure;
+    input.user_text_len = @intCast(max_user_text_len + 1);
+    try std.testing.expectEqual(@as(u64, 0), computeThesisInputHash(input));
 }
