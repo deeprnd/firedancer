@@ -2,7 +2,7 @@
 
 #include "fd_active_set.h"
 #include "../../ballet/sha256/fd_sha256.h"
-#include "../../funk/fd_funk_base.h" /* no link dependency, only using hash */
+#include "../accdb/fd_accdb.h" /* for fd_accdb_hash, which we use for CRDS eviction */
 
 #include <string.h>
 
@@ -236,7 +236,7 @@ struct fd_crds_entry_private {
 #define TREAP_CMP(q,e)  (__extension__({ (void)(q); (void)(e); -1; }))
 #define TREAP_IDX_T     ulong
 
-#if FD_GOSSIP_USE_HANDHOLDING
+#if FD_DCHECK_STYLE>0
 #define TREAP_LT(a,b)   (__extension__({ \
   FD_TEST( (a)->crds_entry ); \
   FD_TEST( (b)->crds_entry ); \
@@ -287,7 +287,7 @@ lookup_hash( fd_crds_key_t const * key,
   default:
     break;
   }
-  return fd_funk_rec_key_hash1( key->pubkey, seed^hash_fn );
+  return fd_accdb_hash( key->pubkey, seed^hash_fn );
 }
 
 static inline int

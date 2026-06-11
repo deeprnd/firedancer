@@ -180,20 +180,16 @@ main( int     argc,
   uchar rodata[ rodata_sz ];
   memset( rodata, 0, rodata_sz );
 
-  fd_exec_instr_ctx_t instr_ctx[1];
-  fd_bank_t           bank[1];
-  fd_txn_out_t        txn_out[1];
-  fd_log_collector_t  log_collector[1];
+  static fd_exec_instr_ctx_t instr_ctx[1];
+  static fd_bank_t           bank[1];
+  static fd_txn_out_t        txn_out[1];
+  static fd_log_collector_t  log_collector[1];
   runtime->log.log_collector = log_collector;
   test_vm_minimal_exec_instr_ctx( instr_ctx, runtime, bank, txn_out );
 
   /* Activate feature-gated syscalls */
-  char const * feature_gates[] = {
-    "HTW2pSyErTj4BV6KBM9NZ9VBUJVxt7sacNWcf76wtzb3",  /* blake3_syscall_enabled */
-    "ToDo111111111111111111111111111111111111111",      /* enable_sha512_syscall  */
-  };
-  fd_features_enable_one_offs( &bank->f.features, feature_gates,
-                               (uint)(sizeof(feature_gates)/sizeof(feature_gates[0])), 0UL );
+  FD_FEATURE_SET_ACTIVE( &bank->f.features, blake3_syscall_enabled, 0UL );
+  FD_FEATURE_SET_ACTIVE( &bank->f.features, enable_sha512_syscall,  0UL );
 
   int vm_ok = !!fd_vm_init(
       vm, instr_ctx, FD_VM_HEAP_DEFAULT, FD_VM_COMPUTE_UNIT_LIMIT,

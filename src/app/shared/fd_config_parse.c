@@ -29,12 +29,10 @@ fd_config_extract_podf( uchar *        pod,
   CFG_POP      ( uint,   layout.gossvf_tile_count                            );
 
   CFG_POP      ( ulong,  accounts.max_accounts                               );
-  CFG_POP      ( ulong,  accounts.file_size_gib                              );
-  CFG_POP      ( ulong,  accounts.mean_account_footprint                     );
+  CFG_POP      ( ulong,  accounts.cache_size_gib                             );
 
-  CFG_POP      ( ulong,  runtime.max_live_slots                              );
   CFG_POP      ( bool,   runtime.fixed_fec_sets                              );
-  CFG_POP      ( ulong,  runtime.concurrent_account_limit                    );
+  CFG_POP      ( ulong,  runtime.max_live_slots                              );
   CFG_POP      ( ulong,  runtime.max_fork_width                              );
 
   CFG_POP      ( ulong,  runtime.program_cache.heap_size_mib                 );
@@ -165,6 +163,7 @@ fd_config_extract_pod( uchar *       pod,
   CFG_POP      ( uint,   tiles.pack.max_pending_transactions              );
   CFG_POP      ( bool,   tiles.pack.use_consumed_cus                      );
   CFG_POP      ( cstr,   tiles.pack.schedule_strategy                     );
+  CFG_POP_ARRAY( cstr,   tiles.pack.account_blocklist                     );
 
   CFG_POP      ( ulong,  tiles.replay.max_transaction_lookahead_buffer_size );
   CFG_POP_ARRAY( cstr,   tiles.replay.enable_features                       );
@@ -255,6 +254,8 @@ fd_config_extract_pod( uchar *       pod,
     CFG_POP    ( bool,   development.gui.websocket_compression            );
   }
   CFG_POP      ( cstr,   development.gui.frontend_release_channel         );
+
+  CFG_POP      ( ulong,  development.accdb.partition_size_gib             );
 
   if( FD_UNLIKELY( config->is_firedancer ) ) {
     if( FD_UNLIKELY( !fd_config_extract_podf( pod, &config->firedancer ) ) ) return NULL;

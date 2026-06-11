@@ -4,8 +4,8 @@
 #include "fd_sched.h"
 #include "fd_execrp.h" /* for poh hash value */
 #include "../../util/math/fd_stat.h" /* for sorted search */
-#include "../../ballet/block/fd_microblock.h"
 #include "../../disco/fd_disco_base.h" /* for FD_MAX_TXN_PER_SLOT */
+#include "../../disco/fd_txn_p.h"
 #include "../../disco/metrics/fd_metrics.h" /* for fd_metrics_convert_seconds_to_ticks and etc. */
 #include "../../disco/pack/fd_chkdup.h"
 #include "../../disco/shred/fd_shredder.h" /* FD_SHREDDER_CHAINED_FEC_SET_PAYLOAD_SZ */
@@ -13,7 +13,6 @@
 #include "../../flamenco/runtime/fd_runtime.h" /* for fd_runtime_load_txn_address_lookup_tables */
 #include "../../flamenco/runtime/fd_system_ids.h"
 #include "../../flamenco/runtime/sysvar/fd_sysvar_slot_hashes.h" /* for ALUTs */
-#include "../../flamenco/accdb/fd_accdb_sync.h"
 
 #define FD_SCHED_MAX_STAGING_LANES_LOG     (2)
 #define FD_SCHED_MAX_STAGING_LANES         (1UL<<FD_SCHED_MAX_STAGING_LANES_LOG)
@@ -236,6 +235,8 @@ struct fd_sched {
   ulong                 depth;         /* Immutable. */
   ulong                 block_cnt_max; /* Immutable. */
   ulong                 exec_cnt;      /* Immutable. */
+  int                   bypass_poh_verify; /* Test/fuzz: skip the PoH end_hash compare in maybe_mixin. */
+  int                   bypass_alut_resolution; /* Test/fuzz: skip ALUT resolution (no accdb). */
   long                  txn_in_flight_last_tick;
   long                  next_ready_last_tick;
   ulong                 next_ready_last_bank_idx;
@@ -322,6 +323,9 @@ check_or_set_active_block( fd_sched_t * sched );
 
 static void
 subtree_abandon( fd_sched_t * sched, fd_sched_block_t * block );
+
+static void
+subtree_release_refcnt( fd_sched_t * sched, fd_sched_block_t * block );
 
 static void
 subtree_prune( fd_sched_t * sched, ulong bank_idx, ulong except_idx );
@@ -444,22 +448,6 @@ block_should_deactivate( fd_sched_block_t * block ) {
 static inline int
 block_is_prunable( fd_sched_block_t * block ) {
   return !block->in_rdisp && !block_is_in_flight( block );
-}
-
-static int
-subtree_is_prunable( fd_sched_t * sched, fd_sched_block_t * block ) {
-  if( FD_UNLIKELY( !block_is_prunable( block ) ) ) return 0;
-
-  ulong child_idx = block->child_idx;
-  while( child_idx!=ULONG_MAX ) {
-    fd_sched_block_t * child_block = block_pool_ele( sched, child_idx );
-    if( FD_UNLIKELY( !subtree_is_prunable( sched, child_block ) ) ) {
-      return 0;
-    }
-    child_idx = child_block->sibling_idx;
-  }
-
-  return 1;
 }
 
 static inline ulong
@@ -700,15 +688,17 @@ fd_sched_new( void *     mem,
   sched->next_ready_last_tick     = LONG_MAX;
   sched->next_ready_last_bank_idx = ULONG_MAX;
 
-  sched->canary               = FD_SCHED_MAGIC;
-  sched->depth                = depth;
-  sched->block_cnt_max        = block_cnt_max;
-  sched->exec_cnt             = exec_cnt;
-  sched->root_idx             = ULONG_MAX;
-  sched->active_bank_idx      = ULONG_MAX;
-  sched->last_active_bank_idx = ULONG_MAX;
-  sched->staged_bitset        = 0UL;
-  sched->staged_popcnt_wmk    = 0UL;
+  sched->canary                 = FD_SCHED_MAGIC;
+  sched->depth                  = depth;
+  sched->block_cnt_max          = block_cnt_max;
+  sched->exec_cnt               = exec_cnt;
+  sched->bypass_poh_verify      = 0;
+  sched->bypass_alut_resolution = 0;
+  sched->root_idx               = ULONG_MAX;
+  sched->active_bank_idx        = ULONG_MAX;
+  sched->last_active_bank_idx   = ULONG_MAX;
+  sched->staged_bitset          = 0UL;
+  sched->staged_popcnt_wmk      = 0UL;
 
   sched->txn_exec_ready_bitset[ 0 ]  = fd_ulong_mask_lsb( (int)exec_cnt );
   sched->sigverify_ready_bitset[ 0 ] = fd_ulong_mask_lsb( (int)exec_cnt );
@@ -853,9 +843,14 @@ fd_sched_fec_ingest( fd_sched_t *     sched,
          dispatcher. */
       sched->metrics->block_added_dead_ood_cnt++;
 
+      /* Release the refcnt right away since we don't intend to replay
+         it at all.  We do this so its bank does not linger and stall
+         root advancement until the next root notify. */
+      subtree_release_refcnt( sched, block );
+
       /* Ignore the FEC set for a dead block. */
       sched->metrics->bytes_dropped_cnt += fec->fec->data_sz;
-      return 1;
+      return 0;
     }
 
     /* Try to find a staging lane for this block. */
@@ -1126,7 +1121,7 @@ fd_sched_task_next_ready( fd_sched_t * sched, fd_sched_task_t * out ) {
     sched->print_buf_sz = 0UL;
     print_all( sched, block );
     FD_LOG_NOTICE(( "%s", sched->print_buf ));
-    FD_LOG_CRIT(( "invariant violation: active_bank_idx %lu is not activatable nor has anything in-flight", sched->active_bank_idx ));
+    FD_LOG_CRIT(( "invariant violation: active block %lu:%lu is not activatable nor has anything in-flight", block->slot, sched->active_bank_idx ));
   }
 
   block->txn_pool_max_popcnt   = fd_ulong_max( block->txn_pool_max_popcnt, sched->depth - sched->txn_pool_free_cnt - 1UL );
@@ -1372,18 +1367,18 @@ fd_sched_task_done( fd_sched_t * sched, ulong task_type, ulong txn_idx, ulong ex
   fd_sched_block_t * block = block_pool_ele( sched, bank_idx );
 
   if( FD_UNLIKELY( !block->in_sched ) ) {
-    FD_LOG_CRIT(( "invariant violation: block->in_sched==0, slot %lu, parent slot %lu, idx %lu",
-                  block->slot, block->parent_slot, bank_idx ));
+    FD_LOG_CRIT(( "invariant violation: block->in_sched==0, block %lu:%lu, parent slot %lu",
+                  block->slot, bank_idx, block->parent_slot ));
   }
   if( FD_UNLIKELY( !block->staged ) ) {
     /* Invariant: only staged blocks can have in-flight transactions. */
-    FD_LOG_CRIT(( "invariant violation: block->staged==0, slot %lu, parent slot %lu",
-                  block->slot, block->parent_slot ));
+    FD_LOG_CRIT(( "invariant violation: block->staged==0, block %lu:%lu, parent slot %lu",
+                  block->slot, bank_idx, block->parent_slot ));
   }
   if( FD_UNLIKELY( !block->in_rdisp ) ) {
     /* Invariant: staged blocks must be in the dispatcher. */
-    FD_LOG_CRIT(( "invariant violation: block->in_rdisp==0, slot %lu, parent slot %lu",
-                  block->slot, block->parent_slot ));
+    FD_LOG_CRIT(( "invariant violation: block->in_rdisp==0, block %lu:%lu, parent slot %lu",
+                  block->slot, bank_idx, block->parent_slot ));
   }
 
   block->txn_pool_max_popcnt   = fd_ulong_max( block->txn_pool_max_popcnt, sched->depth - sched->txn_pool_free_cnt - 1UL );
@@ -1510,10 +1505,10 @@ fd_sched_task_done( fd_sched_t * sched, ulong task_type, ulong txn_idx, ulong ex
 
   if( FD_UNLIKELY( block->dying && !block_is_in_flight( block ) ) ) {
     if( FD_UNLIKELY( sched->active_bank_idx==bank_idx ) ) {
-      FD_LOG_CRIT(( "invariant violation: active block shouldn't be dying, bank_idx %lu, slot %lu, parent slot %lu",
-                    bank_idx, block->slot, block->parent_slot ));
+      FD_LOG_CRIT(( "invariant violation: active block %lu:%lu shouldn't be dying, parent slot %lu",
+                    block->slot, bank_idx, block->parent_slot ));
     }
-    FD_LOG_DEBUG(( "dying block %lu drained", block->slot ));
+    FD_LOG_DEBUG(( "dying block %lu:%lu drained", block->slot, bank_idx ));
     subtree_abandon( sched, block );
     try_activate_block( sched );
     return 0;
@@ -1539,17 +1534,38 @@ fd_sched_block_abandon( fd_sched_t * sched, ulong bank_idx ) {
 
   fd_sched_block_t * block = block_pool_ele( sched, bank_idx );
   if( FD_UNLIKELY( !block->in_sched ) ) {
-    FD_LOG_CRIT(( "invariant violation: block->in_sched==0, slot %lu, parent slot %lu, idx %lu",
-                  block->slot, block->parent_slot, bank_idx ));
+    FD_LOG_CRIT(( "invariant violation: block->in_sched==0, block %lu:%lu, parent slot %lu",
+                  block->slot, bank_idx, block->parent_slot ));
   }
 
-  FD_LOG_INFO(( "abandoning block %lu slot %lu", bank_idx, block->slot ));
+  FD_LOG_INFO(( "abandoning block %lu:%lu", block->slot, bank_idx ));
   sched->print_buf_sz = 0UL;
   print_all( sched, block );
   FD_LOG_DEBUG(( "%s", sched->print_buf ));
 
   subtree_abandon( sched, block );
   try_activate_block( sched );
+}
+
+void
+fd_sched_cancel( fd_sched_t * sched, ulong bank_idx ) {
+  FD_TEST( sched->canary==FD_SCHED_MAGIC );
+  FD_TEST( bank_idx<sched->block_cnt_max );
+
+  fd_sched_block_t * block = block_pool_ele( sched, bank_idx );
+  if( FD_UNLIKELY( !block->in_sched ) ) return;
+  FD_LOG_INFO(( "canceling subtree at block %lu:%lu", block->slot, bank_idx ));
+  fd_sched_block_t * parent = block_pool_ele( sched, block->parent_idx );
+  if( FD_LIKELY( parent ) ) {
+    /* Splice the block out of its parent's children list. */
+    ulong block_idx = block_to_idx( sched, block );
+    ulong * idx_p = &parent->child_idx;
+    while( *idx_p!=block_idx ) {
+      idx_p = &(block_pool_ele( sched, *idx_p )->sibling_idx);
+    }
+    *idx_p = block->sibling_idx;
+  }
+  subtree_prune( sched, bank_idx, ULONG_MAX );
 }
 
 void
@@ -1724,6 +1740,18 @@ fd_sched_set_poh_params( fd_sched_t * sched, ulong bank_idx, ulong tick_height, 
   #endif
 }
 
+void
+fd_sched_set_bypass_poh_verify( fd_sched_t * sched, int bypass_poh_verify ) {
+  FD_TEST( sched->canary==FD_SCHED_MAGIC );
+  sched->bypass_poh_verify = !!bypass_poh_verify;
+}
+
+void
+fd_sched_set_bypass_alut_resolution( fd_sched_t * sched, int bypass_alut_resolution ) {
+  FD_TEST( sched->canary==FD_SCHED_MAGIC );
+  sched->bypass_alut_resolution = !!bypass_alut_resolution;
+}
+
 fd_txn_p_t *
 fd_sched_get_txn( fd_sched_t * sched, ulong txn_idx ) {
   FD_TEST( sched->canary==FD_SCHED_MAGIC );
@@ -1762,57 +1790,64 @@ fd_sched_get_shred_cnt( fd_sched_t * sched, ulong bank_idx ) {
 
 void
 fd_sched_metrics_write( fd_sched_t * sched ) {
-  FD_MGAUGE_SET( REPLAY, SCHED_ACTIVE_BANK_IDX, sched->active_bank_idx );
-  FD_MGAUGE_SET( REPLAY, SCHED_LAST_DISPATCH_BANK_IDX, sched->next_ready_last_bank_idx );
-  FD_MGAUGE_SET( REPLAY, SCHED_LAST_DISPATCH_TIME_NANOS, fd_ulong_if( sched->next_ready_last_tick!=LONG_MAX, (ulong)sched->next_ready_last_tick, ULONG_MAX ) );
-  FD_MGAUGE_SET( REPLAY, SCHED_STAGING_LANE_POPCNT, (ulong)fd_ulong_popcnt( sched->staged_bitset ) );
-  FD_MGAUGE_SET( REPLAY, SCHED_STAGING_LANE_POPCNT_WMK, sched->staged_popcnt_wmk );
-  FD_MGAUGE_SET( REPLAY, SCHED_STAGING_LANE_HEAD_BANK_IDX0, fd_ulong_if( fd_ulong_extract_bit( sched->staged_bitset, 0 ), sched->staged_head_bank_idx[ 0 ], ULONG_MAX ) );
-  FD_MGAUGE_SET( REPLAY, SCHED_STAGING_LANE_HEAD_BANK_IDX1, fd_ulong_if( fd_ulong_extract_bit( sched->staged_bitset, 1 ), sched->staged_head_bank_idx[ 1 ], ULONG_MAX ) );
-  FD_MGAUGE_SET( REPLAY, SCHED_STAGING_LANE_HEAD_BANK_IDX2, fd_ulong_if( fd_ulong_extract_bit( sched->staged_bitset, 2 ), sched->staged_head_bank_idx[ 2 ], ULONG_MAX ) );
-  FD_MGAUGE_SET( REPLAY, SCHED_STAGING_LANE_HEAD_BANK_IDX3, fd_ulong_if( fd_ulong_extract_bit( sched->staged_bitset, 3 ), sched->staged_head_bank_idx[ 3 ], ULONG_MAX ) );
-  FD_MGAUGE_SET( REPLAY, SCHED_TXN_POOL_POPCNT, sched->depth-sched->txn_pool_free_cnt-1UL );
+  FD_MGAUGE_SET( REPLAY, SCHED_ACTIVE_BANK_INDEX, sched->active_bank_idx );
+  FD_MGAUGE_SET( REPLAY, SCHED_LAST_DISPATCH_BANK_INDEX, sched->next_ready_last_bank_idx );
+  FD_MGAUGE_SET( REPLAY, SCHED_LAST_DISPATCH_TIMESTAMP_NANOS, fd_ulong_if( sched->next_ready_last_tick!=LONG_MAX, (ulong)sched->next_ready_last_tick, ULONG_MAX ) );
+  FD_MGAUGE_SET( REPLAY, SCHED_STAGING_LANE_OCCUPIED, (ulong)fd_ulong_popcnt( sched->staged_bitset ) );
+  FD_MGAUGE_SET( REPLAY, SCHED_STAGING_LANE_OCCUPIED_WATERMARK, sched->staged_popcnt_wmk );
+  ulong staging_lane_head_bank_idx[ FD_METRICS_ENUM_STAGING_LANE_CNT ];
+  for( ulong lane=0UL; lane<FD_METRICS_ENUM_STAGING_LANE_CNT; lane++ ) {
+    staging_lane_head_bank_idx[ lane ] = fd_ulong_if( fd_ulong_extract_bit( sched->staged_bitset, (int)lane ), sched->staged_head_bank_idx[ lane ], ULONG_MAX );
+  }
+  FD_MGAUGE_ENUM_COPY( REPLAY, SCHED_STAGING_LANE_HEAD_BANK_INDEX, staging_lane_head_bank_idx );
+  FD_MGAUGE_SET( REPLAY, SCHED_TXN_POOL_OCCUPIED, sched->depth-sched->txn_pool_free_cnt-1UL );
   FD_MGAUGE_SET( REPLAY, SCHED_TXN_POOL_SIZE, sched->depth-1UL );
-  FD_MGAUGE_SET( REPLAY, SCHED_MBLK_POOL_POPCNT, sched->depth-sched->mblk_pool_free_cnt );
-  FD_MGAUGE_SET( REPLAY, SCHED_MBLK_POOL_SIZE, sched->depth );
-  FD_MGAUGE_SET( REPLAY, SCHED_BLOCK_POOL_POPCNT, sched->block_pool_popcnt );
+  FD_MGAUGE_SET( REPLAY, SCHED_MICROBLOCK_POOL_OCCUPIED, sched->depth-sched->mblk_pool_free_cnt );
+  FD_MGAUGE_SET( REPLAY, SCHED_MICROBLOCK_POOL_SIZE, sched->depth );
+  FD_MGAUGE_SET( REPLAY, SCHED_BLOCK_POOL_OCCUPIED, sched->block_pool_popcnt );
   FD_MGAUGE_SET( REPLAY, SCHED_BLOCK_POOL_SIZE, sched->block_cnt_max );
 
-  FD_MCNT_SET( REPLAY, SCHED_BLOCK_ADDED_STAGED, sched->metrics->block_added_staged_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_BLOCK_ADDED_UNSTAGED, sched->metrics->block_added_unstaged_cnt );
+  ulong sched_block_added[ FD_METRICS_ENUM_SCHED_BLOCK_STAGING_CNT ];
+  sched_block_added[ FD_METRICS_ENUM_SCHED_BLOCK_STAGING_V_STAGED_IDX   ] = sched->metrics->block_added_staged_cnt;
+  sched_block_added[ FD_METRICS_ENUM_SCHED_BLOCK_STAGING_V_UNSTAGED_IDX ] = sched->metrics->block_added_unstaged_cnt;
+  FD_MCNT_ENUM_COPY( REPLAY, SCHED_BLOCK_ADDED, sched_block_added );
   FD_MCNT_SET( REPLAY, SCHED_BLOCK_REPLAYED, sched->metrics->block_removed_cnt );
   FD_MCNT_SET( REPLAY, SCHED_BLOCK_ABANDONED, sched->metrics->block_abandoned_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_BLOCK_BAD, sched->metrics->block_bad_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_BLOCK_REJECTED, sched->metrics->block_bad_cnt );
   FD_MCNT_SET( REPLAY, SCHED_BLOCK_PROMOTED, sched->metrics->block_promoted_cnt );
   FD_MCNT_SET( REPLAY, SCHED_BLOCK_DEMOTED, sched->metrics->block_demoted_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_DEACTIVATE_NO_CHILD, sched->metrics->deactivate_no_child_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_DEACTIVATE_NO_WORK, sched->metrics->deactivate_no_txn_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_DEACTIVATE_ABANDONED, sched->metrics->deactivate_abandoned_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_DEACTIVATE_MINORITY, sched->metrics->deactivate_pruned_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_LANE_SWITCH, sched->metrics->lane_switch_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_LANE_PROMOTE, sched->metrics->lane_promoted_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_LANE_DEMOTE, sched->metrics->lane_demoted_cnt );
+  ulong sched_deactivate[ FD_METRICS_ENUM_SCHED_DEACTIVATE_REASON_CNT ];
+  sched_deactivate[ FD_METRICS_ENUM_SCHED_DEACTIVATE_REASON_V_NO_CHILD_IDX  ] = sched->metrics->deactivate_no_child_cnt;
+  sched_deactivate[ FD_METRICS_ENUM_SCHED_DEACTIVATE_REASON_V_NO_WORK_IDX   ] = sched->metrics->deactivate_no_txn_cnt;
+  sched_deactivate[ FD_METRICS_ENUM_SCHED_DEACTIVATE_REASON_V_ABANDONED_IDX ] = sched->metrics->deactivate_abandoned_cnt;
+  sched_deactivate[ FD_METRICS_ENUM_SCHED_DEACTIVATE_REASON_V_MINORITY_IDX  ] = sched->metrics->deactivate_pruned_cnt;
+  FD_MCNT_ENUM_COPY( REPLAY, SCHED_DEACTIVATE, sched_deactivate );
+  FD_MCNT_SET( REPLAY, SCHED_LANE_SWITCHED, sched->metrics->lane_switch_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_LANE_PROMOTED, sched->metrics->lane_promoted_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_LANE_DEMOTED, sched->metrics->lane_demoted_cnt );
   FD_MCNT_SET( REPLAY, SCHED_FORK_OBSERVED, sched->metrics->fork_observed_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_ALUT_SUCCESS, sched->metrics->alut_success_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_ALUT_FAILURE, sched->metrics->alut_serializing_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_TXN_ABANDONED_PARSED, sched->metrics->txn_abandoned_parsed_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_TXN_ABANDONED_EXEC, sched->metrics->txn_abandoned_exec_done_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_TXN_ABANDONED_DONE, sched->metrics->txn_abandoned_done_cnt );
+  ulong sched_alut[ FD_METRICS_ENUM_SCHED_ALUT_RESULT_CNT ];
+  sched_alut[ FD_METRICS_ENUM_SCHED_ALUT_RESULT_V_SUCCESS_IDX ] = sched->metrics->alut_success_cnt;
+  sched_alut[ FD_METRICS_ENUM_SCHED_ALUT_RESULT_V_FAILED_IDX  ] = sched->metrics->alut_serializing_cnt;
+  FD_MCNT_ENUM_COPY( REPLAY, SCHED_ALUT, sched_alut );
+  FD_MCNT_SET( REPLAY, SCHED_TXN_PARSED_ABANDONED, sched->metrics->txn_abandoned_parsed_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_TXN_EXECUTED_ABANDONED, sched->metrics->txn_abandoned_exec_done_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_TXN_DONE_ABANDONED, sched->metrics->txn_abandoned_done_cnt );
   FD_MCNT_SET( REPLAY, SCHED_WEIGHTED_IN_FLIGHT, sched->metrics->txn_weighted_in_flight_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_WEIGHTED_IN_FLIGHT_DURATION, sched->metrics->txn_weighted_in_flight_tickcount );
-  FD_MCNT_SET( REPLAY, SCHED_NONE_IN_FLIGHT_DURATION, sched->metrics->txn_none_in_flight_tickcount );
+  FD_MCNT_SET( REPLAY, SCHED_WEIGHTED_IN_FLIGHT_DURATION_NANOS, sched->metrics->txn_weighted_in_flight_tickcount );
+  FD_MCNT_SET( REPLAY, SCHED_NONE_IN_FLIGHT_DURATION_NANOS, sched->metrics->txn_none_in_flight_tickcount );
   FD_MCNT_SET( REPLAY, SCHED_TXN_PARSED, sched->metrics->txn_parsed_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_TXN_EXEC, sched->metrics->txn_exec_done_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_TXN_SIGVERIFY, sched->metrics->txn_sigverify_done_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_TXN_MIXIN, sched->metrics->txn_mixin_done_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_TXN_EXECUTED, sched->metrics->txn_exec_done_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_TXN_SIGNATURE_VERIFIED, sched->metrics->txn_sigverify_done_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_TXN_POH_MIXED, sched->metrics->txn_mixin_done_cnt );
   FD_MCNT_SET( REPLAY, SCHED_TXN_DONE, sched->metrics->txn_done_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_MBLK_PARSED, sched->metrics->mblk_parsed_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_MBLK_HASHED, sched->metrics->mblk_poh_hashed_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_MBLK_DONE, sched->metrics->mblk_poh_done_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_MICROBLOCK_PARSED, sched->metrics->mblk_parsed_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_MICROBLOCK_HASHED, sched->metrics->mblk_poh_hashed_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_MICROBLOCK_DONE, sched->metrics->mblk_poh_done_cnt );
   FD_MCNT_SET( REPLAY, SCHED_BYTES_INGESTED, sched->metrics->bytes_ingested_cnt );
   FD_MCNT_SET( REPLAY, SCHED_BYTES_INGESTED_PADDING, sched->metrics->bytes_ingested_unparsed_cnt );
   FD_MCNT_SET( REPLAY, SCHED_BYTES_DROPPED, sched->metrics->bytes_dropped_cnt );
-  FD_MCNT_SET( REPLAY, SCHED_FEC, sched->metrics->fec_cnt );
+  FD_MCNT_SET( REPLAY, SCHED_FEC_INGESTED, sched->metrics->fec_cnt );
 }
 
 char *
@@ -1982,6 +2017,26 @@ verify_ticks_final( fd_sched_block_t * block ) {
   }
 
   return verify_ticks_eager( block );
+}
+
+int
+fd_sched_block_verify_ticks( fd_sched_t * sched,
+                             ulong        bank_idx,
+                             ulong        tick_height,
+                             ulong        max_tick_height,
+                             ulong        hashes_per_tick ) {
+  FD_TEST( sched->canary==FD_SCHED_MAGIC );
+  FD_TEST( bank_idx<sched->block_cnt_max );
+  FD_TEST( max_tick_height>tick_height );
+  fd_sched_block_t * block = block_pool_ele( sched, bank_idx );
+  /* Set the tick window directly; skip fd_sched_set_poh_params
+     PoH fixup, unneeded here and unsafe to repeat per FEC set. */
+  block->tick_height     = tick_height;
+  block->max_tick_height = max_tick_height;
+  block->hashes_per_tick = hashes_per_tick;
+  /* fec_eos => slot fully ingested, so the TOO_FEW check is meaningful
+     too. */
+  return block->fec_eos ? verify_ticks_final( block ) : verify_ticks_eager( block );
 }
 
 #define CHECK( cond )  do {             \
@@ -2227,20 +2282,36 @@ fd_sched_parse_txn( fd_sched_t * sched, fd_sched_block_t * block, fd_sched_alut_
   /* Try to expand ALUTs. */
   int serializing = 0;
   if( alt_cnt>0UL ) {
-    fd_accdb_ro_t ro[1];
-    if( FD_LIKELY( fd_accdb_open_ro( alut_ctx->accdb, ro, alut_ctx->xid, &fd_sysvar_slot_hashes_id ) ) ) {
+    if( FD_UNLIKELY( sched->bypass_alut_resolution ) ) {
+      /* test/fuzz: no accdb to query, so treat ALUT txns as serializing. */
+      serializing = 1;
+    } else {
+      /* Copy the slot hashes sysvar out and release the read BEFORE
+         resolving the ALTs.  fd_runtime_load_txn_address_lookup_tables
+         issues its own fd_accdb_read_one per lookup table, and the accdb
+         acquire state is a single non-nestable flag — holding this read
+         open across that call would trip the IDLE assertion in
+         fd_accdb_acquire.  The slot_hashes view aliases the record data,
+         so it must view the copy, not the released record. */
+      static uchar slot_hashes_buf[ FD_SYSVAR_SLOT_HASHES_BINCODE_SZ ];
+      ulong        slot_hashes_sz = 0UL;
+      int          have_slot_hashes = 0;
+      fd_acc_t ro = fd_accdb_read_one( alut_ctx->accdb, alut_ctx->fork_id, fd_sysvar_slot_hashes_id.uc );
+      if( FD_LIKELY( ro.lamports && ro.data_len<=sizeof(slot_hashes_buf) ) ) {
+        fd_memcpy( slot_hashes_buf, ro.data, ro.data_len );
+        slot_hashes_sz   = ro.data_len;
+        have_slot_hashes = 1;
+      }
+      fd_accdb_unread_one( alut_ctx->accdb, &ro );
+
       fd_slot_hashes_t slot_hashes_view[1];
-      if( FD_LIKELY( fd_sysvar_slot_hashes_view( slot_hashes_view,
-                                                 fd_accdb_ref_data_const( ro ),
-                                                 fd_accdb_ref_data_sz( ro ) ) ) ) {
-        serializing = !!fd_runtime_load_txn_address_lookup_tables( NULL, txn, payload, alut_ctx->accdb, alut_ctx->xid, alut_ctx->els, slot_hashes_view, sched->aluts );
+      if( FD_LIKELY( have_slot_hashes &&
+                     fd_sysvar_slot_hashes_view( slot_hashes_view, slot_hashes_buf, slot_hashes_sz ) ) ) {
+        serializing = !!fd_runtime_load_txn_address_lookup_tables( txn, payload, alut_ctx->accdb, alut_ctx->fork_id, alut_ctx->els, slot_hashes_view, sched->aluts );
         sched->metrics->alut_success_cnt += (uint)!serializing;
       } else {
         serializing = 1;
       }
-      fd_accdb_close_ro( alut_ctx->accdb, ro );
-    } else {
-      serializing = 1;
     }
   }
 
@@ -2458,7 +2529,8 @@ maybe_mixin( fd_sched_t * sched, fd_sched_block_t * block ) {
     fd_memcpy( mixin_buf+32UL, root, 32UL );
     fd_sha256_hash( mixin_buf, 64UL, mblk->curr_hash );
     free_mblk( sched, block, (uint)mblk_idx );
-    if( FD_UNLIKELY( memcmp( mblk->curr_hash, mblk->end_hash, sizeof(fd_hash_t) ) ) ) {
+    /* Bypass PoH verification for fuzzing/testing throughput. */
+    if( FD_UNLIKELY( !sched->bypass_poh_verify && memcmp( mblk->curr_hash, mblk->end_hash, sizeof(fd_hash_t) ) ) ) {
       FD_BASE58_ENCODE_32_BYTES( mblk->curr_hash->hash, our_str );
       FD_BASE58_ENCODE_32_BYTES( mblk->end_hash->hash, ref_str );
       FD_LOG_INFO(( "bad block: poh hash mismatch on mblk %lu, ours %s, claimed %s, hashcnt %lu, txns [%lu,%lu), %u sigs, slot %lu, parent slot %lu", mblk_idx, our_str, ref_str, mblk->hashcnt, mblk->start_txn_idx, mblk->end_txn_idx, mblk->curr_sig_cnt, block->slot, block->parent_slot ));
@@ -2741,37 +2813,58 @@ subtree_mark_and_maybe_prune_rdisp( fd_sched_t * sched, fd_sched_block_t * block
   }
 }
 
-/* It's safe to call this function more than once on the same block.
-   The final call is when there are no more in-flight tasks for this
-   block, at which point the block will be pruned from sched. */
+/* This function tells sched that the subtree is no longer worth
+   replaying.  It can happen as a result of one of the following.
+     - Bad block at head of lane.
+     - Bad block at tail of lane.
+     - Root notify.
+
+   It's safe to call this function more than once on the same block. */
 static void
 subtree_abandon( fd_sched_t * sched, fd_sched_block_t * block ) {
   subtree_mark_and_maybe_prune_rdisp( sched, block );
-  /* subtree_abandon can happen as a result of one of the following
-       - Bad block at head of lane
-       - Bad block at tail of lane
-       - Root advance
-       - Root notify
+  /* We do not gate refcnt releases on the entire subtree being
+     prunable.  In the root notify case there can be in-flight tasks in
+     the middle of a subtree, and gating on whole-subtree prunability
+     would defer the release of an otherwise prunable block, e.g. an
+     inactive sibling of an in-flight block, to a later abandon such as
+     a subsequent root notify.  That could stall bank reclamation.
 
-     In the case of bad blocks, it suffices to check the in-flight task
-     count of the block that is bad.  In the case of root advance, the
-     refcnt on the bank is checked and that includes the in-flight task
-     count.  It is only in the case of root notify that there could
-     potentially be a non-zero in-flight count in the middle of a
-     subtree.  To be safe, we check the entire subtree here before
-     pruning. */
-  if( subtree_is_prunable( sched, block ) ) {
-    fd_sched_block_t * parent = block_pool_ele( sched, block->parent_idx );
-    if( FD_LIKELY( parent ) ) {
-      /* Splice the block out of its parent's children list. */
-      ulong block_idx = block_to_idx( sched, block );
-      ulong * idx_p = &parent->child_idx;
-      while( *idx_p!=block_idx ) {
-        idx_p = &(block_pool_ele( sched, *idx_p )->sibling_idx);
-      }
-      *idx_p = block->sibling_idx;
-    }
-    subtree_prune( sched, block_to_idx( sched, block ), ULONG_MAX );
+     The sched fork tree still stays in sync with the banks tree.  This
+     is to prevent attacks targeting lifetime discrepancy.  So while we
+     know that the subtree can be pruned from sched at this point, we
+     only release refcnts here and stop short of actually pruning, which
+     remains solely initiated by banks. */
+  subtree_release_refcnt( sched, block );
+}
+
+/* Release the bank refcnt for every block in the subtree that sched is
+   done with.  This is evaluated per block.  A block's refcnt is
+   released as soon as that block individually qualifies, independent of
+   whether its siblings or descendants still have in-flight tasks.  This
+   is safe because the actual pruning is initiated separately by banks,
+   and gated on the whole subtree's refcnts reaching zero.  Releasing
+   refcnts eagerly per block get us there sooner.  Blocks that are still
+   in-flight will be released when their last task drains.  This
+   function is idempotent. */
+static void
+subtree_release_refcnt( fd_sched_t * sched, fd_sched_block_t * block ) {
+  FD_TEST( block->in_sched );
+  if( block->refcnt && block_is_prunable( block ) ) {
+    FD_TEST( block->dying ); /* The happy path releases the refcnt on full replay.  Only bad blocks end up here. */
+    FD_TEST( !block->block_end_done ); /* Implied by an outstanding refcnt.  The happy path releases the refcnt on full replay. */
+    block->refcnt = 0;
+    FD_TEST( ref_q_avail( sched->ref_q ) );
+    ref_q_push_tail( sched->ref_q, block_to_idx( sched, block ) );
+    if( FD_LIKELY( block->block_start_done ) ) FD_LOG_DEBUG(( "block %lu:%lu replayed partially, releasing refcnt without full replay", block->slot, block_to_idx( sched, block ) ));
+    else FD_LOG_DEBUG(( "block %lu:%lu replayed nothing, releasing refcnt without any replay", block->slot, block_to_idx( sched, block ) ));
+  }
+
+  ulong child_idx = block->child_idx;
+  while( child_idx!=ULONG_MAX ) {
+    fd_sched_block_t * child_block = block_pool_ele( sched, child_idx );
+    subtree_release_refcnt( sched, child_block );
+    child_idx = child_block->sibling_idx;
   }
 }
 
@@ -2782,14 +2875,9 @@ subtree_prune( fd_sched_t * sched, ulong bank_idx, ulong except_idx ) {
   fd_sched_block_t * tail = head;
 
   while( head ) {
+    FD_TEST( !head->refcnt );
     FD_TEST( head->in_sched );
     head->in_sched = 0;
-    if( head->refcnt ) {
-      FD_TEST( !head->block_end_done );
-      head->refcnt = 0;
-      if( FD_UNLIKELY( !ref_q_avail( sched->ref_q ) ) ) FD_LOG_CRIT(( "ref_q full" ));
-      ref_q_push_tail( sched->ref_q, block_to_idx( sched, head ) );
-    }
 
     ulong child_idx = head->child_idx;
     while( child_idx!=ULONG_MAX ) {
@@ -2805,13 +2893,20 @@ subtree_prune( fd_sched_t * sched, ulong bank_idx, ulong except_idx ) {
     }
 
     /* Prune the current block.  We will never publish halfway into a
-       staging lane, because anything on the rooted fork should have
-       finished replaying gracefully and be out of the dispatcher.  In
-       fact, anything that we are publishing away should be out of the
-       dispatcher at this point.  And there should be no more in-flight
-       transactions. */
+       staging lane, because anything that we are publishing away should
+       be out of the dispatcher at this point, much less staged.
+         - Anything on the rooted fork should have finished replaying
+           gracefully and be out of the dispatcher.
+         - Anything on minority forks should have been marked dying and
+           be taken out of the dispatcher.
+
+       There should be no more in-flight tasks either.  Prunes are
+       initiated by banks, and the refcnt on the bank won't drop to zero
+       unless all in-flight tasks have been drained.  So the fact that
+       we're pruning implies that the bank thinks there's nothing more
+       in-flight. */
     if( FD_UNLIKELY( block_is_in_flight( head ) ) ) {
-      FD_LOG_CRIT(( "invariant violation: block has transactions in flight (%u exec %u sigverify %u poh), slot %lu, parent slot %lu",
+      FD_LOG_CRIT(( "invariant violation: block has tasks in flight (%u exec %u sigverify %u poh), slot %lu, parent slot %lu",
                     head->txn_exec_in_flight_cnt, head->txn_sigverify_in_flight_cnt, head->poh_hashing_in_flight_cnt, head->slot, head->parent_slot ));
     }
     if( FD_UNLIKELY( head->in_rdisp ) ) {
@@ -3074,7 +3169,7 @@ demote_lane( fd_sched_t * sched, int lane_idx ) {
 
     int ret = fd_rdisp_demote_block( sched->rdisp, bank_idx );
     if( FD_UNLIKELY( ret!=0 ) ) {
-      FD_LOG_CRIT(( "fd_rdisp_demote_block failed for slot %lu, bank_idx %lu, lane %d", block->slot, bank_idx, lane_idx ));
+      FD_LOG_CRIT(( "fd_rdisp_demote_block failed for block %lu:%lu, lane %d", block->slot, bank_idx, lane_idx ));
     }
     FD_LOG_DEBUG(( "block %lu:%lu exited lane %lu: demote", block->slot, bank_idx, block->staging_lane ));
     block->staged = 0;

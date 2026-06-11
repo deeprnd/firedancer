@@ -36,8 +36,6 @@
 
 #define GRPC_BUF_MAX (2048UL<<10UL) /* 2 MiB */
 
-extern char const firedancer_version_string[];
-
 #define IN_KIND_SHRED  (0)
 #define IN_KIND_DEDUP  (1)
 #define IN_KIND_SIGN   (2)
@@ -138,22 +136,22 @@ loose_footprint( fd_topo_tile_t const * tile ) {
 
 static inline void
 metrics_write( fd_event_tile_t * ctx ) {
-  FD_MGAUGE_SET( EVENT, EVENT_QUEUE_COUNT, ctx->circq->cnt );
-  FD_MCNT_SET( EVENT, EVENT_QUEUE_DROPS, ctx->circq->metrics.drop_cnt );
-  FD_MGAUGE_SET( EVENT, EVENT_QUEUE_BYTES_USED, fd_circq_bytes_used( ctx->circq ) );
-  FD_MGAUGE_SET( EVENT, EVENT_QUEUE_BYTES_CAPACITY, ctx->circq->size );
+  FD_MGAUGE_SET( EVENT, QUEUE_DEPTH, ctx->circq->cnt );
+  FD_MCNT_SET( EVENT, QUEUE_DROPPED, ctx->circq->metrics.drop_cnt );
+  FD_MGAUGE_SET( EVENT, QUEUE_BYTES_USED, fd_circq_bytes_used( ctx->circq ) );
+  FD_MGAUGE_SET( EVENT, QUEUE_BYTES_CAPACITY, ctx->circq->size );
 
   fd_event_client_metrics_t const * metrics = fd_event_client_metrics( ctx->client );
-  FD_MCNT_SET( EVENT, EVENTS_SENT,         metrics->events_sent );
-  FD_MCNT_SET( EVENT, EVENTS_ACKED,        metrics->events_acked );
+  FD_MCNT_SET( EVENT, SENT,          metrics->events_sent );
+  FD_MCNT_SET( EVENT, ACKED,         metrics->events_acked );
   FD_MCNT_SET( EVENT, BYTES_WRITTEN,       metrics->bytes_written );
   FD_MCNT_SET( EVENT, BYTES_READ,          metrics->bytes_read );
-  FD_MCNT_SET( EVENT, AUTH_FAIL,           metrics->auth_fail_cnt );
-  FD_MCNT_SET( EVENT, INVALID_MSG,         metrics->invalid_msg_cnt );
-  FD_MCNT_SET( EVENT, CONNECT_ATTEMPTS,    metrics->connect_attempt_cnt );
-  FD_MCNT_SET( EVENT, HANDSHAKE_TIMEOUTS,  metrics->handshake_timeout_cnt );
+  FD_MCNT_SET( EVENT, AUTH_FAILED,         metrics->auth_fail_cnt );
+  FD_MCNT_SET( EVENT, INVALID_MESSAGE,     metrics->invalid_msg_cnt );
+  FD_MCNT_SET( EVENT, CONN_ATTEMPT,        metrics->connect_attempt_cnt );
+  FD_MCNT_SET( EVENT, HANDSHAKE_TIMEOUT,   metrics->handshake_timeout_cnt );
 
-  FD_MGAUGE_SET( EVENT, CONNECTION_STATE,  fd_event_client_state( ctx->client ) );
+  FD_MGAUGE_SET( EVENT, CONN_STATE,        fd_event_client_state( ctx->client ) );
 }
 
 static void
@@ -478,7 +476,7 @@ unprivileged_init( fd_topo_t const *      topo,
                                                            2*(1UL<<20UL) /* 2 MiB */,
                                                            url_buf,
                                                            ctx->identity_pubkey,
-                                                           firedancer_version_string,
+                                                           fd_version_cstr,
                                                            tile->event.action,
                                                            ctx->instance_id,
                                                            ctx->boot_id,
