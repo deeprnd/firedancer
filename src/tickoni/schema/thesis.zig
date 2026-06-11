@@ -24,6 +24,9 @@ pub const max_user_text_len: usize = 512;
 
 /// Minimum allowed target notional: USD 1.00 = 100 cents.
 pub const min_target_notional_cents: i64 = 100;
+/// Maximum allowed target notional: USD 10 billion = 1_000_000_000_000 cents.
+/// Prevents i64 overflow in downstream multiplication: notional * 10_000 (bp_denom) must fit i64.
+pub const max_target_notional_cents: i64 = 1_000_000_000_000;
 
 // ---------------------------------------------------------------------------
 // Bounded domain types
@@ -180,6 +183,7 @@ pub const ThesisError = error{
     UserTextTooLong,
     MissingTargetAmount,
     TargetAmountTooSmall,
+    TargetAmountTooLarge,
     NoEligibleAssetClass,
 };
 
@@ -193,7 +197,8 @@ pub const ThesisErrorCode = enum(u8) {
     user_text_too_long = 1,
     missing_target_amount = 2,
     target_amount_too_small = 3,
-    no_eligible_asset_class = 4,
+    target_amount_too_large = 4,
+    no_eligible_asset_class = 5,
 };
 
 /// Audit record payload for a successful thesis input normalization.
@@ -233,6 +238,7 @@ pub fn normalize(input: ThesisInput) ThesisError!InvestorIntent {
     if (@as(usize, input.user_text_len) > max_user_text_len) return ThesisError.UserTextTooLong;
     if (input.target_notional_cents <= 0) return ThesisError.MissingTargetAmount;
     if (input.target_notional_cents < min_target_notional_cents) return ThesisError.TargetAmountTooSmall;
+    if (input.target_notional_cents > max_target_notional_cents) return ThesisError.TargetAmountTooLarge;
 
     // Allowed = user prefs, minus always-denied, minus explicit user exclusions.
     var allowed = input.asset_class_prefs;
@@ -342,7 +348,7 @@ pub const fixtures = struct {
         .asset_class_prefs = .{ .equity = true, .etf = true },
         .sector_theme = .dividends,
         .risk_preference = .low,
-        .max_single_name_pct = 25,
+        .max_single_name_pct = 60,
         .exclusions = .{ .option = true, .future = true, .leveraged_etf = true, .inverse_etf = true, .crypto = true },
     };
 
@@ -511,6 +517,12 @@ test "normalize: notional below minimum returns TargetAmountTooSmall" {
     var input = fixtures.ai_infrastructure;
     input.target_notional_cents = 50; // USD 0.50 < USD 1.00 minimum
     try std.testing.expectError(ThesisError.TargetAmountTooSmall, normalize(input));
+}
+
+test "normalize: notional above maximum returns TargetAmountTooLarge" {
+    var input = fixtures.ai_infrastructure;
+    input.target_notional_cents = max_target_notional_cents + 1;
+    try std.testing.expectError(ThesisError.TargetAmountTooLarge, normalize(input));
 }
 
 test "normalize: options-only preference returns NoEligibleAssetClass" {
