@@ -380,7 +380,6 @@ Config, text, or 1-line change. Verifiable without running the full system.
 | #1456 — fddev flame kernel time | Change the `perf` sampling flags (add `-g --call-graph dwarf` or equivalent) so kernel time appears in flamegraphs. Script change only. |
 | #5614 — fddev flame Ubuntu | Replace the Fedora-only `perf script flamegraph` invocation with a portable alternative (e.g. `flamegraph.pl` from Brendan Gregg's repo). |
 | #4540 — mem user check | Remove or conditionalize the UID equality guard so operators and CI scripts can run `tickoni mem` without switching users. |
-| #2297 — Warn on IRQ overlap | At startup, compare each tile's fixed CPU affinity mask against `/proc/irq/*/smp_affinity`. Log a warning on overlap. |
 | #9726 — Log slow hugetlbfs steps | Add a timestamp before and after each hugetlbfs startup step (`mount`, `echo nr_hugepages`, etc.) and log any step that exceeds 100 ms. |
 | #2353 — MAP_remove validation | In `map_remove`, validate that the entry pointer is non-null and still a valid map member before decrementing `key_cnt`. ~10 lines. |
 | #3113 — CodeQL integer-truncation query | Write a new `.ql` file in `contrib/codeql/src/` using the existing implicit-conversion predicate to flag `ulong → ushort` (and similar) truncations in `src/`. `filter.qll` already handles path scoping. |
@@ -436,6 +435,7 @@ architectural change. Budget a week or more; some require non-x86 hardware.
 | --- | --- |
 | #9838 — Torn reads in fd_stem | The AVX atomic is x86-only. A correct portable fix requires understanding the non-x86 memory model and finding a substitute with comparable performance — and hardware to test on. |
 | #2352 — fd-mux OOB via crafted depth | The fix must close an adversarial-tile OOB path in the hot fragment-receive loop without adding overhead or breaking correctness for honest tiles. |
+| #2297 — Warn on IRQ overlap | At startup, compare each tile's fixed CPU affinity mask against `/proc/irq/*/smp_affinity`. Log a warning on overlap. |
 | #1360 — Futex cooperative core sharing | Requires deep OS scheduling knowledge, futex API, and careful benchmarking to confirm that non-critical tiles sharing a core do not starve critical tiles under load. |
 | #664 — Move logging to dedicated tile | Architectural: all existing tile log calls become IPC to a new log tile. Affects every tile, the supervisor, and crash-path guarantees. |
 | #811 — Async signal deadlock in fd_log | Signal handler reentrancy is extremely subtle. The spin-lock in `fd_log_private_cleanup` and the `fd_yield` path interact with signal delivery in ways that are hard to reason about and easy to re-introduce in a fix. |

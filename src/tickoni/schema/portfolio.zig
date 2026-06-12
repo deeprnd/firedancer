@@ -10,6 +10,7 @@
 /// notional, remaining monthly notional, and max affordable basket size, then
 /// returns an AffordabilityResult with outcome and all computed limits (T3).
 const std = @import("std");
+const basket = @import("basket.zig");
 
 pub const portfolio_schema_version: u16 = 1;
 
@@ -103,19 +104,22 @@ pub const AffordabilityOutcome = enum(u8) {
     deny_insufficient_buying_power = 2,
     deny_day_limit_exceeded = 3,
     deny_month_limit_exceeded = 4,
+    deny_invalid_notional = 5,
 };
 
 /// Result of checkAffordability (T3).
 ///
-/// max_affordable_cents is the minimum of buying_power_cents,
-/// remaining_daily_notional_cents, and remaining_monthly_notional_cents.
+/// max_affordable_cents is the minimum of cash_available_cents,
+/// buying_power_cents, remaining_daily_notional_cents, and
+/// remaining_monthly_notional_cents.
 /// On deny, it is the maximum the account can afford right now.
 pub const AffordabilityResult = struct {
     outcome: AffordabilityOutcome,
     requested_notional_cents: i64,
-    /// Effective ceiling: min(buying_power, remaining_daily, remaining_monthly).
+    /// Effective ceiling: min(cash_available, buying_power, remaining_daily, remaining_monthly).
     max_affordable_cents: i64,
-    /// account.cash_cents (raw balance, before open-order commitments).
+    /// Cash available for a new order after clamping invalid negatives and
+    /// respecting the reported buying-power ceiling.
     cash_available_cents: i64,
     /// account.buying_power_cents (net limit for a new order).
     buying_power_cents: i64,
@@ -133,24 +137,32 @@ pub const AffordabilityCheckPayload = struct {
     max_affordable_cents: i64,
 };
 
+pub const BasketAffordabilityError = error{
+    AccountMismatch,
+};
+
 /// Check whether account can afford requested_notional_cents for a new order.
 ///
 /// Check order:
+///   0. requested notional must be positive
 ///   1. open-order slot: open_order_count < max_open_order_count
 ///      (skipped when max_open_order_count == 0)
-///   2. buying power: buying_power_cents >= requested_notional_cents
-///   3. remaining daily notional >= requested_notional_cents
-///   4. remaining monthly notional >= requested_notional_cents
+///   2. cash available: cash_available_cents >= requested_notional_cents
+///   3. buying power: buying_power_cents >= requested_notional_cents
+///   4. remaining daily notional >= requested_notional_cents
+///   5. remaining monthly notional >= requested_notional_cents
 ///
 /// remaining_daily  = max(0, day_notional_limit_cents  - day_notional_used_cents)
 /// remaining_monthly = max(0, month_notional_limit_cents - month_notional_used_cents)
-/// max_affordable   = min(buying_power, remaining_daily, remaining_monthly)
+/// cash_available  = min(max(0, cash_cents), max(0, buying_power_cents))
+/// max_affordable  = min(cash_available, buying_power, remaining_daily, remaining_monthly)
 pub fn checkAffordability(
     account: *const BrokerageAccount,
     requested_notional_cents: i64,
 ) AffordabilityResult {
-    const cash_available = account.cash_cents;
-    const buying_power = account.buying_power_cents;
+    const raw_cash_available = @max(@as(i64, 0), account.cash_cents);
+    const buying_power = @max(@as(i64, 0), account.buying_power_cents);
+    const cash_available = @min(raw_cash_available, buying_power);
     const remaining_daily = @max(
         @as(i64, 0),
         account.day_notional_limit_cents - account.day_notional_used_cents,
@@ -159,12 +171,16 @@ pub fn checkAffordability(
         @as(i64, 0),
         account.month_notional_limit_cents - account.month_notional_used_cents,
     );
-    const max_affordable = @min(buying_power, @min(remaining_daily, remaining_monthly));
+    const max_affordable = @min(cash_available, @min(buying_power, @min(remaining_daily, remaining_monthly)));
 
     const outcome: AffordabilityOutcome = blk: {
+        if (requested_notional_cents <= 0)
+            break :blk .deny_invalid_notional;
         if (account.max_open_order_count > 0 and
             account.open_order_count >= account.max_open_order_count)
             break :blk .deny_open_order_limit;
+        if (requested_notional_cents > cash_available)
+            break :blk .deny_insufficient_buying_power;
         if (requested_notional_cents > buying_power)
             break :blk .deny_insufficient_buying_power;
         if (requested_notional_cents > remaining_daily)
@@ -183,6 +199,23 @@ pub fn checkAffordability(
         .remaining_daily_notional_cents = remaining_daily,
         .remaining_monthly_notional_cents = remaining_monthly,
     };
+}
+
+/// Check affordability for a concrete basket and ensure the basket belongs to
+/// the same demo account fixture.
+pub fn checkBasketAffordability(
+    account: *const BrokerageAccount,
+    proposed_basket: *const basket.Basket,
+) BasketAffordabilityError!AffordabilityResult {
+    if (account.account_id != proposed_basket.account_id)
+        return error.AccountMismatch;
+
+    const basket_notional = if (proposed_basket.total_allocated_cents > 0)
+        proposed_basket.total_allocated_cents
+    else
+        proposed_basket.target_notional_cents;
+
+    return checkAffordability(account, basket_notional);
 }
 
 // ---------------------------------------------------------------------------
@@ -341,8 +374,8 @@ test "checkAffordability: cash_rich affords AI thesis notional" {
     try std.testing.expectEqual(@as(i64, 200_000), result.requested_notional_cents);
 }
 
-test "checkAffordability: cash_rich max_affordable is min(buying_power, daily, monthly)" {
-    // min(5_000_000, 2_500_000, 10_000_000) = 2_500_000
+test "checkAffordability: cash_rich max_affordable is min(cash, buying_power, daily, monthly)" {
+    // min(5_000_000, 5_000_000, 2_500_000, 10_000_000) = 2_500_000
     const result = checkAffordability(&fixtures.cash_rich, 200_000);
     try std.testing.expectEqual(@as(i64, 2_500_000), result.max_affordable_cents);
     try std.testing.expectEqual(@as(i64, 5_000_000), result.cash_available_cents);
@@ -372,7 +405,7 @@ test "checkAffordability: low_cash denied for USD 200 request" {
 
 test "checkAffordability: low_cash max_affordable equals buying_power" {
     const result = checkAffordability(&fixtures.low_cash, 20_000);
-    // max_affordable = min(15_000, 2_500_000, 10_000_000) = 15_000
+    // max_affordable = min(15_000, 15_000, 2_500_000, 10_000_000) = 15_000
     try std.testing.expectEqual(@as(i64, 15_000), result.max_affordable_cents);
 }
 
@@ -381,6 +414,36 @@ test "checkAffordability: deny_insufficient_buying_power when buying_power is ze
     a.buying_power_cents = 0;
     const result = checkAffordability(&a, 1);
     try std.testing.expectEqual(AffordabilityOutcome.deny_insufficient_buying_power, result.outcome);
+    try std.testing.expectEqual(@as(i64, 0), result.max_affordable_cents);
+}
+
+test "checkAffordability: deny_invalid_notional when request is zero or negative" {
+    try std.testing.expectEqual(
+        AffordabilityOutcome.deny_invalid_notional,
+        checkAffordability(&fixtures.cash_rich, 0).outcome,
+    );
+    try std.testing.expectEqual(
+        AffordabilityOutcome.deny_invalid_notional,
+        checkAffordability(&fixtures.cash_rich, -1).outcome,
+    );
+}
+
+test "checkAffordability: cash is a hard ceiling even when buying power is higher" {
+    var a = fixtures.cash_rich;
+    a.cash_cents = 50_000;
+    a.buying_power_cents = 100_000;
+    const result = checkAffordability(&a, 75_000);
+    try std.testing.expectEqual(AffordabilityOutcome.deny_insufficient_buying_power, result.outcome);
+    try std.testing.expectEqual(@as(i64, 50_000), result.cash_available_cents);
+    try std.testing.expectEqual(@as(i64, 50_000), result.max_affordable_cents);
+}
+
+test "checkAffordability: negative cash fails closed" {
+    var a = fixtures.cash_rich;
+    a.cash_cents = -1;
+    const result = checkAffordability(&a, 1);
+    try std.testing.expectEqual(AffordabilityOutcome.deny_insufficient_buying_power, result.outcome);
+    try std.testing.expectEqual(@as(i64, 0), result.cash_available_cents);
     try std.testing.expectEqual(@as(i64, 0), result.max_affordable_cents);
 }
 
@@ -399,7 +462,7 @@ test "checkAffordability: day limit exceeded by large request" {
     // cash_rich day limit is USD 25,000 = 2_500_000 cents; request USD 30,000.
     const result = checkAffordability(&fixtures.cash_rich, 3_000_000);
     try std.testing.expectEqual(AffordabilityOutcome.deny_day_limit_exceeded, result.outcome);
-    // max_affordable = min(5_000_000, 2_500_000, 10_000_000) = 2_500_000
+    // max_affordable = min(5_000_000, 5_000_000, 2_500_000, 10_000_000) = 2_500_000
     try std.testing.expectEqual(@as(i64, 2_500_000), result.max_affordable_cents);
 }
 
@@ -430,7 +493,7 @@ test "checkAffordability: month limit binding when day limit is not" {
     // Request USD 2,000 > remaining monthly USD 1,000.
     const result = checkAffordability(&a, 200_000);
     try std.testing.expectEqual(AffordabilityOutcome.deny_month_limit_exceeded, result.outcome);
-    // max_affordable = min(5_000_000, 50_000_000, 100_000) = 100_000
+    // max_affordable = min(5_000_000, 5_000_000, 50_000_000, 100_000) = 100_000
     try std.testing.expectEqual(@as(i64, 100_000), result.max_affordable_cents);
 }
 
@@ -455,6 +518,38 @@ test "checkAffordability: open-order limit check fires before buying-power check
     a.max_open_order_count = 8;
     const result = checkAffordability(&a, 200_000);
     try std.testing.expectEqual(AffordabilityOutcome.deny_open_order_limit, result.outcome);
+}
+
+test "checkBasketAffordability: uses basket total_allocated_cents for the request" {
+    var proposed_basket = std.mem.zeroes(basket.Basket);
+    proposed_basket.account_id = fixtures.cash_rich.account_id;
+    proposed_basket.target_notional_cents = 200_000;
+    proposed_basket.total_allocated_cents = 150_000;
+
+    const result = try checkBasketAffordability(&fixtures.cash_rich, &proposed_basket);
+    try std.testing.expectEqual(AffordabilityOutcome.allow, result.outcome);
+    try std.testing.expectEqual(@as(i64, 150_000), result.requested_notional_cents);
+}
+
+test "checkBasketAffordability: falls back to target_notional_cents when total_allocated is zero" {
+    var proposed_basket = std.mem.zeroes(basket.Basket);
+    proposed_basket.account_id = fixtures.cash_rich.account_id;
+    proposed_basket.target_notional_cents = 200_000;
+
+    const result = try checkBasketAffordability(&fixtures.cash_rich, &proposed_basket);
+    try std.testing.expectEqual(AffordabilityOutcome.allow, result.outcome);
+    try std.testing.expectEqual(@as(i64, 200_000), result.requested_notional_cents);
+}
+
+test "checkBasketAffordability: rejects account mismatch" {
+    var proposed_basket = std.mem.zeroes(basket.Basket);
+    proposed_basket.account_id = fixtures.cash_rich.account_id;
+    proposed_basket.target_notional_cents = 200_000;
+
+    try std.testing.expectError(
+        BasketAffordabilityError.AccountMismatch,
+        checkBasketAffordability(&fixtures.low_cash, &proposed_basket),
+    );
 }
 
 test "checkAffordability: open-order limit not triggered when max_open_order_count is 0" {
