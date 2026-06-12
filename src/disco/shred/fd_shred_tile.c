@@ -141,6 +141,7 @@ typedef union {
 typedef struct {
   fd_shredder_t      * shredder;
   fd_fec_resolver_t  * resolver;
+  ulong                shred_limit;
   fd_pubkey_t          identity_key[1]; /* Just the public key */
 
   ulong                round_robin_id;
@@ -771,7 +772,7 @@ during_frag( fd_shred_ctx_t * ctx,
     uchar const * dcache_entry = fd_net_rx_translate_frag( &ctx->in[ in_idx ].net_rx, chunk, ctl, sz );
     ulong hdr_sz = fd_disco_netmux_sig_hdr_sz( sig );
     FD_TEST( hdr_sz <= sz ); /* Should be ensured by the net tile */
-    fd_shred_t const * shred = fd_shred_parse( dcache_entry+hdr_sz, sz-hdr_sz );
+    fd_shred_t const * shred = fd_shred_parse( dcache_entry+hdr_sz, sz-hdr_sz, ctx->shred_limit );
     if( FD_UNLIKELY( !shred ) ) {
       ctx->skip_frag = 1;
       return;
@@ -943,7 +944,7 @@ after_frag( fd_shred_ctx_t *    ctx,
     uchar * shred_buffer    = ctx->shred_buffer;
     ulong   shred_buffer_sz = ctx->shred_buffer_sz;
 
-    fd_shred_t const * shred = fd_shred_parse( shred_buffer, shred_buffer_sz );
+    fd_shred_t const * shred = fd_shred_parse( shred_buffer, shred_buffer_sz, ctx->shred_limit );
 
     if( FD_UNLIKELY( !shred       ) ) { ctx->metrics->shred_processing_result[ 1 ]++; return; }
 
@@ -1112,6 +1113,24 @@ after_frag( fd_shred_ctx_t *    ctx,
     }
 
     if( FD_LIKELY( ctx->shred_out_idx!=ULONG_MAX && replay_fwd ) ) { /* firedancer-only */
+
+      /* Send all of the data shred headers we recovered (weren't received) */
+      for( int i=0; i<32; i++ ) {
+        if( fd_uint_extract_bit( set->data_shred_rcvd, i )==0 ) {
+          fd_shred_t * const missing = &set->data_shreds[ i ].s[0];
+          FD_LOG_DEBUG(( "was missing: index=%u, slot=%lu, shred_idx=%u", missing->idx%32, missing->slot, missing->idx ));
+
+          ulong sig = ((ulong)FD_FEC_RESOLVER_SHRED_COMPLETES << 32UL) | SHRED_SIG_SRC_RECONSTRUCTED;
+
+          fd_shred_base_t * shred_msg = (fd_shred_base_t *)fd_chunk_to_laddr( ctx->shred_out_mem, ctx->shred_out_chunk );
+          memcpy(  shred_msg->shred_, missing, fd_shred_sz( missing ) );
+          memcpy( &shred_msg->merkle_root, ctx->out_merkle_roots[fset_k].hash, sizeof(fd_hash_t) );
+
+          ulong tspub = fd_frag_meta_ts_comp( fd_tickcount() );
+          fd_stem_publish( stem, ctx->shred_out_idx, sig, ctx->shred_out_chunk, sizeof(fd_shred_base_t), 0UL, ctx->tsorig, tspub );
+          ctx->shred_out_chunk = fd_dcache_compact_next( ctx->shred_out_chunk, sizeof(fd_shred_base_t), ctx->shred_out_chunk0, ctx->shred_out_wmark );
+        }
+      }
 
       /* Additionally, publish a frag to notify repair and replay that
          the FEC set is complete.  Note the ordering wrt store shred
@@ -1365,6 +1384,7 @@ unprivileged_init( fd_topo_t const *      topo,
                                                             sign_out->mtu ) ) );
 
   ulong shred_limit = fd_ulong_if( tile->shred.larger_shred_limits_per_block, 32UL*32UL*1024UL, 32UL*1024UL );
+  ctx->shred_limit  = shred_limit;
   fd_fec_set_t * resolver_sets = fec_sets + shred_store_mcache_depth + FD_SHRED_BATCH_FEC_SETS_MAX;
   ctx->shredder = NONNULL( fd_shredder_join     ( fd_shredder_new     ( _shredder, fd_shred_signer, ctx->keyguard_client ) ) );
   ctx->resolver = NONNULL( fd_fec_resolver_join ( fd_fec_resolver_new ( _resolver,
@@ -1562,7 +1582,7 @@ populate_allowed_fds( fd_topo_t const *      topo,
    FD_SHRED_BATCH_FEC_SETS_MAX FEC sets;  (Firedancer) that is
    FD_SHRED_BATCH_FEC_SETS_MAX frags to repair (one per FEC set).
    Therefore, the worst case is IN_KIND_POH for Frankendancer. */
-#define STEM_BURST (FD_SHRED_BATCH_FEC_SETS_MAX)
+#define STEM_BURST (FD_SHRED_BATCH_FEC_SETS_MAX + 40UL)
 
 /* See explanation in fd_pack */
 #define STEM_LAZY  (128L*3000L)

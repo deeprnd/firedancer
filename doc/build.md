@@ -197,7 +197,7 @@ Use the Firedancer-side build when you are working on:
 - `src/discof/`
 - the runtime C substrate
 
-That workflow is documented in [Build System](./build-system.md).
+That workflow is documented in [Build Engine](./build-system.md).
 
 Related docs
 ------------

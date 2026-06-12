@@ -306,8 +306,8 @@ fd_executor_check_transaction_age_and_compute_budget_limits( fd_bank_t *        
 
 /* https://github.com/anza-xyz/agave/blob/v2.0.9/runtime/src/bank.rs#L3239-L3251 */
 static inline ulong
-get_transaction_account_lock_limit( fd_bank_t * bank ) {
-  return fd_ulong_if( FD_FEATURE_ACTIVE_BANK( bank, increase_tx_account_lock_limit ), MAX_TX_ACCOUNT_LOCKS, 64UL );
+get_transaction_account_lock_limit( void ) {
+  return 64UL;
 }
 
 /* https://github.com/anza-xyz/agave/blob/v2.3.1/runtime/src/bank/check_transactions.rs#L61-L75 */
@@ -523,7 +523,7 @@ fd_collect_loaded_account( fd_txn_out_t *   txn_out,
       break;
     }
   }
-  if( FD_UNLIKELY( !programdata_ref ) ) return FD_RUNTIME_EXECUTE_SUCCESS;
+  if( FD_UNLIKELY( !programdata_ref || !programdata_ref->lamports ) ) return FD_RUNTIME_EXECUTE_SUCCESS;
   ulong programdata_sz = programdata_ref->data_len;
 
   /* Try to accumulate the programdata's data size
@@ -642,11 +642,10 @@ fd_executor_load_transaction_accounts( fd_bank_t *         bank,
 
 /* https://github.com/anza-xyz/agave/blob/838c1952595809a31520ff1603a13f2c9123aa51/accounts-db/src/account_locks.rs#L118 */
 int
-fd_executor_validate_account_locks( fd_bank_t *          bank,
-                                    fd_txn_out_t const * txn_out ) {
+fd_executor_validate_account_locks( fd_txn_out_t const * txn_out ) {
   /* Ensure the number of account keys does not exceed the transaction lock limit
      https://github.com/anza-xyz/agave/blob/v2.2.17/accounts-db/src/account_locks.rs#L121 */
-  ulong tx_account_lock_limit = get_transaction_account_lock_limit( bank );
+  ulong tx_account_lock_limit = get_transaction_account_lock_limit();
   if( FD_UNLIKELY( txn_out->accounts.cnt>tx_account_lock_limit ) ) {
     return FD_RUNTIME_TXN_ERR_TOO_MANY_ACCOUNT_LOCKS;
   }
@@ -1180,6 +1179,11 @@ fd_executor_setup_accounts_for_txn( fd_runtime_t *      runtime,
   int err = fd_executor_setup_txn_alut_account_keys( runtime, bank, txn_in, txn_out );
   if( FD_UNLIKELY( err!=FD_RUNTIME_EXECUTE_SUCCESS ) ) return err;
 
+  /* Validate account locks before acquiring; the accdb acquire
+     hard-asserts the lock count is within bounds. */
+  err = fd_executor_validate_account_locks( txn_out );
+  if( FD_UNLIKELY( err!=FD_RUNTIME_EXECUTE_SUCCESS ) ) return err;
+
   /* Resolve all transaction accounts and queue them for acquisition. */
 
   for( ushort i=0; i<txn_out->accounts.cnt; i++ ) {
@@ -1312,6 +1316,11 @@ fd_executor_txn_check( fd_bank_t *    bank,
     fd_acc_t * acc = txn_out->accounts.account[ i ];
     if( FD_UNLIKELY( !txn_out->accounts.is_writable[ i ] ) ) continue;
 
+    /* The fee payer's starting balance is its post-fee-deduction
+       balance. */
+    ulong starting_lamports = i!=FD_FEE_PAYER_TXN_IDX ? txn_out->accounts.starting_lamports[ i ]
+                                                      : txn_out->accounts.fee_payer_rollback_lamports;
+
     /* Tips for bundles are collected in the bank: a user submitting a
        bundle must include a instruction that transfers lamports to
        a specific tip account.  Tips accumulated through the slot.
@@ -1323,12 +1332,11 @@ fd_executor_txn_check( fd_bank_t *    bank,
        and inflate bank->f.tips.  starting_lamports[] holds the carried-
        forward balance (== prior_lamports for freshly acquired accounts). */
     if( FD_UNLIKELY( fd_pack_tip_is_tip_account( fd_type_pun_const( txn_out->accounts.keys[ i ].uc ) ) ) ) {
-      txn_out->details.tips += fd_ulong_sat_sub( acc->lamports, txn_out->accounts.starting_lamports[ i ] );
+      txn_out->details.tips += fd_ulong_sat_sub( acc->lamports, starting_lamports );
     }
 
     fd_uwide_inc( &ending_lamports_h, &ending_lamports_l, ending_lamports_h, ending_lamports_l, acc->lamports );
-    if( i!=0 ) fd_uwide_inc( &starting_lamports_h, &starting_lamports_l, starting_lamports_h, starting_lamports_l, txn_out->accounts.starting_lamports[ i ] );
-    else       fd_uwide_inc( &starting_lamports_h, &starting_lamports_l, starting_lamports_h, starting_lamports_l, txn_out->accounts.fee_payer_rollback_lamports );
+    fd_uwide_inc( &starting_lamports_h, &starting_lamports_l, starting_lamports_h, starting_lamports_l, starting_lamports );
 
     /* Rent states are defined as followed:
         - lamports == 0                      -> Uninitialized
@@ -1347,7 +1355,7 @@ fd_executor_txn_check( fd_bank_t *    bank,
         /* https://github.com/anza-xyz/agave/blob/b2c388d6cbff9b765d574bbb83a4378a1fc8af32/svm/src/account_rent_state.rs#L45-L59 */
         /* Use this carried-forward starting state, not acc->prior_*.
            Equals prior_* for freshly acquired accounts. */
-        ulong before_lamports      = txn_out->accounts.starting_lamports[ i ];
+        ulong before_lamports      = starting_lamports;
         ulong before_data_len      = txn_out->accounts.starting_data_len[ i ];
         uchar before_uninitialized = before_lamports==0UL;
         uchar before_rent_exempt   = before_lamports>=fd_rent_exempt_minimum_balance( &bank->f.rent, before_data_len );
