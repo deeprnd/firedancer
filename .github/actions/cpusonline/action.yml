@@ -7,8 +7,11 @@ runs:
   steps:
     - shell: bash
       run: |
-        set -x
+        set -euxo pipefail
         for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+          if [ ! -f "$cpu/online" ]; then
+            continue
+          fi
           if [ "$(cat "$cpu/online")" -eq 0 ]; then
             echo 1 | sudo tee "$cpu/online" > /dev/null
           fi
