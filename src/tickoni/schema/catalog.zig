@@ -15,10 +15,9 @@
 /// so replay can detect catalog drift.  Incrementing catalog_schema_version
 /// signals a compatibility break in InstrumentEntry layout or fixture content.
 ///
-/// Canonical encoding: binary protobuf via fd_pb_encoder, following the audit
-/// codec pattern in src/tickoni/codec/audit_pb.c.  Encoding is not yet
-/// implemented; this comment marks the planned format so the schema is not
-/// extended incompatibly before it is defined.
+/// Canonical encoding: binary protobuf.  Wire format is defined in
+/// src/tickoni/schema/catalog.proto; breaking changes are enforced by buf
+/// in CI (quality-check-proto / proto_check.yml).
 const std = @import("std");
 const thesis = @import("thesis.zig");
 

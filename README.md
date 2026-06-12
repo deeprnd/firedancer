@@ -21,7 +21,7 @@
   <tr>
     <td>
       <!-- badge:unit:start -->
-<img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-passing-brightgreen?style=flat-square" />
+<img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-failing-red?style=flat-square" />
 <!-- badge:unit:end -->
     </td>
     <td>
@@ -38,7 +38,7 @@
   <tr>
     <td>
       <!-- badge:cov-fd:start -->
-<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-43.0%25-orange?style=flat-square" />
+<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-42.7%25-red?style=flat-square" />
 <!-- badge:cov-fd:end -->
     </td>
     <td>
