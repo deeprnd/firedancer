@@ -6,7 +6,7 @@
 /// append-only audit ordering, deterministic replay, metrics, diagnostics, and
 /// crash-only failure propagation.
 const std = @import("std");
-const audit = @import("audit.zig");
+const audit = @import("audit/mod.zig");
 
 pub const PolicyDecision = enum(u8) {
     allow,

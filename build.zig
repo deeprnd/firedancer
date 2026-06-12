@@ -81,14 +81,14 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/runtime/tile.zig",
         "src/tickoni/c_abi/queue.zig",
         "src/tickoni/c_abi/sandbox.zig",
-        "src/tickoni/tiles/audit.zig",
+        "src/tickoni/tiles/audit/mod.zig",
         "src/tickoni/tiles/payment_pipeline.zig",
     }) |path| {
         const t_mod = b.createModule(.{
             .root_source_file = b.path(path),
             .target = target,
             .optimize = optimize,
-            .imports = if (std.mem.eql(u8, path, "src/tickoni/tiles/audit.zig") or
+            .imports = if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig") or
                 std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline.zig"))
                 &.{
                     .{ .name = "audit_cabi", .module = audit_cabi_mod },
@@ -98,7 +98,7 @@ pub fn build(b: *std.Build) void {
                 &.{},
         });
         const t = b.addTest(.{ .root_module = t_mod });
-        if (std.mem.eql(u8, path, "src/tickoni/tiles/audit.zig") or
+        if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig") or
             std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline.zig"))
         {
             linkTickoniCodec(b, t, fd_lib_dir);
@@ -168,7 +168,7 @@ pub fn build(b: *std.Build) void {
         .{ "test-tile", "src/tickoni/runtime/tile.zig" },
         .{ "test-queue", "src/tickoni/c_abi/queue.zig" },
         .{ "test-sandbox", "src/tickoni/c_abi/sandbox.zig" },
-        .{ "test-audit", "src/tickoni/tiles/audit.zig" },
+        .{ "test-audit", "src/tickoni/tiles/audit/mod.zig" },
         .{ "test-payment-pipeline", "src/tickoni/tiles/payment_pipeline.zig" },
     }) |entry| {
         const t = b.addTest(.{
@@ -177,7 +177,7 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path(entry[1]),
                 .target = target,
                 .optimize = optimize,
-                .imports = if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit.zig") or
+                .imports = if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit/mod.zig") or
                     std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline.zig"))
                     &.{
                         .{ .name = "audit_cabi", .module = audit_cabi_mod },
@@ -187,7 +187,7 @@ pub fn build(b: *std.Build) void {
                     &.{},
             }),
         });
-        if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit.zig") or
+        if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit/mod.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline.zig"))
         {
             linkTickoniCodec(b, t, fd_lib_dir);
