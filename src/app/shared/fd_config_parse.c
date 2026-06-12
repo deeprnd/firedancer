@@ -14,69 +14,6 @@ fd_config_check_configf( fd_config_t *  config,
   }
 }
 
-fd_configh_t *
-fd_config_extract_podh( uchar *        pod,
-                        fd_configh_t * config ) {
-  CFG_POP      ( cstr,   dynamic_port_range                               );
-
-  CFG_POP      ( cstr,   reporting.solana_metrics_config                  );
-
-  CFG_POP      ( cstr,   layout.agave_affinity                            );
-  CFG_POP      ( uint,   layout.agave_unified_scheduler_handler_threads   );
-  CFG_POP      ( uint,   layout.resolh_tile_count                         );
-  CFG_POP      ( uint,   layout.bank_tile_count                           );
-
-  CFG_POP1      ( cstr,  ledger.accounts_path,             paths.accounts_path          );
-  CFG_POP1_ARRAY( cstr,  consensus.authorized_voter_paths, paths.authorized_voter_paths );
-
-  CFG_POP      ( uint,   ledger.limit_size                                );
-  CFG_POP_ARRAY( cstr,   ledger.account_indexes                           );
-  CFG_POP_ARRAY( cstr,   ledger.account_index_include_keys                );
-  CFG_POP_ARRAY( cstr,   ledger.account_index_exclude_keys                );
-  CFG_POP      ( bool,   ledger.enable_accounts_disk_index                );
-  CFG_POP      ( cstr,   ledger.accounts_index_path                       );
-  CFG_POP      ( cstr,   ledger.accounts_hash_cache_path                  );
-  CFG_POP      ( bool,   ledger.require_tower                             );
-  CFG_POP      ( cstr,   ledger.snapshot_archive_format                   );
-
-  CFG_POP      ( bool,   gossip.port_check                                );
-
-  CFG_POP      ( bool,   consensus.snapshot_fetch                         );
-  CFG_POP      ( bool,   consensus.genesis_fetch                          );
-  CFG_POP      ( bool,   consensus.poh_speed_test                         );
-  CFG_POP      ( uint,   consensus.wait_for_supermajority_at_slot         );
-  CFG_POP      ( cstr,   consensus.expected_bank_hash                     );
-  CFG_POP      ( bool,   consensus.wait_for_vote_to_start_leader          );
-  CFG_POP_ARRAY( uint,   consensus.hard_fork_at_slots                     );
-  CFG_POP_ARRAY( cstr,   consensus.known_validators                       );
-  CFG_POP      ( bool,   consensus.os_network_limits_test                 );
-
-  CFG_POP      ( ushort, rpc.port                                         );
-  CFG_POP      ( bool,   rpc.extended_tx_metadata_storage                 );
-  CFG_POP      ( bool,   rpc.full_api                                     );
-  CFG_POP      ( bool,   rpc.private                                      );
-  CFG_POP      ( cstr,   rpc.bind_address                                 );
-  CFG_POP      ( cstr,   rpc.public_address                               );
-  CFG_POP      ( bool,   rpc.transaction_history                          );
-  CFG_POP      ( bool,   rpc.only_known                                   );
-  CFG_POP      ( bool,   rpc.pubsub_enable_block_subscription             );
-  CFG_POP      ( bool,   rpc.pubsub_enable_vote_subscription              );
-  CFG_POP      ( bool,   rpc.bigtable_ledger_storage                      );
-
-  CFG_POP      ( bool,   snapshots.enabled                                );
-  CFG_POP      ( bool,   snapshots.incremental_snapshots                  );
-  CFG_POP      ( uint,   snapshots.full_snapshot_interval_slots           );
-  CFG_POP      ( uint,   snapshots.incremental_snapshot_interval_slots    );
-  CFG_POP      ( uint,   snapshots.minimum_snapshot_download_speed        );
-  CFG_POP      ( uint,   snapshots.maximum_snapshot_download_abort        );
-  CFG_POP      ( uint,   snapshots.maximum_full_snapshots_to_retain       );
-  CFG_POP      ( uint,   snapshots.maximum_incremental_snapshots_to_retain);
-  CFG_POP      ( cstr,   snapshots.path                                   );
-  CFG_POP      ( cstr,   snapshots.incremental_path                       );
-
-  return config;
-}
-
 fd_configf_t *
 fd_config_extract_podf( uchar *        pod,
                         fd_configf_t * config ) {
@@ -155,10 +92,8 @@ fd_config_extract_pod( uchar *       pod,
     CFG_POP    ( cstr,   paths.accounts                                   );
     CFG_POP    ( cstr,   paths.shredb                                 );
   } else {
-    CFG_POP1   ( cstr,   scratch_directory,           paths.base          );
-    CFG_POP1   ( cstr,   ledger.path,                 frankendancer.paths.ledger );
-    CFG_POP1   ( cstr,   consensus.identity_path,     paths.identity_key  );
-    CFG_POP1   ( cstr,   consensus.vote_account_path, paths.vote_account  );
+    FD_LOG_ERR(( "legacy runtime configuration paths are disabled. "
+                 "Use runtime config profiles." ));
   }
 
   CFG_POP_ARRAY( cstr,   gossip.entrypoints                               );
@@ -287,7 +222,6 @@ fd_config_extract_pod( uchar *       pod,
   CFG_POP      ( bool,   development.sandbox                              );
   CFG_POP      ( bool,   development.no_clone                             );
   CFG_POP      ( cstr,   development.core_dump                            );
-  CFG_POP      ( bool,   development.no_agave                             );
   CFG_POP      ( bool,   development.bootstrap                            );
 
   CFG_POP      ( bool,   development.gossip.allow_private_address         );
@@ -331,7 +265,7 @@ fd_config_extract_pod( uchar *       pod,
     if( FD_UNLIKELY( !fd_config_extract_podf( pod, &config->firedancer ) ) ) return NULL;
     fd_config_check_configf( config, &config->firedancer );
   } else {
-    if( FD_UNLIKELY( !fd_config_extract_podh( pod, &config->frankendancer ) ) ) return NULL;
+    FD_LOG_ERR(( "legacy runtime pod extraction is disabled." ));
   }
 
   /* Renamed config options */

@@ -4,7 +4,7 @@
   <tr>
     <td>
       <!-- badge:build:start -->
-<img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
+<img alt="Build" src="https://img.shields.io/badge/build-unknown-lightgrey?style=flat-square" />
 <!-- badge:build:end -->
     </td>
     <td>
@@ -38,7 +38,7 @@
   <tr>
     <td>
       <!-- badge:cov-fd:start -->
-<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-unknown-lightgrey?style=flat-square" />
+<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-42.7%25-red?style=flat-square" />
 <!-- badge:cov-fd:end -->
     </td>
     <td>
