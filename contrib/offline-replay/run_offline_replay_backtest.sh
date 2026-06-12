@@ -2,6 +2,14 @@
 
 OBJDIR=${OBJDIR:-build/native/gcc}
 
+if [ -z "${TICKONI_REPO:-}" ] && [ -n "${FIREDANCER_REPO:-}" ]; then
+    TICKONI_REPO="$FIREDANCER_REPO"
+fi
+if [ -z "${TICKONI_REPO:-}" ]; then
+    echo "TICKONI_REPO is not set (or legacy FIREDANCER_REPO fallback)" >&2
+    exit 1
+fi
+
 source $NETWORK_PARAMETERS_FILE $NETWORK
 echo "Updated network parameters"
 
@@ -99,7 +107,7 @@ while true; do
         TEMP_LOG=/home/kbhargava/${NETWORK}_offline_replay_${NEWEST_BUCKET_SLOT}_temp.log
         send_slack_message "Log File: \`$LOG\`"
         echo "" > $LOG && chmod 777 $LOG
-        LEDGER_DIR=${FIREDANCER_REPO}/dump/${NETWORK}-${NEWEST_BUCKET_SLOT}
+        LEDGER_DIR=${TICKONI_REPO}/dump/${NETWORK}-${NEWEST_BUCKET_SLOT}
         send_slack_message "Ledger Directory: \`$LEDGER_DIR\`"
         OLD_SNAPSHOTS_DIR=${LEDGER_DIR}/old_snapshots
 
@@ -176,7 +184,7 @@ while true; do
 
         # Now we have downloaded the rocksdb and closest hourly snapshot
         # Time to start replaying the ledger
-        cd $FIREDANCER_REPO
+        cd $TICKONI_REPO
         git pull
         git checkout $FD_BRANCH
         git pull origin $FD_BRANCH
@@ -196,11 +204,11 @@ while true; do
         LEDGER_REPLAY_SNAPSHOT=$LEDGER_DIR/$CLOSEST_HOURLY_FILENAME
 
         while [ $DONE -eq 0 ]; do
-            cd $FIREDANCER_REPO
+            cd $TICKONI_REPO
             send_slack_message "Starting ledger replay with commit \`$FD_COMMIT\`"
             set +e
 
-            cp $FIREDANCER_REPO/contrib/offline-replay/offline_replay.toml $LEDGER_DIR
+            cp $TICKONI_REPO/contrib/offline-replay/offline_replay.toml $LEDGER_DIR
 
             export ledger=$LEDGER_DIR
             echo "ledger: $ledger"

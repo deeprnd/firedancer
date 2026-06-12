@@ -1,0 +1,80 @@
+name: Security
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-slim
+    outputs:
+      run: ${{ steps.detect.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          paths: '^(src/|build\.zig(\.zon)?$|justfile$|contrib/security\.sh$|contrib/gitleaks-fd\.toml$|contrib/codeql/|\.github/actions/|\.github/workflows/security\.yml$)'
+
+  checks:
+    name: ${{ matrix.name }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Gitleaks
+            timeout_minutes: 20
+            command: just security-gitleaks-check-all
+            gitleaks: 'true'
+            fd_deps: 'false'
+            zig: 'false'
+            apt_packages: ''
+            compiler: gcc
+            compiler_version: system
+          - name: Sanitizers
+            timeout_minutes: 45
+            command: just security-sanitize-check-all
+            gitleaks: 'false'
+            fd_deps: 'true'
+            zig: 'true'
+            apt_packages: clang
+            compiler: clang
+            compiler_version: system
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          apt-packages: ${{ matrix.apt_packages }}
+          compiler: ${{ matrix.compiler }}
+          compiler-version: ${{ matrix.compiler_version }}
+          fd-deps: ${{ matrix.fd_deps }}
+          gitleaks: ${{ matrix.gitleaks }}
+          zig: ${{ matrix.zig }}
+
+      - if: matrix.zig == 'true'
+        uses: ./.github/actions/build-fd-tk-libs
+
+      - name: Run check
+        run: ${{ matrix.command }}

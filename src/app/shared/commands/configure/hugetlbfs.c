@@ -12,6 +12,8 @@
 #include <sys/mount.h>
 #include <linux/capability.h>
 
+extern char const * FD_BINARY_NAME;
+
 static void
 init_perm( fd_cap_chk_t *   chk,
            config_t const * config FD_PARAM_UNUSED ) {

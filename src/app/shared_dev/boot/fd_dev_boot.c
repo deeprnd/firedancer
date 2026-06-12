@@ -41,8 +41,11 @@ execve_as_root( int     argc,
   char * envp[ 3 ] = {0};
   char * env;
   int    idx = 0;
-  if( FD_LIKELY(( env = getenv( "FIREDANCER_CONFIG_TOML" ) )) ) {
-    if( FD_UNLIKELY( asprintf( &envp[ idx++ ], "FIREDANCER_CONFIG_TOML=%s", env ) == -1 ) )
+  if( FD_LIKELY(( env = getenv( FD_RUNTIME_CONFIG_ENV ) )) ) {
+    if( FD_UNLIKELY( asprintf( &envp[ idx++ ], "%s=%s", FD_RUNTIME_CONFIG_ENV, env ) == -1 ) )
+      FD_LOG_ERR(( "asprintf() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+  } else if( FD_LIKELY(( env = getenv( FD_LEGACY_CONFIG_ENV ) )) ) {
+    if( FD_UNLIKELY( asprintf( &envp[ idx++ ], "%s=%s", FD_LEGACY_CONFIG_ENV, env ) == -1 ) )
       FD_LOG_ERR(( "asprintf() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
   }
   if( FD_LIKELY(( env = getenv( "TERM" ) )) ) {
@@ -100,8 +103,16 @@ fd_dev_main( int                        argc,
     &argc,
     &argv,
     "--config",
-    "FIREDANCER_CONFIG_TOML",
+    FD_RUNTIME_CONFIG_ENV,
     NULL );
+  if( FD_UNLIKELY( !opt_user_config_path ) ) {
+    char const * legacy_config_path = fd_env_strip_cmdline_cstr( NULL, NULL, NULL, FD_LEGACY_CONFIG_ENV, NULL );
+    if( FD_UNLIKELY( legacy_config_path ) ) {
+      opt_user_config_path = legacy_config_path;
+      FD_LOG_WARNING(( "%s is deprecated; use %s instead (removal date: 2026-12-31)",
+                       FD_LEGACY_CONFIG_ENV, FD_RUNTIME_CONFIG_ENV ));
+    }
+  }
 
   const char * action_name = "dev";
   if( FD_LIKELY( argc > 0 && !strcmp( argv[ 0 ], "--version" ) ) ) {

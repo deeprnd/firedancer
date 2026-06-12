@@ -1,0 +1,31 @@
+name: Setup Firedancer Test Environment
+description: Setup public GitHub runner with Firedancer deps, online CPUs, and hugepages
+
+inputs:
+  compiler:
+    description: Compiler for Firedancer deps setup
+    required: false
+    default: gcc
+  compiler-version:
+    description: Compiler version for Firedancer deps setup
+    required: false
+    default: system
+
+runs:
+  using: composite
+  steps:
+    - name: Setup public GitHub runner
+      uses: ./.github/actions/setup-public-gh-runner
+      with:
+        fd-deps: 'true'
+        compiler: ${{ inputs.compiler }}
+        compiler-version: ${{ inputs.compiler-version }}
+
+    - name: Enable all CPUs
+      uses: ./.github/actions/cpusonline
+
+    - name: Configure hugepages
+      uses: ./.github/actions/hugepages
+      with:
+        count_gigantic: 6
+        count_huge: 64

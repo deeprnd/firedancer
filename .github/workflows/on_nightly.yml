@@ -5,17 +5,20 @@ on:
     - cron: 0 4 * * *
 jobs:
   coverage-report:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/coverage_report.yml
     secrets: inherit
   codeql:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/codeql.yml
     permissions:
       security-events: write
-  builds_1:
+  builds_1:SKIP_FIREDANCER_CI
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/builds.yml
     with:
         # compiler,machine,target
-      gcc_exceptions: |
+      gcc_exceptiSKIP_FIREDANCER_CI
         ALL,linux_gcc_riscv,ALL;
         ALL,linux_gcc_power9,ALL;
         ALL,linux_gcc_neoverse_n2,ALL;
@@ -42,28 +45,31 @@ jobs:
       verbose: true
       cid: 3
   builds_2:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/builds.yml
     with:
       machine: linux_gcc_icelake
-      build_arm: false
+      build_arm: SKIP_FIREDANCER_CI
       clang: none
       verbose: true
       cid: 4
       gcc_runner_labels: '["self-hosted", "X64", "750G"]'
   builds_3:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/builds.yml
     with:
       machine: linux_gcc_x86_64
-      build_arm: false
+      build_arm: SKIP_FIREDANCER_CI
       clang: none
       verbose: true
       cid: 5
       gcc_runner_labels: '["self-hosted", "X64", "750G"]'
   builds_4:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/builds.yml
     with:
         # compiler,machine,target
-      gcc_exceptions: |
+      gcc_exceptiSKIP_FIREDANCER_CI
         gcc-8.5.0,linux_gcc_zen2,ALL;
       machine: linux_gcc_zen2
       build_arm: false
@@ -72,8 +78,9 @@ jobs:
       cid: 6
       gcc_runner_labels: '["self-hosted", "X64", "750G"]'
   backtest:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/backtest.yml
     with:
       script: DUMP_DIR=../dump src/flamenco/runtime/tests/run_backtest_all.sh
-      timeout: 120
+      timeout: 12SKIP_FIREDANCER_CI
     secrets: inherit

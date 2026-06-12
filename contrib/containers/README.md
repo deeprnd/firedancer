@@ -1,4 +1,4 @@
-# GCC Containers
+# Tickoni GCC Containers
 
 These dockerfiles can be used to build containers with GCC 8, GCC 9, GCC 10 and GCC 12.
 
@@ -7,7 +7,7 @@ These dockerfiles can be used to build containers with GCC 8, GCC 9, GCC 10 and 
 This assumes you are currently in the top directory of the repository.
 
 ```bash
-podman build -t gcc:8 -f ./contrib/containers/gcc-8.dockerfile
+podman build -t tickoni-gcc:8 -f ./contrib/containers/gcc-8.dockerfile
 ```
 
 ## Run the container
@@ -28,10 +28,10 @@ If SELinux is enabled, run the following command once:
 chcon -R -t container_file_t ./
 ```
 
-When running the container, mount the top directory of the repository at `/data/firedancer`:
+When running the container, mount the top directory of the repository at `/data/tickoni`:
 
 ```bash
-podman run -ti -v ./:/data/firedancer gcc:8 bash
+podman run -ti -v ./:/data/tickoni tickoni-gcc:8 bash
 ```
 
 ## Build the binaries
@@ -57,7 +57,7 @@ FD_AUTO_INSTALL_PACKAGES=1 ./deps.sh +dev fetch check install
 Compile desired targets:
 
 ```bash
-make -j all fdctl fddev
+make -j all tickoni firedancer-dev
 ```
 
 ## GCC 12 AVX512 build example
@@ -90,5 +90,5 @@ exit
 podman ps -a
 
 # Remove the container if necessary
-podman rm <container_id> # Image - localhost/gcc:8
+podman rm <container_id> # Image - localhost/tickoni-gcc:8
 ```

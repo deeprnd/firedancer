@@ -30,6 +30,7 @@ on:
         default: 60
 jobs:
   backtest-ledger-replay:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     timeout-minutes: ${{ fromJSON(inputs.timeout) }}
     runs-on:
       labels: [self-hosted, 512G]

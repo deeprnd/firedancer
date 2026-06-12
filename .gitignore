@@ -29,6 +29,9 @@ compile_commands.json
 # Rust
 **/Cargo.lock
 
+# Zig
+.zig-global-cache
+
 # Dependencies
 opt/
 opt-msan/
@@ -46,8 +49,9 @@ deps-bundle.tar.zst
 
 # VSCode
 .vscode
-
+.codex
 .claude
+memory
 
 # JetBrains
 .fleet
@@ -70,12 +74,17 @@ deps-bundle.tar.zst
 # Custom config
 /*.toml
 /*.sh
+!/pyproject.toml
 
 # Python
 venv
 .venv
 *.pyc
 *.egg-info/
+
+# Zig
+.zig-cache
+zig-out/
 
 # Fuchsia trace format
 *.fxt
@@ -87,3 +96,5 @@ venv
 # Version derive
 src/util/fd_version_generated.h
 src/util/fd_version_generated1.h
+src/app/firedancer/version.h
+src/app/firedancer/version2.h

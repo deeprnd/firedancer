@@ -71,6 +71,15 @@ compiled and output placed under `./opt`.
 $ ./deps.sh
 ```
 
+For development builds, use `+dev` to also build optional dependencies
+(`lz4`, `snappy`, and `rocksdb`) into `./opt`. Otherwise the build will
+print warnings such as `"lz4 not installed, skipping"` and
+`"rocksdb not installed, skipping"`.
+
+```sh [bash]
+$ ./deps.sh +dev
+```
+
 ## Releases
 Firedancer does not produce pre-built binaries and you must build from
 source, but Firedancer releases are made available as tags. The

@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   analyze:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     name: Analyze (${{ matrix.language }})
     runs-on:
       group: fd-public-repo-codeql

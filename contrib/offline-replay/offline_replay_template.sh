@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# Firedancer Repo
-export FIREDANCER_REPO="/path/to/firedancer"
+# Tickoni Repo (canonical)
+export TICKONI_REPO="/path/to/tickoni"
+# Compatibility alias (optional): FIREDANCER_REPO still accepted
+# export FIREDANCER_REPO="$TICKONI_REPO"
 export FD_BRANCH="main"
 
 # Agave Repo

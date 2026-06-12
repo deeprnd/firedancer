@@ -15,6 +15,6 @@ RUN pacman -Syu --noconfirm && \
       wget && \
     pacman -Scc --noconfirm
 
-WORKDIR /data/firedancer
+WORKDIR /data/tickoni
 
 CMD ["/bin/bash"]
