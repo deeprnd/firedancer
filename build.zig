@@ -163,6 +163,18 @@ pub fn build(b: *std.Build) void {
     linkTickoniCodec(b, basket_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(basket_test).step);
 
+    // portfolio.zig imports basket.zig, which imports thesis.zig / thesis_cabi.
+    const portfolio_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/portfolio.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{.{ .name = "thesis_cabi", .module = thesis_cabi_mod }},
+        }),
+    });
+    linkTickoniCodec(b, portfolio_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(portfolio_test).step);
+
     // supervisor.zig imports runtime and tiles modules.
     const sup_mod = b.createModule(.{
         .root_source_file = b.path("src/app/tickoni/supervisor.zig"),
@@ -257,6 +269,21 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, catalog_cov_test, fd_lib_dir);
     cov_step.dependOn(&b.addInstallArtifact(catalog_cov_test, .{
+        .dest_dir = .{ .override = .{ .custom = "cov" } },
+    }).step);
+
+    // portfolio coverage binary.
+    const portfolio_cov_test = b.addTest(.{
+        .name = "test-portfolio",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/portfolio.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{.{ .name = "thesis_cabi", .module = thesis_cabi_mod }},
+        }),
+    });
+    linkTickoniCodec(b, portfolio_cov_test, fd_lib_dir);
+    cov_step.dependOn(&b.addInstallArtifact(portfolio_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
 
