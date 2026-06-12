@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "run.h"
+#include "../../../../flamenco/accdb/fd_accdb.h"
 
 #include <sys/wait.h>
 #include "generated/main_seccomp.h"
@@ -234,6 +235,8 @@ main_pid_namespace( void * _args ) {
     fd_topo_install_xdp( &config->topo, xdp_fds, &xdp_fds_cnt, config->net.bind_address_parsed, 0 );
   }
 
+  initialize_accdb_fd( config );
+
   for( ulong i=0UL; i<config->topo.tile_cnt; i++ ) {
     fd_topo_tile_t const * tile = &config->topo.tiles[ i ];
 
@@ -249,6 +252,40 @@ main_pid_namespace( void * _args ) {
           if( FD_UNLIKELY( -1==fcntl( xdp_fds[i].xsk_map_fd,   F_SETFD, 0 ) ) ) FD_LOG_ERR(( "fcntl(F_SETFD,0) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
           if( FD_UNLIKELY( -1==fcntl( xdp_fds[i].prog_link_fd, F_SETFD, 0 ) ) ) FD_LOG_ERR(( "fcntl(F_SETFD,0) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
         }
+      }
+    }
+
+    if( FD_LIKELY( config->is_firedancer ) ) {
+      int tile_uses_accdb    = 0;
+      int tile_uses_accdb_ro = 0;
+      for( ulong i=0UL; i<tile->uses_obj_cnt; i++ ) {
+        fd_topo_obj_t const * obj = &config->topo.objs[ tile->uses_obj_id[ i ] ];
+        if( FD_UNLIKELY( !strcmp( obj->name, "accdb" ) ) ) {
+          if( FD_UNLIKELY( tile->uses_obj_mode[ i ]==FD_SHMEM_JOIN_MODE_READ_ONLY ) ) tile_uses_accdb_ro = 1;
+          else                                                                        tile_uses_accdb    = 1;
+          break;
+        }
+      }
+
+      /* The gui joins the accdb shmem read-only (for partition stats)
+         but never reads account data from the on-disk file, so it does
+         not need the accounts.db fd.  Withhold it to keep the gui at
+         least privilege. */
+      if( FD_UNLIKELY( !strcmp( tile->name, "gui" ) ) ) tile_uses_accdb_ro = 0;
+
+      /* snapwr writes accdb pwrite()s without joining accdb shmem, so
+         it needs the RW fd despite not appearing as an accdb obj user
+         in the topology. */
+      if( FD_UNLIKELY( tile_uses_accdb || !strcmp( tile->name, "snapwr" ) ) ) {
+        if( FD_UNLIKELY( -1==fcntl( FD_ACCDB_FD_RW, F_SETFD, 0 ) ) ) FD_LOG_ERR(( "fcntl(F_SETFD,0) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+      } else {
+        if( FD_UNLIKELY( -1==fcntl( FD_ACCDB_FD_RW, F_SETFD, FD_CLOEXEC ) ) ) FD_LOG_ERR(( "fcntl(F_SETFD,FD_CLOEXEC) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+      }
+
+      if( FD_UNLIKELY( tile_uses_accdb_ro ) ) {
+        if( FD_UNLIKELY( -1==fcntl( FD_ACCDB_FD_RO, F_SETFD, 0 ) ) ) FD_LOG_ERR(( "fcntl(F_SETFD,0) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+      } else {
+        if( FD_UNLIKELY( -1==fcntl( FD_ACCDB_FD_RO, F_SETFD, FD_CLOEXEC ) ) ) FD_LOG_ERR(( "fcntl(F_SETFD,FD_CLOEXEC) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
       }
     }
 
@@ -278,6 +315,11 @@ main_pid_namespace( void * _args ) {
       if( FD_UNLIKELY( close( xdp_fds[i].xsk_map_fd ) ) ) FD_LOG_ERR(( "close() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
       if( FD_UNLIKELY( close( xdp_fds[i].prog_link_fd ) ) ) FD_LOG_ERR(( "close() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
     }
+  }
+
+  if( FD_LIKELY( config->is_firedancer ) ) {
+    if( FD_UNLIKELY( -1==close( FD_ACCDB_FD_RW ) ) ) FD_LOG_ERR(( "close() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+    if( FD_UNLIKELY( -1==close( FD_ACCDB_FD_RO ) ) ) FD_LOG_ERR(( "close() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
   }
 
   int allow_fds[ 4+FD_TOPO_MAX_TILES ];
@@ -350,7 +392,7 @@ main_pid_namespace( void * _args ) {
      a group.  The parent process will also die if this process dies,
      due to getting SIGHUP on the pipe. */
   while( 1 ) {
-    if( FD_UNLIKELY( -1==poll( fds, 1UL+child_cnt, -1 ) ) ) FD_LOG_ERR(( "poll() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+    if( FD_UNLIKELY( -1==poll( fds, 1UL+child_cnt, (int)-1 ) ) ) FD_LOG_ERR(( "poll() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
 
     /* Parent process died, probably SIGINT, exit gracefully. */
     if( FD_UNLIKELY( fds[ child_cnt ].revents ) ) fd_sys_util_exit_group( 0 );
@@ -656,7 +698,7 @@ fdctl_check_configure( config_t const * config ) {
   if( FD_UNLIKELY( check.result!=CONFIGURE_OK ) )
     FD_LOG_ERR(( "Huge pages are not configured correctly: %s. You can run `%s configure init hugetlbfs` "
                  "to create the mounts correctly. This must be done after every system restart before running "
-                 "%s.", check.message, FD_BINARY_NAME, FD_APP_NAME ));
+                 "Firedancer.", check.message, FD_BINARY_NAME ));
 
   if( FD_LIKELY( 0==strcmp( config->net.provider, "xdp" ) ) ) {
     if( fd_cfg_stage_bonding.enabled( config ) ) {
@@ -712,6 +754,31 @@ run_firedancer_init( config_t * config,
   if( check_configure ) fdctl_check_configure( config );
   if( FD_LIKELY( init_workspaces ) ) initialize_workspaces( config );
   initialize_stacks( config );
+}
+
+void
+initialize_accdb_fd( config_t const * config ) {
+  if( FD_UNLIKELY( !config->is_firedancer ) ) return;
+
+  /* TODO: O_TRUNC is a lot slower here, because it means we have to
+     write out extents for the whole file instead of just marking them
+     as free.  Figure out performance implications of this and maybe
+     resolve. */
+  int accounts_fd = open( config->paths.accounts, O_RDWR|O_CREAT|O_NOATIME|O_TRUNC, S_IRUSR|S_IWUSR );
+  if( FD_UNLIKELY( -1==accounts_fd ) ) FD_LOG_ERR(( "failed to open accounts.db (%i-%s)", errno, fd_io_strerror( errno ) ));
+  if( FD_UNLIKELY( -1==dup2( accounts_fd, FD_ACCDB_FD_RW ) ) ) FD_LOG_ERR(( "dup2() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+  if( FD_UNLIKELY( -1==close( accounts_fd ) ) ) FD_LOG_ERR(( "close() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+
+  /* Read-only fd for tiles (e.g. rpc) that consume accdb but must not
+     be able to mutate the on-disk file.  Reopen via /proc/self/fd to
+     guarantee it refers to the same inode as the RW fd, avoiding any
+     race where the file at the path could be replaced between opens. */
+  char proc_path[ PATH_MAX ];
+  FD_TEST( fd_cstr_printf_check( proc_path, sizeof(proc_path), NULL, "/proc/self/fd/%d", FD_ACCDB_FD_RW ) );
+  int accounts_ro_fd = open( proc_path, O_RDONLY|O_NOATIME );
+  if( FD_UNLIKELY( -1==accounts_ro_fd ) ) FD_LOG_ERR(( "failed to open accounts.db read-only (%i-%s)", errno, fd_io_strerror( errno ) ));
+  if( FD_UNLIKELY( -1==dup2( accounts_ro_fd, FD_ACCDB_FD_RO ) ) ) FD_LOG_ERR(( "dup2() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+  if( FD_UNLIKELY( -1==close( accounts_ro_fd ) ) ) FD_LOG_ERR(( "close() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
 }
 
 /* The boot sequence is a little bit involved...
@@ -862,12 +929,28 @@ run_cmd_fn( args_t *   args FD_PARAM_UNUSED,
   run_firedancer( config, -1, 1 );
 }
 
+static void
+run1_args_help( fd_action_help_t * help ) {
+  fd_action_help_arg( help, "<tile-name>", NULL,   "Type of tile to run (e.g. `net`, `quic`, `replay`).  A tile is a single\n"
+                                                  "thread pinned to a CPU core that performs one part of the validator's work" );
+  fd_action_help_arg( help, "<kind-id>",   NULL,   "Zero-based index selecting which instance of that tile type to run\n"
+                                                  "when the topology has more than one" );
+  fd_action_help_arg( help, "--pipe-fd",   "<fd>", "Internal use: file descriptor over which the parent supervisor process\n"
+                                                  "communicates with this tile (default -1, standalone)" );
+}
+
 action_t fd_action_run1 = {
   .name        = "run1",
   .args        = run1_cmd_args,
   .fn          = run1_cmd_fn,
   .perm        = NULL,
-  .description = "Start up a single validator tile"
+  .description = "Start up a single Firedancer tile",
+  .detail      = "Runs one tile of the validator topology in the current process.  A tile is a\n"
+                 "single thread pinned to a CPU core that performs one part of the validator's\n"
+                 "work.  This is primarily an internal command used by `run` to spawn individual\n"
+                 "tiles; most operators should use `run` instead.",
+  .usage       = "run1 <tile-name> <kind-id> [OPTIONS]",
+  .args_help   = run1_args_help,
 };
 
 action_t fd_action_run = {
@@ -876,7 +959,12 @@ action_t fd_action_run = {
   .fn             = run_cmd_fn,
   .require_config = 1,
   .perm           = run_cmd_perm,
-  .description    = "Start up a validator",
+  .description    = "Start up a Firedancer validator",
+  .detail         = "Boots and runs the full validator described by the configuration file.  This\n"
+                    "is the main command operators use to run Firedancer.  It must be started with\n"
+                    "sufficient privileges to perform boot-time setup, after which it drops\n"
+                    "privileges to the configured user.",
+  .usage          = "run [OPTIONS]",
   .permission_err = "insufficient permissions to execute command `%s`. It is recommended "
                     "to start Firedancer as the root user, but you can also start it "
                     "with the missing capabilities listed above. The program only needs "

@@ -7,8 +7,10 @@
 #include "../stakes/fd_stake_delegations.h"
 #include "../stakes/fd_top_votes.h"
 #include "../stakes/fd_vote_stakes.h"
+#include "../progcache/fd_progcache_xid.h"
 #include "../fd_rwlock.h"
 #include "fd_blockhashes.h"
+#include "fd_cost_tracker.h"
 #include "sysvar/fd_sysvar_cache.h"
 #include "../../ballet/lthash/fd_lthash.h"
 #include "fd_txncache_shmem.h"
@@ -259,11 +261,13 @@ struct fd_bank {
   ulong sibling_idx; /* index of the right-sibling in the node pool */
   ulong state;       /* keeps track of the state of the bank */
   ulong bank_seq;    /* app-wide bank sequence number */
+  uchar is_leader;   /* whether the bank is the leader */
 
   ulong refcnt; /* reference count on the bank, see replay for more details */
 
   fd_txncache_fork_id_t  txncache_fork_id;
   fd_progcache_fork_id_t progcache_fork_id;
+  fd_accdb_fork_id_t     accdb_fork_id;
   ushort                 vote_stakes_fork_id;
   uchar                  stake_rewards_fork_id;
   ushort                 stake_delegations_fork_id;
@@ -343,6 +347,7 @@ typedef struct fd_bank fd_bank_t;
 struct fd_banks_prune_cancel_info {
   fd_txncache_fork_id_t  txncache_fork_id;
   fd_progcache_fork_id_t progcache_fork_id;
+  fd_accdb_fork_id_t     accdb_fork_id;
   ulong                  slot;
   ulong                  bank_seq;
   ulong                  bank_idx;
@@ -721,8 +726,10 @@ fd_banks_mark_bank_dead( fd_banks_t * banks,
    marked as dead.  It will not prune a dead bank that has a non-zero
    reference count.  Returns 0 if nothing was pruned, 1 if a bank was
    pruned but no accdb/txncache cancellation is needed, or 2 if a bank
-   was pruned and cancellation is needed, in which case opt_cancel will
-   be populated if non-NULL. */
+   was pruned and cancellation is needed.  Whenever a bank is pruned
+   (returns 1 or 2), cancel->bank_idx is populated if cancel is
+   non-NULL.  The remaining cancel fields are only populated if
+   available. */
 
 int
 fd_banks_prune_one_dead_bank( fd_banks_t *                   banks,
@@ -748,21 +755,22 @@ fd_banks_mark_bank_frozen( fd_bank_t * bank );
 fd_bank_t *
 fd_banks_new_bank( fd_banks_t * banks,
                    ulong        parent_bank_idx,
-                   long         now );
+                   long         now,
+                   uchar        is_leader );
 
 
-/* fd_banks_get_frontier returns the frontier set of bank indices in the
-   banks tree.  The frontier is defined as any bank which has no
-   no children and is initialized or replayable but not dead or frozen.
-   The caller is expected to have enough memory to store the bank
-   indices for the frontier.  The bank indices are written to
+/* fd_banks_get_replay_frontier returns the frontier set of bank indices
+   in the banks tree.  The frontier is defined as any non-leader bank
+   which has no children and is initialized or replayable but not dead
+   or frozen.  The caller is expected to have enough memory to store the
+   bank indices for the frontier.  The bank indices are written to
    frontier_indices_out in no particular order.  The number of banks in
    the frontier is written to the frontier_cnt_out pointer. */
 
 void
-fd_banks_get_frontier( fd_banks_t * banks,
-                       ulong *      frontier_indices_out,
-                       ulong *      frontier_cnt_out );
+fd_banks_get_replay_frontier( fd_banks_t * banks,
+                              ulong *      frontier_indices_out,
+                              ulong *      frontier_cnt_out );
 
 /* fd_banks_is_full returns 1 if the banks are full, 0 otherwise.  Banks
    can be full in two cases:
@@ -772,14 +780,6 @@ fd_banks_get_frontier( fd_banks_t * banks,
 
 int
 fd_banks_is_full( fd_banks_t * banks );
-
-/* fd_bank_xid returns the accdb/progcache xid for the given bank. */
-
-static inline fd_xid_t
-fd_bank_xid( fd_bank_t const * bank ) {
-  if( FD_UNLIKELY( !bank ) ) FD_LOG_CRIT(( "NULL bank" ));
-  return (fd_xid_t){ .ul = { bank->f.slot, bank->bank_seq } };
-}
 
 FD_PROTOTYPES_END
 

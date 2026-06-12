@@ -2,6 +2,7 @@
 #define HEADER_fd_src_app_fddev_main_h
 
 #include "../shared/commands/configure/configure.h"
+#include "../shared/fd_action.h"
 
 #ifndef FD_WITH_AGAVE
 #define FD_WITH_AGAVE 0

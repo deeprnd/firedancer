@@ -37,8 +37,12 @@ DEVMODE=0
 MSAN=0
 _CC="${CC:=gcc}"
 _CXX="${CXX:=g++}"
-EXTRA_CFLAGS="-g3 -fno-omit-frame-pointer"
+EXTRA_CFLAGS="-g3"
 EXTRA_CXXFLAGS=""
+if [[ "$(uname -m)" == x86_64 ]]; then
+  EXTRA_CFLAGS+=" -fno-omit-frame-pointer -fcf-protection=return"
+  EXTRA_CXXFLAGS+=" -fno-omit-frame-pointer -fcf-protection=return"
+fi
 EXTRA_LDFLAGS=""
 
 help () {
@@ -148,7 +152,7 @@ fetch () {
   checkout_repo blst      https://github.com/supranational/blst       "v0.3.13"
   if [[ $DEVMODE == 1 ]]; then
     checkout_repo lz4     https://github.com/lz4/lz4                  "v1.10.0"
-    checkout_repo rocksdb https://github.com/facebook/rocksdb         "v11.0.4"
+    checkout_repo rocksdb https://github.com/facebook/rocksdb         "v11.1.1"
     checkout_repo snappy  https://github.com/google/snappy            "1.2.2"
   fi
 }
@@ -173,9 +177,6 @@ check_fedora_pkgs () {
   )
   if [[ $DEVMODE == 1 ]]; then
     REQUIRED_RPMS+=( autoconf automake bison cmake clang flex gettext-devel gmp-devel lcov )
-    if [[ "${ID_LIKE:-}" == *rhel* ]]; then
-      REQUIRED_RPMS+=( llvm-toolset )
-    fi
   fi
 
   echo "[~] Checking for required RPM packages"
@@ -403,6 +404,8 @@ install_libcxx () {
     -DCMAKE_INSTALL_PREFIX:PATH="$PREFIX" \
     -DCMAKE_INSTALL_LIBDIR="lib" \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_FLAGS="-fcf-protection=return" \
+    -DCMAKE_CXX_FLAGS="-fcf-protection=return" \
     -DLLVM_DIR=".." \
     -DLLVM_ENABLE_RUNTIMES="libcxx;libcxxabi" \
     -DLLVM_USE_SANITIZER=Memory \
@@ -440,7 +443,11 @@ install_s2n () {
 
   echo "[+] Installing s2n-bignum to $PREFIX"
   if [[ "$(uname -m)" == x86_64 ]]; then
-    make -C x86
+    if [[ "$(uname -s)" == Linux ]]; then
+      make -C x86 PREPROCESS="$CC -E -fcf-protection=return -I../include -DWINDOWS_ABI=0 \$(SYMBOL_HIDING) -xassembler-with-cpp -"
+    else
+      make -C x86
+    fi
     cp x86/libs2nbignum.a "$PREFIX/lib"
   elif [[ "$(uname -m)" == aarch64 ]]; then
     make -C arm
@@ -455,7 +462,7 @@ install_blst () {
   cd "$PREFIX/git/blst"
 
   echo "[+] Building blst"
-  ./build.sh
+  CFLAGS="-O2 -fno-builtin -fPIC -Wall -Wextra -Werror $EXTRA_CFLAGS" ./build.sh
   echo "[+] Successfully built blst"
 
   echo "[+] Installing blst to $PREFIX"
@@ -536,7 +543,7 @@ install_openssl () {
     CONFIG_OPTS+=( enable-msan no-asm )
   fi
 
-  ./config "${CONFIG_OPTS[@]}"
+  CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" ./config "${CONFIG_OPTS[@]}"
   echo "[+] Configured OpenSSL"
 
   echo "[+] Building OpenSSL"
@@ -559,6 +566,7 @@ install_rocksdb () {
   ROCKSDB_DISABLE_ZLIB=1 \
   ROCKSDB_DISABLE_BZIP=1 \
   ROCKSDB_DISABLE_GFLAGS=1 \
+  ROCKSDB_USE_IO_URING=0 \
   CFLAGS="-isystem $(pwd)/../../include -g0 -DSNAPPY -DZSTD -Wno-unknown-warning-option -Wno-uninitialized -Wno-array-bounds -Wno-stringop-overread -fPIC $EXTRA_CXXFLAGS" \
   make -j $NJOBS \
     LITE=1 \

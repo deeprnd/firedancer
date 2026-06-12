@@ -1,18 +1,20 @@
 #include "../replay/fd_replay_tile.h"
 #include "../genesis/fd_genesi_tile.h"
-#include "../fd_accdb_topo.h"
 
 #include "../../ballet/json/cJSON_alloc.h"
 #include "../../ballet/base64/fd_base64.h"
 #include "../../ballet/json/cJSON.h"
 #include "../../disco/topo/fd_topo.h"
+#include "../../disco/metrics/fd_metrics.h"
 #include "../../disco/keyguard/fd_keyload.h"
 #include "../../disco/keyguard/fd_keyswitch.h"
 #include "../../disco/metrics/fd_metrics.h"
-#include "../../flamenco/accdb/fd_accdb_sync.h"
 #include "../../flamenco/features/fd_features.h"
 #include "../../flamenco/runtime/sysvar/fd_sysvar_rent.h"
 #include "../../flamenco/runtime/fd_runtime_const.h"
+#include "../../flamenco/accdb/fd_accdb.h"
+#include "../../flamenco/accdb/fd_accdb_shmem.h"
+#include "../../tango/fseq/fd_fseq.h"
 #include "../../flamenco/gossip/fd_gossip_message.h"
 #include "../../flamenco/genesis/fd_genesis_parse.h"
 #include "../../util/net/fd_ip4.h"
@@ -187,10 +189,10 @@ typedef struct fd_rpc_out fd_rpc_out_t;
 struct bank_info {
   ulong slot; /* default ULONG_MAX */
   ulong bank_idx;
+  fd_accdb_fork_id_t accdb_fork_id;
   ulong epoch;
   ulong slot_in_epoch;
   ulong slots_per_epoch;
-  fd_xid_t xid;
 
   ulong transaction_count;
   uchar block_hash[ 32 ];
@@ -239,6 +241,8 @@ struct fd_rpc_tile {
   bank_info_t * banks;
   ulong         max_live_slots;
 
+  fd_accdb_t * accdb;
+
   ulong cluster_confirmed_slot;
 
   ulong processed_idx;
@@ -256,8 +260,6 @@ struct fd_rpc_tile {
 
   long next_poll_deadline;
 
-  char version_string[ 64UL ];
-
   fd_keyswitch_t * keyswitch;
   uchar identity_pubkey[ 32UL ];
 
@@ -266,13 +268,16 @@ struct fd_rpc_tile {
 
   fd_rpc_out_t replay_out[1];
 
-  fd_accdb_user_t accdb[1];
-
   fd_histf_t request_duration[ 1 ];
 
 # if FD_HAS_ZSTD
   uchar compress_buf[ ZSTD_COMPRESSBOUND( FD_RUNTIME_ACC_SZ_MAX ) ];
 # endif
+
+  /* Scratch buffer for fd_accdb_read_one_nocache: holds the account
+     data bytes returned by the readonly accdb path.  Sized to the
+     runtime account data maximum.  Must not be in accdb shmem. */
+  uchar accdb_data_buf[ FD_RUNTIME_ACC_SZ_MAX ];
 };
 
 typedef struct fd_rpc_tile fd_rpc_tile_t;
@@ -355,6 +360,7 @@ scratch_align( void ) {
   a = fd_ulong_max( a, fd_alloc_align() );
   a = fd_ulong_max( a, alignof(bank_info_t) );
   a = fd_ulong_max( a, fd_rpc_cluster_node_dlist_align() );
+  a = fd_ulong_max( a, fd_accdb_align() );
   return a;
 }
 
@@ -370,6 +376,7 @@ scratch_footprint( fd_topo_tile_t const * tile ) {
   l = FD_LAYOUT_APPEND( l, fd_alloc_align(),         fd_alloc_footprint()                         );
   l = FD_LAYOUT_APPEND( l, alignof(bank_info_t),     tile->rpc.max_live_slots*sizeof(bank_info_t) );
   l = FD_LAYOUT_APPEND( l, fd_rpc_cluster_node_dlist_align(), fd_rpc_cluster_node_dlist_footprint() );
+  l = FD_LAYOUT_APPEND( l, fd_accdb_align(),         fd_accdb_footprint( tile->rpc.max_live_slots ) );
   return FD_LAYOUT_FINI( l, scratch_align() );
 }
 
@@ -384,6 +391,13 @@ during_housekeeping( fd_rpc_tile_t * ctx ) {
     fd_memcpy( ctx->identity_pubkey, ctx->keyswitch->bytes, 32UL );
     fd_keyswitch_state( ctx->keyswitch, FD_KEYSWITCH_STATE_COMPLETED );
   }
+}
+
+static inline void
+metrics_write( fd_rpc_tile_t * ctx ) {
+  FD_MHIST_COPY( RPC, REQUEST_DURATION_SECONDS, ctx->request_duration );
+  FD_MGAUGE_SET( RPC, CONN_ACTIVE, ctx->http->metrics.connection_cnt );
+  FD_ACCDB_METRICS_WRITE_RO( RPC, fd_accdb_metrics( ctx->accdb ) );
 }
 
 static void
@@ -433,10 +447,10 @@ returnable_frag( fd_rpc_tile_t *     ctx,
         FD_TEST( slot_completed->bank_idx<ctx->max_live_slots );
         bank_info_t * bank = &ctx->banks[ slot_completed->bank_idx ];
         bank->slot = slot_completed->slot;
+        bank->accdb_fork_id = slot_completed->accdb_fork_id;
         bank->epoch = slot_completed->epoch;
         bank->slot_in_epoch = slot_completed->slot_in_epoch;
         bank->slots_per_epoch = slot_completed->slots_per_epoch;
-        bank->xid = slot_completed->xid;
         bank->transaction_count = slot_completed->transaction_count;
         bank->block_height = slot_completed->block_height;
         fd_memcpy( bank->block_hash, slot_completed->block_hash.uc, 32 );
@@ -998,10 +1012,14 @@ UNIMPLEMENTED(getBlockCommitment)
    (executable, lamports, owner, rentEpoch, space, data) into the http
    staging buffer.  Returns 1 on success.  On failure, calls
    fd_http_server_unstage and writes an error response into
-   err_response. caller should close ro and return err_response. */
+   err_response. */
 static int
 fd_rpc_encode_account_data( fd_rpc_tile_t *             ctx,
-                            fd_accdb_ro_t *             ro,
+                            uchar const *               acct_data,
+                            ulong                       acct_data_len,
+                            uchar const *               acct_owner,
+                            ulong                       acct_lamports,
+                            int                         acct_executable,
                             char const *                encoding_cstr,
                             ulong                       slice_offset,
                             ulong                       slice_length,
@@ -1012,8 +1030,8 @@ fd_rpc_encode_account_data( fd_rpc_tile_t *             ctx,
   int is_base58 = !strcmp( encoding_cstr, "base58" );
   int is_zstd   = !strcmp( encoding_cstr, "base64+zstd" );
 
-  ulong data_sz        = fd_accdb_ref_data_sz( ro );
-  uchar const * out    = (uchar const *)fd_accdb_ref_data_const( ro ) + fd_ulong_if( slice_offset<data_sz, slice_offset, 0UL );
+  ulong data_sz        = acct_data_len;
+  uchar const * out    = acct_data + fd_ulong_if( slice_offset<data_sz, slice_offset, 0UL );
   ulong         snip_sz = fd_ulong_min( fd_ulong_if( slice_offset<data_sz, data_sz-slice_offset, 0UL ), slice_length );
   ulong         out_sz  = snip_sz;
 
@@ -1042,11 +1060,11 @@ fd_rpc_encode_account_data( fd_rpc_tile_t *             ctx,
   }
 # endif
 
-  FD_BASE58_ENCODE_32_BYTES( fd_accdb_ref_owner( ro )->hash, owner_b58 );
+  FD_BASE58_ENCODE_32_BYTES( acct_owner, owner_b58 );
   fd_http_server_printf( ctx->http,
       "{\"executable\":%s,\"lamports\":%lu,\"owner\":\"%s\",\"rentEpoch\":18446744073709551615,\"space\":%lu,\"data\":",
-      fd_accdb_ref_exec_bit( ro ) ? "true" : "false",
-      fd_accdb_ref_lamports( ro ),
+      acct_executable ? "true" : "false",
+      acct_lamports,
       owner_b58,
       data_sz );
 
@@ -1087,7 +1105,7 @@ static fd_http_server_response_t
 getAccountInfo( fd_rpc_tile_t * ctx,
                 cJSON const *   id,
                 cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_ACCOUNT_INFO, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_ACCOUNT_INFO, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 1, 2, &response ) ) ) return response;
@@ -1114,8 +1132,14 @@ getAccountInfo( fd_rpc_tile_t * ctx,
   if( FD_UNLIKELY( !config_valid ) ) return response;
 
   bank_info_t * info = &ctx->banks[ bank_idx ];
-  fd_accdb_ro_t ro[1];
-  if( FD_UNLIKELY( !fd_accdb_open_ro( ctx->accdb, ro, &info->xid, address.uc ) ) ) {
+  ulong acct_lamports;
+  int   acct_executable;
+  uchar acct_owner[ 32UL ];
+  ulong acct_data_len;
+  fd_accdb_read_one_nocache( ctx->accdb, info->accdb_fork_id, address.uc,
+                             &acct_lamports, &acct_executable, acct_owner,
+                             ctx->accdb_data_buf, &acct_data_len );
+  if( FD_UNLIKELY( !acct_lamports ) ) {
     CSTR_JSON( id, id_cstr );
     return PRINTF_JSON( ctx, "{\"jsonrpc\":\"2.0\",\"result\":{\"context\":{\"slot\":%lu},\"value\":null},\"id\":%s}\n", info->slot, id_cstr );
   }
@@ -1124,11 +1148,9 @@ getAccountInfo( fd_rpc_tile_t * ctx,
   fd_http_server_printf( ctx->http, "{\"jsonrpc\":\"2.0\",\"id\":%s,\"result\":{\"context\":{\"apiVersion\":\"%s\",\"slot\":%lu},\"value\":", id_cstr, FD_RPC_AGAVE_API_VERSION, info->slot );
 
   fd_http_server_response_t err_response;
-  if( FD_UNLIKELY( !fd_rpc_encode_account_data( ctx, ro, encoding_cstr, slice_offset, slice_length, id_cstr, &err_response ) ) ) {
-    fd_accdb_close_ro( ctx->accdb, ro );
+  if( FD_UNLIKELY( !fd_rpc_encode_account_data( ctx, ctx->accdb_data_buf, acct_data_len, acct_owner, acct_lamports, acct_executable, encoding_cstr, slice_offset, slice_length, id_cstr, &err_response ) ) ) {
     return err_response;
   }
-  fd_accdb_close_ro( ctx->accdb, ro );
 
   fd_http_server_printf( ctx->http, "}}\n" );
   return STAGE_JSON( ctx );
@@ -1138,7 +1160,7 @@ static fd_http_server_response_t
 getBalance( fd_rpc_tile_t * ctx,
             cJSON const *   id,
             cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_BALANCE, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_BALANCE, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 1, 2, &response ) ) ) return response;
@@ -1161,12 +1183,7 @@ getBalance( fd_rpc_tile_t * ctx,
                                              &response );
   if( FD_UNLIKELY( !config_valid ) ) return response;
 
-  ulong balance = 0UL;
-  fd_accdb_ro_t ro[ 1 ];
-  if( FD_UNLIKELY( fd_accdb_open_ro( ctx->accdb, ro, &ctx->banks[ bank_idx ].xid, address.uc ) ) ) {
-    balance = fd_accdb_ref_lamports( ro );
-    fd_accdb_close_ro( ctx->accdb, ro );
-  }
+  ulong balance = fd_accdb_lamports( ctx->accdb, ctx->banks[ bank_idx ].accdb_fork_id, address.uc );
 
   CSTR_JSON( id, id_cstr );
   return PRINTF_JSON( ctx, "{\"jsonrpc\":\"2.0\",\"result\":{\"context\":{\"apiVersion\":\"%s\",\"slot\":%lu},\"value\":%lu},\"id\":%s}\n", FD_RPC_AGAVE_API_VERSION, ctx->banks[ bank_idx ].slot, balance, id_cstr );
@@ -1176,7 +1193,7 @@ static fd_http_server_response_t
 getBlockHeight( fd_rpc_tile_t * ctx,
                 cJSON const *   id,
                 cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_BLOCK_HEIGHT, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_BLOCK_HEIGHT, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 0, 1, &response ) ) ) return response;
@@ -1208,7 +1225,7 @@ static fd_http_server_response_t
 getClusterNodes( fd_rpc_tile_t * ctx,
                  cJSON const *   id,
                  cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_CLUSTER_NODES, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_CLUSTER_NODES, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 0, 0, &response ) ) ) return response;
@@ -1285,7 +1302,7 @@ static fd_http_server_response_t
 getEpochInfo( fd_rpc_tile_t * ctx,
               cJSON const *   id,
               cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_EPOCH_INFO, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_EPOCH_INFO, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 0, 1, &response ) ) ) return response;
@@ -1322,7 +1339,7 @@ static fd_http_server_response_t
 getGenesisHash( fd_rpc_tile_t * ctx,
                 cJSON const *   id,
                 cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_GENESIS_HASH, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_GENESIS_HASH, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 0, 0, &response ) ) ) return response;
@@ -1375,7 +1392,7 @@ getGenesisHash( fd_rpc_tile_t * ctx,
 
 static inline int
 _getHealth( fd_rpc_tile_t * ctx ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_HEALTH, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_HEALTH, 1UL );
 
   /* fd_http_server_listen is not called until after RPC has initialized banks */
   if( FD_UNLIKELY( ctx->confirmed_idx==ULONG_MAX ) ) return FD_RPC_HEALTH_STATUS_UNKNOWN;
@@ -1413,7 +1430,7 @@ static fd_http_server_response_t
 getIdentity( fd_rpc_tile_t * ctx,
              cJSON const *   id,
              cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_IDENTITY, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_IDENTITY, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 0, 0, &response ) ) ) return response;
@@ -1427,7 +1444,7 @@ static fd_http_server_response_t
 getInflationGovernor( fd_rpc_tile_t * ctx,
                      cJSON const *   id,
                      cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_INFLATION_GOVERNOR, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_INFLATION_GOVERNOR, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 0, 1, &response ) ) ) return response;
@@ -1465,7 +1482,7 @@ static fd_http_server_response_t
 getLatestBlockhash( fd_rpc_tile_t * ctx,
                     cJSON const *   id,
                     cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_LATEST_BLOCKHASH, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_LATEST_BLOCKHASH, 1UL );
 
   if( FD_UNLIKELY( ctx->processed_idx==ULONG_MAX ) ) {
     CSTR_JSON( id, id_cstr );
@@ -1504,7 +1521,7 @@ static fd_http_server_response_t
 getMinimumBalanceForRentExemption( fd_rpc_tile_t * ctx,
                                    cJSON const *   id,
                                    cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_MINIMUM_BALANCE_FOR_RENT_EXEMPTION, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_MINIMUM_BALANCE_FOR_RENT_EXEMPTION, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 1, 2, &response ) ) ) return response;
@@ -1560,7 +1577,7 @@ static fd_http_server_response_t
 getMultipleAccounts( fd_rpc_tile_t * ctx,
                      cJSON const *   id,
                      cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_MULTIPLE_ACCOUNTS, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_MULTIPLE_ACCOUNTS, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 1, 2, &response ) ) ) return response;
@@ -1613,18 +1630,22 @@ getMultipleAccounts( fd_rpc_tile_t * ctx,
   for( ulong i=0; i<(ulong)cnt; i++ ) {
     if( i>0 ) fd_http_server_printf( ctx->http, "," );
 
-    fd_accdb_ro_t ro[1];
-    if( FD_UNLIKELY( !fd_accdb_open_ro( ctx->accdb, ro, &info->xid, addresses[ i ].uc ) ) ) {
+    ulong acct_lamports;
+    int   acct_executable;
+    uchar acct_owner[ 32UL ];
+    ulong acct_data_len;
+    fd_accdb_read_one_nocache( ctx->accdb, info->accdb_fork_id, addresses[i].uc,
+                               &acct_lamports, &acct_executable, acct_owner,
+                               ctx->accdb_data_buf, &acct_data_len );
+    if( FD_UNLIKELY( !acct_lamports ) ) {
       fd_http_server_printf( ctx->http, "null" );
       continue;
     }
 
     fd_http_server_response_t err_response;
-    if( FD_UNLIKELY( !fd_rpc_encode_account_data( ctx, ro, encoding_cstr, slice_offset, slice_length, id_cstr, &err_response ) ) ) {
-      fd_accdb_close_ro( ctx->accdb, ro );
+    if( FD_UNLIKELY( !fd_rpc_encode_account_data( ctx, ctx->accdb_data_buf, acct_data_len, acct_owner, acct_lamports, acct_executable, encoding_cstr, slice_offset, slice_length, id_cstr, &err_response ) ) ) {
       return err_response;
     }
-    fd_accdb_close_ro( ctx->accdb, ro );
   }
 
   fd_http_server_printf( ctx->http, "]}}\n" );
@@ -1641,7 +1662,7 @@ static fd_http_server_response_t
 getSlot( fd_rpc_tile_t * ctx,
          cJSON const *   id,
          cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_SLOT, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_SLOT, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 0, 1, &response ) ) ) return response;
@@ -1680,7 +1701,7 @@ static fd_http_server_response_t
 getTransactionCount( fd_rpc_tile_t * ctx,
                      cJSON const *   id,
                      cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_TRANSACTION_COUNT, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_TRANSACTION_COUNT, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 0, 1, &response ) ) ) return response;
@@ -1708,13 +1729,13 @@ static fd_http_server_response_t
 getVersion( fd_rpc_tile_t * ctx,
             cJSON const *   id,
             cJSON const *   params ) {
-  FD_MCNT_INC( RPC, REQUEST_COUNT_GET_VERSION, 1UL );
+  FD_MCNT_INC( RPC, REQUEST_SERVED_GET_VERSION, 1UL );
 
   fd_http_server_response_t response;
   if( FD_UNLIKELY( !fd_rpc_validate_params( ctx, id, params, 0, 0, &response ) ) ) return response;
 
   CSTR_JSON( id, id_cstr );
-  return PRINTF_JSON( ctx, "{\"jsonrpc\":\"2.0\",\"result\":{\"solana-core\":\"%s\",\"feature-set\":%u},\"id\":%s}\n", ctx->version_string, FD_FEATURE_SET_ID, id_cstr );
+  return PRINTF_JSON( ctx, "{\"jsonrpc\":\"2.0\",\"result\":{\"solana-core\":\"%s\",\"feature-set\":%u},\"id\":%s}\n", fd_version_cstr, FD_FEATURE_SET_ID, id_cstr );
 }
 
 UNIMPLEMENTED(getVoteAccounts) // TODO: Used by solana-exporter
@@ -1739,7 +1760,7 @@ rpc_http_request1( fd_rpc_tile_t *                  ctx,
   }
 
   if( FD_UNLIKELY( request->method==FD_HTTP_SERVER_METHOD_GET && !strcmp( request->path, "/genesis.tar.bz2" ) ) ) {
-    FD_MCNT_INC( RPC, REQUEST_COUNT_GENESIS, 1UL );
+    FD_MCNT_INC( RPC, REQUEST_SERVED_GENESIS, 1UL );
     if( FD_UNLIKELY( ctx->genesis_tar_bz_sz==ULONG_MAX ) ) return (fd_http_server_response_t){ .status = 404 };
 
     fd_http_server_response_t response = (fd_http_server_response_t){ .status = 200 };
@@ -1898,7 +1919,7 @@ rpc_http_request1( fd_rpc_tile_t *                  ctx,
   else if( FD_LIKELY( !strcmp( _method->valuestring, "sendTransaction"                   ) ) ) response = sendTransaction( ctx, id, params );
   else if( FD_LIKELY( !strcmp( _method->valuestring, "simulateTransaction"               ) ) ) response = simulateTransaction( ctx, id, params );
   else {
-    FD_MCNT_INC( RPC, REQUEST_COUNT_UNKNOWN, 1UL );
+    FD_MCNT_INC( RPC, REQUEST_SERVED_UNKNOWN, 1UL );
     CSTR_JSON( id, id_cstr );
     response = PRINTF_JSON( ctx, "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"Method not found\"},\"id\":%s}\n", id_cstr );
   }
@@ -1928,6 +1949,8 @@ privileged_init( fd_topo_t const *      topo,
   fd_rpc_tile_t * ctx      = FD_SCRATCH_ALLOC_APPEND( l, alignof( fd_rpc_tile_t ), sizeof( fd_rpc_tile_t ) );
   fd_http_server_t * _http = FD_SCRATCH_ALLOC_APPEND( l, fd_http_server_align(),   fd_http_server_footprint( http_params ) );
 
+  fd_memset( ctx, 0, sizeof(fd_rpc_tile_t) );
+
   if( FD_UNLIKELY( !strcmp( tile->rpc.identity_key_path, "" ) ) )
     FD_LOG_ERR(( "identity_key_path not set" ));
 
@@ -1941,8 +1964,6 @@ privileged_init( fd_topo_t const *      topo,
   fd_http_server_listen( ctx->http, tile->rpc.listen_addr, tile->rpc.listen_port );
   FD_LOG_NOTICE(( "rpc server listening at http://" FD_IP4_ADDR_FMT ":%u", FD_IP4_ADDR_FMT_ARGS( tile->rpc.listen_addr ), tile->rpc.listen_port ));
 }
-
-extern char const tickoni_version_string[];
 
 static inline fd_rpc_out_t
 out1( fd_topo_t const *      topo,
@@ -1983,6 +2004,7 @@ unprivileged_init( fd_topo_t const *      topo,
   void * _bz2_alloc   = FD_SCRATCH_ALLOC_APPEND( l, fd_alloc_align(),         fd_alloc_footprint()                                   );
   void * _banks       = FD_SCRATCH_ALLOC_APPEND( l, alignof(bank_info_t),     tile->rpc.max_live_slots*sizeof(bank_info_t)           );
   void * _nodes_dlist = FD_SCRATCH_ALLOC_APPEND( l, fd_rpc_cluster_node_dlist_align(), fd_rpc_cluster_node_dlist_footprint() );
+  void * _accdb_join  = FD_SCRATCH_ALLOC_APPEND( l, fd_accdb_align(),         fd_accdb_footprint( tile->rpc.max_live_slots )         );
 
   fd_alloc_t * alloc = fd_alloc_join( fd_alloc_new( _alloc, 1UL ), 1UL );
   FD_TEST( alloc );
@@ -1991,8 +2013,6 @@ unprivileged_init( fd_topo_t const *      topo,
   ctx->delay_startup = tile->rpc.delay_startup;
   ctx->keyswitch = fd_keyswitch_join( fd_topo_obj_laddr( topo, tile->id_keyswitch_obj_id ) );
   FD_TEST( ctx->keyswitch );
-
-  for( ulong i=0UL; i<FD_CONTACT_INFO_TABLE_SIZE; i++ ) ctx->cluster_nodes[ i ].valid = 0;
 
   ctx->bz2_alloc = fd_alloc_join( fd_alloc_new( _bz2_alloc, 1UL ), 1UL );
   FD_TEST( ctx->bz2_alloc );
@@ -2010,8 +2030,6 @@ unprivileged_init( fd_topo_t const *      topo,
   ctx->banks = _banks;
   ctx->max_live_slots = tile->rpc.max_live_slots;
   for( ulong i=0UL; i<ctx->max_live_slots; i++ ) ctx->banks[ i ].slot = ULONG_MAX;
-
-  FD_TEST( fd_cstr_printf_check( ctx->version_string, sizeof( ctx->version_string ), NULL, "%s", tickoni_version_string ) );
 
   FD_TEST( tile->in_cnt<=sizeof( ctx->in )/sizeof( ctx->in[ 0 ] ) );
   for( ulong i=0; i<tile->in_cnt; i++ ) {
@@ -2031,7 +2049,17 @@ unprivileged_init( fd_topo_t const *      topo,
 
   *ctx->replay_out = out1( topo, tile, "rpc_replay" ); FD_TEST( ctx->replay_out->idx!=ULONG_MAX );
 
-  fd_accdb_init_from_topo( ctx->accdb, topo, tile->rpc.accdb_max_depth );
+  /* Read-only join to accdb.  The accdb workspace is mapped
+     PROT_READ in this tile (see topology); the only writable
+     external mapping is our private epoch fseq.  fd FD_ACCDB_FD_RO is
+     the O_RDONLY dup of the accdb data file. */
+  void * _accdb_shmem = fd_topo_obj_laddr( topo, tile->rpc.accdb_obj_id );
+  fd_accdb_shmem_t * accdb_shmem_ro = fd_accdb_shmem_join( _accdb_shmem );
+  FD_TEST( accdb_shmem_ro );
+  ulong * epoch_fseq = fd_fseq_join( fd_topo_obj_laddr( topo, tile->rpc.accdb_epoch_fseq_obj_id ) );
+  FD_TEST( epoch_fseq );
+  ctx->accdb = fd_accdb_join_readonly( _accdb_join, accdb_shmem_ro, epoch_fseq, FD_ACCDB_FD_RO );
+  FD_TEST( ctx->accdb );
 
   fd_histf_join( fd_histf_new( ctx->request_duration, FD_MHIST_SECONDS_MIN( RPC, REQUEST_DURATION_SECONDS ),
                                                       FD_MHIST_SECONDS_MAX( RPC, REQUEST_DURATION_SECONDS ) ) );
@@ -2050,7 +2078,7 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
   FD_SCRATCH_ALLOC_INIT( l, scratch );
   fd_rpc_tile_t * ctx = FD_SCRATCH_ALLOC_APPEND( l, alignof( fd_rpc_tile_t ), sizeof( fd_rpc_tile_t ) );
 
-  populate_sock_filter_policy_fd_rpc_tile( out_cnt, out, (uint)fd_log_private_logfile_fd(), (uint)fd_http_server_fd( ctx->http ) );
+  populate_sock_filter_policy_fd_rpc_tile( out_cnt, out, (uint)fd_log_private_logfile_fd(), (uint)fd_http_server_fd( ctx->http ), (uint)FD_ACCDB_FD_RO );
   return sock_filter_policy_fd_rpc_tile_instr_cnt;
 }
 
@@ -2063,13 +2091,15 @@ populate_allowed_fds( fd_topo_t const *      topo,
   FD_SCRATCH_ALLOC_INIT( l, scratch );
   fd_rpc_tile_t * ctx = FD_SCRATCH_ALLOC_APPEND( l, alignof( fd_rpc_tile_t ), sizeof( fd_rpc_tile_t ) );
 
-  if( FD_UNLIKELY( out_fds_cnt<3UL ) ) FD_LOG_ERR(( "out_fds_cnt %lu", out_fds_cnt ));
+  if( FD_UNLIKELY( out_fds_cnt<4UL ) ) FD_LOG_ERR(( "out_fds_cnt %lu", out_fds_cnt ));
 
   ulong out_cnt = 0UL;
   out_fds[ out_cnt++ ] = 2; /* stderr */
   if( FD_LIKELY( -1!=fd_log_private_logfile_fd() ) )
     out_fds[ out_cnt++ ] = fd_log_private_logfile_fd(); /* logfile */
   out_fds[ out_cnt++ ] = fd_http_server_fd( ctx->http ); /* rpc listen socket */
+  out_fds[ out_cnt++ ] = FD_ACCDB_FD_RO; /* accounts db readonly fd */
+
   return out_cnt;
 }
 
@@ -2079,12 +2109,6 @@ rlimit_file_cnt( fd_topo_t const *      topo FD_PARAM_UNUSED,
   /* pipefd, socket, stderr, logfile, and one spare for new accept() connections */
   ulong base = 5UL;
   return base+tile->rpc.max_http_connections;
-}
-
-static inline void
-metrics_write( fd_rpc_tile_t * ctx ) {
-  FD_MHIST_COPY( RPC, REQUEST_DURATION_SECONDS, ctx->request_duration );
-  FD_MGAUGE_SET( RPC, CONNECTION_COUNT, ctx->http->metrics.connection_cnt );
 }
 
 #define STEM_BURST (1UL)
@@ -2103,11 +2127,11 @@ metrics_write( fd_rpc_tile_t * ctx ) {
 #define STEM_CALLBACK_CONTEXT_TYPE  fd_rpc_tile_t
 #define STEM_CALLBACK_CONTEXT_ALIGN alignof(fd_rpc_tile_t)
 
+#define STEM_CALLBACK_METRICS_WRITE       metrics_write
 #define STEM_CALLBACK_DURING_HOUSEKEEPING during_housekeeping
 #define STEM_CALLBACK_BEFORE_CREDIT       before_credit
 #define STEM_CALLBACK_BEFORE_FRAG         before_frag
 #define STEM_CALLBACK_RETURNABLE_FRAG     returnable_frag
-#define STEM_CALLBACK_METRICS_WRITE       metrics_write
 
 #include "../../disco/stem/fd_stem.c"
 

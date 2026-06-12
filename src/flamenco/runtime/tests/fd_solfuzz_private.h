@@ -12,13 +12,13 @@
 
 FD_PROTOTYPES_BEGIN
 
-/* Creates / overwrites an account in funk given an input account state.
-   On success, loads the account into acc.  Optionally, reject any
-   zero-lamport accounts from being loaded in. */
+/* Creates / overwrites an account in the accdb given an input account
+   state.  On success, loads the account into acc.  Optionally, reject
+   any zero-lamport accounts from being loaded in. */
 int
 fd_solfuzz_pb_load_account( fd_runtime_t *                    runtime,
-                            fd_accdb_user_t *                 accdb,
-                            fd_funk_txn_xid_t const *         xid,
+                            fd_accdb_t *                      accdb,
+                            fd_accdb_fork_id_t                fork_id,
                             fd_exec_test_acct_state_t const * state,
                             ulong                             acc_idx );
 
@@ -27,12 +27,6 @@ fd_solfuzz_pb_load_account( fd_runtime_t *                    runtime,
 void
 fd_solfuzz_pb_restore_fee_rate_governor( fd_bank_t *                              bank,
                                          fd_exec_test_fee_rate_governor_t const * fee_rate_governor );
-
-/* Restores the epoch schedule in the bank from the given protobuf
-   epoch schedule. */
-void
-fd_solfuzz_pb_restore_epoch_schedule( fd_bank_t *                           bank,
-                                      fd_exec_test_epoch_schedule_t const * epoch_schedule );
 
 /* Initializes the blockhash queue in the bank from the given protobuf
    blockhash queue entries. */
@@ -71,8 +65,8 @@ fd_solfuzz_direct_mapping_handle_cu_exhaustion( fd_solfuzz_runner_t *       runn
    already appears in acct_states so the caller-supplied state wins
    (matches solfuzz-agave's accounts_to_store filter). */
 void
-fd_solfuzz_pb_create_feature_accounts( fd_accdb_user_t *                  accdb,
-                                       fd_funk_txn_xid_t const *          xid,
+fd_solfuzz_pb_create_feature_accounts( fd_accdb_t *                       accdb,
+                                       fd_accdb_fork_id_t                 fork_id,
                                        fd_exec_test_feature_set_t const * feature_set,
                                        fd_exec_test_acct_state_t const *  acct_states,
                                        pb_size_t                          acct_states_count );

@@ -515,7 +515,7 @@ fd_bank_t *
 fd_banks_init_bank( fd_banks_t * banks ) {
 
   fd_bank_t * bank_pool = fd_banks_get_bank_pool( banks );
-  FD_CRIT( fd_banks_pool_free( bank_pool )!=0UL, "invariant violation: no free bank pool elements" );
+  FD_CHECK_CRIT( fd_banks_pool_free( bank_pool )!=0UL, "invariant violation: no free bank pool elements" );
 
   fd_bank_t * bank = fd_banks_pool_ele_acquire( bank_pool );
   bank->bank_seq = FD_ATOMIC_FETCH_AND_ADD( &banks->bank_seq, 1UL );
@@ -541,8 +541,9 @@ fd_banks_init_bank( fd_banks_t * banks ) {
   fd_vote_stakes_t * vote_stakes = fd_banks_get_vote_stakes( banks );
   bank->vote_stakes_fork_id      = fd_vote_stakes_get_root_idx( vote_stakes );
 
-  bank->state  = FD_BANK_STATE_FROZEN;
-  bank->refcnt = 0UL;
+  bank->state     = FD_BANK_STATE_FROZEN;
+  bank->refcnt    = 0UL;
+  bank->is_leader = 0;
 
   banks->root_idx = bank->idx;
 
@@ -562,13 +563,13 @@ fd_banks_clone_from_parent( fd_banks_t * banks,
 
   fd_bank_t * bank_pool  = fd_banks_get_bank_pool( banks );
   fd_bank_t * child_bank = fd_banks_pool_ele( bank_pool, child_bank_idx );
-  FD_CRIT( child_bank->state==FD_BANK_STATE_INIT, "invariant violation: bank is not initialized" );
+  FD_CHECK_CRIT( child_bank->state==FD_BANK_STATE_INIT, "invariant violation: bank is not initialized" );
 
   fd_bank_t * parent_bank = fd_banks_pool_ele( bank_pool, child_bank->parent_idx );
-  FD_CRIT( parent_bank->state==FD_BANK_STATE_FROZEN, "invariant violation: parent bank is not frozen" );
+  FD_CHECK_CRIT( parent_bank->state==FD_BANK_STATE_FROZEN, "invariant violation: parent bank is not frozen" );
 
   fd_bank_cost_tracker_t * cost_tracker_pool = fd_banks_get_cost_tracker_pool( banks );
-  FD_CRIT( fd_bank_cost_tracker_pool_free( cost_tracker_pool )!=0UL, "invariant violation: no free cost tracker pool elements" );
+  FD_CHECK_CRIT( fd_bank_cost_tracker_pool_free( cost_tracker_pool )!=0UL, "invariant violation: no free cost tracker pool elements" );
   child_bank->cost_tracker_pool_idx = fd_bank_cost_tracker_pool_idx_acquire( cost_tracker_pool );
 
   fd_memcpy( child_bank->top_votes_t_1_mem, parent_bank->top_votes_t_1_mem, FD_TOP_VOTES_MAX_FOOTPRINT );
@@ -771,7 +772,7 @@ fd_banks_advance_root( fd_banks_t * banks,
      have to remove banks that aren't descendants of the new root. */
 
   fd_bank_t * old_root = fd_banks_root( banks );
-  FD_CRIT( old_root->refcnt==0UL, "refcnt for old root bank is nonzero" );
+  FD_CHECK_CRIT( old_root->refcnt==0UL, "refcnt for old root bank is nonzero" );
 
   fd_bank_t * new_root = fd_banks_pool_ele( bank_pool, root_bank_idx );
 
@@ -941,14 +942,15 @@ fd_banks_advance_root_prepare( fd_banks_t * banks,
 fd_bank_t *
 fd_banks_new_bank( fd_banks_t * banks,
                    ulong        parent_bank_idx,
-                   long         now ) {
+                   long         now,
+                   uchar        is_leader ) {
 
   fd_bank_t * bank_pool = fd_banks_get_bank_pool( banks );
-  FD_CRIT( fd_banks_pool_free( bank_pool )!=0UL, "invariant violation: no free bank indices available" );
+  FD_CHECK_CRIT( fd_banks_pool_free( bank_pool )!=0UL, "invariant violation: no free bank indices available" );
 
   ulong       child_bank_idx = fd_banks_pool_idx_acquire( bank_pool );
   fd_bank_t * child_bank     = fd_banks_pool_ele( bank_pool, child_bank_idx );
-  FD_CRIT( child_bank->state==FD_BANK_STATE_INACTIVE, "invariant violation: bank for bank index is already initialized" );
+  FD_CHECK_CRIT( child_bank->state==FD_BANK_STATE_INACTIVE, "invariant violation: bank for bank index is already initialized" );
 
   ulong null_idx = fd_banks_pool_idx_null( bank_pool );
 
@@ -959,6 +961,7 @@ fd_banks_new_bank( fd_banks_t * banks,
   child_bank->next        = null_idx;
   child_bank->state       = FD_BANK_STATE_INIT;
   child_bank->refcnt      = 0UL;
+  child_bank->is_leader   = is_leader;
 
   child_bank->stake_delegations_fork_id = USHORT_MAX;
   child_bank->new_votes_fork_id         = USHORT_MAX;
@@ -966,7 +969,7 @@ fd_banks_new_bank( fd_banks_t * banks,
   /* Then make sure that the parent bank is valid and frozen. */
 
   fd_bank_t * parent_bank = fd_banks_pool_ele( bank_pool, parent_bank_idx );
-  FD_CRIT( parent_bank->state!=FD_BANK_STATE_INACTIVE && parent_bank->state!=FD_BANK_STATE_DEAD, "invariant violation: parent bank is dead or inactive" );
+  FD_CHECK_CRIT( parent_bank->state!=FD_BANK_STATE_INACTIVE && parent_bank->state!=FD_BANK_STATE_DEAD, "invariant violation: parent bank is dead or inactive" );
 
   /* Link node->parent */
   child_bank->parent_idx = parent_bank_idx;
@@ -1093,12 +1096,15 @@ fd_banks_prune_one_dead_bank( fd_banks_t *                   banks,
 
     bank->stake_rewards_fork_id = UCHAR_MAX;
 
-    if( FD_LIKELY( started_replaying && cancel ) ) {
-      cancel->txncache_fork_id  = bank->txncache_fork_id;
-      cancel->progcache_fork_id = bank->progcache_fork_id;
-      cancel->slot              = bank->f.slot;
-      cancel->bank_seq          = bank->bank_seq;
-      cancel->bank_idx          = bank->idx;
+    if( FD_LIKELY( cancel ) ) {
+      cancel->bank_idx = bank->idx;
+      if( FD_LIKELY( started_replaying ) ) {
+        cancel->txncache_fork_id  = bank->txncache_fork_id;
+        cancel->progcache_fork_id = bank->progcache_fork_id;
+        cancel->accdb_fork_id     = bank->accdb_fork_id;
+        cancel->slot              = bank->f.slot;
+        cancel->bank_seq          = bank->bank_seq;
+      }
     }
 
     bank->state = FD_BANK_STATE_INACTIVE;
@@ -1114,10 +1120,10 @@ void
 fd_banks_mark_bank_frozen( fd_bank_t * bank ) {
   fd_banks_t * banks = fd_type_pun( (uchar *)bank - bank->banks_data_offset );
 
-  FD_CRIT( bank->state==FD_BANK_STATE_REPLAYABLE, "invariant violation: bank is not replayable" );
+  FD_CHECK_CRIT( bank->state==FD_BANK_STATE_REPLAYABLE, "invariant violation: bank is not replayable" );
   bank->state = FD_BANK_STATE_FROZEN;
 
-  FD_CRIT( bank->cost_tracker_pool_idx!=ULONG_MAX, "invariant violation: cost tracker pool index is null" );
+  FD_CHECK_CRIT( bank->cost_tracker_pool_idx!=ULONG_MAX, "invariant violation: cost tracker pool index is null" );
   fd_bank_cost_tracker_pool_idx_release( fd_banks_get_cost_tracker_pool( banks ), bank->cost_tracker_pool_idx );
   bank->cost_tracker_pool_idx = ULONG_MAX;
 }
@@ -1132,7 +1138,7 @@ fd_banks_get_frontier_private( fd_bank_t * bank_pool,
   fd_bank_t * bank = fd_banks_pool_ele( bank_pool, bank_idx );
 
   if( bank->child_idx==fd_banks_pool_idx_null( bank_pool ) ) {
-    if( bank->state!=FD_BANK_STATE_FROZEN && bank->state!=FD_BANK_STATE_DEAD ) {
+    if( bank->state!=FD_BANK_STATE_FROZEN && bank->state!=FD_BANK_STATE_DEAD && !bank->is_leader ) {
       frontier_indices_out[*frontier_cnt_out] = bank->idx;
       (*frontier_cnt_out)++;
     }
@@ -1143,9 +1149,9 @@ fd_banks_get_frontier_private( fd_bank_t * bank_pool,
 }
 
 void
-fd_banks_get_frontier( fd_banks_t * banks,
-                       ulong *      frontier_indices_out,
-                       ulong *      frontier_cnt_out ) {
+fd_banks_get_replay_frontier( fd_banks_t * banks,
+                              ulong *      frontier_indices_out,
+                              ulong *      frontier_cnt_out ) {
   *frontier_cnt_out = 0UL;
   fd_bank_t * bank_pool = fd_banks_get_bank_pool( banks );
   fd_banks_get_frontier_private( bank_pool, banks->root_idx, frontier_indices_out, frontier_cnt_out );
