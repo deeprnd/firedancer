@@ -15,9 +15,8 @@ Use it to understand:
 Before making changes, read these in order:
 
 1. `README.md` — project overview
-2. `doc/position/status.md` project status with respect to roadmap
-3. `doc/architecture.md` — project architecture
-4. this file — constraints, invariants, and engineering rules
+2. `doc/architecture.md` — project architecture
+3. this file — constraints, invariants, and engineering rules
 
 ### Mental model
 

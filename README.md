@@ -4,7 +4,7 @@
   <tr>
     <td>
       <!-- badge:build:start -->
-<img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
+<img alt="Build" src="https://img.shields.io/badge/build-unknown-lightgrey?style=flat-square" />
 <!-- badge:build:end -->
     </td>
     <td>
@@ -273,9 +273,7 @@ No black boxes.
 - [Overview](doc/overview.md)
 - [Architecture](doc/architecture.md)
 - [Development](doc/development.md)
-- [Workflows](doc/workflows.md)
 - [Build](doc/build.md)
-- [Build system](doc/build-system.md)
 - [Testing](doc/testing-tickoni.md)
 - [Observability](doc/observability.md)
 - [Telemetry](doc/telemetry.md)

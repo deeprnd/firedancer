@@ -931,6 +931,49 @@
 
 </div>
 
+## Rserve Tile
+
+<div class="metrics">
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| <span class="metrics-name">rserve_&#8203;received_&#8203;request_&#8203;count</span><br/>{rserve_&#8203;request_&#8203;types="<span class="metrics-enum">pong</span>"} | counter | Total repair requests received by type, before any validation (Pong) |
+| <span class="metrics-name">rserve_&#8203;received_&#8203;request_&#8203;count</span><br/>{rserve_&#8203;request_&#8203;types="<span class="metrics-enum">window_&#8203;index</span>"} | counter | Total repair requests received by type, before any validation (Window Index) |
+| <span class="metrics-name">rserve_&#8203;received_&#8203;request_&#8203;count</span><br/>{rserve_&#8203;request_&#8203;types="<span class="metrics-enum">highest_&#8203;window_&#8203;index</span>"} | counter | Total repair requests received by type, before any validation (Highest Window Index) |
+| <span class="metrics-name">rserve_&#8203;received_&#8203;request_&#8203;count</span><br/>{rserve_&#8203;request_&#8203;types="<span class="metrics-enum">orphan</span>"} | counter | Total repair requests received by type, before any validation (Orphan) |
+| <span class="metrics-name">rserve_&#8203;received_&#8203;request_&#8203;bytes</span> | counter | Total bytes of incoming repair request payloads |
+| <span class="metrics-name">rserve_&#8203;received_&#8203;malformed_&#8203;count</span><br/>{rserve_&#8203;malformed_&#8203;types="<span class="metrics-enum">too_&#8203;small</span>"} | counter | Packets dropped for being malformed, broken down by reason (Too Small) |
+| <span class="metrics-name">rserve_&#8203;received_&#8203;malformed_&#8203;count</span><br/>{rserve_&#8203;malformed_&#8203;types="<span class="metrics-enum">ping</span>"} | counter | Packets dropped for being malformed, broken down by reason (Ping) |
+| <span class="metrics-name">rserve_&#8203;received_&#8203;malformed_&#8203;count</span><br/>{rserve_&#8203;malformed_&#8203;types="<span class="metrics-enum">unknown_&#8203;tag</span>"} | counter | Packets dropped for being malformed, broken down by reason (Unknown Tag) |
+| <span class="metrics-name">rserve_&#8203;received_&#8203;malformed_&#8203;count</span><br/>{rserve_&#8203;malformed_&#8203;types="<span class="metrics-enum">wrong_&#8203;size</span>"} | counter | Packets dropped for being malformed, broken down by reason (Wrong Size) |
+| <span class="metrics-name">rserve_&#8203;received_&#8203;malformed_&#8203;count</span><br/>{rserve_&#8203;malformed_&#8203;types="<span class="metrics-enum">ancestor_&#8203;hashes</span>"} | counter | Packets dropped for being malformed, broken down by reason (Ancestor Hashes) |
+| <span class="metrics-name">rserve_&#8203;total_&#8203;pkt_&#8203;count</span> | counter | How many network packets we have sent, including pings, responses, etc |
+| <span class="metrics-name">rserve_&#8203;sent_&#8203;response_&#8203;types</span><br/>{rserve_&#8203;sent_&#8203;response_&#8203;types="<span class="metrics-enum">ping</span>"} | counter | What types of response messages are we sending (Ping) |
+| <span class="metrics-name">rserve_&#8203;sent_&#8203;response_&#8203;types</span><br/>{rserve_&#8203;sent_&#8203;response_&#8203;types="<span class="metrics-enum">window</span>"} | counter | What types of response messages are we sending (Window) |
+| <span class="metrics-name">rserve_&#8203;sent_&#8203;response_&#8203;types</span><br/>{rserve_&#8203;sent_&#8203;response_&#8203;types="<span class="metrics-enum">highest_&#8203;window</span>"} | counter | What types of response messages are we sending (Highest Window) |
+| <span class="metrics-name">rserve_&#8203;sent_&#8203;response_&#8203;types</span><br/>{rserve_&#8203;sent_&#8203;response_&#8203;types="<span class="metrics-enum">orphan</span>"} | counter | What types of response messages are we sending (Orphan) |
+| <span class="metrics-name">rserve_&#8203;sent_&#8203;response_&#8203;bytes</span> | counter | Total payload bytes sent in response packets |
+| <span class="metrics-name">rserve_&#8203;sent_&#8203;ping_&#8203;back_&#8203;count</span> | counter | How many ping-back packets we sent to nodes not yet in the ping cache |
+| <span class="metrics-name">rserve_&#8203;missed_&#8203;response_&#8203;types</span><br/>{rserve_&#8203;sent_&#8203;response_&#8203;types="<span class="metrics-enum">ping</span>"} | counter | What types of response messages could we not fulfill (Ping) |
+| <span class="metrics-name">rserve_&#8203;missed_&#8203;response_&#8203;types</span><br/>{rserve_&#8203;sent_&#8203;response_&#8203;types="<span class="metrics-enum">window</span>"} | counter | What types of response messages could we not fulfill (Window) |
+| <span class="metrics-name">rserve_&#8203;missed_&#8203;response_&#8203;types</span><br/>{rserve_&#8203;sent_&#8203;response_&#8203;types="<span class="metrics-enum">highest_&#8203;window</span>"} | counter | What types of response messages could we not fulfill (Highest Window) |
+| <span class="metrics-name">rserve_&#8203;missed_&#8203;response_&#8203;types</span><br/>{rserve_&#8203;sent_&#8203;response_&#8203;types="<span class="metrics-enum">orphan</span>"} | counter | What types of response messages could we not fulfill (Orphan) |
+| <span class="metrics-name">rserve_&#8203;failed_&#8203;sigverify</span> | counter | How many times we failed to verify the signature of a request |
+| <span class="metrics-name">rserve_&#8203;failed_&#8203;own_&#8203;key</span> | counter | How many requests we've received that were sent by us |
+| <span class="metrics-name">rserve_&#8203;failed_&#8203;invalid_&#8203;token</span> | counter | How many pong requests we've received with outdated or invalid tokens |
+| <span class="metrics-name">rserve_&#8203;failed_&#8203;not_&#8203;for_&#8203;us</span> | counter | How many requests we've received that were not intended for us |
+| <span class="metrics-name">rserve_&#8203;failed_&#8203;outdated</span> | counter | How many requests we've received that had outdated timestamps |
+| <span class="metrics-name">rserve_&#8203;failed_&#8203;invalid_&#8203;shred_&#8203;index</span> | counter | How many requests we've received that had invalid shred indices |
+| <span class="metrics-name">rserve_&#8203;failed_&#8203;ping_&#8203;cache_&#8203;lookup</span> | counter | Requests from nodes not in the ping cache, which triggered a ping-back instead of a response |
+| <span class="metrics-name">rserve_&#8203;shreds_&#8203;current</span> | gauge | The number of shreds currently in the shreds database |
+| <span class="metrics-name">rserve_&#8203;shreds_&#8203;max</span> | gauge | Total capacity of shreds that can be stored in the shreds database |
+| <span class="metrics-name">rserve_&#8203;disk_&#8203;current_&#8203;bytes</span> | gauge | The number of bytes currently used on disk by the database |
+| <span class="metrics-name">rserve_&#8203;disk_&#8203;allocated_&#8203;bytes</span> | gauge | The current size of the database file on disk |
+| <span class="metrics-name">rserve_&#8203;ping_&#8203;cache_&#8203;entries</span> | counter | How many active entries do we have in the ping cache |
+| <span class="metrics-name">rserve_&#8203;ping_&#8203;cache_&#8203;evictions</span> | counter | How many entries we've evicted from the ping cache |
+
+</div>
+
 ## Replay Tile
 
 <div class="metrics">
@@ -1289,8 +1332,8 @@
 | <span class="metrics-name">tower_&#8203;root_&#8203;slot</span> | gauge | Highest rooted slot, ULONG_MAX if no root yet. Monotonically increasing |
 | <span class="metrics-name">tower_&#8203;init_&#8203;slot</span> | gauge | Init slot, either the snapshot or genesis slot. Set once and does not change |
 | <span class="metrics-name">tower_&#8203;frag_&#8203;not_&#8203;ready_&#8203;dropped</span> | counter | Frags dropped because they arrived before the tower tile was initialized |
-| <span class="metrics-name">tower_&#8203;eqvoc_&#8203;proof</span><br/>{eqvoc_&#8203;proof_&#8203;result="<span class="metrics-enum">success</span>"} | counter | Equivocation proofs, by validation outcome (Valid equivocation proof) |
-| <span class="metrics-name">tower_&#8203;eqvoc_&#8203;proof</span><br/>{eqvoc_&#8203;proof_&#8203;result="<span class="metrics-enum">error</span>"} | counter | Equivocation proofs, by validation outcome (Proof failed validation (gossip-only)) |
+| <span class="metrics-name">tower_&#8203;eqvoc_&#8203;success</span> | counter | Number of success proofs |
+| <span class="metrics-name">tower_&#8203;eqvoc_&#8203;err</span> | counter | Number of proofs that failed validation (gossip-only) |
 | <span class="metrics-name">tower_&#8203;ghost_&#8203;vote</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">success</span>"} | counter | Result of counting a vote towards ghost (Vote was counted towards ghost) |
 | <span class="metrics-name">tower_&#8203;ghost_&#8203;vote</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">not_&#8203;voted</span>"} | counter | Result of counting a vote towards ghost (Skipped because voter hasn't voted) |
 | <span class="metrics-name">tower_&#8203;ghost_&#8203;vote</span><br/>{ghost_&#8203;vote_&#8203;result="<span class="metrics-enum">too_&#8203;old</span>"} | counter | Result of counting a vote towards ghost (Slot was behind the root) |
@@ -1494,14 +1537,6 @@
 | <span class="metrics-name">diag_&#8203;vote_&#8203;status</span> | gauge | Precise status of the vote subsystem: 0=disabled (non-voting or no tower tile), 1=not started (tower tile not running or no votes cast yet), 2=delinquent (vote distance exceeds threshold or vote stalled), 3=voting (voting normally) |
 | <span class="metrics-name">diag_&#8203;replay_&#8203;status</span> | gauge | Precise status of the replay subsystem: 0=disabled (no replay tile), 1=not started (replay tile not running or slots are zero), 2=behind (replay lagging behind turbine or reset slot stalled), 3=running (replay keeping up) |
 | <span class="metrics-name">diag_&#8203;turbine_&#8203;status</span> | gauge | Precise status of the turbine subsystem: 0=disabled (no shred or replay tiles), 1=not started (tiles not all running or turbine slot is zero), 2=stalled (turbine slot not advancing), 3=repair outpacing (repair byte throughput exceeds turbine), 4=running (turbine receiving normally) |
-| <span class="metrics-name">diag_&#8203;device_&#8203;irq</span> | counter | Number of device IRQs across all CPUs |
-| <span class="metrics-name">diag_&#8203;device_&#8203;irq_&#8203;undesired</span> | counter | Number of device hard IRQs that stole CPU time from fixed tiles |
-| <span class="metrics-name">diag_&#8203;softirq</span><br/>{softirq="<span class="metrics-enum">net</span>"} | counter | Number of soft-IRQs across all CPUs (NET_TX, NET_RX) |
-| <span class="metrics-name">diag_&#8203;softirq</span><br/>{softirq="<span class="metrics-enum">disk</span>"} | counter | Number of soft-IRQs across all CPUs (BLOCK) |
-| <span class="metrics-name">diag_&#8203;softirq</span><br/>{softirq="<span class="metrics-enum">other</span>"} | counter | Number of soft-IRQs across all CPUs (e.g. TIMER, HRTIMER, IRQ_POLL, TASKLET, SCHED, RCU, ...) |
-| <span class="metrics-name">diag_&#8203;softirq_&#8203;undesired</span><br/>{softirq="<span class="metrics-enum">net</span>"} | counter | Number of soft-IRQs that stole CPU time from fixed tiles (NET_TX, NET_RX) |
-| <span class="metrics-name">diag_&#8203;softirq_&#8203;undesired</span><br/>{softirq="<span class="metrics-enum">disk</span>"} | counter | Number of soft-IRQs that stole CPU time from fixed tiles (BLOCK) |
-| <span class="metrics-name">diag_&#8203;softirq_&#8203;undesired</span><br/>{softirq="<span class="metrics-enum">other</span>"} | counter | Number of soft-IRQs that stole CPU time from fixed tiles (e.g. TIMER, HRTIMER, IRQ_POLL, TASKLET, SCHED, RCU, ...) |
 
 </div>
 
