@@ -217,7 +217,7 @@ forktest_topo( config_t * config ) {
 
   fd_topob_link( topo, "net_shred", "net_shred", config->net.ingress_buffer_size, FD_NET_MTU, 1UL );
 
-  /*                                  topo, tile_name, tile_wksp, metrics_wksp, cpu_idx,                       is_legacy_hosted, uses_id_keyswitch, uses_av_keyswitch */
+  /*                                  topo, tile_name, tile_wksp, metrics_wksp, cpu_idx,                       is_agave, uses_id_keyswitch, uses_av_keyswitch */
   /**/                 fd_topob_tile( topo, "metric",  "metric",  "metric_in",  tile_to_cpu[ topo->tile_cnt ], 0,        0,                 0 );
 
   fd_topo_tile_t * snapin_tile = NULL;

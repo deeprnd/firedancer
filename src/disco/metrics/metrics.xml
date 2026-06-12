@@ -1679,6 +1679,11 @@ EXAMPLES
     <gauge name="VoteStatus" summary="Precise status of the vote subsystem: 0=disabled (non-voting or no tower tile), 1=not started (tower tile not running or no votes cast yet), 2=delinquent (vote distance exceeds threshold or vote stalled), 3=voting (voting normally)" />
     <gauge name="ReplayStatus" summary="Precise status of the replay subsystem: 0=disabled (no replay tile), 1=not started (replay tile not running or slots are zero), 2=behind (replay lagging behind turbine or reset slot stalled), 3=running (replay keeping up)" />
     <gauge name="TurbineStatus" summary="Precise status of the turbine subsystem: 0=disabled (no shred or replay tiles), 1=not started (tiles not all running or turbine slot is zero), 2=stalled (turbine slot not advancing), 3=repair outpacing (repair byte throughput exceeds turbine), 4=running (turbine receiving normally)" />
+
+    <counter name="DeviceIrq" summary="Number of device IRQs across all CPUs" />
+    <counter name="DeviceIrqUndesired" summary="Number of device hard IRQs that stole CPU time from fixed tiles" />
+    <counter name="Softirq" enum="Softirq" summary="Number of soft-IRQs across all CPUs" />
+    <counter name="SoftirqUndesired" enum="Softirq" summary="Number of soft-IRQs that stole CPU time from fixed tiles" />
 </tile>
 
 <tile name="genesi">
@@ -1855,8 +1860,7 @@ EXAMPLES
 
     <!-- Eqvoc -->
 
-    <counter name="EqvocSuccess" summary="Number of success proofs" />
-    <counter name="EqvocErr"     summary="Number of proofs that failed validation (gossip-only)" />
+    <counter name="EqvocProof" enum="EqvocProofResult" summary="Equivocation proofs, by validation outcome" />
 
     <!-- Ghost -->
 

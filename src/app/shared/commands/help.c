@@ -143,13 +143,12 @@ help_cmd_fn( args_t *   args   FD_PARAM_UNUSED,
              config_t * config FD_PARAM_UNUSED ) {
   FD_LOG_STDOUT(( "%s control binary\n\n", FD_APP_NAME ));
   FD_LOG_STDOUT(( "Usage: %s <SUBCOMMAND> [OPTIONS]\n\n", FD_BINARY_NAME ));
-  FD_LOG_STDOUT(( "\nOPTIONS:\n" ));
-  /* This runtime currently has few global flag arguments so we hard-code
-     the --config parameter here. */
-  FD_LOG_STDOUT(( "        --config <PATH>    Path to config TOML file\n" ));
-  FD_LOG_STDOUT(( "        --version          Show the current software version\n" ));
-  FD_LOG_STDOUT(( "        --help             Print this help message\n\n" ));
-  FD_LOG_STDOUT(( "SUBCOMMANDS:\n" ));
+
+  fd_action_help_t global[1] = {0};
+  fd_global_options_help( global );
+  help_print_args( "OPTIONS:", global );
+
+  FD_LOG_STDOUT(( "\nSUBCOMMANDS:\n" ));
   for( ulong i=0UL; ACTIONS[ i ]; i++ ) {
     FD_LOG_STDOUT(( "   %20s    %s\n", ACTIONS[ i ]->name, ACTIONS[ i ]->description ));
   }

@@ -1222,9 +1222,8 @@ fd_gui_peers_viewport_snap( fd_gui_peers_ctx_t * peers, ulong ws_conn_id ) {
 
     ulong viewport_idx = j-peers->client_viewports[ ws_conn_id ].start_row;
     FD_TEST( viewport_idx<FD_GUI_PEERS_WS_VIEWPORT_MAX_SZ );
-    fd_gui_peers_row_t * ref = &peers->client_viewports[ ws_conn_id ].viewport[ viewport_idx ];
-
-    *ref = cur->row;
+    peers->scratch.viewport[ viewport_idx ] = cur->row;
+    peers->scratch.viewport_cnt             = viewport_idx+1UL;
   }
 
   /* Capture the old baseline as the diff reference, then commit the new
@@ -1265,12 +1264,6 @@ fd_gui_peers_request_scroll( fd_gui_peers_ctx_t * peers,
 
   fd_gui_peers_viewport_snap( peers, ws_conn_id );
   fd_gui_printf_peers_viewport_request( peers, "query_scroll", ws_conn_id, request_id );
-
-  /* The full response just formatted establishes the new baseline for
-     the client.  Re-snapshot so the next periodic view_update diff is
-     computed against the rows we just sent. This must happen before
-     fd_http_server_ws_send, which can close the connection. */
-  fd_gui_peers_viewport_snap( peers, ws_conn_id );
   FD_TEST( !fd_http_server_ws_send( peers->http, ws_conn_id ) );
   return 0;
 }
@@ -1323,12 +1316,6 @@ fd_gui_peers_request_sort( fd_gui_peers_ctx_t * peers,
 
   fd_gui_peers_viewport_snap( peers, ws_conn_id );
   fd_gui_printf_peers_viewport_request( peers, "query_sort", ws_conn_id, request_id );
-
-  /* The full response just formatted establishes the new baseline for
-     the client.  Re-snapshot so the next periodic view_update diff is
-     computed against the rows we just sent. This must happen before
-     fd_http_server_ws_send, which can close the connection. */
-  fd_gui_peers_viewport_snap( peers, ws_conn_id );
   FD_TEST( !fd_http_server_ws_send( peers->http, ws_conn_id ) );
   return 0;
 }
@@ -1412,17 +1399,17 @@ fd_gui_peers_viewport_log( fd_gui_peers_ctx_t *  peers,
     fd_gui_peers_row_t const * cur = &peers->scratch.viewport[ i ];
 
     char pubkey_base58[ FD_BASE58_ENCODED_32_SZ ];
-    fd_base58_encode_32( cur->row.pubkey.uc, NULL, pubkey_base58 );
+    fd_base58_encode_32( cur->pubkey.uc, NULL, pubkey_base58 );
 
     char peer_addr[ 16 ]; /* 255.255.255.255 + '\0' */
-    uint ip4 = cur->row.contact_info.sockets[ FD_GOSSIP_CONTACT_INFO_SOCKET_GOSSIP ].is_ipv6 ? 0 : cur->row.contact_info.sockets[ FD_GOSSIP_CONTACT_INFO_SOCKET_GOSSIP ].ip4;
+    uint ip4 = cur->contact_info.sockets[ FD_GOSSIP_CONTACT_INFO_SOCKET_GOSSIP ].is_ipv6 ? 0 : cur->contact_info.sockets[ FD_GOSSIP_CONTACT_INFO_SOCKET_GOSSIP ].ip4;
     FD_TEST(fd_cstr_printf_check( peer_addr, sizeof(peer_addr), NULL, FD_IP4_ADDR_FMT,
                                   FD_IP4_ADDR_FMT_ARGS( ip4 ) ) );
 
-    long cur_egress_push_bps           = cur->row.gossip_tx[ FD_METRICS_ENUM_GOSSIP_MESSAGE_V_PUSH_IDX ].rate_ema;
-    long cur_ingress_push_bps          = cur->row.gossvf_rx[ FD_METRICS_ENUM_GOSSIP_MESSAGE_V_PUSH_IDX ].rate_ema;
-    long cur_egress_pull_response_bps  = cur->row.gossip_tx[ FD_METRICS_ENUM_GOSSIP_MESSAGE_V_PULL_RESPONSE_IDX ].rate_ema;
-    long cur_ingress_pull_response_bps = cur->row.gossvf_rx[ FD_METRICS_ENUM_GOSSIP_MESSAGE_V_PULL_RESPONSE_IDX ].rate_ema;
+    long cur_egress_push_bps           = cur->gossip_tx[ FD_METRICS_ENUM_GOSSIP_MESSAGE_V_PUSH_IDX ].rate_ema;
+    long cur_ingress_push_bps          = cur->gossvf_rx[ FD_METRICS_ENUM_GOSSIP_MESSAGE_V_PUSH_IDX ].rate_ema;
+    long cur_egress_pull_response_bps  = cur->gossip_tx[ FD_METRICS_ENUM_GOSSIP_MESSAGE_V_PULL_RESPONSE_IDX ].rate_ema;
+    long cur_ingress_pull_response_bps = cur->gossvf_rx[ FD_METRICS_ENUM_GOSSIP_MESSAGE_V_PULL_RESPONSE_IDX ].rate_ema;
 
     p = fd_cstr_append_printf( p,
                                "| %5lu | %14ld | %14ld | %14ld | %14ld | %-50s | %-15s |\n",

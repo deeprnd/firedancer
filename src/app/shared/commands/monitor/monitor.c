@@ -112,8 +112,8 @@ tile_snap( tile_snap_t *     snap_cur, /* Snapshot for each tile, indexed [0,til
 
     FD_COMPILER_MFENCE();
     snap->tid       = FD_MGAUGE_GET( TILE, TID );
-    snap->nvcsw     = FD_MCNT_GET( TILE, CONTEXT_SWITCH_VOLUNTARY_COUNT );
-    snap->nivcsw    = FD_MCNT_GET( TILE, CONTEXT_SWITCH_INVOLUNTARY_COUNT );
+    snap->nvcsw     = FD_MCNT_GET( TILE, CONTEXT_SWITCH_VOLUNTARY );
+    snap->nivcsw    = FD_MCNT_GET( TILE, CONTEXT_SWITCH_INVOLUNTARY );
     snap->in_backp  = FD_MGAUGE_GET( TILE, IN_BACKPRESSURE );
     snap->backp_cnt = FD_MCNT_GET( TILE, BACKPRESSURE );
     for( ulong i=0UL; i<9UL; i++ ) {
@@ -633,5 +633,11 @@ action_t fd_action_monitor = {
   .fn             = monitor_cmd_fn,
   .require_config = 1,
   .perm           = monitor_cmd_perm,
-  .description    = "Monitor a locally running validator instance with a terminal GUI",
+  .description    = "Monitor a locally running Firedancer instance with a terminal GUI",
+  .detail         = "Connects to a running validator and continuously renders a terminal\n"
+                    "dashboard of tile activity and the message passing links between them.  A\n"
+                    "tile is a single thread pinned to a CPU core that performs one part of the\n"
+                    "validator's work.  The validator must be running.",
+  .usage          = "monitor [OPTIONS]",
+  .args_help      = monitor_args_help,
 };

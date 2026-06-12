@@ -98,7 +98,7 @@ monitor_gossip_cmd_fn( args_t *   args,
   fd_gossip_diag_ctx_t diag_ctx[1];
   if( FD_UNLIKELY( fd_gossip_diag_init( diag_ctx, &config->topo, config ) ) ) {
     FD_LOG_ERR(( "Failed to initialize gossip diagnostics. "
-                 "Is a validator instance running with gossip tiles?" ));
+                 "Is a Firedancer instance running with gossip tiles?" ));
   }
 
   printf( "Found %lu gossvf tiles\n", diag_ctx->gossvf.tile_count );
@@ -132,5 +132,10 @@ action_t fd_action_monitor_gossip = {
   .require_config = 1,
   .perm           = monitor_gossip_cmd_perm,
   .is_diagnostic  = 1,
-  .description    = "Monitor gossip diagnostics on a running validator instance",
+  .description    = "Monitor gossip diagnostics on a running Firedancer instance",
+  .detail         = "Connects to a running validator's shared memory and prints gossip diagnostics,\n"
+                    "including gossip table statistics, message statistics, and per-tile\n"
+                    "performance.",
+  .usage          = "monitor-gossip [OPTIONS]",
+  .args_help      = monitor_gossip_args_help,
 };

@@ -38,7 +38,7 @@
   <tr>
     <td>
       <!-- badge:cov-fd:start -->
-<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-42.7%25-red?style=flat-square" />
+<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-unknown-lightgrey?style=flat-square" />
 <!-- badge:cov-fd:end -->
     </td>
     <td>
@@ -273,9 +273,7 @@ No black boxes.
 - [Overview](doc/overview.md)
 - [Architecture](doc/architecture.md)
 - [Development](doc/development.md)
-- [Workflows](doc/workflows.md)
 - [Build](doc/build.md)
-- [Build system](doc/build-system.md)
 - [Testing](doc/testing-tickoni.md)
 - [Observability](doc/observability.md)
 - [Telemetry](doc/telemetry.md)

@@ -289,7 +289,7 @@ check_engine_metric( fd_diag_tile_t * ctx, long now ) {
       replay_status = FD_DIAG_REPLAY_STATUS_NOT_STARTED;
     } else {
       volatile ulong * m = ctx->metrics[ replay_idx ];
-      ulong turbine_slot = m[ FD_METRICS_GAUGE_REPLAY_REASM_LATEST_SLOT_OFF ];
+      ulong turbine_slot = m[ FD_METRICS_GAUGE_REPLAY_REASSEMBLY_LATEST_SLOT_OFF ];
       ulong reset_slot   = m[ FD_METRICS_GAUGE_REPLAY_RESET_SLOT_OFF ];
       if( FD_UNLIKELY( reset_slot!=ctx->check_engine.prev_reset_slot ) ) {
         ctx->check_engine.prev_reset_slot       = reset_slot;
@@ -316,8 +316,8 @@ check_engine_metric( fd_diag_tile_t * ctx, long now ) {
       ulong cur_turbine_bytes = 0UL, cur_repair_bytes = 0UL;
       for( ulong i=0UL; i<shred_cnt; i++ ) {
         volatile ulong * sm = ctx->metrics[ ctx->tiles.shred_tile_idx[ i ] ];
-        cur_turbine_bytes += sm[ FD_METRICS_COUNTER_SHRED_SHRED_TURBINE_RCV_BYTES_OFF ];
-        cur_repair_bytes  += sm[ FD_METRICS_COUNTER_SHRED_SHRED_REPAIR_RCV_BYTES_OFF ];
+        cur_turbine_bytes += sm[ FD_METRICS_COUNTER_SHRED_SHRED_TURBINE_RX_BYTES_OFF ];
+        cur_repair_bytes  += sm[ FD_METRICS_COUNTER_SHRED_SHRED_REPAIR_RX_BYTES_OFF ];
         if( FD_UNLIKELY( sm[ FD_METRICS_GAUGE_TILE_STATUS_OFF ]!=1UL ) ) {
           all_shred_running = 0;
           break;
@@ -326,7 +326,7 @@ check_engine_metric( fd_diag_tile_t * ctx, long now ) {
       if( FD_UNLIKELY( !all_shred_running ) ) {
         turbine_status = FD_DIAG_TURBINE_STATUS_NOT_STARTED;
       } else {
-        ulong turbine_slot = ctx->metrics[ replay_idx ][ FD_METRICS_GAUGE_REPLAY_REASM_LATEST_SLOT_OFF ];
+        ulong turbine_slot = ctx->metrics[ replay_idx ][ FD_METRICS_GAUGE_REPLAY_REASSEMBLY_LATEST_SLOT_OFF ];
         if( FD_UNLIKELY( turbine_slot!=ctx->check_engine.prev_turbine_slot ) ) {
           ctx->check_engine.prev_turbine_slot       = turbine_slot;
           ctx->check_engine.turbine_slot_changed_ns = now;
@@ -355,6 +355,50 @@ check_engine_metric( fd_diag_tile_t * ctx, long now ) {
   FD_MGAUGE_SET( DIAG, VOTE_STATUS,    vote_status    );
   FD_MGAUGE_SET( DIAG, REPLAY_STATUS,  replay_status  );
   FD_MGAUGE_SET( DIAG, TURBINE_STATUS, turbine_status );
+}
+
+static void
+irq_metrics( fd_diag_tile_t * ctx ) {
+  if( FD_UNLIKELY( -1==lseek( ctx->proc_softirqs_fd, 0, SEEK_SET ) ) ) FD_LOG_ERR(( "lseek failed (%i-%s)", errno, strerror( errno ) ));
+  ulong softirq_cpu_cnt = fd_proc_softirqs_sum( ctx->proc_softirqs_fd, ctx->irq_cnt );
+  if( FD_UNLIKELY( !softirq_cpu_cnt ) ) return; /* parse fail */
+
+  ulong volatile * softirq_total     = &fd_metrics_tl[ MIDX( COUNTER, DIAG, SOFTIRQ     ) ];
+  ulong volatile * softirq_undesired = &fd_metrics_tl[ MIDX( COUNTER, DIAG, SOFTIRQ_UNDESIRED ) ];
+  for( ulong j=0UL; j<FD_METRICS_ENUM_SOFTIRQ_CNT; j++ ) {
+    ulong tot_cnt       = 0UL;
+    ulong undesired_cnt = 0UL;
+    for( ulong i=0UL; i<softirq_cpu_cnt; i++ ) {
+      ulong since = fd_ulong_sat_sub( ctx->irq_cnt[ j ][ i ], ctx->softirq_baseline[ j ][ i ] );
+      tot_cnt += since;
+      if( fd_cpuset_test( ctx->cpu_has_tile, i ) ) {
+        undesired_cnt += since;
+      }
+    }
+    softirq_total    [ j ] = tot_cnt;
+    softirq_undesired[ j ] = undesired_cnt;
+  }
+
+  ulong * cpu_irq = ctx->irq_cnt[ 0 ]; /* re-use as scratch memory */
+  if( FD_UNLIKELY( -1==lseek( ctx->proc_interrupts_fd, 0, SEEK_SET ) ) ) FD_LOG_ERR(( "lseek failed (%i-%s)", errno, strerror( errno ) ));
+  ulong device_cpu_cnt = fd_proc_interrupts_colwise( ctx->proc_interrupts_fd, cpu_irq );
+  if( FD_UNLIKELY( !device_cpu_cnt ) ) return; /* parse fail */
+
+  ulong tot_cnt       = 0UL;
+  ulong undesired_cnt = 0UL;
+  for( ulong i=0UL; i<device_cpu_cnt; i++ ) {
+    ulong since = fd_ulong_sat_sub( cpu_irq[ i ], ctx->device_irq_baseline[ i ] );
+    tot_cnt += since;
+    if( fd_cpuset_test( ctx->cpu_has_tile, i ) ) {
+      undesired_cnt += since;
+    }
+    ulong tile_id = ctx->cpu_to_tile[ i ];
+    if( tile_id!=USHORT_MAX ) {
+      ctx->metrics[ tile_id ][ FD_METRICS_COUNTER_TILE_IRQ_PREEMPTED_OFF ] = since;
+    }
+  }
+  FD_MCNT_SET( DIAG, DEVICE_IRQ,           tot_cnt       );
+  FD_MCNT_SET( DIAG, DEVICE_IRQ_UNDESIRED, undesired_cnt );
 }
 
 static void

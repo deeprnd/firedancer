@@ -398,8 +398,8 @@ log_end_block_metrics( fd_pack_ctx_t * ctx,
                        long            now,
                        char const    * reason,
                        ulong           cus_consumed_in_block ) {
-#define DELTA( m ) (fd_metrics_tl[ MIDX(COUNTER, PACK, TRANSACTION_SCHEDULE_##m) ] - ctx->last_sched_metrics->sched_results[ FD_METRICS_ENUM_PACK_TXN_SCHEDULE_V_##m##_IDX ])
-#define AVAIL( m ) (fd_metrics_tl[ MIDX(GAUGE, PACK, AVAILABLE_TRANSACTIONS_##m) ])
+#define DELTA( m ) (fd_metrics_tl[ MIDX(COUNTER, PACK, TXN_SCHEDULED_##m) ] - ctx->last_sched_metrics->sched_results[ FD_METRICS_ENUM_PACK_TXN_SCHEDULE_V_##m##_IDX ])
+#define AVAIL( m ) (fd_metrics_tl[ MIDX(GAUGE, PACK, TXN_AVAILABLE_##m) ])
     FD_LOG_INFO(( "pack_end_block(slot=%lu,%s,%lx,ticks_since_last_schedule=%ld,reasons=%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu;remaining=%lu+%lu+%lu+%lu;smallest=%lu;cus=%lu->%lu)",
           ctx->leader_slot, reason, ctx->execle_idle_bitset, now-ctx->last_sched_metrics->time,
           DELTA( TAKEN ), DELTA( CU_LIMIT ), DELTA( FAST_PATH ), DELTA( BYTE_LIMIT ), DELTA( ALLOC_LIMIT ), DELTA( WRITE_COST ), DELTA( SLOW_PATH ), DELTA( DEFER_SKIP ),
@@ -418,7 +418,7 @@ get_done_packing( fd_pack_ctx_t * ctx, fd_done_packing_t * done_packing, int rea
     done_packing->end_slot_reason = reason;
     fd_pack_get_block_limits( ctx->pack, done_packing->limits_usage, done_packing->limits );
 
-#define DELTA( mem, m ) (fd_metrics_tl[ MIDX(COUNTER, PACK, TRANSACTION_SCHEDULE_##m) ] - ctx->mem->sched_results[ FD_METRICS_ENUM_PACK_TXN_SCHEDULE_V_##m##_IDX ])
+#define DELTA( mem, m ) (fd_metrics_tl[ MIDX(COUNTER, PACK, TXN_SCHEDULED_##m) ] - ctx->mem->sched_results[ FD_METRICS_ENUM_PACK_TXN_SCHEDULE_V_##m##_IDX ])
     done_packing->block_results[ FD_METRICS_ENUM_PACK_TXN_SCHEDULE_V_TAKEN_IDX       ] = DELTA( start_block_sched_metrics, TAKEN       );
     done_packing->block_results[ FD_METRICS_ENUM_PACK_TXN_SCHEDULE_V_CU_LIMIT_IDX    ] = DELTA( start_block_sched_metrics, CU_LIMIT    );
     done_packing->block_results[ FD_METRICS_ENUM_PACK_TXN_SCHEDULE_V_FAST_PATH_IDX   ] = DELTA( start_block_sched_metrics, FAST_PATH   );

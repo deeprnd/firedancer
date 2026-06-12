@@ -27,6 +27,7 @@
 #include "../../flamenco/rewards/fd_rewards.h"
 #include "../../disco/metrics/fd_metrics.h"
 #include "../repair/fd_repair_tile.h"
+#include "../repair/fd_repair_tile.h"
 #include "../../flamenco/fd_flamenco_base.h"
 #include "../../flamenco/runtime/fd_runtime.h"
 #include "../../flamenco/runtime/fd_runtime_stack.h"
@@ -2114,7 +2115,7 @@ process_fec_complete( fd_replay_tile_t *  ctx,
     /* FEC set detected as invalid based on duplicate confirmations.
        Nothing to do except remove from store.  If the FEC set is not in
        reasm, we can directly remove from store.  If the FEC set is in
-       reasm, then we let the natural prune/publish process handle it. */
+       reasm, then we let reasm_publish handle it. */
     if( FD_LIKELY( !fd_reasm_query( ctx->reasm, merkle_root ) ) ) {
       fd_store_remove( ctx->store, merkle_root );
     }

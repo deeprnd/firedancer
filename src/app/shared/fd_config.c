@@ -127,6 +127,86 @@ fd_config_fillf( fd_config_t * config ) {
 }
 
 static void
+fd_config_fillh( fd_config_t * config ) {
+  if( FD_UNLIKELY( strcmp( config->frankendancer.paths.accounts_path, "" ) ) ) {
+    replace( config->frankendancer.paths.accounts_path, "{user}", config->user );
+    replace( config->frankendancer.paths.accounts_path, "{name}", config->name );
+  }
+
+  if( FD_UNLIKELY( strcmp( config->frankendancer.paths.ledger, "" ) ) ) {
+    replace( config->frankendancer.paths.ledger, "{user}", config->user );
+    replace( config->frankendancer.paths.ledger, "{name}", config->name );
+  } else {
+    FD_TEST( fd_cstr_printf_check( config->frankendancer.paths.ledger, sizeof(config->frankendancer.paths.ledger), NULL, "%s/ledger", config->paths.base ) );
+  }
+
+  if( FD_UNLIKELY( strcmp( config->frankendancer.snapshots.path, "" ) ) ) {
+    replace( config->frankendancer.snapshots.path, "{user}", config->user );
+    replace( config->frankendancer.snapshots.path, "{name}", config->name );
+  } else {
+    strncpy( config->frankendancer.snapshots.path, config->frankendancer.paths.ledger, sizeof(config->frankendancer.snapshots.path) );
+  }
+
+  for( ulong i=0UL; i<config->frankendancer.paths.authorized_voter_paths_cnt; i++ ) {
+    replace( config->frankendancer.paths.authorized_voter_paths[ i ], "{user}", config->user );
+    replace( config->frankendancer.paths.authorized_voter_paths[ i ], "{name}", config->name );
+  }
+
+  if( FD_UNLIKELY( config->tiles.quic.quic_transaction_listen_port!=config->tiles.quic.regular_transaction_listen_port+6 ) )
+    FD_LOG_ERR(( "configuration specifies invalid [tiles.quic.quic_transaction_listen_port] `%hu`. "
+                 "This must be 6 more than [tiles.quic.regular_transaction_listen_port] `%hu`",
+                 config->tiles.quic.quic_transaction_listen_port,
+                 config->tiles.quic.regular_transaction_listen_port ));
+
+  char dynamic_port_range[ 32 ];
+  fd_memcpy( dynamic_port_range, config->frankendancer.dynamic_port_range, sizeof(dynamic_port_range) );
+
+  char * dash = strstr( dynamic_port_range, "-" );
+  if( FD_UNLIKELY( !dash ) )
+    FD_LOG_ERR(( "configuration specifies invalid [dynamic_port_range] `%s`. "
+                 "This must be formatted like `<min>-<max>`",
+                 config->frankendancer.dynamic_port_range ));
+
+  *dash = '\0';
+  char * endptr;
+  ulong agave_port_min = strtoul( dynamic_port_range, &endptr, 10 );
+  if( FD_UNLIKELY( *endptr != '\0' || agave_port_min > USHORT_MAX ) )
+    FD_LOG_ERR(( "configuration specifies invalid [dynamic_port_range] `%s`. "
+                 "This must be formatted like `<min>-<max>`",
+                 config->frankendancer.dynamic_port_range ));
+  ulong agave_port_max = strtoul( dash + 1, &endptr, 10 );
+  if( FD_UNLIKELY( *endptr != '\0' || agave_port_max > USHORT_MAX ) )
+    FD_LOG_ERR(( "configuration specifies invalid [dynamic_port_range] `%s`. "
+                 "This must be formatted like `<min>-<max>`",
+                 config->frankendancer.dynamic_port_range ));
+  if( FD_UNLIKELY( agave_port_min > agave_port_max ) )
+    FD_LOG_ERR(( "configuration specifies invalid [dynamic_port_range] `%s`. "
+                 "The minimum port must be less than or equal to the maximum port",
+                 config->frankendancer.dynamic_port_range ));
+
+  if( FD_UNLIKELY( config->tiles.quic.regular_transaction_listen_port >= agave_port_min &&
+                   config->tiles.quic.regular_transaction_listen_port < agave_port_max ) )
+    FD_LOG_ERR(( "configuration specifies invalid [tiles.quic.transaction_listen_port] `%hu`. "
+                 "This must be outside the dynamic port range `%s`",
+                 config->tiles.quic.regular_transaction_listen_port,
+                 config->frankendancer.dynamic_port_range ));
+
+  if( FD_UNLIKELY( config->tiles.quic.quic_transaction_listen_port >= agave_port_min &&
+                   config->tiles.quic.quic_transaction_listen_port < agave_port_max ) )
+    FD_LOG_ERR(( "configuration specifies invalid [tiles.quic.quic_transaction_listen_port] `%hu`. "
+                 "This must be outside the dynamic port range `%s`",
+                 config->tiles.quic.quic_transaction_listen_port,
+                 config->frankendancer.dynamic_port_range ));
+
+  if( FD_UNLIKELY( config->tiles.shred.shred_listen_port >= agave_port_min &&
+                   config->tiles.shred.shred_listen_port < agave_port_max ) )
+    FD_LOG_ERR(( "configuration specifies invalid [tiles.shred.shred_listen_port] `%hu`. "
+                 "This must be outside the dynamic port range `%s`",
+                 config->tiles.shred.shred_listen_port,
+                 config->frankendancer.dynamic_port_range ));
+}
+
+static void
 fd_config_fill_net( fd_config_t * config ) {
   if( FD_UNLIKELY( !strcmp( config->net.interface, "" ) ) ) {
     uint ifindex;
@@ -186,6 +266,9 @@ fd_config_fill( fd_config_t * config,
   config->hostname[ sizeof(config->hostname)-1UL ] = '\0'; /* Just truncate the name if it's too long to fit */
 
   ulong cluster = FD_CLUSTER_UNKNOWN;
+  if( FD_UNLIKELY( !config->is_firedancer ) ) {
+    cluster = fd_genesis_cluster_identify( config->frankendancer.consensus.expected_genesis_hash );
+  }
   config->is_live_cluster = cluster!=FD_CLUSTER_UNKNOWN;
   strcpy( config->cluster, fd_genesis_cluster_name( cluster ) );
 
@@ -293,7 +376,7 @@ fd_config_fill( fd_config_t * config,
   if( FD_UNLIKELY( config->is_firedancer ) ) {
     fd_config_fillf( config );
   } else {
-    FD_LOG_ERR(( "legacy runtime config fill is disabled." ));
+    fd_config_fillh( config );
   }
 
 
@@ -326,7 +409,19 @@ fd_config_fill( fd_config_t * config,
     strncpy( config->cluster, "development", sizeof(config->cluster) );
 
     if( FD_UNLIKELY( !config->is_firedancer ) ) {
-      FD_LOG_ERR(( "legacy runtime local-cluster overrides are disabled." ));
+      /* By default only_known is true for validators to ensure secure
+        snapshot download, but in development it doesn't matter and
+        often the developer does not provide known peers. */
+      config->frankendancer.rpc.only_known = 0;
+
+      /* When starting from a new genesis block, this needs to be off else
+        the validator will get stuck forever. */
+      config->frankendancer.consensus.wait_for_vote_to_start_leader = 0;
+
+      /* We have to wait until we get a snapshot before we can join a
+        second validator to this one, so make this smaller than the
+        default.  */
+      config->frankendancer.snapshots.full_snapshot_interval_slots = fd_uint_min( config->frankendancer.snapshots.full_snapshot_interval_slots, 200U );
     }
   }
 
@@ -395,12 +490,28 @@ fd_config_validatef( fd_configf_t const * config ) {
   if( config->runtime.program_cache.heap_size_mib < 32 ) { FD_LOG_ERR(( "`%s` must be >= 32", "runtime.program_cache.heap_size_mib" )); }
 }
 
+static void
+fd_config_validateh( fd_configh_t const * config ) {
+  CFG_HAS_NON_EMPTY( dynamic_port_range );
+
+  CFG_HAS_NON_EMPTY( ledger.snapshot_archive_format );
+
+  CFG_HAS_NON_ZERO( snapshots.full_snapshot_interval_slots );
+  CFG_HAS_NON_ZERO( snapshots.incremental_snapshot_interval_slots );
+  CFG_HAS_NON_ZERO( snapshots.minimum_snapshot_download_speed );
+  CFG_HAS_NON_ZERO( snapshots.maximum_snapshot_download_abort );
+
+  CFG_HAS_NON_EMPTY( layout.agave_affinity );
+  CFG_HAS_NON_ZERO ( layout.resolh_tile_count );
+  CFG_HAS_NON_ZERO ( layout.bank_tile_count );
+}
+
 void
 fd_config_validate( fd_config_t const * config ) {
   if( FD_LIKELY( config->is_firedancer ) ) {
     fd_config_validatef( &config->firedancer );
   } else {
-    FD_LOG_ERR(( "legacy runtime config validation is disabled." ));
+    fd_config_validateh( &config->frankendancer );
   }
 
   CFG_HAS_NON_EMPTY( name );
