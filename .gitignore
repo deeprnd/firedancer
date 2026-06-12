@@ -29,6 +29,9 @@ compile_commands.json
 # Rust
 **/Cargo.lock
 
+# Zig
+.zig-global-cache
+
 # Dependencies
 opt/
 opt-msan/
@@ -89,3 +92,9 @@ zig-out/
 # LLMs
 .claude
 .codex
+
+# Version derive
+src/util/fd_version_generated.h
+src/util/fd_version_generated1.h
+src/app/firedancer/version.h
+src/app/firedancer/version2.h

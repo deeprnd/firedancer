@@ -3,6 +3,7 @@
 #include "../shared/fd_config_file.h"
 #include "../shared/boot/fd_boot.h"
 #include "../shared/commands/configure/configure.h"
+#include "../shared/fd_action.h"
 
 #ifndef FD_WITH_AGAVE
 #define FD_WITH_AGAVE 0

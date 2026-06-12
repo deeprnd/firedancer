@@ -93,7 +93,7 @@ dynamic_port_range = "8900-9000"
 # STDERR and STDOUT from the launcher.  An example log message would
 # look something like:
 #
-#    NOTICE  01-23 04:56:07.890123 45678 f0 0 src/file.c(901): 1 is the loneliest number
+#    NOTICE  01-23 04:56:07.890123 45678 f0 0 file.c(901): 1 is the loneliest number
 #
 # to the ephemeral log (stderr) and log something like:
 #
@@ -1322,6 +1322,16 @@ dynamic_port_range = "8900-9000"
         # block packing performance for any reason, it is recommended to
         # revert to the "balanced" strategy.
         schedule_strategy = "balanced"
+
+        # If the pack tile receives a transaction that reads from or
+        # writes to an address in the account_blocklist, it will reject
+        # the transaction immediately and not consider it for inclusion
+        # in any blocks this validator produces as leader.  This does
+        # not prevent replaying blocks that contain transactions that
+        # access an account in the blocklist.  Up to 16 addresses are
+        # currently allowed.  account_blocklist should be a list of
+        # base58-encoded public keys.
+        account_blocklist = []
 
     # The bank tile is what executes transactions and updates the
     # accounting state as a result of any operations performed by the

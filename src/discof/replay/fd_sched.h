@@ -2,11 +2,9 @@
 #define HEADER_fd_src_discof_replay_fd_sched_h
 
 #include "fd_rdisp.h"
+#include "../../disco/fd_txn_p.h"
 #include "../../disco/store/fd_store.h" /* for fd_store_fec_t */
-#include "../../disco/pack/fd_microblock.h" /* for fd_txn_p_t */
-
-#include "../../flamenco/accdb/fd_accdb_user.h"
-#include "../../util/spad/fd_spad.h" /* for ALUTs */
+#include "../../flamenco/accdb/fd_accdb.h"
 
 /* fd_sched wraps all the smarts and mechanical chores around scheduling
    transactions for replay execution.  It is built on top of the
@@ -57,9 +55,9 @@ struct fd_sched;
 typedef struct fd_sched fd_sched_t;
 
 struct fd_sched_alut_ctx {
-  fd_accdb_user_t   accdb[1];
-  fd_funk_txn_xid_t xid[1];
-  ulong             els; /* Effective lookup slot. */
+  fd_accdb_t *       accdb;
+  fd_accdb_fork_id_t fork_id;
+  ulong              els; /* Effective lookup slot. */
 };
 typedef struct fd_sched_alut_ctx fd_sched_alut_ctx_t;
 
@@ -170,6 +168,21 @@ struct fd_sched_task {
   };
 };
 typedef struct fd_sched_task fd_sched_task_t;
+
+struct __attribute__((packed)) fd_microblock_hdr {
+  /* Number of PoH hashes between this and last microblock */
+  /* 0x00 */ ulong hash_cnt;
+
+  /* PoH state after evaluating this microblock (including all
+     appends and mixin). The input to the poh calculation of the first
+     microblock is the last hash of the parent block, otherwise it is the
+     hash of the previous microblock. */
+  /* 0x08 */ uchar hash[32];
+
+  /* Number of transactions in this microblock */
+  /* 0x28 */ ulong txn_cnt;
+};
+typedef struct fd_microblock_hdr fd_microblock_hdr_t;
 
 FD_PROTOTYPES_BEGIN
 
@@ -307,14 +320,23 @@ fd_sched_task_done( fd_sched_t * sched, ulong task_type, ulong txn_idx, ulong ex
    abandoned blocks for execution.  This should only be invoked on an
    actively replayed block, and should only be invoked once on it.
 
-   An abandoned block will be pruned from sched as soon as, and only if,
-   the block has no more in-flight tasks associated with it.  No sooner,
-   no later.  In the immediate ensuing stem run loop,
-   sched_pruned_next() will return the index for the corresponding bank
-   so the refcnt can be decremented for sched.  After that point, the
-   bank_idx may be recycled for another block. */
+   For the purposes of bank lifetime management, sched is a subsidiary
+   of banks.  So while sched sets things in motion for a bad block to be
+   eagerly pruned, banks/replay is the sole initiator of actual pruning.
+   The way this works is that an abandoned block will have its refcnt
+   queued for release by sched as soon as, and only if, the block has no
+   more in-flight tasks associated with it.  No sooner, no later.  In
+   the immediate ensuing stem run loop, sched_pruned_next() will return
+   the index for the corresponding bank so the refcnt can be decremented
+   for sched.  After that point, banks will eventually instruct sched to
+   prune the block, when all other components release their refcnts on
+   said bank.  Then the bank_idx may be recycled for another block. */
 void
 fd_sched_block_abandon( fd_sched_t * sched, ulong bank_idx );
+
+/* Prune the given block including descendants of it. */
+void
+fd_sched_cancel( fd_sched_t * sched, ulong bank_idx );
 
 /* Add a block as immediately done to the scheduler.  This is useful for
    installing the snapshot slot, or for informing the scheduler of a
@@ -350,6 +372,30 @@ fd_sched_pruned_block_next( fd_sched_t * sched );
 
 void
 fd_sched_set_poh_params( fd_sched_t * sched, ulong bank_idx, ulong tick_height, ulong max_tick_height, ulong hashes_per_tick, fd_hash_t const * start_poh );
+
+/* fd_sched_block_verify_ticks sets the tick window and verifies
+   ticks on bank_idx (shred fuzz harness, no exec); 0 if valid. */
+int
+fd_sched_block_verify_ticks( fd_sched_t * sched,
+                             ulong        bank_idx,
+                             ulong        tick_height,
+                             ulong        max_tick_height,
+                             ulong        hashes_per_tick );
+
+/* fd_sched_set_bypass_poh_verify configures whether the per-microblock
+   PoH end_hash comparison in maybe_mixin is bypassed.  This is intended
+   for test and fuzz harnesses: the expected end_hash is carried in the
+   shred payload, so comparing it would reject any mutated input before
+   the deeper parse/tick logic is exercised.  Production call sites
+   should leave this disabled. */
+void
+fd_sched_set_bypass_poh_verify( fd_sched_t * sched, int bypass_poh_verify );
+
+/* fd_sched_set_bypass_alut_resolution bypasses ALUT resolution during
+   parsing (test/fuzz: no accounts DB).  ALUT txns become serializing.
+   Production call sites should leave this disabled. */
+void
+fd_sched_set_bypass_alut_resolution( fd_sched_t * sched, int bypass_alut_resolution );
 
 fd_txn_p_t *
 fd_sched_get_txn( fd_sched_t * sched, ulong txn_idx );

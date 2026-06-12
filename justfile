@@ -19,26 +19,26 @@ python-dev-install-all:
 # ── Build ──────────────────────────────────────────────────────────────────
 
 build-tk:
-  zig build
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build
 
 build-fd:
-  make -j"$(nproc)" tickoni
+  make -j"$(nproc)" firedancer
 
 build-fd-gcc:
-  make -j"$(nproc)" BUILDDIR=fd-gcc CC=gcc-12 MACHINE=linux_gcc_x86_64 tickoni
+  make -j"$(nproc)" BUILDDIR=fd-gcc CC=gcc-12 MACHINE=linux_gcc_x86_64 firedancer
 
 build-fd-clang:
-  make -j"$(nproc)" BUILDDIR=fd-clang CC=clang-18 MACHINE=linux_clang_x86_64 tickoni
+  make -j"$(nproc)" BUILDDIR=fd-clang CC=clang-18 MACHINE=linux_clang_x86_64 firedancer
 
 # Compile-only ARM lane matching the CI machine target; Firedancer runtime remains x86-64 Linux only.
 build-fd-arm:
-  make -j"$(nproc)" BUILDDIR=fd-arm CC=gcc-14 MACHINE=linux_gcc_neoverse_n1 tickoni
+  make -j"$(nproc)" BUILDDIR=fd-arm CC=gcc-14 MACHINE=linux_gcc_neoverse_n1 firedancer
 
 build-fd-dev:
   make -j"$(nproc)" firedancer-dev
 
 build-all:
-  python3 contrib/readme/run-badged-command.py build bash -c "just build-tk && just build-fd"
+  python3 contrib/readme/run-badged-command.py build bash -c "just build-fd && just build-tk"
 
 # ── Test ───────────────────────────────────────────────────────────────────
 
