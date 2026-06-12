@@ -157,10 +157,22 @@ quality-lint-check-all:
   @just quality-lint-check-fd
   @just quality-lint-check-tk
 
+# ── Quality: Proto ─────────────────────────────────────────────────────────
+
+quality-proto-check-fd:
+  bash -c "command -v buf >/dev/null || exit 0; buf lint src/disco/events/schema"
+
+quality-proto-check-tk:
+  bash -c "command -v buf >/dev/null || exit 0; buf lint src/tickoni/codec && buf lint src/tickoni/schema"
+
+quality-proto-check-all:
+  @just quality-proto-check-fd
+  @just quality-proto-check-tk
+
 # ── Quality: All ───────────────────────────────────────────────────────────
 
 quality-check-all:
-  python3 contrib/readme/run-badged-command.py quality bash -c "just quality-format-check-all && just quality-lint-check-all"
+  python3 contrib/readme/run-badged-command.py quality bash -c "just quality-format-check-all && just quality-lint-check-all && just quality-proto-check-all"
 
 # ── Security: CodeQL ───────────────────────────────────────────────────────
 

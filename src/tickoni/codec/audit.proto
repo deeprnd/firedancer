@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package tickoni.audit.v1;
+
+// AuditEvent is the top-level audit record written by tkaudt.
+// The oneof payload field encodes both the variant and its fields; no
+// separate record_type discriminant is needed on the wire.
+// The C struct (tk_audit_event_t) retains record_type internally; it is
+// derived from the oneof field number on decode (field - 12).
+message AuditEvent {
+  uint32 schema_version            = 1;
+  uint64 seq                       = 3;
+  uint64 source_offset             = 4;
+  bytes  tile_id                   = 5;
+  uint64 logical_actor_id          = 6;
+  bytes  policy_version            = 7;
+  bytes  capability_envelope_id_le = 8;
+  uint64 timestamp_ns              = 9;
+  uint64 prev_hash                 = 10;
+  uint64 record_hash               = 11;
+  oneof payload {
+    SourceEventPayload          source_event          = 12;
+    NormalizationPayload        normalization         = 13;
+    PolicyDecisionPayload       policy_decision       = 14;
+    ModelCallPayload            model_call            = 15;
+    FinancialAdapterCallPayload financial_adapter_call = 16;
+    ProposalPayload             proposal              = 17;
+    DestinationCheckPayload     destination_check     = 18;
+    LimitCheckPayload           limit_check           = 19;
+    ApprovalRequiredPayload     approval_required     = 20;
+    DenialPayload               denial                = 21;
+    TelemetryCheckpointPayload  telemetry_checkpoint  = 22;
+    ReplayResultPayload         replay_result         = 23;
+  }
+}
+
+message SourceEventPayload {
+  bytes  source_system = 1;
+  bytes  event_type    = 2;
+  uint64 raw_hash      = 3;
+}
+
+message NormalizationPayload {
+  uint64 source_event_hash    = 1;
+  uint64 normalized_hash      = 2;
+  bytes  canonical_event_type = 3;
+}
+
+message PolicyDecisionPayload {
+  uint32 outcome           = 1;
+  uint32 rule_id           = 2;
+  bytes  failed_scope_dim  = 3;
+  uint64 source_event_hash = 4;
+}
+
+message ModelCallPayload {
+  bytes  model_id       = 1;
+  uint64 prompt_hash    = 2;
+  uint64 response_hash  = 3;
+  uint32 token_estimate = 4;
+  uint32 retry_count    = 5;
+}
+
+message FinancialAdapterCallPayload {
+  bytes  adapter_id    = 1;
+  uint64 request_hash  = 2;
+  uint64 response_hash = 3;
+  uint32 fixture_id    = 4;
+}
+
+message ProposalPayload {
+  bytes  proposal_type  = 1;
+  uint64 proposal_hash  = 2;
+  uint32 approval_state = 3;
+}
+
+message DestinationCheckPayload {
+  bytes  destination_type  = 1;
+  uint32 allowlist_version = 2;
+  uint32 outcome           = 3;
+}
+
+message LimitCheckPayload {
+  uint32 limit_type = 1;
+  int64  value      = 2;
+  int64  limit      = 3;
+  uint32 outcome    = 4;
+}
+
+message ApprovalRequiredPayload {
+  bytes  action_class  = 1;
+  bytes  approval_path = 2;
+  uint64 proposal_hash = 3;
+}
+
+message DenialPayload {
+  bytes  action_class     = 1;
+  uint32 reason_code      = 2;
+  bytes  failed_scope_dim = 3;
+}
+
+message TelemetryCheckpointPayload {
+  uint64 metric_set_hash         = 1;
+  uint64 source_offset_watermark = 2;
+}
+
+message ReplayResultPayload {
+  uint64 capsule_id          = 1;
+  uint64 divergences         = 2;
+  uint64 first_divergent_seq = 3;
+}
