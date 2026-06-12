@@ -33,17 +33,26 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const audit_tile_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/audit/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "audit_cabi", .module = audit_cabi_mod },
+            .{ .name = "audit_fixtures_gen", .module = audit_fixtures_gen_mod },
+        },
+    });
     const thesis_cabi_mod = b.addModule("thesis_cabi", .{
         .root_source_file = b.path("src/tickoni/c_abi/thesis_codec.zig"),
         .target = target,
         .optimize = optimize,
     });
     const tiles_mod = b.addModule("tiles", .{
-        .root_source_file = b.path("src/tickoni/tiles/payment_pipeline.zig"),
+        .root_source_file = b.path("src/tickoni/tiles/payment_pipeline/mod.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "audit_cabi", .module = audit_cabi_mod },
+            .{ .name = "audit_tile", .module = audit_tile_mod },
         },
     });
 
@@ -82,24 +91,36 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/c_abi/queue.zig",
         "src/tickoni/c_abi/sandbox.zig",
         "src/tickoni/tiles/audit/mod.zig",
-        "src/tickoni/tiles/payment_pipeline.zig",
+        "src/tickoni/tiles/payment_pipeline/mod.zig",
     }) |path| {
-        const t_mod = b.createModule(.{
-            .root_source_file = b.path(path),
-            .target = target,
-            .optimize = optimize,
-            .imports = if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig") or
-                std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline.zig"))
-                &.{
+        const t_mod = if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig"))
+            b.createModule(.{
+                .root_source_file = b.path(path),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
                     .{ .name = "audit_cabi", .module = audit_cabi_mod },
                     .{ .name = "audit_fixtures_gen", .module = audit_fixtures_gen_mod },
-                }
-            else
-                &.{},
-        });
+                },
+            })
+        else if (std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline/mod.zig"))
+            b.createModule(.{
+                .root_source_file = b.path(path),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "audit_tile", .module = audit_tile_mod },
+                },
+            })
+        else
+            b.createModule(.{
+                .root_source_file = b.path(path),
+                .target = target,
+                .optimize = optimize,
+            });
         const t = b.addTest(.{ .root_module = t_mod });
         if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig") or
-            std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline.zig"))
+            std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline/mod.zig"))
         {
             linkTickoniCodec(b, t, fd_lib_dir);
         }
@@ -169,26 +190,38 @@ pub fn build(b: *std.Build) void {
         .{ "test-queue", "src/tickoni/c_abi/queue.zig" },
         .{ "test-sandbox", "src/tickoni/c_abi/sandbox.zig" },
         .{ "test-audit", "src/tickoni/tiles/audit/mod.zig" },
-        .{ "test-payment-pipeline", "src/tickoni/tiles/payment_pipeline.zig" },
+        .{ "test-payment-pipeline", "src/tickoni/tiles/payment_pipeline/mod.zig" },
     }) |entry| {
         const t = b.addTest(.{
             .name = entry[0],
-            .root_module = b.createModule(.{
-                .root_source_file = b.path(entry[1]),
-                .target = target,
-                .optimize = optimize,
-                .imports = if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit/mod.zig") or
-                    std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline.zig"))
-                    &.{
+            .root_module = if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit/mod.zig"))
+                b.createModule(.{
+                    .root_source_file = b.path(entry[1]),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
                         .{ .name = "audit_cabi", .module = audit_cabi_mod },
                         .{ .name = "audit_fixtures_gen", .module = audit_fixtures_gen_mod },
-                    }
-                else
-                    &.{},
-            }),
+                    },
+                })
+            else if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline/mod.zig"))
+                b.createModule(.{
+                    .root_source_file = b.path(entry[1]),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "audit_tile", .module = audit_tile_mod },
+                    },
+                })
+            else
+                b.createModule(.{
+                    .root_source_file = b.path(entry[1]),
+                    .target = target,
+                    .optimize = optimize,
+                }),
         });
         if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit/mod.zig") or
-            std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline.zig"))
+            std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline/mod.zig"))
         {
             linkTickoniCodec(b, t, fd_lib_dir);
         }
