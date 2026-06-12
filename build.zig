@@ -28,6 +28,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const audit_fixtures_gen_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test/audit_fixtures_gen.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const thesis_cabi_mod = b.addModule("thesis_cabi", .{
         .root_source_file = b.path("src/tickoni/c_abi/thesis_codec.zig"),
         .target = target,
@@ -85,7 +90,10 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = if (std.mem.eql(u8, path, "src/tickoni/tiles/audit.zig") or
                 std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline.zig"))
-                &.{.{ .name = "audit_cabi", .module = audit_cabi_mod }}
+                &.{
+                    .{ .name = "audit_cabi", .module = audit_cabi_mod },
+                    .{ .name = "audit_fixtures_gen", .module = audit_fixtures_gen_mod },
+                }
             else
                 &.{},
         });
@@ -171,7 +179,10 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
                 .imports = if (std.mem.eql(u8, entry[1], "src/tickoni/tiles/audit.zig") or
                     std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline.zig"))
-                    &.{.{ .name = "audit_cabi", .module = audit_cabi_mod }}
+                    &.{
+                        .{ .name = "audit_cabi", .module = audit_cabi_mod },
+                        .{ .name = "audit_fixtures_gen", .module = audit_fixtures_gen_mod },
+                    }
                 else
                     &.{},
             }),

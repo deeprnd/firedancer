@@ -63,6 +63,11 @@ test-unit-fd:
 test-unit-tk:
   zig build test
 
+# Print computed hash and wire bytes for every audit fixture event.
+# Use the output to understand or snapshot the current encoding after intentional changes.
+gen-audit-fixtures:
+  TK_GEN_FIXTURES=1 zig build test 2>&1
+
 test-unit-all:
   python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
 
