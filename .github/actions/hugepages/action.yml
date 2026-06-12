@@ -15,15 +15,33 @@ runs:
   steps:
     - shell: bash
       run: |
-        set -x
+        set -euxo pipefail
         just mem-fini || true
         findmnt -t hugetlbfs -n -o TARGET | xargs -r sudo umount || true
         just mem-free gigantic 0 || true
         just mem-free huge 0 || true
         just mem-reset || true
         just mem-init 0775 "$USER" || true
-        [ $(cat /sys/devices/system/node/node0/hugepages/hugepages-1048576kB/nr_hugepages) -lt '${{ inputs.count_gigantic }}' ] && \
-          just mem-alloc '${{ inputs.count_gigantic }}' gigantic 0
-        [ $(cat /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages) -lt '${{ inputs.count_huge }}' ] && \
-          just mem-alloc '${{ inputs.count_huge }}' huge 0
+
+        gigantic_path=/sys/devices/system/node/node0/hugepages/hugepages-1048576kB
+        huge_path=/sys/devices/system/node/node0/hugepages/hugepages-2048kB
+        want_gigantic='${{ inputs.count_gigantic }}'
+        want_huge='${{ inputs.count_huge }}'
+
+        have_gigantic=$(cat "$gigantic_path/nr_hugepages")
+        if (( have_gigantic < want_gigantic )); then
+          if ! just mem-alloc "$want_gigantic" gigantic 0; then
+            have_gigantic=$(cat "$gigantic_path/nr_hugepages")
+            echo "requested $want_gigantic gigantic pages but only $have_gigantic are available; continuing with smaller pages if needed"
+          fi
+        fi
+
+        have_huge=$(cat "$huge_path/nr_hugepages")
+        if (( have_huge < want_huge )); then
+          if ! just mem-alloc "$want_huge" huge 0; then
+            have_huge=$(cat "$huge_path/nr_hugepages")
+            echo "requested $want_huge huge pages but only $have_huge are available; tests may fall back to normal pages"
+          fi
+        fi
+
         sudo chown -R $USER:$USER /mnt/.fd
