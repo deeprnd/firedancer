@@ -45,6 +45,9 @@ jobs:
           - name: Lint Check
             timeout_minutes: 30
             command: just quality-lint-check-all
+          - name: Proto Check
+            timeout_minutes: 10
+            command: just quality-proto-check-all
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,6 +65,14 @@ jobs:
           zig: 'true'
 
       - uses: ./.github/actions/build-fd-tk-libs
+
+      - name: Install buf
+        if: matrix.name == 'Proto Check'
+        run: |
+          curl -sSL \
+            "https://github.com/bufbuild/buf/releases/latest/download/buf-Linux-x86_64" \
+            -o /usr/local/bin/buf
+          chmod +x /usr/local/bin/buf
 
       - name: Run check
         run: ${{ matrix.command }}

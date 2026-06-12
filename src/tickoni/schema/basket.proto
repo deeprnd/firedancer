@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package tickoni.schema.v1;
+
+import "thesis.proto";
+
+enum RejectionReason {
+  REJECTION_REASON_UNSPECIFIED         = 0;
+  REJECTION_REASON_RESTRICTED_INSTRUMENT = 1;
+  REJECTION_REASON_WRONG_ASSET_CLASS   = 2;
+  REJECTION_REASON_WRONG_MARKET        = 3;
+  REJECTION_REASON_WRONG_VENUE         = 4;
+}
+
+enum BasketErrorCode {
+  BASKET_ERROR_CODE_UNSPECIFIED           = 0;
+  BASKET_ERROR_CODE_NO_ELIGIBLE_INSTRUMENTS = 1;
+}
+
+// One instrument included in a basket with its allocation and rationale.
+// weight_bp is the allocation weight in basis points (10000 = 100.0%).
+message BasketInstrument {
+  bytes      ticker           = 1;
+  AssetClass asset_class      = 2;
+  uint32     weight_bp        = 3;
+  int64      allocation_cents = 4;
+  bytes      rationale        = 5;
+}
+
+// One theme-matching instrument rejected from the basket.
+message RejectedCandidate {
+  bytes           ticker      = 1;
+  RejectionReason reason_code = 2;
+  bytes           reason      = 3;
+}
+
+// Deterministic basket produced from InvestorIntent and the instrument catalog.
+// basket_id is a content hash of the basket composition (distinct from
+// thesis_id) so replay can detect basket-construction drift independently.
+message Basket {
+  uint64                   basket_id              = 1;
+  uint64                   thesis_id              = 2;
+  uint32                   account_id             = 3;
+  int64                    target_notional_cents  = 4;
+  uint32                   catalog_schema_version = 5;
+  repeated BasketInstrument instruments           = 6;
+  repeated RejectedCandidate rejected             = 7;
+  int64                    total_allocated_cents  = 8;
+}
+
+// Audit payload for a successful basket construction.
+message BasketConstructionPayload {
+  uint64 thesis_id              = 1;
+  uint64 basket_id              = 2;
+  uint32 account_id             = 3;
+  int64  target_notional_cents  = 4;
+  uint32 instrument_count       = 5;
+  uint32 rejected_count         = 6;
+  uint32 catalog_schema_version = 7;
+}
+
+// Audit payload for a basket construction denial.
+message BasketDenialPayload {
+  uint64          thesis_id             = 1;
+  uint32          account_id            = 2;
+  int64           target_notional_cents = 3;
+  BasketErrorCode error_code            = 4;
+}

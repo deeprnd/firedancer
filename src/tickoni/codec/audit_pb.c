@@ -102,7 +102,6 @@ tk_audit_record_hash( tk_audit_event_t const * event ) {
 #undef TK_HASH
 
 #define TK_AUDIT_FIELD_SCHEMA_VERSION           (1U)
-#define TK_AUDIT_FIELD_RECORD_TYPE              (2U)
 #define TK_AUDIT_FIELD_SEQ                      (3U)
 #define TK_AUDIT_FIELD_SOURCE_OFFSET            (4U)
 #define TK_AUDIT_FIELD_TILE_ID                  (5U)
@@ -112,7 +111,8 @@ tk_audit_record_hash( tk_audit_event_t const * event ) {
 #define TK_AUDIT_FIELD_TIMESTAMP_NS             (9U)
 #define TK_AUDIT_FIELD_PREV_HASH                (10U)
 #define TK_AUDIT_FIELD_RECORD_HASH              (11U)
-#define TK_AUDIT_FIELD_PAYLOAD                  (12U)
+/* oneof payload: field = 12 + record_type (0..11) */
+#define TK_AUDIT_FIELD_PAYLOAD_BASE             (12U)
 
 static size_t
 tk_trimmed_len( unsigned char const * buf,
@@ -476,7 +476,6 @@ tk_audit_format_protobuf( void *                   out,
   size_t policy_len = tk_trimmed_len( event->header.policy_version, 32UL );
 
   if( !fd_pb_push_uint32( enc, TK_AUDIT_FIELD_SCHEMA_VERSION, (uint)event->header.schema_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_uint32( enc, TK_AUDIT_FIELD_RECORD_TYPE,    (uint)event->record_type ) ) return TK_AUDIT_CODEC_NO_SPACE;
   if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_SEQ,            (ulong)event->header.seq ) ) return TK_AUDIT_CODEC_NO_SPACE;
   if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_SOURCE_OFFSET,  (ulong)event->header.source_offset ) ) return TK_AUDIT_CODEC_NO_SPACE;
   if( !fd_pb_push_bytes(  enc, TK_AUDIT_FIELD_TILE_ID,        event->header.tile_id, tile_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
@@ -487,7 +486,7 @@ tk_audit_format_protobuf( void *                   out,
   if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_PREV_HASH,      (ulong)event->header.prev_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
   if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_RECORD_HASH,    (ulong)event->header.record_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
 
-  if( !fd_pb_submsg_open( enc, TK_AUDIT_FIELD_PAYLOAD ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !fd_pb_submsg_open( enc, TK_AUDIT_FIELD_PAYLOAD_BASE + (uint)event->record_type ) ) return TK_AUDIT_CODEC_NO_SPACE;
   switch( event->record_type ) {
     case 0U: {
       size_t source_len = tk_trimmed_len( event->payload.source_event.source_system, 16UL );
@@ -612,10 +611,6 @@ tk_audit_parse_protobuf( void const *       in,
         if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.schema_version = (uint16_t)tlv->varint;
         break;
-      case TK_AUDIT_FIELD_RECORD_TYPE:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
-        event->record_type = (uint8_t)tlv->varint;
-        break;
       case TK_AUDIT_FIELD_SEQ:
         if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.seq = (uint64_t)tlv->varint;
@@ -661,15 +656,16 @@ tk_audit_parse_protobuf( void const *       in,
         if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.record_hash = (uint64_t)tlv->varint;
         break;
-      case TK_AUDIT_FIELD_PAYLOAD:
+      case 12U: case 13U: case 14U: case 15U: case 16U: case 17U:
+      case 18U: case 19U: case 20U: case 21U: case 22U: case 23U:
         if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         if( fd_pb_inbuf_sz( inbuf )<tlv->len ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
-        if( event->record_type>11U ) {
-          inbuf->cur += tlv->len;
-        } else {
+        {
+          uint rt = tlv->field_id - TK_AUDIT_FIELD_PAYLOAD_BASE;
+          event->record_type = (uint8_t)rt;
           fd_pb_inbuf_t payload_buf_[1];
           fd_pb_inbuf_t * payload_buf = fd_pb_inbuf_init( payload_buf_, inbuf->cur, tlv->len );
-          int err = tk_parse_payload( event->record_type, payload_buf, &event->payload );
+          int err = tk_parse_payload( rt, payload_buf, &event->payload );
           if( err ) return err;
           inbuf->cur += tlv->len;
         }
