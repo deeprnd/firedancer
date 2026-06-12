@@ -7,6 +7,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   firedancer-testnet:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     runs-on:
       labels: [self-hosted, 512G]
       group: fd-public-repo

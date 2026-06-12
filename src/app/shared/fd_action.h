@@ -54,7 +54,6 @@ union fdctl_args {
     int  no_watch;
     int  no_configure;
     int  no_init_workspaces;
-    int  no_agave;
   } dev;
 
   struct {

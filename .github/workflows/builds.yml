@@ -126,14 +126,14 @@ jobs:
     runs-on:
       labels: ${{ fromJSON(inputs.gcc_runner_labels) }}
       group: fd-public-repo
-    if: ${{ inputs.gcc != 'none' }}
+    if: ${{ inputs.gcc != 'none' && vars.SKIP_FIREDANCER_CI != 'true' }}
     steps:
       - uses: actions/checkout@v6
 
       - uses: ./.github/actions/submodule-init
 
       - uses: dtolnay/rust-toolchain@1.95.0
-
+SKIP_FIREDANCER_CI
       - uses: ./.github/actions/deps
         with:
           compiler: gcc
@@ -189,7 +189,7 @@ jobs:
     runs-on:
       labels: ${{ fromJSON(inputs.clang_runner_labels) }}
       group: fd-public-repo
-    if: ${{ inputs.clang != 'none' }}
+    if: ${{ inputs.clang != 'none' && vars.SKIP_FIREDANCER_CI != 'true' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -200,7 +200,7 @@ jobs:
       - uses: ./.github/actions/deps
         with:
           compiler: clang
-          compiler-version: 18.1.6
+          compiler-version: 18.1.6SKIP_FIREDANCER_CI
           extras: +dev
 
       - name: Build command line args
@@ -252,7 +252,7 @@ jobs:
     runs-on:
       labels: ARM64
       group: fd-public-repo
-    if: ${{ inputs.build_arm }}
+    if: ${{ inputs.build_arm && vars.SKIP_FIREDANCER_CI != 'true' }}
     strategy:
       matrix:
         gcc_version: [12]
@@ -270,4 +270,4 @@ jobs:
           fi
           ./deps.sh fetch install
           make -j clean
-          make -j all
+          make -j allSKIP_FIREDANCER_CI

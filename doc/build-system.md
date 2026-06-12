@@ -4,6 +4,9 @@ Build System
 This page explains the philosophy and technical details of the
 build system and source code management in Firedancer.
 
+For the Tickoni Zig supervisor build, see
+[Build](./build.md).
+
 Users are strongly encouraged to build Firedancer from source instead
 of downloading compiled binaries.  The build system therefore has a
 particular focus on simplicity and robustness.  In summary, it should
@@ -63,7 +66,7 @@ Firedancer depends on the GNU C Library (glibc) and the C++ standard library.
 Both are linked dynamically.
 
 ```
-$ ldd build/native/gcc/bin/fdctl
+$ ldd build/native/gcc/bin/tickoni
         linux-vdso.so.1 (0x00007ffce652e000)
         librt.so.1 => /lib64/librt.so.1 (0x00007f0d0398c000)
         libdl.so.2 => /lib64/libdl.so.2 (0x00007f0d03788000)

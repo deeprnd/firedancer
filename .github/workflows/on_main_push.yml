@@ -4,6 +4,7 @@ on:
     branches: [main]
 jobs:
   book:
+    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     uses: ./.github/workflows/book.yml
     secrets: inherit
     permissions:
