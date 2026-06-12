@@ -11,10 +11,9 @@
 /// distinct from thesis_id so replay can detect basket-construction drift
 /// independent of the source thesis.
 ///
-/// Canonical encoding: binary protobuf via fd_pb_encoder, following the
-/// audit codec pattern in src/tickoni/codec/audit_pb.c.  Encoding is not yet
-/// implemented; this comment marks the planned format so the schema is not
-/// extended incompatibly before it is defined.
+/// Canonical encoding: binary protobuf.  Wire format is defined in
+/// src/tickoni/schema/basket.proto; breaking changes are enforced by buf
+/// in CI (quality-check-proto / proto_check.yml).
 const std = @import("std");
 const thesis = @import("thesis.zig");
 const cat = @import("catalog.zig");
