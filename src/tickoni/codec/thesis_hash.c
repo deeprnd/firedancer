@@ -75,3 +75,103 @@ tk_basket_hash( uint64_t         thesis_id,
 
   return fd_siphash13_fini( sip );
 }
+
+/* Hash keys for the trade ticket schema.
+   TK_TICKET_HASH_K0 encodes "TKTCKT\0\0" approximately in little-endian.
+   Changing either constant invalidates all existing ticket content hashes. */
+#define TK_TICKET_HASH_K0 (0x000054434B544B54UL)
+#define TK_TICKET_HASH_K1 ((ulong)TK_TRADE_TICKET_SCHEMA_VERSION)
+
+uint64_t
+tk_trade_ticket_hash( uint64_t         basket_id,
+                      uint32_t         account_id,
+                      uint8_t          side,
+                      uint8_t          order_type,
+                      uint8_t          time_in_force,
+                      int64_t          target_notional_cents,
+                      uint8_t          line_item_count,
+                      uint8_t  const * tickers,
+                      int64_t  const * notional_cents,
+                      int64_t  const * limit_price_cents,
+                      uint8_t  const * markets,
+                      uint8_t  const * venues,
+                      uint8_t  const * sectors ) {
+  fd_siphash13_t _sip[1];
+  fd_siphash13_t * sip = fd_siphash13_init( _sip, TK_TICKET_HASH_K0, TK_TICKET_HASH_K1 );
+
+  uint16_t ver = TK_TRADE_TICKET_SCHEMA_VERSION;
+  TK_HASH( &ver,                   sizeof(uint16_t) );
+  TK_HASH( &basket_id,             sizeof(uint64_t) );
+  TK_HASH( &account_id,            sizeof(uint32_t) );
+  TK_HASH( &side,                  sizeof(uint8_t)  );
+  TK_HASH( &order_type,            sizeof(uint8_t)  );
+  TK_HASH( &time_in_force,         sizeof(uint8_t)  );
+  TK_HASH( &target_notional_cents, sizeof(int64_t)  );
+  TK_HASH( &line_item_count,       sizeof(uint8_t)  );
+  ulong stride = TK_TICKET_MAX_TICKER_LEN;
+  for( uint8_t i = 0; i < line_item_count; i++ ) {
+    TK_HASH( tickers + (ulong)i * stride, stride            );
+    TK_HASH( notional_cents + i,          sizeof(int64_t)   );
+    TK_HASH( limit_price_cents + i,       sizeof(int64_t)   );
+    TK_HASH( markets + i,                 sizeof(uint8_t)   );
+    TK_HASH( venues + i,                  sizeof(uint8_t)   );
+    TK_HASH( sectors + i,                 sizeof(uint8_t)   );
+  }
+
+  return fd_siphash13_fini( sip );
+}
+
+/* Hash keys for the paper execution result.
+   TK_PAPER_ORDER_HASH_K0 encodes "TKPODR\0\0" approximately in little-endian.
+   Changing either constant invalidates all existing paper-order content hashes. */
+#define TK_PAPER_ORDER_HASH_K0 (0x000052444F504B54UL)
+#define TK_PAPER_ORDER_HASH_K1 ((ulong)TK_TRADE_TICKET_SCHEMA_VERSION)
+
+uint64_t
+tk_paper_order_hash( uint64_t ticket_id,
+                     uint32_t account_id,
+                     uint64_t executed_at_ns,
+                     uint8_t  filled_line_item_count,
+                     uint64_t paper_seq,
+                     int64_t  total_fill_notional_cents,
+                     int64_t  resulting_cash_cents,
+                     int64_t  resulting_buying_power_cents,
+                     uint8_t  const * filled_tickers,
+                     uint32_t const * filled_shares,
+                     int64_t  const * fill_price_cents,
+                     int64_t  const * fill_notional_cents,
+                     uint8_t  holding_count,
+                     uint8_t  const * holding_tickers,
+                     uint32_t const * holding_share_counts,
+                     int64_t  const * holding_market_values ) {
+  fd_siphash13_t _sip[1];
+  fd_siphash13_t * sip = fd_siphash13_init( _sip, TK_PAPER_ORDER_HASH_K0, TK_PAPER_ORDER_HASH_K1 );
+
+  uint16_t ver = TK_TRADE_TICKET_SCHEMA_VERSION;
+  TK_HASH( &ver,                         sizeof(uint16_t) );
+  TK_HASH( &ticket_id,                   sizeof(uint64_t) );
+  TK_HASH( &account_id,                  sizeof(uint32_t) );
+  TK_HASH( &executed_at_ns,              sizeof(uint64_t) );
+  TK_HASH( &filled_line_item_count,      sizeof(uint8_t)  );
+  TK_HASH( &paper_seq,                   sizeof(uint64_t) );
+  TK_HASH( &total_fill_notional_cents,   sizeof(int64_t)  );
+  TK_HASH( &resulting_cash_cents,        sizeof(int64_t)  );
+  TK_HASH( &resulting_buying_power_cents,sizeof(int64_t)  );
+
+  ulong filled_stride = TK_TICKET_MAX_TICKER_LEN;
+  for( uint8_t i = 0; i < filled_line_item_count; i++ ) {
+    TK_HASH( filled_tickers + (ulong)i * filled_stride, filled_stride     );
+    TK_HASH( filled_shares + i,                         sizeof(uint32_t)  );
+    TK_HASH( fill_price_cents + i,                      sizeof(int64_t)   );
+    TK_HASH( fill_notional_cents + i,                   sizeof(int64_t)   );
+  }
+
+  TK_HASH( &holding_count, sizeof(uint8_t) );
+  for( uint8_t i = 0; i < holding_count; i++ ) {
+    TK_HASH( holding_tickers + (ulong)i * filled_stride, filled_stride     );
+    TK_HASH( holding_share_counts + i,                   sizeof(uint32_t)  );
+    TK_HASH( holding_market_values + i,                  sizeof(int64_t)   );
+  }
+
+  return fd_siphash13_fini( sip );
+}
