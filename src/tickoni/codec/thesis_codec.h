@@ -50,4 +50,41 @@ tk_basket_hash( uint64_t         thesis_id,
                 uint32_t const * weight_bps,
                 int64_t  const * alloc_cents );
 
+/* Schema version for the trade ticket schema.
+   Must match trade_ticket_schema_version in src/tickoni/schema/trade_ticket.zig.
+   Incrementing this value changes the hash key and invalidates existing hashes. */
+#define TK_TRADE_TICKET_SCHEMA_VERSION ((uint16_t)1)
+
+/* Ticker stride for trade tickets: same as the basket and catalog stride. */
+#define TK_TICKET_MAX_TICKER_LEN ((ulong)8)
+
+/* Compute a stable content hash for a trade ticket.
+   Covers schema_version, basket_id, account_id, side, order_type,
+   time_in_force, target_notional_cents, line_item_count, and for each
+   line item: ticker (zero-padded to TK_TICKET_MAX_TICKER_LEN bytes) and
+   target_notional_cents.
+   Hash key: "TKTCKT\0\0" LE (k0=0x000054434B544B54, k1=TK_TRADE_TICKET_SCHEMA_VERSION).
+   tickers must point to line_item_count * TK_TICKET_MAX_TICKER_LEN bytes.
+   notional_cents must point to line_item_count elements. */
+uint64_t
+tk_trade_ticket_hash( uint64_t         basket_id,
+                      uint32_t         account_id,
+                      uint8_t          side,
+                      uint8_t          order_type,
+                      uint8_t          time_in_force,
+                      int64_t          target_notional_cents,
+                      uint8_t          line_item_count,
+                      uint8_t  const * tickers,
+                      int64_t  const * notional_cents );
+
+/* Compute a stable content hash for a paper execution result.
+   Covers schema_version, ticket_id, account_id, filled_line_item_count,
+   and paper_seq.
+   Hash key: "TKPODR\0\0" LE (k0=0x000052444F504B54, k1=TK_TRADE_TICKET_SCHEMA_VERSION). */
+uint64_t
+tk_paper_order_hash( uint64_t ticket_id,
+                     uint32_t account_id,
+                     uint8_t  filled_line_item_count,
+                     uint64_t paper_seq );
+
 #endif /* HEADER_fd_src_tickoni_codec_thesis_codec_h */
