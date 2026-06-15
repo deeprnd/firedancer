@@ -1,0 +1,57 @@
+{
+  "fixture_id": "quotes_ai_infra",
+  "schema": "tickoni.v1_1.quote_snapshot",
+  "currency": "USD",
+  "as_of_ns": 1765792800000000000,
+  "quotes": [
+    {
+      "ticker": "NVDA",
+      "venue": "NASDAQ",
+      "bid_cents": 12495,
+      "ask_cents": 12500,
+      "last_cents": 12498
+    },
+    {
+      "ticker": "AMD",
+      "venue": "NASDAQ",
+      "bid_cents": 15990,
+      "ask_cents": 16000,
+      "last_cents": 15995
+    },
+    {
+      "ticker": "AVGO",
+      "venue": "NASDAQ",
+      "bid_cents": 24990,
+      "ask_cents": 25000,
+      "last_cents": 24995
+    },
+    {
+      "ticker": "MSFT",
+      "venue": "NASDAQ",
+      "bid_cents": 49990,
+      "ask_cents": 50000,
+      "last_cents": 49995
+    },
+    {
+      "ticker": "AMZN",
+      "venue": "NASDAQ",
+      "bid_cents": 19990,
+      "ask_cents": 20000,
+      "last_cents": 19995
+    },
+    {
+      "ticker": "BOTZ",
+      "venue": "NASDAQ",
+      "bid_cents": 2995,
+      "ask_cents": 3000,
+      "last_cents": 2998
+    },
+    {
+      "ticker": "SOXX",
+      "venue": "NASDAQ",
+      "bid_cents": 24990,
+      "ask_cents": 25000,
+      "last_cents": 24995
+    }
+  ]
+}

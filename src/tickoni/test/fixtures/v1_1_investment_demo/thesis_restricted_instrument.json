@@ -1,0 +1,24 @@
+{
+  "fixture_id": "thesis_restricted_instrument",
+  "schema": "tickoni.v1_1.thesis_input",
+  "account_id": "brokerage.demo_ops",
+  "target_notional_cents": 200000,
+  "currency": "USD",
+  "market_scope": "US",
+  "asset_class_preferences": [
+    "equity",
+    "etf"
+  ],
+  "sector_theme": "ai_infrastructure",
+  "risk_preference": "high",
+  "max_single_name_weight_bp": 2500,
+  "requested_symbols": [
+    "META",
+    "AAPL",
+    "AMZN",
+    "NFLX",
+    "GOOGL",
+    "SPACEX"
+  ],
+  "user_text": "I want a USD 2,000 AI and FAANG-style basket, and include SpaceX if possible."
+}

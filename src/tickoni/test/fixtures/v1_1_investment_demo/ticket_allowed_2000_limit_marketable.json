@@ -1,0 +1,72 @@
+{
+  "fixture_id": "ticket_allowed_2000_limit_marketable",
+  "schema": "tickoni.v1_1.trade_ticket",
+  "ticket_id": "ticket_v1_1_ai_infra_2000_limit_marketable",
+  "basket_id": "basket_v1_1_ai_infra_2000",
+  "thesis_id": "thesis_allowed_2000",
+  "account_id": "brokerage.demo_ops",
+  "policy_version": "v1.1.demo.investment",
+  "capability": "trading_order.place",
+  "environment": "demo",
+  "execution_mode": "paper",
+  "side": "buy",
+  "order_type": "limit",
+  "time_in_force": "day",
+  "currency": "USD",
+  "target_notional_cents": 200000,
+  "estimated_cost_cents": 200000,
+  "limit_policy": "buy_limits_at_or_above_fixture_ask_are_marketable_in_paper",
+  "line_items": [
+    {
+      "ticker": "NVDA",
+      "limit_price_cents": 12600,
+      "fixture_ask_cents": 12500,
+      "line_notional_cents": 25000
+    },
+    {
+      "ticker": "AMD",
+      "limit_price_cents": 16100,
+      "fixture_ask_cents": 16000,
+      "line_notional_cents": 25000
+    },
+    {
+      "ticker": "AVGO",
+      "limit_price_cents": 25100,
+      "fixture_ask_cents": 25000,
+      "line_notional_cents": 25000
+    },
+    {
+      "ticker": "MSFT",
+      "limit_price_cents": 50100,
+      "fixture_ask_cents": 50000,
+      "line_notional_cents": 25000
+    },
+    {
+      "ticker": "AMZN",
+      "limit_price_cents": 20100,
+      "fixture_ask_cents": 20000,
+      "line_notional_cents": 25000
+    },
+    {
+      "ticker": "BOTZ",
+      "limit_price_cents": 3050,
+      "fixture_ask_cents": 3000,
+      "line_notional_cents": 37500
+    },
+    {
+      "ticker": "SOXX",
+      "limit_price_cents": 25100,
+      "fixture_ask_cents": 25000,
+      "line_notional_cents": 37500
+    }
+  ],
+  "affordability_result": {
+    "outcome": "allow",
+    "max_affordable_cents": 2500000,
+    "effective_max_paper_trade_cents": 250000
+  },
+  "policy_outcome": "allow",
+  "blocked_reasons": [],
+  "proposal_hash": "proposal_hash_ticket_v1_1_ai_infra_2000_limit",
+  "approval_state": "not_required_for_paper_demo"
+}

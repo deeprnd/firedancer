@@ -1,0 +1,60 @@
+{
+  "fixture_id": "policy_demo_investment",
+  "schema": "tickoni.v1_1.demo_policy",
+  "policy_version": "v1.1.demo.investment",
+  "actor_role": "trading_ops_reviewer",
+  "workflow": "investment_intent_to_paper_trade",
+  "environment": "demo",
+  "account": "brokerage.demo_ops",
+  "budget_id": "v1.1.s6.demo",
+  "capabilities": [
+    "trading_portfolio.read",
+    "market_event.read",
+    "trading_order.recommend",
+    "trading_order.propose",
+    "trading_order.place"
+  ],
+  "scope": {
+    "asset_classes": [
+      "equity",
+      "etf"
+    ],
+    "market": "US",
+    "venues": [
+      "NASDAQ",
+      "NYSE"
+    ],
+    "sectors": [
+      "Information Technology"
+    ],
+    "sides": [
+      "buy"
+    ],
+    "order_types": [
+      "market",
+      "limit"
+    ],
+    "time_in_force": [
+      "day"
+    ],
+    "restricted_instruments": [
+      "option",
+      "future",
+      "leveraged_etf",
+      "inverse_etf",
+      "manual_denylist",
+      "non_public_private_company"
+    ]
+  },
+  "limits": {
+    "max_notional_per_order_cents": 250000,
+    "max_notional_per_day_cents": 2500000,
+    "max_notional_per_month_cents": 10000000,
+    "max_single_name_weight_bp": 2500
+  },
+  "execution": {
+    "paper_place_only": true,
+    "live_place": "deny",
+    "requires_validated_ticket": true
+  }
+}
