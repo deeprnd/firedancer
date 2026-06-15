@@ -61,11 +61,11 @@ tk_basket_hash( uint64_t         thesis_id,
 /* Compute a stable content hash for a trade ticket.
    Covers schema_version, basket_id, account_id, side, order_type,
    time_in_force, target_notional_cents, line_item_count, and for each
-   line item: ticker (zero-padded to TK_TICKET_MAX_TICKER_LEN bytes) and
-   target_notional_cents.
+   line item: ticker (zero-padded to TK_TICKET_MAX_TICKER_LEN bytes),
+   target_notional_cents, limit_price_cents, market, venue, and sector.
    Hash key: "TKTCKT\0\0" LE (k0=0x000054434B544B54, k1=TK_TRADE_TICKET_SCHEMA_VERSION).
    tickers must point to line_item_count * TK_TICKET_MAX_TICKER_LEN bytes.
-   notional_cents must point to line_item_count elements. */
+   line-item arrays must each point to line_item_count elements. */
 uint64_t
 tk_trade_ticket_hash( uint64_t         basket_id,
                       uint32_t         account_id,
@@ -75,16 +75,34 @@ tk_trade_ticket_hash( uint64_t         basket_id,
                       int64_t          target_notional_cents,
                       uint8_t          line_item_count,
                       uint8_t  const * tickers,
-                      int64_t  const * notional_cents );
+                      int64_t  const * notional_cents,
+                      int64_t  const * limit_price_cents,
+                      uint8_t  const * markets,
+                      uint8_t  const * venues,
+                      uint8_t  const * sectors );
 
 /* Compute a stable content hash for a paper execution result.
-   Covers schema_version, ticket_id, account_id, filled_line_item_count,
-   and paper_seq.
+   Covers schema_version, ticket_id, account_id, executed_at_ns,
+   filled_line_item_count, paper_seq, total_fill_notional_cents,
+   resulting_cash_cents, resulting_buying_power_cents, each filled line item,
+   and the resulting holdings snapshot.
    Hash key: "TKPODR\0\0" LE (k0=0x000052444F504B54, k1=TK_TRADE_TICKET_SCHEMA_VERSION). */
 uint64_t
 tk_paper_order_hash( uint64_t ticket_id,
                      uint32_t account_id,
+                     uint64_t executed_at_ns,
                      uint8_t  filled_line_item_count,
-                     uint64_t paper_seq );
+                     uint64_t paper_seq,
+                     int64_t  total_fill_notional_cents,
+                     int64_t  resulting_cash_cents,
+                     int64_t  resulting_buying_power_cents,
+                     uint8_t  const * filled_tickers,
+                     uint32_t const * filled_shares,
+                     int64_t  const * fill_price_cents,
+                     int64_t  const * fill_notional_cents,
+                     uint8_t  holding_count,
+                     uint8_t  const * holding_tickers,
+                     uint32_t const * holding_share_counts,
+                     int64_t  const * holding_market_values );
 
 #endif /* HEADER_fd_src_tickoni_codec_thesis_codec_h */

@@ -4,7 +4,7 @@
   <tr>
     <td>
       <!-- badge:build:start -->
-<img alt="Build" src="https://img.shields.io/badge/build-unknown-lightgrey?style=flat-square" />
+<img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
 <!-- badge:build:end -->
     </td>
     <td>

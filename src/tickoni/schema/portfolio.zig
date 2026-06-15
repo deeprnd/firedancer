@@ -43,6 +43,8 @@ pub const Side = enum(u8) { buy, sell };
 pub const Holding = struct {
     ticker: [max_ticker_len]u8,
     ticker_len: u8,
+    /// Whole shares currently held.
+    share_count: u32,
     /// Latest mark-to-market value in cents.
     market_value_cents: i64,
 
@@ -218,6 +220,17 @@ pub fn checkBasketAffordability(
     return checkAffordability(account, basket_notional);
 }
 
+/// Return the held position for ticker, or null when the account does not own it.
+pub fn findHolding(
+    account: *const BrokerageAccount,
+    ticker: []const u8,
+) ?*const Holding {
+    for (account.holdings[0..account.holding_count]) |*holding| {
+        if (std.mem.eql(u8, holding.tickerSlice(), ticker)) return holding;
+    }
+    return null;
+}
+
 // ---------------------------------------------------------------------------
 // Comptime helpers
 // ---------------------------------------------------------------------------
@@ -229,10 +242,11 @@ fn tickerBuf(comptime s: []const u8) [max_ticker_len]u8 {
     return buf;
 }
 
-fn mkHolding(comptime ticker_s: []const u8, mv_cents: i64) Holding {
+fn mkHoldingWithShares(comptime ticker_s: []const u8, share_count: u32, mv_cents: i64) Holding {
     return .{
         .ticker = tickerBuf(ticker_s),
         .ticker_len = @intCast(ticker_s.len),
+        .share_count = share_count,
         .market_value_cents = mv_cents,
     };
 }
@@ -290,20 +304,23 @@ pub const fixtures = struct {
     };
 
     /// technology_heavy: USD 10,000 cash; USD 9,000 buying power (one open order
-    /// for USD 1,000 committed).  Five technology/AI positions totalling USD 50,000.
-    /// USD 20,000/day (USD 5,000 used) and USD 80,000/month (USD 15,000 used) limits.
+    /// for USD 1,000 committed). Seven technology/AI positions concentrated in
+    /// the AI infrastructure thesis universe. USD 20,000/day (USD 5,000 used)
+    /// and USD 80,000/month (USD 15,000 used) limits.
     pub const technology_heavy: BrokerageAccount = blk: {
         var a = std.mem.zeroes(BrokerageAccount);
         a.account_id = 2003;
         a.currency = .usd;
         a.cash_cents = 1_000_000;
         a.buying_power_cents = 900_000;
-        a.holdings[0] = mkHolding("NVDA", 1_500_000);
-        a.holdings[1] = mkHolding("AMD", 800_000);
-        a.holdings[2] = mkHolding("MSFT", 1_200_000);
-        a.holdings[3] = mkHolding("SOXX", 1_000_000);
-        a.holdings[4] = mkHolding("BOTZ", 500_000);
-        a.holding_count = 5;
+        a.holdings[0] = mkHoldingWithShares("NVDA", 115, 1_495_000);
+        a.holdings[1] = mkHoldingWithShares("AMD", 48, 792_000);
+        a.holdings[2] = mkHoldingWithShares("AVGO", 20, 360_000);
+        a.holdings[3] = mkHoldingWithShares("MSFT", 28, 1_176_000);
+        a.holdings[4] = mkHoldingWithShares("SOXX", 43, 989_000);
+        a.holdings[5] = mkHoldingWithShares("AMZN", 18, 351_000);
+        a.holdings[6] = mkHoldingWithShares("BOTZ", 156, 499_200);
+        a.holding_count = 7;
         a.open_orders[0] = mkOpenOrder("NVDA", .buy, 100_000);
         a.open_order_count = 1;
         a.max_open_order_count = 8;
@@ -323,11 +340,11 @@ pub const fixtures = struct {
         a.currency = .usd;
         a.cash_cents = 800_000;
         a.buying_power_cents = 800_000;
-        a.holdings[0] = mkHolding("SPY", 500_000);
-        a.holdings[1] = mkHolding("VYM", 300_000);
-        a.holdings[2] = mkHolding("PANW", 200_000);
-        a.holdings[3] = mkHolding("AVGO", 200_000);
-        a.holdings[4] = mkHolding("BIL", 400_000);
+        a.holdings[0] = mkHoldingWithShares("SPY", 8, 456_000);
+        a.holdings[1] = mkHoldingWithShares("VYM", 23, 299_000);
+        a.holdings[2] = mkHoldingWithShares("PANW", 11, 192_500);
+        a.holdings[3] = mkHoldingWithShares("AVGO", 11, 198_000);
+        a.holdings[4] = mkHoldingWithShares("BIL", 43, 393_450);
         a.holding_count = 5;
         a.max_open_order_count = 8;
         a.day_notional_limit_cents = 1_500_000;
@@ -616,16 +633,18 @@ test "fixtures: day_notional_used_cents <= day_notional_limit_cents" {
     }
 }
 
-test "fixtures: technology_heavy has 5 holdings" {
-    try std.testing.expectEqual(@as(u8, 5), fixtures.technology_heavy.holding_count);
+test "fixtures: technology_heavy has 7 holdings" {
+    try std.testing.expectEqual(@as(u8, 7), fixtures.technology_heavy.holding_count);
     try std.testing.expectEqualStrings("NVDA", fixtures.technology_heavy.holdings[0].tickerSlice());
-    try std.testing.expectEqualStrings("BOTZ", fixtures.technology_heavy.holdings[4].tickerSlice());
+    try std.testing.expectEqualStrings("BOTZ", fixtures.technology_heavy.holdings[6].tickerSlice());
+    try std.testing.expect(fixtures.technology_heavy.holdings[0].share_count > 0);
 }
 
 test "fixtures: diversified has 5 holdings across different sectors" {
     try std.testing.expectEqual(@as(u8, 5), fixtures.diversified.holding_count);
     try std.testing.expectEqualStrings("SPY", fixtures.diversified.holdings[0].tickerSlice());
     try std.testing.expectEqualStrings("BIL", fixtures.diversified.holdings[4].tickerSlice());
+    try std.testing.expect(fixtures.diversified.holdings[0].share_count > 0);
 }
 
 test "fixtures: restricted_account open_order_count equals max_open_order_count" {
@@ -648,6 +667,15 @@ test "fixtures: cash_rich buying_power covers the USD 2,000 AI thesis target" {
 
 test "fixtures: low_cash buying_power is below USD 200 threshold" {
     try std.testing.expect(fixtures.low_cash.buying_power_cents < 20_000);
+}
+
+test "findHolding: returns the owned position when present" {
+    const holding = findHolding(&fixtures.technology_heavy, "NVDA").?;
+    try std.testing.expectEqual(@as(u32, 115), holding.share_count);
+}
+
+test "findHolding: returns null when the account does not own the ticker" {
+    try std.testing.expect(findHolding(&fixtures.cash_rich, "NVDA") == null);
 }
 
 // --- AffordabilityCheckPayload audit record construction ---

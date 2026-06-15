@@ -5,7 +5,8 @@
 /// and status (.allowed or .blocked).
 ///
 /// PaperExecutionResult: produced by execute() when status is .allowed.
-/// Simulates fills at fixture prices and returns a cash/buying-power snapshot.
+/// Simulates fills at fixture prices and returns a timestamped cash/holdings
+/// snapshot.
 ///
 /// Invariant (T7, T8): execute() rejects any ticket whose status is not
 /// .allowed.  There is no path that bypasses ticket validation to reach
@@ -62,6 +63,14 @@ pub const GuardrailFailure = enum(u8) {
     minimum_holding_period = 6,
     /// Limit order type selected but limit_price_cents is zero or negative (T4).
     limit_price_required = 7,
+    /// One or more instruments fall outside the supported US market scope.
+    unsupported_market = 8,
+    /// One or more instruments fall outside the supported NYSE/NASDAQ venue scope.
+    unsupported_venue = 9,
+    /// One or more instruments fall outside the supported sector/theme scope.
+    unsupported_sector = 10,
+    /// SELL: the account does not hold enough shares for one or more line items.
+    insufficient_holdings = 11,
 };
 
 /// One line item in a trade ticket, corresponding to one basket instrument (T1, T2).
@@ -69,6 +78,9 @@ pub const TradeTicketLineItem = struct {
     ticker: [cat.max_ticker_len]u8,
     ticker_len: u8,
     asset_class: cat.AssetClass,
+    market: cat.Market,
+    venue: cat.Venue,
+    sector: cat.SectorTheme,
     side: portfolio.Side,
     order_type: OrderType,
     /// Dollar allocation from the basket for this instrument (in cents).
@@ -131,19 +143,21 @@ pub const PaperFilledLineItem = struct {
 
 /// Paper execution result produced by execute() for an allowed ticket (T6).
 ///
-/// resulting_cash_cents and resulting_buying_power_cents are post-fill snapshots:
-/// cash decreases on BUY (fills paid from account) and increases on SELL.
-/// paper_seq is a caller-supplied deterministic sequence number for audit and
-/// replay; it is hashed into paper_order_id.
+/// executed_at_ns is a caller-supplied deterministic execution timestamp for
+/// audit and replay. resulting_cash_cents, resulting_buying_power_cents, and
+/// resulting_holdings are post-fill snapshots.
 pub const PaperExecutionResult = struct {
     paper_order_id: u64,
     ticket_id: u64,
     account_id: u32,
+    executed_at_ns: u64,
     filled_line_items: [basket_mod.max_basket_instruments]PaperFilledLineItem,
     filled_line_item_count: u8,
     total_fill_notional_cents: i64,
     resulting_cash_cents: i64,
     resulting_buying_power_cents: i64,
+    resulting_holdings: [portfolio.max_holdings]portfolio.Holding,
+    resulting_holding_count: u8,
     paper_seq: u64,
 };
 
@@ -175,6 +189,8 @@ pub const HoldingRecord = struct {
 pub const TicketError = error{
     /// basket.account_id does not match account.account_id.
     AccountMismatch,
+    /// A basket instrument could not be resolved in the catalog.
+    InstrumentNotInCatalog,
 };
 
 pub const PaperExecutionError = error{
@@ -182,6 +198,10 @@ pub const PaperExecutionError = error{
     TicketBlocked,
     /// ticket.account_id does not match account.account_id.
     AccountMismatch,
+    /// The ticket requires more holdings than the account currently has.
+    InsufficientHoldings,
+    /// Applying the fills would exceed the bounded holdings snapshot capacity.
+    HoldingCapacityExceeded,
 };
 
 // ---------------------------------------------------------------------------
@@ -197,30 +217,30 @@ const FixturePrice = struct {
 /// Prices in cents.  All 24 catalog entries are covered; restricted instruments
 /// are included so the table is complete, though they will not appear in baskets.
 const fixture_price_table = [_]FixturePrice{
-    .{ .ticker = "NVDA", .price_cents = 13_000  }, // USD 130.00
-    .{ .ticker = "AMD",  .price_cents = 16_500  }, // USD 165.00
-    .{ .ticker = "AVGO", .price_cents = 18_000  }, // USD 180.00
-    .{ .ticker = "MSFT", .price_cents = 42_000  }, // USD 420.00
-    .{ .ticker = "BOTZ", .price_cents = 3_200   }, // USD  32.00
-    .{ .ticker = "SOXX", .price_cents = 23_000  }, // USD 230.00
-    .{ .ticker = "AMZN", .price_cents = 19_500  }, // USD 195.00
-    .{ .ticker = "WCLD", .price_cents = 3_000   }, // USD  30.00
-    .{ .ticker = "PANW", .price_cents = 17_500  }, // USD 175.00
-    .{ .ticker = "CRWD", .price_cents = 36_000  }, // USD 360.00
-    .{ .ticker = "HACK", .price_cents = 5_000   }, // USD  50.00
-    .{ .ticker = "CIBR", .price_cents = 6_200   }, // USD  62.00
-    .{ .ticker = "SPY",  .price_cents = 57_000  }, // USD 570.00
-    .{ .ticker = "IVV",  .price_cents = 57_000  }, // USD 570.00
-    .{ .ticker = "VOO",  .price_cents = 52_500  }, // USD 525.00
-    .{ .ticker = "VTI",  .price_cents = 26_000  }, // USD 260.00
-    .{ .ticker = "VYM",  .price_cents = 13_000  }, // USD 130.00
-    .{ .ticker = "DVY",  .price_cents = 12_500  }, // USD 125.00
-    .{ .ticker = "SHV",  .price_cents = 11_000  }, // USD 110.00
-    .{ .ticker = "SGOV", .price_cents = 10_050  }, // USD 100.50
-    .{ .ticker = "BIL",  .price_cents = 9_150   }, // USD  91.50
-    .{ .ticker = "SOXL", .price_cents = 3_700   }, // USD  37.00 (restricted)
-    .{ .ticker = "SOXS", .price_cents = 1_500   }, // USD  15.00 (restricted)
-    .{ .ticker = "BULZ", .price_cents = 800     }, // USD   8.00 (restricted)
+    .{ .ticker = "NVDA", .price_cents = 13_000 }, // USD 130.00
+    .{ .ticker = "AMD", .price_cents = 16_500 }, // USD 165.00
+    .{ .ticker = "AVGO", .price_cents = 18_000 }, // USD 180.00
+    .{ .ticker = "MSFT", .price_cents = 42_000 }, // USD 420.00
+    .{ .ticker = "BOTZ", .price_cents = 3_200 }, // USD  32.00
+    .{ .ticker = "SOXX", .price_cents = 23_000 }, // USD 230.00
+    .{ .ticker = "AMZN", .price_cents = 19_500 }, // USD 195.00
+    .{ .ticker = "WCLD", .price_cents = 3_000 }, // USD  30.00
+    .{ .ticker = "PANW", .price_cents = 17_500 }, // USD 175.00
+    .{ .ticker = "CRWD", .price_cents = 36_000 }, // USD 360.00
+    .{ .ticker = "HACK", .price_cents = 5_000 }, // USD  50.00
+    .{ .ticker = "CIBR", .price_cents = 6_200 }, // USD  62.00
+    .{ .ticker = "SPY", .price_cents = 57_000 }, // USD 570.00
+    .{ .ticker = "IVV", .price_cents = 57_000 }, // USD 570.00
+    .{ .ticker = "VOO", .price_cents = 52_500 }, // USD 525.00
+    .{ .ticker = "VTI", .price_cents = 26_000 }, // USD 260.00
+    .{ .ticker = "VYM", .price_cents = 13_000 }, // USD 130.00
+    .{ .ticker = "DVY", .price_cents = 12_500 }, // USD 125.00
+    .{ .ticker = "SHV", .price_cents = 11_000 }, // USD 110.00
+    .{ .ticker = "SGOV", .price_cents = 10_050 }, // USD 100.50
+    .{ .ticker = "BIL", .price_cents = 9_150 }, // USD  91.50
+    .{ .ticker = "SOXL", .price_cents = 3_700 }, // USD  37.00 (restricted)
+    .{ .ticker = "SOXS", .price_cents = 1_500 }, // USD  15.00 (restricted)
+    .{ .ticker = "BULZ", .price_cents = 800 }, // USD   8.00 (restricted)
 };
 
 // Guard: fixture table must cover the full catalog.
@@ -243,15 +263,24 @@ pub fn fixturePriceCents(ticker: []const u8) i64 {
 /// Compute a stable content hash for a TradeTicket via tk_trade_ticket_hash.
 /// Covers schema_version, basket_id, account_id, side, order_type,
 /// time_in_force, target_notional_cents, line_item_count, and per line item:
-/// ticker (zero-padded) and target_notional_cents.
+/// ticker (zero-padded), target_notional_cents, limit_price_cents, market,
+/// venue, and sector.
 pub fn computeTicketHash(ticket: *const TradeTicket) u64 {
     var ticker_data: [basket_mod.max_basket_instruments * cat.max_ticker_len]u8 =
         std.mem.zeroes([basket_mod.max_basket_instruments * cat.max_ticker_len]u8);
     var notional_arr: [basket_mod.max_basket_instruments]i64 = [_]i64{0} ** basket_mod.max_basket_instruments;
+    var limit_price_arr: [basket_mod.max_basket_instruments]i64 = [_]i64{0} ** basket_mod.max_basket_instruments;
+    var market_arr: [basket_mod.max_basket_instruments]u8 = [_]u8{0} ** basket_mod.max_basket_instruments;
+    var venue_arr: [basket_mod.max_basket_instruments]u8 = [_]u8{0} ** basket_mod.max_basket_instruments;
+    var sector_arr: [basket_mod.max_basket_instruments]u8 = [_]u8{0} ** basket_mod.max_basket_instruments;
     for (0..ticket.line_item_count) |i| {
         const off = i * cat.max_ticker_len;
         @memcpy(ticker_data[off..][0..cat.max_ticker_len], &ticket.line_items[i].ticker);
         notional_arr[i] = ticket.line_items[i].target_notional_cents;
+        limit_price_arr[i] = ticket.line_items[i].limit_price_cents;
+        market_arr[i] = @intFromEnum(ticket.line_items[i].market);
+        venue_arr[i] = @intFromEnum(ticket.line_items[i].venue);
+        sector_arr[i] = @intFromEnum(ticket.line_items[i].sector);
     }
     return thesis_cabi.tk_trade_ticket_hash(
         ticket.basket_id,
@@ -263,18 +292,83 @@ pub fn computeTicketHash(ticket: *const TradeTicket) u64 {
         ticket.line_item_count,
         &ticker_data,
         &notional_arr,
+        &limit_price_arr,
+        &market_arr,
+        &venue_arr,
+        &sector_arr,
     );
 }
 
 /// Compute a stable content hash for a PaperExecutionResult via tk_paper_order_hash.
-/// Covers schema_version, ticket_id, account_id, filled_line_item_count, paper_seq.
+/// Covers schema_version, ticket_id, account_id, executed_at_ns, filled line
+/// items, paper_seq, cash/buying-power snapshots, and the resulting holdings
+/// snapshot.
 pub fn computePaperOrderHash(result: *const PaperExecutionResult) u64 {
+    var filled_ticker_data: [basket_mod.max_basket_instruments * cat.max_ticker_len]u8 =
+        std.mem.zeroes([basket_mod.max_basket_instruments * cat.max_ticker_len]u8);
+    var filled_shares_arr: [basket_mod.max_basket_instruments]u32 = [_]u32{0} ** basket_mod.max_basket_instruments;
+    var fill_price_arr: [basket_mod.max_basket_instruments]i64 = [_]i64{0} ** basket_mod.max_basket_instruments;
+    var fill_notional_arr: [basket_mod.max_basket_instruments]i64 = [_]i64{0} ** basket_mod.max_basket_instruments;
+    var holding_ticker_data: [portfolio.max_holdings * cat.max_ticker_len]u8 =
+        std.mem.zeroes([portfolio.max_holdings * cat.max_ticker_len]u8);
+    var holding_share_arr: [portfolio.max_holdings]u32 = [_]u32{0} ** portfolio.max_holdings;
+    var holding_market_value_arr: [portfolio.max_holdings]i64 = [_]i64{0} ** portfolio.max_holdings;
+    for (0..result.filled_line_item_count) |i| {
+        const off = i * cat.max_ticker_len;
+        @memcpy(filled_ticker_data[off..][0..cat.max_ticker_len], &result.filled_line_items[i].ticker);
+        filled_shares_arr[i] = result.filled_line_items[i].filled_shares;
+        fill_price_arr[i] = result.filled_line_items[i].fill_price_cents;
+        fill_notional_arr[i] = result.filled_line_items[i].fill_notional_cents;
+    }
+    for (0..result.resulting_holding_count) |i| {
+        const off = i * cat.max_ticker_len;
+        @memcpy(holding_ticker_data[off..][0..cat.max_ticker_len], &result.resulting_holdings[i].ticker);
+        holding_share_arr[i] = result.resulting_holdings[i].share_count;
+        holding_market_value_arr[i] = result.resulting_holdings[i].market_value_cents;
+    }
     return thesis_cabi.tk_paper_order_hash(
         result.ticket_id,
         result.account_id,
+        result.executed_at_ns,
         result.filled_line_item_count,
         result.paper_seq,
+        result.total_fill_notional_cents,
+        result.resulting_cash_cents,
+        result.resulting_buying_power_cents,
+        &filled_ticker_data,
+        &filled_shares_arr,
+        &fill_price_arr,
+        &fill_notional_arr,
+        result.resulting_holding_count,
+        &holding_ticker_data,
+        &holding_share_arr,
+        &holding_market_value_arr,
     );
+}
+
+fn isSupportedMarket(market: cat.Market) bool {
+    return switch (market) {
+        .us => true,
+    };
+}
+
+fn isSupportedVenue(venue: cat.Venue) bool {
+    return switch (venue) {
+        .nyse, .nasdaq => true,
+    };
+}
+
+fn isSupportedSector(sector: cat.SectorTheme) bool {
+    return switch (sector) {
+        .ai_infrastructure,
+        .semiconductors,
+        .cloud,
+        .cyber_security,
+        .broad_market,
+        .dividends,
+        .cash_like,
+        => true,
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +382,79 @@ fn addFailure(ticket: *TradeTicket, f: GuardrailFailure) void {
     if (ticket.guardrail_failure_count < max_guardrail_failures) {
         ticket.guardrail_failures[ticket.guardrail_failure_count] = f;
         ticket.guardrail_failure_count += 1;
+    }
+}
+
+fn findHoldingIndex(
+    holdings: []const portfolio.Holding,
+    ticker: []const u8,
+) ?usize {
+    for (holdings, 0..) |holding, i| {
+        if (std.mem.eql(u8, holding.tickerSlice(), ticker)) return i;
+    }
+    return null;
+}
+
+fn removeHoldingAt(
+    holdings: *[portfolio.max_holdings]portfolio.Holding,
+    holding_count: *u8,
+    idx: usize,
+) void {
+    var i = idx;
+    while (i + 1 < @as(usize, holding_count.*)) : (i += 1) {
+        holdings[i] = holdings[i + 1];
+    }
+    holding_count.* -= 1;
+    holdings[@as(usize, holding_count.*)] = std.mem.zeroes(portfolio.Holding);
+}
+
+fn applyFillToHoldings(
+    result: *PaperExecutionResult,
+    li: *const TradeTicketLineItem,
+    fill_notional_cents: i64,
+) PaperExecutionError!void {
+    if (li.estimated_shares == 0) return;
+
+    const idx = findHoldingIndex(
+        result.resulting_holdings[0..result.resulting_holding_count],
+        li.tickerSlice(),
+    );
+    switch (li.side) {
+        .buy => {
+            if (idx) |holding_idx| {
+                result.resulting_holdings[holding_idx].share_count += li.estimated_shares;
+                result.resulting_holdings[holding_idx].market_value_cents += fill_notional_cents;
+            } else {
+                if (@as(usize, result.resulting_holding_count) >= portfolio.max_holdings) {
+                    return error.HoldingCapacityExceeded;
+                }
+                result.resulting_holdings[@as(usize, result.resulting_holding_count)] = .{
+                    .ticker = li.ticker,
+                    .ticker_len = li.ticker_len,
+                    .share_count = li.estimated_shares,
+                    .market_value_cents = fill_notional_cents,
+                };
+                result.resulting_holding_count += 1;
+            }
+        },
+        .sell => {
+            const holding_idx = idx orelse return error.InsufficientHoldings;
+            if (result.resulting_holdings[holding_idx].share_count < li.estimated_shares) {
+                return error.InsufficientHoldings;
+            }
+            result.resulting_holdings[holding_idx].share_count -= li.estimated_shares;
+            result.resulting_holdings[holding_idx].market_value_cents = @max(
+                @as(i64, 0),
+                result.resulting_holdings[holding_idx].market_value_cents - fill_notional_cents,
+            );
+            if (result.resulting_holdings[holding_idx].share_count == 0) {
+                removeHoldingAt(
+                    &result.resulting_holdings,
+                    &result.resulting_holding_count,
+                    holding_idx,
+                );
+            }
+        },
     }
 }
 
@@ -305,10 +472,12 @@ fn addFailure(ticket: *TradeTicket, f: GuardrailFailure) void {
 /// Guardrail checks (T5) — all failures are collected before returning:
 ///   1. limit_price_required: limit order with non-positive limit_price_cents.
 ///   2. BUY affordability (cash, buying_power, day/month notional, open order slot).
-///   3. restricted_instrument: any basket instrument is policy-denied.
+///   3. market/venue/sector/restricted-instrument scope checks.
 ///   4. same_day_round_trip: any basket instrument ticker appears in same_day_opposite.
 ///   5. minimum_holding_period (SELL only): any basket instrument's days_held is
 ///      below min_holding_days in the holding_records slice.
+///   6. insufficient_holdings (SELL only): one or more line items exceed the
+///      account's current share count.
 ///
 /// same_day_opposite is the list of tickers traded on the opposite side today:
 ///   for BUY — tickers of instruments sold today;
@@ -320,6 +489,8 @@ fn addFailure(ticket: *TradeTicket, f: GuardrailFailure) void {
 /// Pass an empty slice to skip the check.
 ///
 /// Returns TicketError.AccountMismatch when basket.account_id != account.account_id.
+/// Returns TicketError.InstrumentNotInCatalog when a basket instrument no longer
+/// resolves against the static V1.1 catalog.
 pub fn preview(
     proposed_basket: *const basket_mod.Basket,
     account: *const portfolio.BrokerageAccount,
@@ -345,6 +516,8 @@ pub fn preview(
     var estimated_total: i64 = 0;
     for (0..proposed_basket.instrument_count) |i| {
         const inst = &proposed_basket.instruments[i];
+        const entry = cat.lookupByTicker(inst.tickerSlice()) orelse
+            return error.InstrumentNotInCatalog;
         const price = fixturePriceCents(inst.tickerSlice());
         const shares: u32 = if (price > 0)
             @intCast(@min(
@@ -358,6 +531,9 @@ pub fn preview(
             .ticker = inst.ticker,
             .ticker_len = inst.ticker_len,
             .asset_class = inst.asset_class,
+            .market = entry.market,
+            .venue = entry.venue,
+            .sector = entry.sector,
             .side = side,
             .order_type = order_type,
             .target_notional_cents = inst.allocation_cents,
@@ -399,13 +575,25 @@ pub fn preview(
         }
     }
 
-    // Check 3: restricted instrument (re-verify even though basket.build() filters these).
+    // Check 3: market/venue/sector/restricted-instrument scope.
     for (0..proposed_basket.instrument_count) |i| {
-        const inst = &proposed_basket.instruments[i];
-        if (cat.lookupByTicker(inst.tickerSlice())) |entry| {
+        const li = &ticket.line_items[i];
+        if (!isSupportedMarket(li.market)) {
+            addFailure(&ticket, .unsupported_market);
+            break;
+        }
+        if (!isSupportedVenue(li.venue)) {
+            addFailure(&ticket, .unsupported_venue);
+            break;
+        }
+        if (!isSupportedSector(li.sector)) {
+            addFailure(&ticket, .unsupported_sector);
+            break;
+        }
+        if (cat.lookupByTicker(li.tickerSlice())) |entry| {
             if (entry.restricted) {
                 addFailure(&ticket, .restricted_instrument);
-                break; // one failure record per ticket
+                break;
             }
         }
     }
@@ -421,10 +609,23 @@ pub fn preview(
         }
     }
 
-    // Check 5: minimum holding period — SELL only.
+    // Check 5: minimum holding period and sufficient holdings — SELL only.
     if (side == .sell) {
+        holdings_available: for (ticket.line_items[0..ticket.line_item_count]) |li| {
+            if (li.estimated_shares == 0) continue;
+            const holding = portfolio.findHolding(account, li.tickerSlice()) orelse {
+                addFailure(&ticket, .insufficient_holdings);
+                break :holdings_available;
+            };
+            if (holding.share_count < li.estimated_shares) {
+                addFailure(&ticket, .insufficient_holdings);
+                break :holdings_available;
+            }
+        }
+
         holding_period: for (0..proposed_basket.instrument_count) |i| {
-            const inst = &proposed_basket.instruments[i];
+            const inst = &ticket.line_items[i];
+            if (inst.estimated_shares == 0) continue;
             for (holding_records) |hr| {
                 if (std.mem.eql(u8, inst.tickerSlice(), hr.tickerSlice())) {
                     if (hr.days_held < min_holding_days) {
@@ -455,12 +656,14 @@ pub fn preview(
 ///   BUY  → cash and buying_power decrease by total_fill_notional_cents.
 ///   SELL → cash and buying_power increase by total_fill_notional_cents.
 ///
-/// paper_seq is a caller-supplied sequence number that must be unique per
-/// account within a trading session.  It is hashed into paper_order_id.
+/// executed_at_ns and paper_seq are caller-supplied deterministic inputs for
+/// audit and replay.  paper_order_id is derived from the filled lines and the
+/// resulting account snapshot.
 pub fn execute(
     ticket: *const TradeTicket,
     account: *const portfolio.BrokerageAccount,
     paper_seq: u64,
+    executed_at_ns: u64,
 ) PaperExecutionError!PaperExecutionResult {
     if (ticket.status != .allowed) return error.TicketBlocked; // T7, T8
     if (ticket.account_id != account.account_id) return error.AccountMismatch;
@@ -468,7 +671,13 @@ pub fn execute(
     var result: PaperExecutionResult = std.mem.zeroes(PaperExecutionResult);
     result.ticket_id = ticket.ticket_id;
     result.account_id = ticket.account_id;
+    result.executed_at_ns = executed_at_ns;
     result.paper_seq = paper_seq;
+    result.resulting_holding_count = account.holding_count;
+    @memcpy(
+        result.resulting_holdings[0..portfolio.max_holdings],
+        account.holdings[0..portfolio.max_holdings],
+    );
 
     var total_fill: i64 = 0;
     for (0..ticket.line_item_count) |i| {
@@ -483,6 +692,7 @@ pub fn execute(
             .fill_notional_cents = fill_notional,
         };
         total_fill += fill_notional;
+        try applyFillToHoldings(&result, li, fill_notional);
     }
     result.filled_line_item_count = ticket.line_item_count;
     result.total_fill_notional_cents = total_fill;
@@ -577,6 +787,14 @@ fn buildAiBasket(account_id: u32, target_notional_cents: i64) !basket_mod.Basket
     return basket_mod.build(intent, hash);
 }
 
+fn countNonZeroShareLineItems(ticket: *const TradeTicket) u8 {
+    var count: u8 = 0;
+    for (ticket.line_items[0..ticket.line_item_count]) |li| {
+        if (li.estimated_shares > 0) count += 1;
+    }
+    return count;
+}
+
 // --- Acceptance: USD 2,000 buy is allowed in cash-rich account ---
 
 test "preview: USD 2,000 AI infrastructure BUY is allowed in cash-rich account" {
@@ -584,30 +802,40 @@ test "preview: USD 2,000 AI infrastructure BUY is allowed in cash-rich account" 
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .buy, .market, .day,
+        .buy,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.allowed, ticket.status);
     try std.testing.expectEqual(@as(u8, 0), ticket.guardrail_failure_count);
     try std.testing.expect(ticket.ticket_id != 0);
 }
 
-// --- Acceptance: USD 30,000 BUY is blocked (exceeds day limit of USD 25,000) ---
+// --- Acceptance: exact USD 25,000 BUY is blocked when max affordable is lower ---
 
-test "preview: USD 30,000 BUY is blocked with day_notional_exceeded and max_affordable" {
-    // cash_rich day limit is USD 25,000; a USD 30,000 request exceeds it.
-    const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 3_000_000);
+test "preview: exact USD 25,000 BUY is blocked with day_notional_exceeded and max_affordable" {
+    var account = portfolio.fixtures.cash_rich;
+    account.day_notional_used_cents = 1; // remaining daily notional = USD 24,999.99
+
+    const b = try buildAiBasket(account.account_id, 2_500_000);
     const ticket = try preview(
         &b,
-        &portfolio.fixtures.cash_rich,
-        .buy, .market, .day,
+        &account,
+        .buy,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.blocked, ticket.status);
     try std.testing.expect(ticket.guardrail_failure_count > 0);
-    try std.testing.expect(ticket.max_affordable_cents > 0);
+    try std.testing.expectEqual(@as(i64, 2_499_999), ticket.max_affordable_cents);
 
     var found = false;
     for (ticket.guardrail_failures[0..ticket.guardrail_failure_count]) |f| {
@@ -619,18 +847,24 @@ test "preview: USD 30,000 BUY is blocked with day_notional_exceeded and max_affo
 // --- Acceptance: blocked ticket cannot be paper-placed (T7, T8) ---
 
 test "execute: blocked ticket returns TicketBlocked" {
-    const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 3_000_000);
+    var account = portfolio.fixtures.cash_rich;
+    account.day_notional_used_cents = 1;
+    const b = try buildAiBasket(account.account_id, 2_500_000);
     const ticket = try preview(
         &b,
-        &portfolio.fixtures.cash_rich,
-        .buy, .market, .day,
+        &account,
+        .buy,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.blocked, ticket.status);
     try std.testing.expectError(
         PaperExecutionError.TicketBlocked,
-        execute(&ticket, &portfolio.fixtures.cash_rich, 1),
+        execute(&ticket, &account, 1, 1_720_000_000_000_000_000),
     );
 }
 
@@ -641,15 +875,20 @@ test "execute: allowed USD 2,000 BUY produces filled result with cash decrease" 
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .buy, .market, .day,
+        .buy,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.allowed, ticket.status);
-    const result = try execute(&ticket, &portfolio.fixtures.cash_rich, 1);
+    const result = try execute(&ticket, &portfolio.fixtures.cash_rich, 1, 1_720_000_000_000_000_000);
 
     try std.testing.expectEqual(ticket.ticket_id, result.ticket_id);
     try std.testing.expectEqual(portfolio.fixtures.cash_rich.account_id, result.account_id);
+    try std.testing.expectEqual(@as(u64, 1_720_000_000_000_000_000), result.executed_at_ns);
     try std.testing.expect(result.total_fill_notional_cents > 0);
     // Fills cannot exceed target notional.
     try std.testing.expect(result.total_fill_notional_cents <= ticket.target_notional_cents);
@@ -659,6 +898,10 @@ test "execute: allowed USD 2,000 BUY produces filled result with cash decrease" 
         result.resulting_cash_cents,
     );
     try std.testing.expect(result.resulting_cash_cents < portfolio.fixtures.cash_rich.cash_cents);
+    try std.testing.expectEqual(
+        countNonZeroShareLineItems(&ticket),
+        result.resulting_holding_count,
+    );
     try std.testing.expect(result.paper_order_id != 0);
 }
 
@@ -667,12 +910,16 @@ test "execute: paper_order_id is stable (same inputs produce same hash)" {
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .buy, .market, .day,
+        .buy,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
-    const r1 = try execute(&ticket, &portfolio.fixtures.cash_rich, 42);
-    const r2 = try execute(&ticket, &portfolio.fixtures.cash_rich, 42);
+    const r1 = try execute(&ticket, &portfolio.fixtures.cash_rich, 42, 1_720_000_000_000_000_100);
+    const r2 = try execute(&ticket, &portfolio.fixtures.cash_rich, 42, 1_720_000_000_000_000_100);
     try std.testing.expectEqual(r1.paper_order_id, r2.paper_order_id);
 }
 
@@ -681,12 +928,34 @@ test "execute: paper_order_id differs when paper_seq differs" {
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .buy, .market, .day,
+        .buy,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
-    const r1 = try execute(&ticket, &portfolio.fixtures.cash_rich, 1);
-    const r2 = try execute(&ticket, &portfolio.fixtures.cash_rich, 2);
+    const r1 = try execute(&ticket, &portfolio.fixtures.cash_rich, 1, 1_720_000_000_000_000_100);
+    const r2 = try execute(&ticket, &portfolio.fixtures.cash_rich, 2, 1_720_000_000_000_000_100);
+    try std.testing.expect(r1.paper_order_id != r2.paper_order_id);
+}
+
+test "execute: paper_order_id differs when executed_at_ns differs" {
+    const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 200_000);
+    const ticket = try preview(
+        &b,
+        &portfolio.fixtures.cash_rich,
+        .buy,
+        .market,
+        .day,
+        0,
+        &.{},
+        &.{},
+        1,
+    );
+    const r1 = try execute(&ticket, &portfolio.fixtures.cash_rich, 1, 1_720_000_000_000_000_100);
+    const r2 = try execute(&ticket, &portfolio.fixtures.cash_rich, 1, 1_720_000_000_000_000_101);
     try std.testing.expect(r1.paper_order_id != r2.paper_order_id);
 }
 
@@ -695,46 +964,89 @@ test "execute: account mismatch on execute returns AccountMismatch" {
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .buy, .market, .day,
+        .buy,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectError(
         PaperExecutionError.AccountMismatch,
-        execute(&ticket, &portfolio.fixtures.low_cash, 1),
+        execute(&ticket, &portfolio.fixtures.low_cash, 1, 1_720_000_000_000_000_000),
     );
 }
 
 // --- Sell preview (T3) ---
 
-test "preview: SELL preview builds line items with sell side" {
-    const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 200_000);
+test "preview: SELL preview builds line items with sell side for owned positions" {
+    const b = try buildAiBasket(portfolio.fixtures.technology_heavy.account_id, 200_000);
     const ticket = try preview(
         &b,
-        &portfolio.fixtures.cash_rich,
-        .sell, .market, .day,
+        &portfolio.fixtures.technology_heavy,
+        .sell,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
-    // Sell orders are not checked for buying power; status depends only on
-    // other guardrails (none active here: no round-trip list, no holding records).
     try std.testing.expectEqual(TicketStatus.allowed, ticket.status);
     for (ticket.line_items[0..ticket.line_item_count]) |li| {
         try std.testing.expectEqual(portfolio.Side.sell, li.side);
     }
 }
 
-test "execute: SELL increases resulting cash" {
+test "preview: SELL is blocked when the account does not hold the basket positions" {
     const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 200_000);
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .sell, .market, .day,
+        .sell,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
-    const result = try execute(&ticket, &portfolio.fixtures.cash_rich, 1);
-    try std.testing.expect(result.resulting_cash_cents > portfolio.fixtures.cash_rich.cash_cents);
+    try std.testing.expectEqual(TicketStatus.blocked, ticket.status);
+
+    var found = false;
+    for (ticket.guardrail_failures[0..ticket.guardrail_failure_count]) |f| {
+        if (f == .insufficient_holdings) found = true;
+    }
+    try std.testing.expect(found);
+}
+
+test "execute: SELL increases resulting cash and decreases held shares" {
+    const b = try buildAiBasket(portfolio.fixtures.technology_heavy.account_id, 200_000);
+    const ticket = try preview(
+        &b,
+        &portfolio.fixtures.technology_heavy,
+        .sell,
+        .market,
+        .day,
+        0,
+        &.{},
+        &.{},
+        1,
+    );
+    const result = try execute(&ticket, &portfolio.fixtures.technology_heavy, 1, 1_720_000_000_000_000_000);
+    try std.testing.expect(result.resulting_cash_cents > portfolio.fixtures.technology_heavy.cash_cents);
+    if (ticket.line_items[0].estimated_shares > 0) {
+        const before = portfolio.findHolding(&portfolio.fixtures.technology_heavy, ticket.line_items[0].tickerSlice()).?;
+        const after_idx = findHoldingIndex(
+            result.resulting_holdings[0..result.resulting_holding_count],
+            ticket.line_items[0].tickerSlice(),
+        ).?;
+        try std.testing.expectEqual(
+            before.share_count - ticket.line_items[0].estimated_shares,
+            result.resulting_holdings[after_idx].share_count,
+        );
+    }
 }
 
 // --- Limit orders (T4) ---
@@ -744,9 +1056,13 @@ test "preview: limit order with positive limit_price_cents is allowed (T4)" {
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .buy, .limit, .day,
+        .buy,
+        .limit,
+        .day,
         14_000, // USD 140 limit price per share
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.allowed, ticket.status);
     // All line items carry the limit price.
@@ -761,9 +1077,13 @@ test "preview: limit order with zero limit_price_cents blocks with limit_price_r
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .buy, .limit, .day,
+        .buy,
+        .limit,
+        .day,
         0, // invalid
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.blocked, ticket.status);
 
@@ -779,11 +1099,22 @@ test "preview: limit order with negative limit_price_cents blocks" {
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .buy, .limit, .day,
+        .buy,
+        .limit,
+        .day,
         -1,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.blocked, ticket.status);
+}
+
+test "computeTicketHash: different limit prices produce different ticket_id" {
+    const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 200_000);
+    const t1 = try preview(&b, &portfolio.fixtures.cash_rich, .buy, .limit, .day, 14_000, &.{}, &.{}, 1);
+    const t2 = try preview(&b, &portfolio.fixtures.cash_rich, .buy, .limit, .day, 14_500, &.{}, &.{}, 1);
+    try std.testing.expect(t1.ticket_id != t2.ticket_id);
 }
 
 // --- Affordability guardrails (T5) ---
@@ -793,9 +1124,13 @@ test "preview: low_cash account blocks BUY with insufficient_buying_power" {
     const ticket = try preview(
         &b,
         &portfolio.fixtures.low_cash,
-        .buy, .market, .day,
+        .buy,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.blocked, ticket.status);
 
@@ -813,9 +1148,13 @@ test "preview: restricted_account blocks BUY with open_order_limit" {
     const ticket = try preview(
         &b,
         &portfolio.fixtures.restricted_account,
-        .buy, .market, .day,
+        .buy,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.blocked, ticket.status);
 
@@ -832,10 +1171,15 @@ test "preview: month limit exceeded blocks BUY with month_notional_exceeded" {
 
     const b = try buildAiBasket(account.account_id, 200_000);
     const ticket = try preview(
-        &b, &account,
-        .buy, .market, .day,
+        &b,
+        &account,
+        .buy,
+        .market,
+        .day,
         0,
-        &.{}, &.{}, 1,
+        &.{},
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.blocked, ticket.status);
 
@@ -859,10 +1203,13 @@ test "preview: BUY blocked when instrument was sold today (round-trip)" {
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .buy, .market, .day,
+        .buy,
+        .market,
+        .day,
         0,
         &[1][cat.max_ticker_len]u8{first_ticker},
-        &.{}, 1,
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.blocked, ticket.status);
 
@@ -881,10 +1228,13 @@ test "preview: BUY not blocked when same_day_opposite contains a different ticke
     const ticket = try preview(
         &b,
         &portfolio.fixtures.cash_rich,
-        .buy, .market, .day,
+        .buy,
+        .market,
+        .day,
         0,
         &[1][cat.max_ticker_len]u8{zzzz},
-        &.{}, 1,
+        &.{},
+        1,
     );
     try std.testing.expectEqual(TicketStatus.allowed, ticket.status);
 }
@@ -892,7 +1242,7 @@ test "preview: BUY not blocked when same_day_opposite contains a different ticke
 // --- Minimum holding period (T5) ---
 
 test "preview: SELL blocked when holding bought today (minimum_holding_period)" {
-    const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 200_000);
+    const b = try buildAiBasket(portfolio.fixtures.technology_heavy.account_id, 200_000);
     // Use the first basket instrument to construct a holding with days_held = 0.
     try std.testing.expect(b.instrument_count > 0);
     const first_instrument = &b.instruments[0];
@@ -903,8 +1253,10 @@ test "preview: SELL blocked when holding bought today (minimum_holding_period)" 
     };
     const ticket = try preview(
         &b,
-        &portfolio.fixtures.cash_rich,
-        .sell, .market, .day,
+        &portfolio.fixtures.technology_heavy,
+        .sell,
+        .market,
+        .day,
         0,
         &.{},
         &[1]HoldingRecord{holding},
@@ -920,7 +1272,7 @@ test "preview: SELL blocked when holding bought today (minimum_holding_period)" 
 }
 
 test "preview: SELL allowed when holding exceeds min holding period" {
-    const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 200_000);
+    const b = try buildAiBasket(portfolio.fixtures.technology_heavy.account_id, 200_000);
     try std.testing.expect(b.instrument_count > 0);
     const first_instrument = &b.instruments[0];
     const holding = HoldingRecord{
@@ -930,8 +1282,10 @@ test "preview: SELL allowed when holding exceeds min holding period" {
     };
     const ticket = try preview(
         &b,
-        &portfolio.fixtures.cash_rich,
-        .sell, .market, .day,
+        &portfolio.fixtures.technology_heavy,
+        .sell,
+        .market,
+        .day,
         0,
         &.{},
         &[1]HoldingRecord{holding},
@@ -968,6 +1322,16 @@ test "preview: all line items have non-zero fixture prices and estimated cost >=
     }
 }
 
+test "preview: line items carry explicit market, venue, and sector scope" {
+    const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 200_000);
+    const ticket = try preview(&b, &portfolio.fixtures.cash_rich, .buy, .market, .day, 0, &.{}, &.{}, 1);
+    for (ticket.line_items[0..ticket.line_item_count]) |li| {
+        try std.testing.expectEqual(cat.Market.us, li.market);
+        try std.testing.expect(isSupportedVenue(li.venue));
+        try std.testing.expect(isSupportedSector(li.sector));
+    }
+}
+
 test "preview: line_item_count matches basket instrument_count" {
     const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 200_000);
     const ticket = try preview(&b, &portfolio.fixtures.cash_rich, .buy, .market, .day, 0, &.{}, &.{}, 1);
@@ -995,7 +1359,7 @@ test "preview: account_id mismatch returns AccountMismatch" {
 test "execute: filled_shares * fill_price == fill_notional for each line item" {
     const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 200_000);
     const ticket = try preview(&b, &portfolio.fixtures.cash_rich, .buy, .market, .day, 0, &.{}, &.{}, 1);
-    const result = try execute(&ticket, &portfolio.fixtures.cash_rich, 1);
+    const result = try execute(&ticket, &portfolio.fixtures.cash_rich, 1, 1_720_000_000_000_000_000);
     for (result.filled_line_items[0..result.filled_line_item_count]) |fi| {
         try std.testing.expectEqual(
             @as(i64, fi.filled_shares) * fi.fill_price_cents,
@@ -1007,7 +1371,7 @@ test "execute: filled_shares * fill_price == fill_notional for each line item" {
 test "execute: total_fill_notional_cents equals sum of fill_notional_cents" {
     const b = try buildAiBasket(portfolio.fixtures.cash_rich.account_id, 200_000);
     const ticket = try preview(&b, &portfolio.fixtures.cash_rich, .buy, .market, .day, 0, &.{}, &.{}, 1);
-    const result = try execute(&ticket, &portfolio.fixtures.cash_rich, 1);
+    const result = try execute(&ticket, &portfolio.fixtures.cash_rich, 1, 1_720_000_000_000_000_000);
     var sum: i64 = 0;
     for (result.filled_line_items[0..result.filled_line_item_count]) |fi| {
         sum += fi.fill_notional_cents;
