@@ -27,6 +27,7 @@ fn mkHolding(comptime ticker_s: []const u8, mv_cents: i64) Holding {
     return .{
         .ticker = tickerBuf(ticker_s),
         .ticker_len = @intCast(ticker_s.len),
+        .share_count = 0,
         .market_value_cents = mv_cents,
     };
 }

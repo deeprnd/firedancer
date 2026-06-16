@@ -284,6 +284,11 @@ pub fn build(b: *std.Build) void {
     const adapter_run = b.addRunArtifact(adapter_test);
     test_step.dependOn(&adapter_run.step);
 
+    // trade_ticket.zig imports basket, portfolio, portfolio_fixtures, and thesis.
+    const trade_ticket_test = b.addTest(.{ .root_module = trade_ticket_adapter_test_mod });
+    linkTickoniCodec(b, trade_ticket_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(trade_ticket_test).step);
+
     // supervisor.zig imports runtime and tiles modules.
     const sup_mod = b.createModule(.{
         .root_source_file = b.path("src/app/tickoni/supervisor.zig"),
@@ -632,6 +637,21 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, portfolio_fixtures_cov_test, fd_lib_dir);
     cov_step.dependOn(&b.addInstallArtifact(portfolio_fixtures_cov_test, .{
+        .dest_dir = .{ .override = .{ .custom = "cov" } },
+    }).step);
+
+    // trade_ticket coverage binary.
+    const trade_ticket_cov_test = b.addTest(.{
+        .name = "test-trade-ticket",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/trade_ticket.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{.{ .name = "thesis_cabi", .module = thesis_cabi_mod }},
+        }),
+    });
+    linkTickoniCodec(b, trade_ticket_cov_test, fd_lib_dir);
+    cov_step.dependOn(&b.addInstallArtifact(trade_ticket_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
 
