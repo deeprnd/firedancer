@@ -348,7 +348,8 @@ This is the required proof lane.
 
 Used by:
 
-- an explicit smoke recipe such as `just test-smoke-tkmodl-live`,
+- an explicit system/smoke recipe such as `just test-system-tk`
+  (`just test-smoke-tkmodl-live` remains an alias),
 - an optional demo mode when the local model server is intentionally running.
 
 Behavior:

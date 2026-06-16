@@ -643,7 +643,17 @@ pub fn build(b: *std.Build) void {
     // trade_ticket coverage binary.
     const trade_ticket_cov_test = b.addTest(.{
         .name = "test-trade-ticket",
-        .root_module = trade_ticket_int_mod,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/trade_ticket.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "basket", .module = basket_int_mod },
+                .{ .name = "portfolio", .module = portfolio_int_mod },
+                .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_int_mod },
+                .{ .name = "thesis", .module = thesis_int_mod },
+            },
+        }),
     });
     linkTickoniCodec(b, trade_ticket_cov_test, fd_lib_dir);
     cov_step.dependOn(&b.addInstallArtifact(trade_ticket_cov_test, .{

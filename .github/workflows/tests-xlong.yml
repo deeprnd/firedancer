@@ -56,8 +56,8 @@ jobs:
       - name: Run test suite
         run: just test-e2e-fd
 
-  integration-tests-tk:
-    name: Harness Integration Tests
+  system-tests-tk:
+    name: LLM System Tests
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-latest
@@ -83,5 +83,5 @@ jobs:
       - name: Download model
         run: just infra-ensure-model
 
-      - name: Run integration tests
-        run: just test-integration-tk
+      - name: Run test suite
+        run: just test-system-tk
