@@ -10,15 +10,10 @@
     "etf"
   ],
   "sector_theme": "ai_infrastructure",
-  "risk_preference": "high",
+  "risk_preference": "moderate",
   "max_single_name_weight_bp": 2500,
   "requested_symbols": [
-    "META",
-    "AAPL",
-    "AMZN",
-    "NFLX",
-    "GOOGL",
-    "SPACEX"
+    "SOXL"
   ],
-  "user_text": "I want a USD 2,000 AI and FAANG-style basket, and include SpaceX if possible."
+  "user_text": "Buy SOXL in the AI infrastructure basket."
 }

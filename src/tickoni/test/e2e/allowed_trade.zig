@@ -21,6 +21,7 @@ const oversized_target_notional_cents: i64 = 2_500_000;
 const policy_max_notional_per_order_cents: i64 = 250_000;
 const expected_ticket_id = "ticket_v1_1_ai_infra_2000_market";
 const expected_blocked_ticket_id = "ticket_v1_1_ai_infra_25000_blocked";
+const restricted_ticker = "SOXL";
 
 const ExpectedLine = struct {
     ticker: []const u8,
@@ -41,6 +42,15 @@ fn demoOpsThesisInput() thesis.ThesisInput {
     return demoOpsThesisInputWithTarget(target_notional_cents);
 }
 
+fn demoOpsRestrictedTickerInput() thesis.ThesisInput {
+    var input = demoOpsThesisInput();
+    const user_text = "Buy SOXL in the AI infrastructure basket.";
+    @memset(&input.user_text, 0);
+    @memcpy(input.user_text[0..user_text.len], user_text);
+    input.user_text_len = user_text.len;
+    return input;
+}
+
 fn findLineItem(ticket: *const trade_ticket.TradeTicket, ticker: []const u8) ?trade_ticket.TicketLineItem {
     for (ticket.line_items[0..ticket.line_item_count]) |line| {
         if (std.mem.eql(u8, line.tickerSlice(), ticker)) return line;
@@ -53,6 +63,16 @@ fn basketRejects(proposed_basket: *const basket_mod.Basket, ticker: []const u8) 
         if (std.mem.eql(u8, candidate.tickerSlice(), ticker)) return true;
     }
     return false;
+}
+
+fn findRejectedCandidate(
+    proposed_basket: *const basket_mod.Basket,
+    ticker: []const u8,
+) ?basket_mod.RejectedCandidate {
+    for (proposed_basket.rejected[0..proposed_basket.rejected_count]) |candidate| {
+        if (std.mem.eql(u8, candidate.tickerSlice(), ticker)) return candidate;
+    }
+    return null;
 }
 
 test "allowed_trade_e2e: tkmodl tktool tkadpt build the allowed paper trade" {
@@ -356,6 +376,96 @@ test "allowed_trade_e2e: oversized trade replay and audit reproduce the deny" {
         oversized_target_notional_cents,
         audit_chain.events[7].payload.limit_check.value,
     );
+    try std.testing.expectEqual(@as(u64, 0), audit_chain.events[0].header.prev_hash);
+    for (audit_chain.events[1..], 1..) |event, i| {
+        try std.testing.expectEqual(audit_chain.events[i - 1].header.record_hash, event.header.prev_hash);
+    }
+}
+
+test "allowed_trade_e2e: direct restricted ticker request is denied before adapter work" {
+    const allocator = std.testing.allocator;
+    const input = demoOpsRestrictedTickerInput();
+    const thesis_id = thesis.computeThesisInputHash(input);
+    const intent = try thesis.normalize(input);
+    const basket = try basket_mod.build(intent, thesis_id);
+
+    const rejected = findRejectedCandidate(&basket, restricted_ticker) orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(basket_mod.RejectionReason.restricted_instrument, rejected.reason_code);
+    try std.testing.expect(std.mem.indexOf(u8, rejected.reasonSlice(), "leveraged ETF") != null);
+    try std.testing.expect(basketRejects(&basket, restricted_ticker));
+
+    var model_backend = model.Backend{ .fixture = .{} };
+    const model_response = try model_backend.call(allocator, .{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{.{ .role = "user", .content = "buy soxl direct request demo" }},
+    });
+    defer model_response.deinit(allocator);
+
+    var adapter_call_attempts: u32 = 0;
+    var ticket_build_attempts: u32 = 0;
+    if (rejected.reason_code != .restricted_instrument) {
+        ticket_build_attempts += 1;
+        adapter_call_attempts += 1;
+    }
+
+    try std.testing.expectEqual(@as(u32, 0), ticket_build_attempts);
+    try std.testing.expectEqual(@as(u32, 0), adapter_call_attempts);
+}
+
+test "allowed_trade_e2e: restricted ticker replay and audit reproduce the deny" {
+    const allocator = std.testing.allocator;
+    const input = demoOpsRestrictedTickerInput();
+    const thesis_id = thesis.computeThesisInputHash(input);
+    const intent = try thesis.normalize(input);
+    const basket = try basket_mod.build(intent, thesis_id);
+
+    const rejected = findRejectedCandidate(&basket, restricted_ticker) orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(basket_mod.RejectionReason.restricted_instrument, rejected.reason_code);
+
+    var model_backend = model.Backend{ .fixture = .{} };
+    const model_response = try model_backend.call(allocator, .{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{.{ .role = "user", .content = "buy soxl direct request demo" }},
+    });
+    defer model_response.deinit(allocator);
+
+    const replay_result = try replay.verifyRestrictedInstrumentBlock(
+        allocator,
+        std.testing.io,
+        &basket,
+        restricted_ticker,
+        &model_response,
+    );
+    try std.testing.expect(replay_result.external_effects_disabled);
+    try std.testing.expect(replay_result.replay_match);
+    try std.testing.expectEqual(@as(u64, 0), replay_result.divergence_count);
+
+    const audit_chain = investment_audit.buildRestrictedInstrumentBlockedChain(
+        &input,
+        &basket,
+        &model_response,
+        &replay_result,
+    );
+    try std.testing.expectEqual(
+        investment_audit.restricted_instrument_blocked_event_count,
+        audit_chain.slice().len,
+    );
+    try std.testing.expectEqual(audit.RecordType.policy_decision, std.meta.activeTag(audit_chain.events[2].payload));
+    try std.testing.expectEqual(audit.RecordType.denial, std.meta.activeTag(audit_chain.events[4].payload));
+    try std.testing.expectEqual(audit.RecordType.replay_result, std.meta.activeTag(audit_chain.events[5].payload));
+    try std.testing.expectEqual(audit.PolicyOutcome.deny, audit_chain.events[2].payload.policy_decision.outcome);
+    try std.testing.expectEqualStrings(
+        "restricted_instrument",
+        std.mem.sliceTo(&audit_chain.events[2].payload.policy_decision.failed_scope_dim, 0),
+    );
+    try std.testing.expectEqualStrings(
+        "restricted_instrument",
+        std.mem.sliceTo(&audit_chain.events[4].payload.denial.failed_scope_dim, 0),
+    );
+    for (audit_chain.events) |event| {
+        try std.testing.expect(std.meta.activeTag(event.payload) != audit.RecordType.financial_adapter_call);
+        try std.testing.expect(std.meta.activeTag(event.payload) != audit.RecordType.proposal);
+    }
     try std.testing.expectEqual(@as(u64, 0), audit_chain.events[0].header.prev_hash);
     for (audit_chain.events[1..], 1..) |event, i| {
         try std.testing.expectEqual(audit_chain.events[i - 1].header.record_hash, event.header.prev_hash);

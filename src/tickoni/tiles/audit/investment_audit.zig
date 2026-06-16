@@ -9,6 +9,7 @@ const trade_ticket = @import("trade_ticket");
 
 pub const allowed_trade_event_count: usize = 9;
 pub const oversized_trade_blocked_event_count: usize = 10;
+pub const restricted_instrument_blocked_event_count: usize = 6;
 
 pub const AllowedTradeAuditChain = struct {
     events: [allowed_trade_event_count]audit.AuditEvent,
@@ -22,6 +23,14 @@ pub const OversizedTradeBlockedAuditChain = struct {
     events: [oversized_trade_blocked_event_count]audit.AuditEvent,
 
     pub fn slice(self: *const OversizedTradeBlockedAuditChain) []const audit.AuditEvent {
+        return &self.events;
+    }
+};
+
+pub const RestrictedInstrumentBlockedAuditChain = struct {
+    events: [restricted_instrument_blocked_event_count]audit.AuditEvent,
+
+    pub fn slice(self: *const RestrictedInstrumentBlockedAuditChain) []const audit.AuditEvent {
         return &self.events;
     }
 };
@@ -375,6 +384,79 @@ pub fn buildOversizedTradeBlockedChain(
             .capsule_id = hashBytes("replay_capsule_ai_infra_oversized_25000"),
             .divergences = replay_result.divergence_count,
             .first_divergent_seq = if (replay_result.divergence_count == 0) 0 else 9,
+        },
+    });
+
+    return .{ .events = events };
+}
+
+pub fn buildRestrictedInstrumentBlockedChain(
+    thesis_input: *const thesis.ThesisInput,
+    proposed_basket: *const basket.Basket,
+    model_response: *const model.ModelResponse,
+    replay_result: *const replay.ReplayVerification,
+) RestrictedInstrumentBlockedAuditChain {
+    const raw_hash = thesis.computeThesisInputHash(thesis_input.*);
+    const normalized_hash = proposed_basket.basket_id;
+    const model_response_hash = hashBytes(model_response.content);
+    const capability_id = capabilityEnvelopeId(thesis_input, proposed_basket);
+
+    var events: [restricted_instrument_blocked_event_count]audit.AuditEvent = undefined;
+    var prev_hash: u64 = 0;
+
+    events[0] = audit.buildEvent(header(0, "tkings", thesis_input.account_id, capability_id, prev_hash), .{
+        .source_event = .{
+            .source_system = parseFixedAsciiBytes(16, source_system),
+            .event_type = parseFixedAsciiBytes(32, source_event_type),
+            .raw_hash = raw_hash,
+        },
+    });
+    prev_hash = events[0].header.record_hash;
+
+    events[1] = audit.buildEvent(header(1, "tknorm", thesis_input.account_id, capability_id, prev_hash), .{
+        .normalization = .{
+            .source_event_hash = raw_hash,
+            .normalized_hash = normalized_hash,
+            .canonical_event_type = parseFixedAsciiBytes(32, canonical_event_type),
+        },
+    });
+    prev_hash = events[1].header.record_hash;
+
+    events[2] = audit.buildEvent(header(2, "tkpoly", thesis_input.account_id, capability_id, prev_hash), .{
+        .policy_decision = .{
+            .outcome = .deny,
+            .rule_id = 1101,
+            .failed_scope_dim = parseFixedAsciiBytes(32, "restricted_instrument"),
+            .source_event_hash = normalized_hash,
+        },
+    });
+    prev_hash = events[2].header.record_hash;
+
+    events[3] = audit.buildEvent(header(3, "tkmodl", thesis_input.account_id, capability_id, prev_hash), .{
+        .model_call = .{
+            .model_id = parseFixedAsciiBytes(32, model_backend_id),
+            .prompt_hash = raw_hash,
+            .response_hash = model_response_hash,
+            .token_estimate = model_response.token_usage.total_tokens,
+            .retry_count = 0,
+        },
+    });
+    prev_hash = events[3].header.record_hash;
+
+    events[4] = audit.buildEvent(header(4, "tkpoly", thesis_input.account_id, capability_id, prev_hash), .{
+        .denial = .{
+            .action_class = parseFixedAsciiBytes(32, proposal_type),
+            .reason_code = @intFromEnum(basket.RejectionReason.restricted_instrument),
+            .failed_scope_dim = parseFixedAsciiBytes(32, "restricted_instrument"),
+        },
+    });
+    prev_hash = events[4].header.record_hash;
+
+    events[5] = audit.buildEvent(header(5, "tkrepl", thesis_input.account_id, capability_id, prev_hash), .{
+        .replay_result = .{
+            .capsule_id = hashBytes("replay_capsule_ai_infra_restricted_soxl"),
+            .divergences = replay_result.divergence_count,
+            .first_divergent_seq = if (replay_result.divergence_count == 0) 0 else 5,
         },
     });
 

@@ -291,8 +291,8 @@ Initial demo implementation:
 
 - fixture adapter only,
 - returns:
-  - `account_demo_ops.json`,
-  - `quotes_ai_infra.json`,
+  - `account_ops.json`,
+  - `quotes.json`,
   - `paper_execution_allowed_2000.json`,
 - denies paper fill unless ticket policy outcome is `allow`,
 - records adapter request and response hashes.
@@ -337,7 +337,7 @@ Behavior:
 - `tkmodl` validates the model request scope, policy version, budget id, and
   model id,
 - `tkmodl` returns the captured fixture response from
-  `model_response_ai_infra_gemma4.json`,
+  `model_response_gemma4.json`,
 - `tkmodl` emits audit-ready request/response references,
 - no HTTP call occurs,
 - no llama.cpp server is required.
@@ -398,4 +398,3 @@ The lean demo is done when one command can show:
 - replay tamper detection,
 - no default live external calls,
 - audit/replay evidence for every scenario.
-

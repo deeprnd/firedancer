@@ -1,0 +1,30 @@
+{
+  "fixture_id": "replay_capsule_ai_infra_restricted_soxl",
+  "schema": "tickoni.v1_1.replay_capsule",
+  "capsule_id": "replay_capsule_ai_infra_restricted_soxl",
+  "run_id": "run_v1_1_ai_infra_demo_restricted_soxl",
+  "policy_version": "v1.1.demo.investment",
+  "catalog_schema_version": 1,
+  "thesis_input_hash": "thesis_hash_restricted_soxl",
+  "normalized_intent_hash": "intent_hash_restricted_soxl",
+  "basket_id": "basket_v1_1_ai_infra_restricted_soxl",
+  "ticket_id": "",
+  "proposal_hash": null,
+  "audit_chain_hash": "audit_chain_hash_restricted_soxl",
+  "model_substitutions": [
+    {
+      "request_hash": "model_request_hash_ai_infra_restricted_soxl",
+      "response_hash": "model_response_hash_ai_infra_gemma4",
+      "fixture_file": "model_response_gemma4.json"
+    }
+  ],
+  "adapter_substitutions": [],
+  "replay_assertions": {
+    "no_live_model_call": true,
+    "no_live_adapter_call": true,
+    "no_paper_fill_emitted": true,
+    "affordability_outcome_matches": "",
+    "policy_outcome_matches": "deny",
+    "failed_scope_dim_matches": "restricted_instrument"
+  }
+}

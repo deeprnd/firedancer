@@ -337,17 +337,17 @@ Suggested fixture files:
 - `thesis_oversized_25000.json`: product/test-owned oversized variant.
 - `thesis_restricted_instrument.json`: product/test-owned explicit
   restricted-instrument request.
-- `policy_demo_investment.json`: policy/test-owned V1.1 paper-trade
+- `policy_investment.json`: policy/test-owned V1.1 paper-trade
   capability envelope and limits.
-- `account_demo_ops.json`: product/test-owned cash, buying power, limits,
+- `account_ops.json`: product/test-owned cash, buying power, limits,
   holdings, and open orders.
-- `quotes_ai_infra.json`: adapter/test-owned quote snapshot used to build
+- `quotes.json`: adapter/test-owned quote snapshot used to build
   ticket line items.
-- `market_events_ai_infra.json`: adapter/test-owned market-event fixture for
+- `market_events.json`: adapter/test-owned market-event fixture for
   the agent context.
-- `model_request_ai_infra.json`: model/test-owned exact prompt sent through
+- `model_request.json`: model/test-owned exact prompt sent through
   `tkmodl`.
-- `model_response_ai_infra_gemma4.json`: model/test-owned captured real-LLM
+- `model_response_gemma4.json`: model/test-owned captured real-LLM
   response and metadata.
 - `ticket_allowed_2000.json`: product/test-owned expected ticket for the
   allowed paper trade.
@@ -363,7 +363,7 @@ Suggested fixture files:
   oversized blocked flow.
 - `audit_restricted_instrument.jsonl`: audit/test-owned audit records for the
   restricted flow.
-- `replay_capsule_ai_infra.json`: replay/test-owned captured hashes and
+- `replay_capsule.json`: replay/test-owned captured hashes and
   substitutions for replay.
 
 Ticket fixture files should store real ticket information, not prose:

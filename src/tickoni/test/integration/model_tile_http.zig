@@ -16,7 +16,7 @@ const model = @import("model");
 const default_endpoint = "http://127.0.0.1:8080/v1";
 const default_model_id = "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL";
 
-// System prompt from model_request_ai_infra.json.
+// System prompt from model_request.json.
 const system_prompt =
     "You are a structured financial research assistant. " ++
     "Your task is to analyze an investor thesis and recommend a basket of US-listed equities and ETFs. " ++
@@ -25,7 +25,7 @@ const system_prompt =
     "Only recommend instruments appropriate for the given sector theme. " ++
     "Do not recommend leveraged ETFs, inverse ETFs, options, futures, or crypto.";
 
-// User prompt from model_request_ai_infra.json.
+// User prompt from model_request.json.
 const user_prompt =
     "Thesis: I want to invest USD 2,000 in AI infrastructure, but avoid single-name concentration " ++
     "and keep it to US-listed ETFs or large-cap equities.\n" ++

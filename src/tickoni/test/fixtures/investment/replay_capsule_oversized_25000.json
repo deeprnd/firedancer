@@ -15,7 +15,7 @@
     {
       "request_hash": "model_request_hash_ai_infra_oversized_25000",
       "response_hash": "model_response_hash_ai_infra_gemma4",
-      "fixture_file": "model_response_ai_infra_gemma4.json"
+      "fixture_file": "model_response_gemma4.json"
     }
   ],
   "adapter_substitutions": [
@@ -24,14 +24,14 @@
       "operation": "quote_snapshot",
       "request_hash": "adapter_request_hash_quote_ai_infra",
       "response_hash": "adapter_response_hash_quote_ai_infra",
-      "fixture_file": "quotes_ai_infra.json"
+      "fixture_file": "quotes.json"
     },
     {
       "adapter_id": "paper_broker_demo",
       "operation": "portfolio_snapshot",
       "request_hash": "adapter_request_hash_portfolio_demo_ops",
       "response_hash": "adapter_response_hash_portfolio_demo_ops",
-      "fixture_file": "account_demo_ops.json"
+      "fixture_file": "account_ops.json"
     }
   ],
   "replay_assertions": {

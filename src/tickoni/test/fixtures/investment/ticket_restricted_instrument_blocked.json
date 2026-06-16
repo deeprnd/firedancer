@@ -1,7 +1,7 @@
 {
   "fixture_id": "ticket_restricted_instrument_blocked",
   "schema": "tickoni.v1_1.trade_ticket",
-  "ticket_id": "ticket_v1_1_faang_spacex_blocked",
+  "ticket_id": "",
   "basket_id": null,
   "thesis_id": "thesis_restricted_instrument",
   "account_id": "brokerage.demo_ops",
@@ -16,58 +16,31 @@
   "target_notional_cents": 200000,
   "estimated_cost_cents": 0,
   "requested_symbols": [
-    "META",
-    "AAPL",
-    "AMZN",
-    "NFLX",
-    "GOOGL",
-    "SPACEX"
+    "SOXL"
   ],
-  "recognized_symbols": [
-    "AMZN"
-  ],
+  "recognized_symbols": [],
   "rejected_candidates": [
     {
-      "symbol": "META",
-      "reason_code": "not_in_v1_1_catalog",
-      "failed_scope_dim": "instrument_catalog"
-    },
-    {
-      "symbol": "AAPL",
-      "reason_code": "not_in_v1_1_catalog",
-      "failed_scope_dim": "instrument_catalog"
-    },
-    {
-      "symbol": "NFLX",
-      "reason_code": "not_in_v1_1_catalog",
-      "failed_scope_dim": "instrument_catalog"
-    },
-    {
-      "symbol": "GOOGL",
-      "reason_code": "not_in_v1_1_catalog",
-      "failed_scope_dim": "instrument_catalog"
-    },
-    {
-      "symbol": "SPACEX",
-      "reason_code": "non_public_private_company_manual_denylist",
+      "symbol": "SOXL",
+      "reason_code": "leveraged_etf",
       "failed_scope_dim": "restricted_instrument"
     }
   ],
   "affordability_result": {
-    "outcome": "not_evaluated_restricted_instrument",
-    "max_affordable_cents": 2500000,
-    "effective_max_paper_trade_cents": 250000
+    "outcome": null,
+    "max_affordable_cents": null,
+    "effective_max_paper_trade_cents": null
   },
   "policy_outcome": "deny",
   "blocked_reasons": [
     {
-      "code": "restricted_or_unsupported_instrument",
-      "failed_scope_dim": "instrument",
-      "user_message": "This request includes instruments outside the V1.1 public US equity and ETF demo catalog."
+      "code": "restricted_instrument",
+      "failed_scope_dim": "restricted_instrument",
+      "user_message": "SOXL is a leveraged ETF and is denied in the V1.1 paper trading demo."
     }
   ],
   "paper_execution": null,
-  "proposal_hash": "proposal_hash_ticket_v1_1_faang_spacex_blocked",
+  "proposal_hash": null,
   "approval_state": "not_placeable",
   "evidence_hashes": [
     "thesis_hash_restricted_instrument",

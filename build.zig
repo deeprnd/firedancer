@@ -368,7 +368,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const investment_audit_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/tiles/audit/investment_demo.zig"),
+        .root_source_file = b.path("src/tickoni/tiles/audit/investment_audit.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
