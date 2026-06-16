@@ -17,8 +17,10 @@ const trade_ticket = @import("trade_ticket");
 
 const demo_ops_account_id: u32 = 2001;
 const target_notional_cents: i64 = 200_000;
+const oversized_target_notional_cents: i64 = 2_500_000;
 const policy_max_notional_per_order_cents: i64 = 250_000;
 const expected_ticket_id = "ticket_v1_1_ai_infra_2000_market";
+const expected_blocked_ticket_id = "ticket_v1_1_ai_infra_25000_blocked";
 
 const ExpectedLine = struct {
     ticker: []const u8,
@@ -27,11 +29,16 @@ const ExpectedLine = struct {
     line_notional_cents: i64,
 };
 
-fn demoOpsThesisInput() thesis.ThesisInput {
+fn demoOpsThesisInputWithTarget(target_notional_cents_arg: i64) thesis.ThesisInput {
     var input = thesis.fixtures.ai_infrastructure;
     input.account_id = demo_ops_account_id;
+    input.target_notional_cents = target_notional_cents_arg;
     input.max_single_name_pct = 25;
     return input;
+}
+
+fn demoOpsThesisInput() thesis.ThesisInput {
+    return demoOpsThesisInputWithTarget(target_notional_cents);
 }
 
 fn findLineItem(ticket: *const trade_ticket.TradeTicket, ticker: []const u8) ?trade_ticket.TicketLineItem {
@@ -206,4 +213,151 @@ test "allowed_trade_e2e: replay succeeds with fixture substitutions and no live 
         @as(u64, 0),
         audit_chain.events[8].payload.replay_result.divergences,
     );
+}
+
+test "allowed_trade_e2e: oversized trade is blocked before paper execution" {
+    const allocator = std.testing.allocator;
+    const input = demoOpsThesisInputWithTarget(oversized_target_notional_cents);
+    const thesis_id = thesis.computeThesisInputHash(input);
+    const intent = try thesis.normalize(input);
+    const basket = try basket_mod.build(intent, thesis_id);
+    try std.testing.expect(basketRejects(&basket, "SOXL"));
+    try std.testing.expect(basketRejects(&basket, "BULZ"));
+
+    var model_backend = model.Backend{ .fixture = .{} };
+    const model_request = model.ModelRequest{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{.{ .role = "user", .content = "ai infrastructure oversized demo" }},
+    };
+    const model_response = try model_backend.call(allocator, model_request);
+    defer model_response.deinit(allocator);
+
+    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    const portfolio_result = try adapter_backend.call(tool.normalizePortfolioRead(demo_ops_account_id));
+    const account = switch (portfolio_result) {
+        .portfolio_snapshot => |snapshot| snapshot,
+        else => unreachable,
+    };
+    const affordability = try portfolio.checkBasketAffordability(&account, &basket);
+    try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, affordability.outcome);
+    try std.testing.expectEqual(@as(i64, 2_500_000), affordability.max_affordable_cents);
+
+    const quote_result = try adapter_backend.call(tool.normalizeQuoteRead(&basket));
+    const quote_snapshot = switch (quote_result) {
+        .quote_snapshot => |snapshot| snapshot,
+        else => unreachable,
+    };
+
+    const ticket = try trade_ticket.buildMarketBuyTicket(
+        &basket,
+        &quote_snapshot,
+        affordability,
+        policy_max_notional_per_order_cents,
+        expected_blocked_ticket_id,
+    );
+
+    try std.testing.expectEqual(trade_ticket.PolicyOutcome.deny, ticket.policy_outcome);
+    try std.testing.expectEqualStrings(expected_blocked_ticket_id, ticket.ticketIdSlice());
+    try std.testing.expectEqual(oversized_target_notional_cents, ticket.estimated_cost_cents);
+    try std.testing.expectEqual(@as(i64, 250_000), ticket.affordability_result.effective_max_paper_trade_cents);
+    try std.testing.expectEqual(@as(u8, 1), ticket.blocked_reason_count);
+    try std.testing.expectEqual(
+        trade_ticket.BlockedReasonCode.per_order_notional_exceeded,
+        ticket.blocked_reasons[0].code,
+    );
+    try std.testing.expectEqual(
+        trade_ticket.FailedScopeDimension.per_order_notional,
+        ticket.blocked_reasons[0].failed_scope_dim,
+    );
+    try std.testing.expectEqual(oversized_target_notional_cents, ticket.blocked_reasons[0].requested_cents);
+    try std.testing.expectEqual(@as(i64, 250_000), ticket.blocked_reasons[0].limit_cents);
+
+    var paper_order_attempts: u32 = 0;
+    if (ticket.policy_outcome == .allow) {
+        paper_order_attempts += 1;
+        _ = try adapter_backend.call(tool.normalizePaperOrder(&ticket));
+    }
+    try std.testing.expectEqual(@as(u32, 0), paper_order_attempts);
+}
+
+test "allowed_trade_e2e: oversized trade replay and audit reproduce the deny" {
+    const allocator = std.testing.allocator;
+    const input = demoOpsThesisInputWithTarget(oversized_target_notional_cents);
+    const thesis_id = thesis.computeThesisInputHash(input);
+    const intent = try thesis.normalize(input);
+    const basket = try basket_mod.build(intent, thesis_id);
+
+    var model_backend = model.Backend{ .fixture = .{} };
+    const model_response = try model_backend.call(allocator, .{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{.{ .role = "user", .content = "ai infrastructure oversized demo" }},
+    });
+    defer model_response.deinit(allocator);
+
+    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    const account_result = try adapter_backend.call(tool.normalizePortfolioRead(demo_ops_account_id));
+    const account = switch (account_result) {
+        .portfolio_snapshot => |snapshot| snapshot,
+        else => unreachable,
+    };
+    const affordability = try portfolio.checkBasketAffordability(&account, &basket);
+    const quote_result = try adapter_backend.call(tool.normalizeQuoteRead(&basket));
+    const quote_snapshot = switch (quote_result) {
+        .quote_snapshot => |snapshot| snapshot,
+        else => unreachable,
+    };
+    const ticket = try trade_ticket.buildMarketBuyTicket(
+        &basket,
+        &quote_snapshot,
+        affordability,
+        policy_max_notional_per_order_cents,
+        expected_blocked_ticket_id,
+    );
+
+    const replay_result = try replay.verifyOversizedTradeBlock(
+        allocator,
+        std.testing.io,
+        &basket,
+        &ticket,
+        &model_response,
+    );
+    try std.testing.expect(replay_result.external_effects_disabled);
+    try std.testing.expect(replay_result.replay_match);
+    try std.testing.expectEqual(@as(u64, 0), replay_result.divergence_count);
+
+    const audit_chain = investment_audit.buildOversizedTradeBlockedChain(
+        &input,
+        &basket,
+        &quote_snapshot,
+        affordability,
+        &model_response,
+        &ticket,
+        &replay_result,
+    );
+    try std.testing.expectEqual(
+        investment_audit.oversized_trade_blocked_event_count,
+        audit_chain.slice().len,
+    );
+    try std.testing.expectEqual(audit.RecordType.policy_decision, std.meta.activeTag(audit_chain.events[2].payload));
+    try std.testing.expectEqual(audit.RecordType.limit_check, std.meta.activeTag(audit_chain.events[7].payload));
+    try std.testing.expectEqual(audit.RecordType.denial, std.meta.activeTag(audit_chain.events[8].payload));
+    try std.testing.expectEqual(audit.RecordType.replay_result, std.meta.activeTag(audit_chain.events[9].payload));
+    try std.testing.expectEqual(audit.PolicyOutcome.deny, audit_chain.events[2].payload.policy_decision.outcome);
+    try std.testing.expectEqual(audit.PolicyOutcome.deny, audit_chain.events[7].payload.limit_check.outcome);
+    try std.testing.expectEqual(
+        @as(u32, @intFromEnum(trade_ticket.BlockedReasonCode.per_order_notional_exceeded)),
+        audit_chain.events[8].payload.denial.reason_code,
+    );
+    try std.testing.expectEqual(
+        @as(i64, 250_000),
+        audit_chain.events[7].payload.limit_check.limit,
+    );
+    try std.testing.expectEqual(
+        oversized_target_notional_cents,
+        audit_chain.events[7].payload.limit_check.value,
+    );
+    try std.testing.expectEqual(@as(u64, 0), audit_chain.events[0].header.prev_hash);
+    for (audit_chain.events[1..], 1..) |event, i| {
+        try std.testing.expectEqual(audit_chain.events[i - 1].header.record_hash, event.header.prev_hash);
+    }
 }

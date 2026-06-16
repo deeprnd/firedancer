@@ -255,10 +255,10 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&sup_run.step);
 
     // ---------------------------------------------------------------------------
-    // Integration-test step — V1.1 simple lane tests
+    // Integration-test step — simple lane tests
     // Run with: zig build integration-test
     // ---------------------------------------------------------------------------
-    const integration_step = b.step("integration-test", "Run V1.1 investment demo integration tests");
+    const integration_step = b.step("integration-test", "Run investment demo integration tests");
 
     // Schema modules for the integration test.
     //

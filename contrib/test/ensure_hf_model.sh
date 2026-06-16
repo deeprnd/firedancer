@@ -5,7 +5,7 @@ usage() {
   cat <<'USAGE'
 Usage: contrib/test/ensure_hf_model.sh [--check-only]
 
-Ensures the V1.1 real-LLM smoke-test GGUF exists locally. If it is missing,
+Ensures the real-LLM smoke-test GGUF exists locally. If it is missing,
 downloads it with `hf download`.
 
 Environment overrides:
