@@ -92,6 +92,8 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/c_abi/sandbox.zig",
         "src/tickoni/tiles/audit/mod.zig",
         "src/tickoni/tiles/payment_pipeline/mod.zig",
+        "src/tickoni/tiles/case/mod.zig",
+        "src/tickoni/tiles/disp/mod.zig",
     }) |path| {
         const t_mod = if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig"))
             b.createModule(.{
@@ -258,7 +260,7 @@ pub fn build(b: *std.Build) void {
     // Integration-test step — simple lane tests
     // Run with: zig build integration-test
     // ---------------------------------------------------------------------------
-    const integration_step = b.step("integration-test", "Run investment demo integration tests");
+    const integration_step = b.step("integration-test", "Run investment integration tests");
 
     // Schema modules for the integration test.
     //
@@ -315,9 +317,9 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const ai_infrastructure_allowed_trade_fixture_test = b.addTest(.{
+    const allowed_trade_fixture_test = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test/fixtures/investment/ai_infrastructure_allowed_trade.zig"),
+            .root_source_file = b.path("src/tickoni/test/fixtures/investment/allowed_trade.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -327,9 +329,9 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    linkTickoniCodec(b, ai_infrastructure_allowed_trade_fixture_test, fd_lib_dir);
-    const ai_infrastructure_fixture_run = b.addRunArtifact(ai_infrastructure_allowed_trade_fixture_test);
-    integration_step.dependOn(&ai_infrastructure_fixture_run.step);
+    linkTickoniCodec(b, allowed_trade_fixture_test, fd_lib_dir);
+    const allowed_trade_fixture_run = b.addRunArtifact(allowed_trade_fixture_test);
+    integration_step.dependOn(&allowed_trade_fixture_run.step);
 
     const model_int_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
@@ -354,6 +356,30 @@ pub fn build(b: *std.Build) void {
             .{ .name = "adapter", .module = adapter_int_mod },
             .{ .name = "basket", .module = basket_int_mod },
             .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+        },
+    });
+    const case_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/case/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const disp_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/disp/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const agent_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/agent/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "adapter", .module = adapter_int_mod },
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "disp", .module = disp_int_mod },
+            .{ .name = "model", .module = model_int_mod },
+            .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "tool", .module = tool_int_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
         },
     });
@@ -395,8 +421,10 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "portfolio", .module = portfolio_int_mod },
                 .{ .name = "replay", .module = replay_int_mod },
                 .{ .name = "thesis", .module = thesis_int_mod },
-                .{ .name = "tool", .module = tool_int_mod },
                 .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+                .{ .name = "tkcase", .module = case_int_mod },
+                .{ .name = "tkdisp", .module = disp_int_mod },
+                .{ .name = "tkagnt", .module = agent_int_mod },
             },
         }),
     });
@@ -433,6 +461,8 @@ pub fn build(b: *std.Build) void {
         .{ "test-sandbox", "src/tickoni/c_abi/sandbox.zig" },
         .{ "test-audit", "src/tickoni/tiles/audit/mod.zig" },
         .{ "test-payment-pipeline", "src/tickoni/tiles/payment_pipeline/mod.zig" },
+        .{ "test-case", "src/tickoni/tiles/case/mod.zig" },
+        .{ "test-disp", "src/tickoni/tiles/disp/mod.zig" },
     }) |entry| {
         const t = b.addTest(.{
             .name = entry[0],

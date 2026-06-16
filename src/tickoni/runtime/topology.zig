@@ -77,7 +77,7 @@ const payment_channels = [_]Channel{
     .{ .src_idx = 3, .dst_idx = 4, .depth = 64, .mtu = 128 },
 };
 
-const investment_demo_tiles = [_]TileDescriptor{
+const investment_tiles = [_]TileDescriptor{
     .{ .id = TileId.parse("tkings") catch unreachable, .name = "ingest_tile", .phase = 0 },
     .{ .id = TileId.parse("tknorm") catch unreachable, .name = "normalize_tile", .phase = 0 },
     .{ .id = TileId.parse("tkdedu") catch unreachable, .name = "dedupe_tile", .phase = 0 },
@@ -94,7 +94,7 @@ const investment_demo_tiles = [_]TileDescriptor{
     .{ .id = TileId.parse("tkdiag") catch unreachable, .name = "diag_tile", .phase = 0 },
 };
 
-const investment_demo_channels = [_]Channel{
+const investment_channels = [_]Channel{
     .{ .src_idx = 0, .dst_idx = 1, .depth = 64, .mtu = 256 },
     .{ .src_idx = 1, .dst_idx = 2, .depth = 64, .mtu = 256 },
     .{ .src_idx = 2, .dst_idx = 3, .depth = 64, .mtu = 256 },
@@ -125,10 +125,10 @@ pub fn paymentPipeline() Topology {
     };
 }
 
-pub fn investmentDemo() Topology {
+pub fn investmentWorkflow() Topology {
     return .{
-        .tiles = &investment_demo_tiles,
-        .channels = &investment_demo_channels,
+        .tiles = &investment_tiles,
+        .channels = &investment_channels,
     };
 }
 
@@ -169,8 +169,8 @@ test "paymentPipeline passes validation" {
     try paymentPipeline().validate();
 }
 
-test "investmentDemo includes tkmodl tktool tkadpt and passes validation" {
-    const topo = investmentDemo();
+test "investmentWorkflow includes tkmodl tktool tkadpt and passes validation" {
+    const topo = investmentWorkflow();
     try topo.validate();
     try std.testing.expectEqual(@as(usize, 14), topo.tiles.len);
     try std.testing.expectEqualStrings("tkmodl", topo.tiles[8].id.slice());

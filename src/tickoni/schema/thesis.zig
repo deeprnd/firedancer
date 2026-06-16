@@ -1,8 +1,8 @@
 /// Thesis input schema and investor intent normalization for V1.1.S1.
 ///
-/// ThesisInput: raw investor request captured from the user or a demo fixture.
+/// ThesisInput: raw investor request captured from the user or a test fixture.
 /// InvestorIntent: validated, structured form produced by normalize().
-/// fixtures: deterministic demo inputs for the five canonical V1.1 themes.
+/// fixtures: deterministic test inputs for the five canonical V1.1 themes.
 ///
 /// All validation in normalize() is fail-closed: missing or out-of-range
 /// fields return an explicit ThesisError instead of silently substituting
@@ -99,7 +99,7 @@ pub const RiskPreference = enum(u8) { low, moderate, high };
 // Input schema (T1)
 // ---------------------------------------------------------------------------
 
-/// Raw investor thesis as received from the user or provided by a demo fixture.
+/// Raw investor thesis as received from the user or provided by a test fixture.
 ///
 /// user_text is the plain-English investment intent; user_text_len is its byte
 /// count.  Call normalize() to validate and convert to InvestorIntent.
@@ -318,7 +318,7 @@ fn textBuf(comptime s: []const u8) [max_user_text_len]u8 {
     return buf;
 }
 
-/// Deterministic demo fixtures for the five canonical V1.1.S1 investment themes.
+/// Deterministic test fixtures for the five canonical V1.1.S1 investment themes.
 pub const fixtures = struct {
     const ai_text =
         "I want to invest USD 2,000 in AI infrastructure, " ++

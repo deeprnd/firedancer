@@ -35,8 +35,8 @@ pub const RestrictedInstrumentBlockedAuditChain = struct {
     }
 };
 
-const policy_version = "tickoni.v1_1_demo";
-const source_system = "tkapi_demo";
+const policy_version = "tickoni.v1_1";
+const source_system = "tkapi";
 const source_event_type = "investment_intent";
 const canonical_event_type = "investment.intent";
 const model_backend_id = "fixture.ai_infra";
@@ -224,7 +224,7 @@ pub fn buildAllowedTradeChain(
 
     events[4] = audit.buildEvent(header(4, "tkadpt", thesis_input.account_id, capability_id, prev_hash), .{
         .financial_adapter_call = .{
-            .adapter_id = parseFixedAsciiBytes(16, "portfolio_demo"),
+            .adapter_id = parseFixedAsciiBytes(16, "portfolio"),
             .request_hash = hashBytes("portfolio.read"),
             .response_hash = hashAffordability(affordability),
             .fixture_id = 1,
@@ -234,7 +234,7 @@ pub fn buildAllowedTradeChain(
 
     events[5] = audit.buildEvent(header(5, "tkadpt", thesis_input.account_id, capability_id, prev_hash), .{
         .financial_adapter_call = .{
-            .adapter_id = parseFixedAsciiBytes(16, "quotes_demo"),
+            .adapter_id = parseFixedAsciiBytes(16, "quotes"),
             .request_hash = normalized_hash,
             .response_hash = quote_response_hash,
             .fixture_id = 2,
@@ -253,7 +253,7 @@ pub fn buildAllowedTradeChain(
 
     events[7] = audit.buildEvent(header(7, "tkadpt", thesis_input.account_id, capability_id, prev_hash), .{
         .financial_adapter_call = .{
-            .adapter_id = parseFixedAsciiBytes(16, "paper_fill_demo"),
+            .adapter_id = parseFixedAsciiBytes(16, "paper_fill"),
             .request_hash = proposal_hash,
             .response_hash = paper_response_hash,
             .fixture_id = 3,
@@ -333,7 +333,7 @@ pub fn buildOversizedTradeBlockedChain(
 
     events[4] = audit.buildEvent(header(4, "tkadpt", thesis_input.account_id, capability_id, prev_hash), .{
         .financial_adapter_call = .{
-            .adapter_id = parseFixedAsciiBytes(16, "portfolio_demo"),
+            .adapter_id = parseFixedAsciiBytes(16, "portfolio"),
             .request_hash = hashBytes("portfolio.read"),
             .response_hash = hashAffordability(affordability),
             .fixture_id = 1,
@@ -343,7 +343,7 @@ pub fn buildOversizedTradeBlockedChain(
 
     events[5] = audit.buildEvent(header(5, "tkadpt", thesis_input.account_id, capability_id, prev_hash), .{
         .financial_adapter_call = .{
-            .adapter_id = parseFixedAsciiBytes(16, "quotes_demo"),
+            .adapter_id = parseFixedAsciiBytes(16, "quotes"),
             .request_hash = normalized_hash,
             .response_hash = quote_response_hash,
             .fixture_id = 2,

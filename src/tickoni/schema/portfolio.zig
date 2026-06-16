@@ -1,9 +1,9 @@
-/// Demo brokerage account schema and affordability checks for V1.1.S4.
+/// Test brokerage account schema and affordability checks for V1.1.S4.
 ///
 /// BrokerageAccount: account id, cash, buying power, currency, holdings,
 /// open orders, day notional used, and month notional used (T1).
 ///
-/// fixtures: five deterministic demo accounts — cash_rich, low_cash,
+/// fixtures: five deterministic test accounts — cash_rich, low_cash,
 /// technology_heavy, diversified, and restricted_account (T2).
 ///
 /// checkAffordability(): derives cash available, buying power, remaining daily
@@ -64,10 +64,10 @@ pub const OpenOrder = struct {
     }
 };
 
-/// Demo brokerage account snapshot (T1).
+/// Test brokerage account snapshot (T1).
 ///
 /// buying_power_cents is already net of open-order commitments and any pending
-/// settlement holds as reported by the demo account provider.  It is the
+/// settlement holds as reported by the test account provider.  It is the
 /// binding limit for a new paper or sandbox order.  cash_cents is the raw
 /// balance before deductions; it may be higher than buying_power_cents when
 /// open orders have committed part of the balance.
@@ -202,7 +202,7 @@ pub fn checkAffordability(
 }
 
 /// Check affordability for a concrete basket and ensure the basket belongs to
-/// the same demo account fixture.
+/// the same test account fixture.
 pub fn checkBasketAffordability(
     account: *const BrokerageAccount,
     proposed_basket: *const basket.Basket,
@@ -247,14 +247,14 @@ fn mkOpenOrder(comptime ticker_s: []const u8, side: Side, notional_cents: i64) O
 }
 
 // ---------------------------------------------------------------------------
-// Demo fixtures (T2)
+// Test fixtures (T2)
 // ---------------------------------------------------------------------------
 
-/// Deterministic demo fixtures for the five canonical V1.1.S4 account scenarios.
+/// Deterministic test fixtures for the five canonical V1.1.S4 account scenarios.
 pub const fixtures = struct {
     /// cash_rich: USD 50,000 cash/buying power, no holdings, no open orders.
     /// USD 25,000/day and USD 100,000/month notional limits.  The canonical
-    /// demo account for the USD 2,000 AI infrastructure paper trade.
+    /// test account for the USD 2,000 AI infrastructure paper trade.
     pub const cash_rich: BrokerageAccount = .{
         .account_id = 2001,
         .currency = .usd,

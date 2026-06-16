@@ -499,7 +499,7 @@ test "basket_schema_version is 1" {
     try std.testing.expectEqual(@as(u16, 1), basket_schema_version);
 }
 
-// --- Acceptance: >= 4 eligible, >= 2 rejected for AI infrastructure demo ---
+// --- Acceptance: >= 4 eligible, >= 2 rejected for AI infrastructure scenario ---
 
 test "build: ai_infrastructure produces >= 4 instruments and >= 2 rejected" {
     const input = thesis.fixtures.ai_infrastructure;

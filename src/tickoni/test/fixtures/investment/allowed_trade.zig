@@ -1,6 +1,6 @@
 // Scenario fixture contract: AI infrastructure allowed trade.
 //
-// Per doc/testing/v1-1-investment-demo-integration.md (S6-P1), this test
+// Per doc/testing/v1-1-investment-integration.md (S6-P1), this test
 // exercises the real Tickoni schema pipeline with external systems replaced
 // by recorded fixtures. No live model, adapter, broker, or execution call.
 //
@@ -8,7 +8,7 @@
 // invariants without involving tkmodl/tktool/tkadpt/tkrepl boundary wiring.
 //
 // Pipeline under test:
-//   thesis (demo ops input)
+//   thesis (operations account input)
 //     -> thesis.normalize()             [real tknorm logic]
 //     -> basket.build()                 [real basket construction]
 //     -> portfolio.checkAffordability() [real affordability check]
@@ -20,7 +20,7 @@
 //   - basket contains >= 4 eligible AI infrastructure instruments
 //   - restricted instruments (SOXL, BULZ) do not appear in basket
 //   - basket total allocated == target notional (USD 2,000)
-//   - affordability outcome is allow for demo ops account
+//   - affordability outcome is allow for ops account
 //   - effective max paper trade amount is min(max_affordable, policy_per_order)
 //   - paper execution fills are consistent with basket line items
 //   - basket id and thesis id are distinct and stable
@@ -31,8 +31,8 @@ const thesis = @import("thesis");
 const basket_mod = @import("basket");
 const portfolio = @import("portfolio");
 
-// Numeric id for "brokerage.demo_ops" as stored in portfolio.fixtures.cash_rich.
-const demo_ops_account_id: u32 = 2001;
+// Numeric id for "brokerage.operations" as stored in portfolio.fixtures.cash_rich.
+const operations_account_id: u32 = 2001;
 
 // Target notional from thesis_allowed_2000.json.
 const target_notional_cents: i64 = 200_000;
@@ -58,11 +58,11 @@ const paper_fills_cents = [expected_instrument_count]i64{
 const expected_equity_alloc_cents: i64 = 25_000;
 const expected_etf_alloc_cents: i64 = 37_500;
 
-// Build the demo ops thesis input by taking the canonical AI infra fixture
-// and substituting the numeric account id for brokerage.demo_ops.
-fn demoOpsThesisInput() thesis.ThesisInput {
+// Build the operations thesis input by taking the canonical AI infra fixture
+// and substituting the numeric account id for brokerage.operations.
+fn operationsThesisInput() thesis.ThesisInput {
     var input = thesis.fixtures.ai_infrastructure;
-    input.account_id = demo_ops_account_id;
+    input.account_id = operations_account_id;
     // max_single_name_weight_bp in policy_investment.json = 2500 bp = 25%
     input.max_single_name_pct = 25;
     return input;
@@ -72,10 +72,10 @@ fn demoOpsThesisInput() thesis.ThesisInput {
 // Thesis normalization assertions
 // ---------------------------------------------------------------------------
 
-test "ai_infrastructure_allowed_trade: thesis normalization succeeds for demo ops account" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: thesis normalization succeeds for ops account" {
+    const input = operationsThesisInput();
     const intent = try thesis.normalize(input);
-    try std.testing.expectEqual(demo_ops_account_id, intent.account_id);
+    try std.testing.expectEqual(operations_account_id, intent.account_id);
     try std.testing.expectEqual(thesis.SectorTheme.ai_infrastructure, intent.theme);
     try std.testing.expectEqual(target_notional_cents, intent.target_amount_cents);
     try std.testing.expect(intent.allowed_asset_classes.equity);
@@ -90,16 +90,16 @@ test "ai_infrastructure_allowed_trade: thesis normalization succeeds for demo op
     try std.testing.expectEqual(thesis.RiskPreference.moderate, intent.risk_preference);
 }
 
-test "ai_infrastructure_allowed_trade: thesis input hash is stable across calls" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: thesis input hash is stable across calls" {
+    const input = operationsThesisInput();
     const h1 = thesis.computeThesisInputHash(input);
     const h2 = thesis.computeThesisInputHash(input);
     try std.testing.expectEqual(h1, h2);
     try std.testing.expect(h1 != 0);
 }
 
-test "ai_infrastructure_allowed_trade: thesis hash changes when target notional changes" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: thesis hash changes when target notional changes" {
+    const input = operationsThesisInput();
     var oversized = input;
     oversized.target_notional_cents = 2_500_000;
     try std.testing.expect(
@@ -111,24 +111,24 @@ test "ai_infrastructure_allowed_trade: thesis hash changes when target notional 
 // Basket construction assertions
 // ---------------------------------------------------------------------------
 
-test "ai_infrastructure_allowed_trade: basket contains >= 4 eligible AI infrastructure instruments" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: basket contains >= 4 eligible AI infrastructure instruments" {
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
     try std.testing.expect(b.instrument_count >= 4);
 }
 
-test "ai_infrastructure_allowed_trade: basket contains exactly expected instrument count" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: basket contains exactly expected instrument count" {
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
     try std.testing.expectEqual(expected_instrument_count, b.instrument_count);
 }
 
-test "ai_infrastructure_allowed_trade: restricted instruments not in basket" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: restricted instruments not in basket" {
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
@@ -138,8 +138,8 @@ test "ai_infrastructure_allowed_trade: restricted instruments not in basket" {
     }
 }
 
-test "ai_infrastructure_allowed_trade: restricted instruments appear in rejected candidates" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: restricted instruments appear in rejected candidates" {
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
@@ -161,16 +161,16 @@ test "ai_infrastructure_allowed_trade: restricted instruments appear in rejected
     try std.testing.expect(found_bulz);
 }
 
-test "ai_infrastructure_allowed_trade: basket total allocated equals USD 2000 target" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: basket total allocated equals USD 2000 target" {
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
     try std.testing.expectEqual(target_notional_cents, b.total_allocated_cents);
 }
 
-test "ai_infrastructure_allowed_trade: basket line item allocations sum to target" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: basket line item allocations sum to target" {
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
@@ -179,8 +179,8 @@ test "ai_infrastructure_allowed_trade: basket line item allocations sum to targe
     try std.testing.expectEqual(target_notional_cents, sum);
 }
 
-test "ai_infrastructure_allowed_trade: all basket allocations are positive" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: all basket allocations are positive" {
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
@@ -189,10 +189,10 @@ test "ai_infrastructure_allowed_trade: all basket allocations are positive" {
     }
 }
 
-test "ai_infrastructure_allowed_trade: ETF lines receive higher allocation than equity lines" {
+test "allowed_trade: ETF lines receive higher allocation than equity lines" {
     // With ETF preference enabled, ETFs get 1.5x the base equity weight.
     // Expected: ETF allocation (37500) > equity allocation (25000).
-    const input = demoOpsThesisInput();
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
@@ -218,16 +218,16 @@ test "ai_infrastructure_allowed_trade: ETF lines receive higher allocation than 
     try std.testing.expectEqual(expected_equity_alloc_cents, avg_eq);
 }
 
-test "ai_infrastructure_allowed_trade: basket account id matches demo ops account" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: basket account id matches operations account" {
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
-    try std.testing.expectEqual(demo_ops_account_id, b.account_id);
+    try std.testing.expectEqual(operations_account_id, b.account_id);
 }
 
-test "ai_infrastructure_allowed_trade: catalog schema version stamped on basket" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: catalog schema version stamped on basket" {
+    const input = operationsThesisInput();
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, 0);
     try std.testing.expectEqual(@as(u16, 1), b.catalog_schema_version);
@@ -237,18 +237,18 @@ test "ai_infrastructure_allowed_trade: catalog schema version stamped on basket"
 // Affordability and policy assertions
 // ---------------------------------------------------------------------------
 
-test "ai_infrastructure_allowed_trade: affordability outcome is allow for demo ops account" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: affordability outcome is allow for ops account" {
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
-    // portfolio.fixtures.cash_rich.account_id == demo_ops_account_id == 2001
+    // portfolio.fixtures.cash_rich.account_id == operations_account_id == 2001
     const result = try portfolio.checkBasketAffordability(&portfolio.fixtures.cash_rich, &b);
     try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, result.outcome);
     try std.testing.expectEqual(target_notional_cents, result.requested_notional_cents);
 }
 
-test "ai_infrastructure_allowed_trade: max affordable is day-limit-bound at USD 25000" {
+test "allowed_trade: max affordable is day-limit-bound at USD 25000" {
     // cash_rich: cash=5M, buying_power=5M, day_remaining=2.5M, month_remaining=10M.
     // max_affordable = min(5M, 5M, 2.5M, 10M) = 2.5M (day limit binds).
     const result = portfolio.checkAffordability(&portfolio.fixtures.cash_rich, target_notional_cents);
@@ -260,7 +260,7 @@ test "ai_infrastructure_allowed_trade: max affordable is day-limit-bound at USD 
     try std.testing.expectEqual(@as(i64, 10_000_000), result.remaining_monthly_notional_cents);
 }
 
-test "ai_infrastructure_allowed_trade: effective max paper trade is policy-per-order-bound at USD 2500" {
+test "allowed_trade: effective max paper trade is policy-per-order-bound at USD 2500" {
     // effective_max = min(max_affordable=2.5M, policy_per_order=250K) = 250K.
     // Target (200K) <= effective_max (250K): allowed.
     const result = portfolio.checkAffordability(&portfolio.fixtures.cash_rich, target_notional_cents);
@@ -273,16 +273,16 @@ test "ai_infrastructure_allowed_trade: effective max paper trade is policy-per-o
 // Paper execution fixture consistency assertions
 // ---------------------------------------------------------------------------
 
-test "ai_infrastructure_allowed_trade: paper execution fills sum to target notional" {
+test "allowed_trade: paper execution fills sum to target notional" {
     // Validates consistency with paper_execution_allowed_2000.json.
     var total: i64 = 0;
     for (paper_fills_cents) |f| total += f;
     try std.testing.expectEqual(target_notional_cents, total);
 }
 
-test "ai_infrastructure_allowed_trade: paper execution fill count matches basket instrument count" {
+test "allowed_trade: paper execution fill count matches basket instrument count" {
     // Every basket line item must have exactly one fill in the execution fixture.
-    const input = demoOpsThesisInput();
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
@@ -293,8 +293,8 @@ test "ai_infrastructure_allowed_trade: paper execution fill count matches basket
 // Determinism and replay-stability assertions
 // ---------------------------------------------------------------------------
 
-test "ai_infrastructure_allowed_trade: basket is deterministic across repeated builds" {
-    const input = demoOpsThesisInput();
+test "allowed_trade: basket is deterministic across repeated builds" {
+    const input = operationsThesisInput();
     const h = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b1 = try basket_mod.build(intent, h);
@@ -318,10 +318,10 @@ test "ai_infrastructure_allowed_trade: basket is deterministic across repeated b
     }
 }
 
-test "ai_infrastructure_allowed_trade: basket id and thesis id are distinct non-zero values" {
+test "allowed_trade: basket id and thesis id are distinct non-zero values" {
     // basket_id covers composition; thesis_id covers the source input.
     // Replay can detect basket-construction drift independent of the source thesis.
-    const input = demoOpsThesisInput();
+    const input = operationsThesisInput();
     const h = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, h);

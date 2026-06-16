@@ -1,7 +1,8 @@
-// End-to-end tile-boundary test: AI infrastructure allowed trade.
+// End-to-end tile-boundary test: AI infrastructure investment scenarios.
 //
-// This file exercises the fixture-backed tkmodl/tktool/tkadpt/tkrepl path and
-// audit chain generation on top of the deterministic scenario inputs.
+// All paths flow through tkcase (run_id derivation), tkdisp (work item dispatch),
+// and tkagnt (model + adapter calls) so every assertion touches the tile boundary,
+// not the underlying function directly.
 
 const std = @import("std");
 const adapter = @import("adapter");
@@ -12,10 +13,12 @@ const model = @import("model");
 const portfolio = @import("portfolio");
 const replay = @import("replay");
 const thesis = @import("thesis");
-const tool = @import("tool");
 const trade_ticket = @import("trade_ticket");
+const tkcase = @import("tkcase");
+const tkdisp = @import("tkdisp");
+const tkagnt = @import("tkagnt");
 
-const demo_ops_account_id: u32 = 2001;
+const operations_account_id: u32 = 2001;
 const target_notional_cents: i64 = 200_000;
 const oversized_target_notional_cents: i64 = 2_500_000;
 const policy_max_notional_per_order_cents: i64 = 250_000;
@@ -31,20 +34,20 @@ const ExpectedLine = struct {
     line_notional_cents: i64,
 };
 
-fn demoOpsThesisInputWithTarget(target_notional_cents_arg: i64) thesis.ThesisInput {
+fn operationsThesisInputWithTarget(target_notional_cents_arg: i64) thesis.ThesisInput {
     var input = thesis.fixtures.ai_infrastructure;
-    input.account_id = demo_ops_account_id;
+    input.account_id = operations_account_id;
     input.target_notional_cents = target_notional_cents_arg;
     input.max_single_name_pct = 25;
     return input;
 }
 
-fn demoOpsThesisInput() thesis.ThesisInput {
-    return demoOpsThesisInputWithTarget(target_notional_cents);
+fn operationsThesisInput() thesis.ThesisInput {
+    return operationsThesisInputWithTarget(target_notional_cents);
 }
 
-fn demoOpsRestrictedTickerInput() thesis.ThesisInput {
-    var input = demoOpsThesisInput();
+fn operationsRestrictedTickerInput() thesis.ThesisInput {
+    var input = operationsThesisInput();
     const user_text = "Buy SOXL in the AI infrastructure basket.";
     @memset(&input.user_text, 0);
     @memcpy(input.user_text[0..user_text.len], user_text);
@@ -76,56 +79,40 @@ fn findRejectedCandidate(
     return null;
 }
 
-test "allowed_trade_e2e: tkmodl tktool tkadpt build the allowed paper trade" {
+test "allowed_trade_e2e: tkcase tkdisp tkagnt build the allowed paper trade" {
     const allocator = std.testing.allocator;
-    const input = demoOpsThesisInput();
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const basket = try basket_mod.build(intent, thesis_id);
     try std.testing.expect(basketRejects(&basket, "SOXL"));
     try std.testing.expect(basketRejects(&basket, "BULZ"));
 
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+    const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
+
     var model_backend = model.Backend{ .fixture = .{} };
-    const model_request = model.ModelRequest{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{.{ .role = "user", .content = "ai infrastructure demo" }},
-    };
-    const model_response = try model_backend.call(allocator, model_request);
-    defer model_response.deinit(allocator);
-
-    try std.testing.expect(std.mem.indexOf(u8, model_response.content, "SOXX") != null);
-    try std.testing.expectEqual(@as(u32, 335), model_response.token_usage.total_tokens);
-
     var adapter_backend = adapter.Backend{ .fixture = .{} };
-
-    const portfolio_req = tool.normalizePortfolioRead(demo_ops_account_id);
-    const portfolio_result = try adapter_backend.call(portfolio_req);
-    const account = switch (portfolio_result) {
-        .portfolio_snapshot => |snapshot| snapshot,
-        else => unreachable,
-    };
-    const affordability = try portfolio.checkBasketAffordability(&account, &basket);
-    try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, affordability.outcome);
-
-    const quote_req = tool.normalizeQuoteRead(&basket);
-    const quote_result = try adapter_backend.call(quote_req);
-    const quote_snapshot = switch (quote_result) {
-        .quote_snapshot => |snapshot| snapshot,
-        else => unreachable,
-    };
-
-    const ticket = try trade_ticket.buildMarketBuyTicket(
+    const agent_result = try tkagnt.runInvestmentAgent(
+        allocator,
+        work_item,
         &basket,
-        &quote_snapshot,
-        affordability,
+        &model_backend,
+        &adapter_backend,
         policy_max_notional_per_order_cents,
         expected_ticket_id,
     );
+    defer agent_result.deinit(allocator);
 
-    try std.testing.expectEqual(trade_ticket.PolicyOutcome.allow, ticket.policy_outcome);
-    try std.testing.expectEqualStrings(expected_ticket_id, ticket.ticketIdSlice());
-    try std.testing.expectEqual(target_notional_cents, ticket.estimated_cost_cents);
-    try std.testing.expectEqual(@as(u8, 7), ticket.line_item_count);
+    try std.testing.expect(std.mem.indexOf(u8, agent_result.model_response.content, "SOXX") != null);
+    try std.testing.expectEqual(@as(u32, 335), agent_result.model_response.token_usage.total_tokens);
+
+    try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, agent_result.affordability.outcome);
+
+    try std.testing.expectEqual(trade_ticket.PolicyOutcome.allow, agent_result.ticket.policy_outcome);
+    try std.testing.expectEqualStrings(expected_ticket_id, agent_result.ticket.ticketIdSlice());
+    try std.testing.expectEqual(target_notional_cents, agent_result.ticket.estimated_cost_cents);
+    try std.testing.expectEqual(@as(u8, 7), agent_result.ticket.line_item_count);
 
     const expected_lines = [_]ExpectedLine{
         .{ .ticker = "NVDA", .quantity_micros = 2_000_000, .price_cents = 12_500, .line_notional_cents = 25_000 },
@@ -137,19 +124,13 @@ test "allowed_trade_e2e: tkmodl tktool tkadpt build the allowed paper trade" {
         .{ .ticker = "SOXX", .quantity_micros = 1_500_000, .price_cents = 25_000, .line_notional_cents = 37_500 },
     };
     for (expected_lines) |expected| {
-        const line = findLineItem(&ticket, expected.ticker) orelse return error.TestUnexpectedResult;
+        const line = findLineItem(&agent_result.ticket, expected.ticker) orelse return error.TestUnexpectedResult;
         try std.testing.expectEqual(expected.quantity_micros, line.quantity_micros);
         try std.testing.expectEqual(expected.price_cents, line.price_cents);
         try std.testing.expectEqual(expected.line_notional_cents, line.line_notional_cents);
     }
 
-    const paper_req = tool.normalizePaperOrder(&ticket);
-    const paper_result = try adapter_backend.call(paper_req);
-    const execution = switch (paper_result) {
-        .paper_order => |result| result,
-        else => unreachable,
-    };
-
+    const execution = agent_result.paper_result orelse return error.TestUnexpectedResult;
     try std.testing.expectEqual(trade_ticket.ExecutionStatus.filled, execution.status);
     try std.testing.expectEqual(target_notional_cents, execution.total_filled_cents);
     try std.testing.expectEqualStrings(expected_ticket_id, execution.ticketIdSlice());
@@ -159,52 +140,38 @@ test "allowed_trade_e2e: tkmodl tktool tkadpt build the allowed paper trade" {
 
 test "allowed_trade_e2e: replay succeeds with fixture substitutions and no live effects" {
     const allocator = std.testing.allocator;
-    const input = demoOpsThesisInput();
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const basket = try basket_mod.build(intent, thesis_id);
     try std.testing.expect(basketRejects(&basket, "SOXL"));
     try std.testing.expect(basketRejects(&basket, "BULZ"));
 
-    var model_backend = model.Backend{ .fixture = .{} };
-    const model_response = try model_backend.call(allocator, .{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{.{ .role = "user", .content = "ai infrastructure demo" }},
-    });
-    defer model_response.deinit(allocator);
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+    const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
 
+    var model_backend = model.Backend{ .fixture = .{} };
     var adapter_backend = adapter.Backend{ .fixture = .{} };
-    const account_result = try adapter_backend.call(tool.normalizePortfolioRead(demo_ops_account_id));
-    const account = switch (account_result) {
-        .portfolio_snapshot => |snapshot| snapshot,
-        else => unreachable,
-    };
-    const affordability = try portfolio.checkBasketAffordability(&account, &basket);
-    const quote_result = try adapter_backend.call(tool.normalizeQuoteRead(&basket));
-    const quote_snapshot = switch (quote_result) {
-        .quote_snapshot => |snapshot| snapshot,
-        else => unreachable,
-    };
-    const ticket = try trade_ticket.buildMarketBuyTicket(
+    const agent_result = try tkagnt.runInvestmentAgent(
+        allocator,
+        work_item,
         &basket,
-        &quote_snapshot,
-        affordability,
+        &model_backend,
+        &adapter_backend,
         policy_max_notional_per_order_cents,
         expected_ticket_id,
     );
-    const paper_result = try adapter_backend.call(tool.normalizePaperOrder(&ticket));
-    const execution = switch (paper_result) {
-        .paper_order => |result| result,
-        else => unreachable,
-    };
+    defer agent_result.deinit(allocator);
+
+    const execution = agent_result.paper_result orelse return error.TestUnexpectedResult;
 
     const replay_result = try replay.verifyAllowedTrade(
         allocator,
         std.testing.io,
         &basket,
-        &ticket,
+        &agent_result.ticket,
         &execution,
-        &model_response,
+        &agent_result.model_response,
     );
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(replay_result.replay_match);
@@ -215,10 +182,10 @@ test "allowed_trade_e2e: replay succeeds with fixture substitutions and no live 
     const audit_chain = investment_audit.buildAllowedTradeChain(
         &input,
         &basket,
-        &quote_snapshot,
-        affordability,
-        &model_response,
-        &ticket,
+        &agent_result.quote_snapshot,
+        agent_result.affordability,
+        &agent_result.model_response,
+        &agent_result.ticket,
         &execution,
         &replay_result,
     );
@@ -244,51 +211,37 @@ test "allowed_trade_e2e: replay succeeds with fixture substitutions and no live 
 
 test "allowed_trade_e2e: replay tamper detection reports first divergent hash and sequence" {
     const allocator = std.testing.allocator;
-    const input = demoOpsThesisInput();
+    const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const basket = try basket_mod.build(intent, thesis_id);
 
-    var model_backend = model.Backend{ .fixture = .{} };
-    const model_response = try model_backend.call(allocator, .{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{.{ .role = "user", .content = "ai infrastructure demo" }},
-    });
-    defer model_response.deinit(allocator);
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+    const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
 
+    var model_backend = model.Backend{ .fixture = .{} };
     var adapter_backend = adapter.Backend{ .fixture = .{} };
-    const account_result = try adapter_backend.call(tool.normalizePortfolioRead(demo_ops_account_id));
-    const account = switch (account_result) {
-        .portfolio_snapshot => |snapshot| snapshot,
-        else => unreachable,
-    };
-    const affordability = try portfolio.checkBasketAffordability(&account, &basket);
-    const quote_result = try adapter_backend.call(tool.normalizeQuoteRead(&basket));
-    const quote_snapshot = switch (quote_result) {
-        .quote_snapshot => |snapshot| snapshot,
-        else => unreachable,
-    };
-    const ticket = try trade_ticket.buildMarketBuyTicket(
+    const agent_result = try tkagnt.runInvestmentAgent(
+        allocator,
+        work_item,
         &basket,
-        &quote_snapshot,
-        affordability,
+        &model_backend,
+        &adapter_backend,
         policy_max_notional_per_order_cents,
         expected_ticket_id,
     );
-    const paper_result = try adapter_backend.call(tool.normalizePaperOrder(&ticket));
-    const execution = switch (paper_result) {
-        .paper_order => |result| result,
-        else => unreachable,
-    };
+    defer agent_result.deinit(allocator);
+
+    const execution = agent_result.paper_result orelse return error.TestUnexpectedResult;
 
     const replay_result = try replay.verifyAllowedTradeWithCapsulePath(
         allocator,
         std.testing.io,
         tampered_replay_capsule_path,
         &basket,
-        &ticket,
+        &agent_result.ticket,
         &execution,
-        &model_response,
+        &agent_result.model_response,
     );
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(!replay_result.replay_match);
@@ -299,10 +252,10 @@ test "allowed_trade_e2e: replay tamper detection reports first divergent hash an
     const audit_chain = investment_audit.buildAllowedTradeChain(
         &input,
         &basket,
-        &quote_snapshot,
-        affordability,
-        &model_response,
-        &ticket,
+        &agent_result.quote_snapshot,
+        agent_result.affordability,
+        &agent_result.model_response,
+        &agent_result.ticket,
         &execution,
         &replay_result,
     );
@@ -318,109 +271,81 @@ test "allowed_trade_e2e: replay tamper detection reports first divergent hash an
 
 test "allowed_trade_e2e: oversized trade is blocked before paper execution" {
     const allocator = std.testing.allocator;
-    const input = demoOpsThesisInputWithTarget(oversized_target_notional_cents);
+    const input = operationsThesisInputWithTarget(oversized_target_notional_cents);
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const basket = try basket_mod.build(intent, thesis_id);
     try std.testing.expect(basketRejects(&basket, "SOXL"));
     try std.testing.expect(basketRejects(&basket, "BULZ"));
 
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+    const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
+
     var model_backend = model.Backend{ .fixture = .{} };
-    const model_request = model.ModelRequest{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{.{ .role = "user", .content = "ai infrastructure oversized demo" }},
-    };
-    const model_response = try model_backend.call(allocator, model_request);
-    defer model_response.deinit(allocator);
-
     var adapter_backend = adapter.Backend{ .fixture = .{} };
-    const portfolio_result = try adapter_backend.call(tool.normalizePortfolioRead(demo_ops_account_id));
-    const account = switch (portfolio_result) {
-        .portfolio_snapshot => |snapshot| snapshot,
-        else => unreachable,
-    };
-    const affordability = try portfolio.checkBasketAffordability(&account, &basket);
-    try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, affordability.outcome);
-    try std.testing.expectEqual(@as(i64, 2_500_000), affordability.max_affordable_cents);
-
-    const quote_result = try adapter_backend.call(tool.normalizeQuoteRead(&basket));
-    const quote_snapshot = switch (quote_result) {
-        .quote_snapshot => |snapshot| snapshot,
-        else => unreachable,
-    };
-
-    const ticket = try trade_ticket.buildMarketBuyTicket(
+    const agent_result = try tkagnt.runInvestmentAgent(
+        allocator,
+        work_item,
         &basket,
-        &quote_snapshot,
-        affordability,
+        &model_backend,
+        &adapter_backend,
         policy_max_notional_per_order_cents,
         expected_blocked_ticket_id,
     );
+    defer agent_result.deinit(allocator);
 
-    try std.testing.expectEqual(trade_ticket.PolicyOutcome.deny, ticket.policy_outcome);
-    try std.testing.expectEqualStrings(expected_blocked_ticket_id, ticket.ticketIdSlice());
-    try std.testing.expectEqual(oversized_target_notional_cents, ticket.estimated_cost_cents);
-    try std.testing.expectEqual(@as(i64, 250_000), ticket.affordability_result.effective_max_paper_trade_cents);
-    try std.testing.expectEqual(@as(u8, 1), ticket.blocked_reason_count);
+    try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, agent_result.affordability.outcome);
+    try std.testing.expectEqual(@as(i64, 2_500_000), agent_result.affordability.max_affordable_cents);
+
+    try std.testing.expectEqual(trade_ticket.PolicyOutcome.deny, agent_result.ticket.policy_outcome);
+    try std.testing.expectEqualStrings(expected_blocked_ticket_id, agent_result.ticket.ticketIdSlice());
+    try std.testing.expectEqual(oversized_target_notional_cents, agent_result.ticket.estimated_cost_cents);
+    try std.testing.expectEqual(@as(i64, 250_000), agent_result.ticket.affordability_result.effective_max_paper_trade_cents);
+    try std.testing.expectEqual(@as(u8, 1), agent_result.ticket.blocked_reason_count);
     try std.testing.expectEqual(
         trade_ticket.BlockedReasonCode.per_order_notional_exceeded,
-        ticket.blocked_reasons[0].code,
+        agent_result.ticket.blocked_reasons[0].code,
     );
     try std.testing.expectEqual(
         trade_ticket.FailedScopeDimension.per_order_notional,
-        ticket.blocked_reasons[0].failed_scope_dim,
+        agent_result.ticket.blocked_reasons[0].failed_scope_dim,
     );
-    try std.testing.expectEqual(oversized_target_notional_cents, ticket.blocked_reasons[0].requested_cents);
-    try std.testing.expectEqual(@as(i64, 250_000), ticket.blocked_reasons[0].limit_cents);
+    try std.testing.expectEqual(oversized_target_notional_cents, agent_result.ticket.blocked_reasons[0].requested_cents);
+    try std.testing.expectEqual(@as(i64, 250_000), agent_result.ticket.blocked_reasons[0].limit_cents);
 
-    var paper_order_attempts: u32 = 0;
-    if (ticket.policy_outcome == .allow) {
-        paper_order_attempts += 1;
-        _ = try adapter_backend.call(tool.normalizePaperOrder(&ticket));
-    }
-    try std.testing.expectEqual(@as(u32, 0), paper_order_attempts);
+    // Agent must not place a paper order when the ticket is denied.
+    try std.testing.expect(agent_result.paper_result == null);
 }
 
 test "allowed_trade_e2e: oversized trade replay and audit reproduce the deny" {
     const allocator = std.testing.allocator;
-    const input = demoOpsThesisInputWithTarget(oversized_target_notional_cents);
+    const input = operationsThesisInputWithTarget(oversized_target_notional_cents);
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const basket = try basket_mod.build(intent, thesis_id);
 
-    var model_backend = model.Backend{ .fixture = .{} };
-    const model_response = try model_backend.call(allocator, .{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{.{ .role = "user", .content = "ai infrastructure oversized demo" }},
-    });
-    defer model_response.deinit(allocator);
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+    const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
 
+    var model_backend = model.Backend{ .fixture = .{} };
     var adapter_backend = adapter.Backend{ .fixture = .{} };
-    const account_result = try adapter_backend.call(tool.normalizePortfolioRead(demo_ops_account_id));
-    const account = switch (account_result) {
-        .portfolio_snapshot => |snapshot| snapshot,
-        else => unreachable,
-    };
-    const affordability = try portfolio.checkBasketAffordability(&account, &basket);
-    const quote_result = try adapter_backend.call(tool.normalizeQuoteRead(&basket));
-    const quote_snapshot = switch (quote_result) {
-        .quote_snapshot => |snapshot| snapshot,
-        else => unreachable,
-    };
-    const ticket = try trade_ticket.buildMarketBuyTicket(
+    const agent_result = try tkagnt.runInvestmentAgent(
+        allocator,
+        work_item,
         &basket,
-        &quote_snapshot,
-        affordability,
+        &model_backend,
+        &adapter_backend,
         policy_max_notional_per_order_cents,
         expected_blocked_ticket_id,
     );
+    defer agent_result.deinit(allocator);
 
     const replay_result = try replay.verifyOversizedTradeBlock(
         allocator,
         std.testing.io,
         &basket,
-        &ticket,
-        &model_response,
+        &agent_result.ticket,
+        &agent_result.model_response,
     );
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(replay_result.replay_match);
@@ -431,10 +356,10 @@ test "allowed_trade_e2e: oversized trade replay and audit reproduce the deny" {
     const audit_chain = investment_audit.buildOversizedTradeBlockedChain(
         &input,
         &basket,
-        &quote_snapshot,
-        affordability,
-        &model_response,
-        &ticket,
+        &agent_result.quote_snapshot,
+        agent_result.affordability,
+        &agent_result.model_response,
+        &agent_result.ticket,
         &replay_result,
     );
     try std.testing.expectEqual(
@@ -467,7 +392,7 @@ test "allowed_trade_e2e: oversized trade replay and audit reproduce the deny" {
 
 test "allowed_trade_e2e: direct restricted ticker request is denied before adapter work" {
     const allocator = std.testing.allocator;
-    const input = demoOpsRestrictedTickerInput();
+    const input = operationsRestrictedTickerInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const basket = try basket_mod.build(intent, thesis_id);
@@ -477,27 +402,24 @@ test "allowed_trade_e2e: direct restricted ticker request is denied before adapt
     try std.testing.expect(std.mem.indexOf(u8, rejected.reasonSlice(), "leveraged ETF") != null);
     try std.testing.expect(basketRejects(&basket, restricted_ticker));
 
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+    const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
+
+    // Policy denies: only tkmodl is called; no adapter work occurs.
     var model_backend = model.Backend{ .fixture = .{} };
-    const model_response = try model_backend.call(allocator, .{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{.{ .role = "user", .content = "buy soxl direct request demo" }},
-    });
-    defer model_response.deinit(allocator);
+    const block_result = try tkagnt.runRestrictedInstrumentDenialAgent(
+        allocator,
+        work_item,
+        &model_backend,
+    );
+    defer block_result.deinit(allocator);
 
-    var adapter_call_attempts: u32 = 0;
-    var ticket_build_attempts: u32 = 0;
-    if (rejected.reason_code != .restricted_instrument) {
-        ticket_build_attempts += 1;
-        adapter_call_attempts += 1;
-    }
-
-    try std.testing.expectEqual(@as(u32, 0), ticket_build_attempts);
-    try std.testing.expectEqual(@as(u32, 0), adapter_call_attempts);
+    try std.testing.expectEqual(run_id, block_result.run_id);
 }
 
 test "allowed_trade_e2e: restricted ticker replay and audit reproduce the deny" {
     const allocator = std.testing.allocator;
-    const input = demoOpsRestrictedTickerInput();
+    const input = operationsRestrictedTickerInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const basket = try basket_mod.build(intent, thesis_id);
@@ -505,19 +427,23 @@ test "allowed_trade_e2e: restricted ticker replay and audit reproduce the deny" 
     const rejected = findRejectedCandidate(&basket, restricted_ticker) orelse return error.TestUnexpectedResult;
     try std.testing.expectEqual(basket_mod.RejectionReason.restricted_instrument, rejected.reason_code);
 
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+    const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
+
     var model_backend = model.Backend{ .fixture = .{} };
-    const model_response = try model_backend.call(allocator, .{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{.{ .role = "user", .content = "buy soxl direct request demo" }},
-    });
-    defer model_response.deinit(allocator);
+    const block_result = try tkagnt.runRestrictedInstrumentDenialAgent(
+        allocator,
+        work_item,
+        &model_backend,
+    );
+    defer block_result.deinit(allocator);
 
     const replay_result = try replay.verifyRestrictedInstrumentBlock(
         allocator,
         std.testing.io,
         &basket,
         restricted_ticker,
-        &model_response,
+        &block_result.model_response,
     );
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(replay_result.replay_match);
@@ -528,7 +454,7 @@ test "allowed_trade_e2e: restricted ticker replay and audit reproduce the deny" 
     const audit_chain = investment_audit.buildRestrictedInstrumentBlockedChain(
         &input,
         &basket,
-        &model_response,
+        &block_result.model_response,
         &replay_result,
     );
     try std.testing.expectEqual(
