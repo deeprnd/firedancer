@@ -175,6 +175,16 @@ pub fn build(b: *std.Build) void {
     linkTickoniCodec(b, portfolio_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(portfolio_test).step);
 
+    // model tile: unit tests use MockBackend only, no network calls.
+    const model_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(model_test).step);
+
     // supervisor.zig imports runtime and tiles modules.
     const sup_mod = b.createModule(.{
         .root_source_file = b.path("src/app/tickoni/supervisor.zig"),
@@ -254,6 +264,25 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, v1_1_allowed_2000_test, fd_lib_dir);
     integration_step.dependOn(&b.addRunArtifact(v1_1_allowed_2000_test).step);
+
+    // model tile integration tests: require a running llama.cpp server.
+    // Tests skip (not fail) when the server is unreachable so unit-test CI
+    // lanes are not broken. Start the server with: just run-llm-server-cpu
+    const model_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const model_http_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/integration/model_tile_http.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{.{ .name = "model", .module = model_int_mod }},
+        }),
+    });
+    model_http_test.root_module.link_libc = true;
+    integration_step.dependOn(&b.addRunArtifact(model_http_test).step);
 
     // ---------------------------------------------------------------------------
     // Coverage step — install test binaries to zig-out/cov/ for kcov

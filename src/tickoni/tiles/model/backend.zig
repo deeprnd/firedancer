@@ -1,0 +1,231 @@
+const std = @import("std");
+const schema = @import("schema.zig");
+
+pub const ModelRequest = schema.ModelRequest;
+pub const ModelResponse = schema.ModelResponse;
+
+// MockBackend returns a pre-set canned response. Used in unit tests.
+pub const MockBackend = struct {
+    canned_content: []const u8,
+    canned_model_id: []const u8 = "mock",
+    canned_finish_reason: []const u8 = "stop",
+
+    pub fn call(self: MockBackend, allocator: std.mem.Allocator, req: ModelRequest) error{OutOfMemory}!ModelResponse {
+        _ = req;
+        return .{
+            .model_id = try allocator.dupe(u8, self.canned_model_id),
+            .content = try allocator.dupe(u8, self.canned_content),
+            .finish_reason = try allocator.dupe(u8, self.canned_finish_reason),
+            .token_usage = .{ .prompt_tokens = 0, .completion_tokens = 0, .total_tokens = 0 },
+            .latency_ms = 0,
+        };
+    }
+};
+
+// Wire types for the OpenAI-compatible chat completions API.
+const WireRequest = struct {
+    model: []const u8,
+    messages: []const schema.Message,
+    temperature: f32,
+    top_p: f32,
+    max_tokens: u32,
+    seed: u64,
+    stream: bool,
+};
+
+const WireChoice = struct {
+    message: struct {
+        content: []const u8,
+    },
+    finish_reason: ?[]const u8 = null,
+};
+
+const WireUsage = struct {
+    prompt_tokens: u32 = 0,
+    completion_tokens: u32 = 0,
+    total_tokens: u32 = 0,
+};
+
+const WireResponse = struct {
+    model: ?[]const u8 = null,
+    choices: []const WireChoice,
+    usage: WireUsage = .{},
+};
+
+// HttpBackend calls an OpenAI-compatible llama.cpp server.
+// endpoint must be a base URL like "http://127.0.0.1:8080/v1".
+// io is the std.Io instance for TCP connections (use std.testing.io in tests).
+pub const HttpBackend = struct {
+    endpoint: []const u8,
+    io: std.Io,
+
+    pub fn call(self: HttpBackend, allocator: std.mem.Allocator, req: ModelRequest) !ModelResponse {
+        const url = try std.fmt.allocPrint(allocator, "{s}/chat/completions", .{self.endpoint});
+        defer allocator.free(url);
+
+        const wire_req = WireRequest{
+            .model = req.model_id,
+            .messages = req.messages,
+            .temperature = req.sampling.temperature,
+            .top_p = req.sampling.top_p,
+            .max_tokens = req.sampling.max_output_tokens,
+            .seed = req.sampling.seed,
+            .stream = false,
+        };
+
+        const json_body = try std.json.Stringify.valueAlloc(allocator, wire_req, .{});
+        defer allocator.free(json_body);
+
+        var client = std.http.Client{ .allocator = allocator, .io = self.io };
+        defer client.deinit();
+
+        var resp_writer: std.Io.Writer.Allocating = .init(allocator);
+        defer resp_writer.deinit();
+
+        const fetch_result = client.fetch(.{
+            .location = .{ .url = url },
+            .method = .POST,
+            .extra_headers = &.{.{ .name = "Content-Type", .value = "application/json" }},
+            .payload = json_body,
+            .response_writer = &resp_writer.writer,
+        }) catch |err| switch (err) {
+            error.ConnectionRefused, error.NetworkUnreachable, error.HostUnreachable => return error.ServerUnreachable,
+            else => return err,
+        };
+
+        if (fetch_result.status != .ok) return error.HttpStatusError;
+
+        const resp_bytes = resp_writer.written();
+
+        var parsed = try std.json.parseFromSlice(WireResponse, allocator, resp_bytes, .{
+            .ignore_unknown_fields = true,
+        });
+        defer parsed.deinit();
+
+        if (parsed.value.choices.len == 0) return error.EmptyChoices;
+
+        const choice = parsed.value.choices[0];
+
+        const model_id = try allocator.dupe(u8, parsed.value.model orelse req.model_id);
+        errdefer allocator.free(model_id);
+
+        const content = try allocator.dupe(u8, choice.message.content);
+        errdefer allocator.free(content);
+
+        const finish_reason = try allocator.dupe(u8, choice.finish_reason orelse "unknown");
+
+        return .{
+            .model_id = model_id,
+            .content = content,
+            .finish_reason = finish_reason,
+            .token_usage = .{
+                .prompt_tokens = parsed.value.usage.prompt_tokens,
+                .completion_tokens = parsed.value.usage.completion_tokens,
+                .total_tokens = parsed.value.usage.total_tokens,
+            },
+            .latency_ms = 0,
+        };
+    }
+};
+
+// Backend dispatches between mock and http implementations.
+// Use .mock in unit tests, .http in integration tests.
+pub const Backend = union(enum) {
+    mock: MockBackend,
+    http: HttpBackend,
+
+    pub fn call(self: *Backend, allocator: std.mem.Allocator, req: ModelRequest) anyerror!ModelResponse {
+        return switch (self.*) {
+            .mock => |m| m.call(allocator, req),
+            .http => |h| h.call(allocator, req),
+        };
+    }
+};
+
+// ---------------------------------------------------------------------------
+// Unit tests: MockBackend and Backend dispatch. No network calls.
+// ---------------------------------------------------------------------------
+
+test "MockBackend returns canned response" {
+    const allocator = std.testing.allocator;
+    const mock = MockBackend{
+        .canned_content = "test response",
+        .canned_model_id = "mock-v1",
+    };
+    const req = ModelRequest{ .model_id = "any", .messages = &.{} };
+    const resp = try mock.call(allocator, req);
+    defer resp.deinit(allocator);
+
+    try std.testing.expectEqualStrings("test response", resp.content);
+    try std.testing.expectEqualStrings("mock-v1", resp.model_id);
+    try std.testing.expectEqualStrings("stop", resp.finish_reason);
+    try std.testing.expectEqual(@as(u64, 0), resp.latency_ms);
+    try std.testing.expectEqual(@as(u32, 0), resp.token_usage.total_tokens);
+}
+
+test "MockBackend default model_id and finish_reason" {
+    const allocator = std.testing.allocator;
+    const mock = MockBackend{ .canned_content = "hello" };
+    const req = ModelRequest{ .model_id = "any", .messages = &.{} };
+    const resp = try mock.call(allocator, req);
+    defer resp.deinit(allocator);
+
+    try std.testing.expectEqualStrings("mock", resp.model_id);
+    try std.testing.expectEqualStrings("stop", resp.finish_reason);
+}
+
+test "MockBackend is deterministic across calls" {
+    const allocator = std.testing.allocator;
+    const mock = MockBackend{ .canned_content = "deterministic output" };
+    const req = ModelRequest{ .model_id = "x", .messages = &.{} };
+
+    const r1 = try mock.call(allocator, req);
+    defer r1.deinit(allocator);
+    const r2 = try mock.call(allocator, req);
+    defer r2.deinit(allocator);
+
+    try std.testing.expectEqualStrings(r1.content, r2.content);
+    try std.testing.expectEqualStrings(r1.model_id, r2.model_id);
+    try std.testing.expectEqualStrings(r1.finish_reason, r2.finish_reason);
+    try std.testing.expectEqual(r1.token_usage.total_tokens, r2.token_usage.total_tokens);
+}
+
+test "Backend union dispatches to mock" {
+    const allocator = std.testing.allocator;
+    var backend = Backend{ .mock = .{ .canned_content = "from mock backend" } };
+    const req = ModelRequest{ .model_id = "any", .messages = &.{} };
+
+    const resp = try backend.call(allocator, req);
+    defer resp.deinit(allocator);
+
+    try std.testing.expectEqualStrings("from mock backend", resp.content);
+}
+
+test "MockBackend ignores request model_id and messages" {
+    const allocator = std.testing.allocator;
+    const mock = MockBackend{ .canned_content = "fixed" };
+    const messages = [_]schema.Message{
+        .{ .role = "user", .content = "hello" },
+    };
+    const req = ModelRequest{
+        .model_id = "gpt-999",
+        .messages = &messages,
+        .sampling = .{ .temperature = 0.8, .max_output_tokens = 1024 },
+    };
+    const resp = try mock.call(allocator, req);
+    defer resp.deinit(allocator);
+
+    try std.testing.expectEqualStrings("fixed", resp.content);
+}
+
+test "ModelResponse token_usage fields accessible" {
+    const allocator = std.testing.allocator;
+    const mock = MockBackend{ .canned_content = "x" };
+    const req = ModelRequest{ .model_id = "any", .messages = &.{} };
+    const resp = try mock.call(allocator, req);
+    defer resp.deinit(allocator);
+
+    try std.testing.expectEqual(@as(u32, 0), resp.token_usage.prompt_tokens);
+    try std.testing.expectEqual(@as(u32, 0), resp.token_usage.completion_tokens);
+    try std.testing.expectEqual(@as(u32, 0), resp.token_usage.total_tokens);
+}
