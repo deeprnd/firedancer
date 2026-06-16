@@ -8,6 +8,7 @@ pub const TokenUsage = schema.TokenUsage;
 pub const ModelResponse = schema.ModelResponse;
 
 pub const MockBackend = backend.MockBackend;
+pub const FixtureBackend = backend.FixtureBackend;
 pub const HttpBackend = backend.HttpBackend;
 pub const Backend = backend.Backend;
 

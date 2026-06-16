@@ -77,6 +77,41 @@ const payment_channels = [_]Channel{
     .{ .src_idx = 3, .dst_idx = 4, .depth = 64, .mtu = 128 },
 };
 
+const investment_demo_tiles = [_]TileDescriptor{
+    .{ .id = TileId.parse("tkings") catch unreachable, .name = "ingest_tile", .phase = 0 },
+    .{ .id = TileId.parse("tknorm") catch unreachable, .name = "normalize_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkdedu") catch unreachable, .name = "dedupe_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkcase") catch unreachable, .name = "case_router_tile", .phase = 2 },
+    .{ .id = TileId.parse("tkpoly") catch unreachable, .name = "policy_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkaudt") catch unreachable, .name = "audit_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkdisp") catch unreachable, .name = "agent_dispatch_tile", .phase = 1 },
+    .{ .id = TileId.parse("tkagnt") catch unreachable, .name = "agent_worker_tile", .phase = 1 },
+    .{ .id = TileId.parse("tkmodl") catch unreachable, .name = "model_gateway_tile", .phase = 1 },
+    .{ .id = TileId.parse("tktool") catch unreachable, .name = "tool_broker_tile", .phase = 1 },
+    .{ .id = TileId.parse("tkadpt") catch unreachable, .name = "adapter_tile", .phase = 1 },
+    .{ .id = TileId.parse("tkrepl") catch unreachable, .name = "replay_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkmetr") catch unreachable, .name = "metric_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkdiag") catch unreachable, .name = "diag_tile", .phase = 0 },
+};
+
+const investment_demo_channels = [_]Channel{
+    .{ .src_idx = 0, .dst_idx = 1, .depth = 64, .mtu = 256 },
+    .{ .src_idx = 1, .dst_idx = 2, .depth = 64, .mtu = 256 },
+    .{ .src_idx = 2, .dst_idx = 3, .depth = 64, .mtu = 256 },
+    .{ .src_idx = 3, .dst_idx = 4, .depth = 64, .mtu = 256 },
+    .{ .src_idx = 3, .dst_idx = 6, .depth = 32, .mtu = 256 },
+    .{ .src_idx = 6, .dst_idx = 7, .depth = 32, .mtu = 256 },
+    .{ .src_idx = 7, .dst_idx = 8, .depth = 32, .mtu = 1024 },
+    .{ .src_idx = 7, .dst_idx = 9, .depth = 32, .mtu = 512 },
+    .{ .src_idx = 9, .dst_idx = 10, .depth = 32, .mtu = 512 },
+    .{ .src_idx = 4, .dst_idx = 5, .depth = 64, .mtu = 256 },
+    .{ .src_idx = 8, .dst_idx = 5, .depth = 32, .mtu = 256 },
+    .{ .src_idx = 9, .dst_idx = 5, .depth = 32, .mtu = 256 },
+    .{ .src_idx = 10, .dst_idx = 5, .depth = 32, .mtu = 256 },
+    .{ .src_idx = 7, .dst_idx = 5, .depth = 32, .mtu = 256 },
+    .{ .src_idx = 5, .dst_idx = 11, .depth = 32, .mtu = 256 },
+};
+
 /// Phase 0 in-process pipeline used by the Tickoni product supervisor.
 ///
 ///   tkings -> tknorm -> tkdedu -> tkpoly -> tkaudt
@@ -87,6 +122,13 @@ pub fn paymentPipeline() Topology {
     return .{
         .tiles = &payment_tiles,
         .channels = &payment_channels,
+    };
+}
+
+pub fn investmentDemo() Topology {
+    return .{
+        .tiles = &investment_demo_tiles,
+        .channels = &investment_demo_channels,
     };
 }
 
@@ -125,6 +167,16 @@ test "paymentPipeline has Phase 0 product tiles and channels" {
 
 test "paymentPipeline passes validation" {
     try paymentPipeline().validate();
+}
+
+test "investmentDemo includes tkmodl tktool tkadpt and passes validation" {
+    const topo = investmentDemo();
+    try topo.validate();
+    try std.testing.expectEqual(@as(usize, 14), topo.tiles.len);
+    try std.testing.expectEqualStrings("tkmodl", topo.tiles[8].id.slice());
+    try std.testing.expectEqualStrings("tktool", topo.tiles[9].id.slice());
+    try std.testing.expectEqualStrings("tkadpt", topo.tiles[10].id.slice());
+    try std.testing.expectEqualStrings("tkrepl", topo.tiles[11].id.slice());
 }
 
 test "validate rejects non-power-of-two channel depth" {

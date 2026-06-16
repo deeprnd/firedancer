@@ -256,6 +256,16 @@ pub fn build(b: *std.Build) void {
             .{ .name = "basket.zig", .module = basket_int_mod },
         },
     });
+    const trade_ticket_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/trade_ticket.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "thesis", .module = thesis_int_mod },
+        },
+    });
 
     const v1_1_allowed_2000_test = b.addTest(.{
         .root_module = b.createModule(.{
@@ -273,14 +283,82 @@ pub fn build(b: *std.Build) void {
     const v1_1_run = b.addRunArtifact(v1_1_allowed_2000_test);
     integration_step.dependOn(&v1_1_run.step);
 
-    // model tile integration tests: require a running llama.cpp server.
-    // Tests skip (not fail) when the server is unreachable so unit-test CI
-    // lanes are not broken. Start the server with: just infra-run-llamacpp-cpu
     const model_int_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
         .target = target,
         .optimize = optimize,
     });
+    const adapter_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/adapter/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+        },
+    });
+    const tool_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/tool/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "adapter", .module = adapter_int_mod },
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+        },
+    });
+    const replay_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/replay/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "model", .module = model_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+        },
+    });
+    const investment_audit_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/audit/investment_demo.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "audit_tile", .module = audit_tile_mod },
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "model", .module = model_int_mod },
+            .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "replay", .module = replay_int_mod },
+            .{ .name = "thesis", .module = thesis_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+        },
+    });
+    const v1_1_allowed_2000_e2e_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/integration/v1_1_allowed_2000_e2e.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "adapter", .module = adapter_int_mod },
+                .{ .name = "audit_tile", .module = audit_tile_mod },
+                .{ .name = "basket", .module = basket_int_mod },
+                .{ .name = "investment_audit", .module = investment_audit_int_mod },
+                .{ .name = "model", .module = model_int_mod },
+                .{ .name = "portfolio", .module = portfolio_int_mod },
+                .{ .name = "replay", .module = replay_int_mod },
+                .{ .name = "thesis", .module = thesis_int_mod },
+                .{ .name = "tool", .module = tool_int_mod },
+                .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, v1_1_allowed_2000_e2e_test, fd_lib_dir);
+    const v1_1_e2e_run = b.addRunArtifact(v1_1_allowed_2000_e2e_test);
+    integration_step.dependOn(&v1_1_e2e_run.step);
+
+    // model tile integration tests: require a running llama.cpp server.
+    // Run with: zig build integration-test-live-model
+    const live_model_step = b.step("integration-test-live-model", "Run live tkmodl llama.cpp smoke tests");
     const model_http_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/test/integration/model_tile_http.zig"),
@@ -291,7 +369,7 @@ pub fn build(b: *std.Build) void {
     });
     model_http_test.root_module.link_libc = true;
     const model_http_run = b.addRunArtifact(model_http_test);
-    integration_step.dependOn(&model_http_run.step);
+    live_model_step.dependOn(&model_http_run.step);
 
     // ---------------------------------------------------------------------------
     // Coverage step — install test binaries to zig-out/cov/ for kcov

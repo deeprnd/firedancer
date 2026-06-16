@@ -77,6 +77,6 @@ if (( !ready )); then
 fi
 echo "llama-server ready"
 
-# Run integration tests in foreground so stdin is available for the
+# Run the live tkmodl smoke tests in foreground so stdin is available for the
 # zig build --listen=- test protocol. The EXIT trap kills the server.
-zig build integration-test --summary all
+zig build integration-test-live-model --summary all

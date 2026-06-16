@@ -22,6 +22,22 @@ pub const MockBackend = struct {
     }
 };
 
+pub const FixtureBackend = struct {
+    pub fn call(_: FixtureBackend, allocator: std.mem.Allocator, req: ModelRequest) error{OutOfMemory}!ModelResponse {
+        _ = req;
+        return .{
+            .model_id = try allocator.dupe(u8, "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL"),
+            .content = try allocator.dupe(
+                u8,
+                "{\"thesis_summary\":\"USD 2,000 into AI infrastructure via diversified US-listed large-cap equities and ETFs.\",\"recommended_tickers\":[\"NVDA\",\"AMD\",\"AVGO\",\"MSFT\",\"AMZN\",\"BOTZ\",\"SOXX\"]}",
+            ),
+            .finish_reason = try allocator.dupe(u8, "stop"),
+            .token_usage = .{ .prompt_tokens = 148, .completion_tokens = 187, .total_tokens = 335 },
+            .latency_ms = 842,
+        };
+    }
+};
+
 // Wire types for the OpenAI-compatible chat completions API.
 const WireRequest = struct {
     model: []const u8,
@@ -132,11 +148,13 @@ pub const HttpBackend = struct {
 // Use .mock in unit tests, .http in integration tests.
 pub const Backend = union(enum) {
     mock: MockBackend,
+    fixture: FixtureBackend,
     http: HttpBackend,
 
     pub fn call(self: *Backend, allocator: std.mem.Allocator, req: ModelRequest) anyerror!ModelResponse {
         return switch (self.*) {
             .mock => |m| m.call(allocator, req),
+            .fixture => |f| f.call(allocator, req),
             .http => |h| h.call(allocator, req),
         };
     }
@@ -199,6 +217,23 @@ test "Backend union dispatches to mock" {
     defer resp.deinit(allocator);
 
     try std.testing.expectEqualStrings("from mock backend", resp.content);
+}
+
+test "FixtureBackend returns deterministic ai infrastructure response" {
+    const allocator = std.testing.allocator;
+    const fixture = FixtureBackend{};
+    const req = ModelRequest{ .model_id = "fixture", .messages = &.{} };
+
+    const resp = try fixture.call(allocator, req);
+    defer resp.deinit(allocator);
+
+    try std.testing.expectEqualStrings(
+        "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL",
+        resp.model_id,
+    );
+    try std.testing.expect(std.mem.indexOf(u8, resp.content, "NVDA") != null);
+    try std.testing.expectEqual(@as(u32, 335), resp.token_usage.total_tokens);
+    try std.testing.expectEqual(@as(u64, 842), resp.latency_ms);
 }
 
 test "MockBackend ignores request model_id and messages" {

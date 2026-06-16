@@ -84,6 +84,9 @@ test-integration-fd:
   @true
 
 test-integration-tk:
+  zig build integration-test --summary all
+
+test-smoke-tkmodl-live:
   bash contrib/test/run_integration_model_tests.sh
 
 infra-run-llamacpp:
