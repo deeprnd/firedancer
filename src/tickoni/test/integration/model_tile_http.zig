@@ -184,3 +184,216 @@ test "model tile http: two sequential calls both succeed" {
     try std.testing.expect(r1.content.len > 0);
     try std.testing.expect(r2.content.len > 0);
 }
+
+// Leveraged ETFs and inverse ETFs prohibited by the system prompt.
+const restricted_tickers = [_][]const u8{
+    "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",
+    "UVXY", "SVXY", "LABU", "LABD", "FAS", "FAZ",
+};
+
+// ---------------------------------------------------------------------------
+// Fixture-based tests: deterministic substitution and captured-response replay.
+// These do not require a running llama.cpp server.
+// ---------------------------------------------------------------------------
+
+test "model tile fixture: replay substitution content is deterministic" {
+    const allocator = std.testing.allocator;
+    const req = makeAiInfraRequest("any-model");
+
+    var b1 = model.Backend{ .fixture = .{} };
+    const r1 = try b1.call(allocator, req);
+    defer r1.deinit(allocator);
+
+    var b2 = model.Backend{ .fixture = .{} };
+    const r2 = try b2.call(allocator, req);
+    defer r2.deinit(allocator);
+
+    try std.testing.expectEqualStrings(r1.content, r2.content);
+    try std.testing.expectEqualStrings(r1.model_id, r2.model_id);
+    try std.testing.expectEqualStrings(r1.finish_reason, r2.finish_reason);
+    try std.testing.expectEqual(r1.token_usage.prompt_tokens, r2.token_usage.prompt_tokens);
+    try std.testing.expectEqual(r1.token_usage.completion_tokens, r2.token_usage.completion_tokens);
+    try std.testing.expectEqual(r1.token_usage.total_tokens, r2.token_usage.total_tokens);
+}
+
+test "model tile fixture: captured response JSON matches fixture tickers and usage" {
+    const allocator = std.testing.allocator;
+    var backend = model.Backend{ .fixture = .{} };
+    const req = makeAiInfraRequest("any-model");
+    const resp = try backend.call(allocator, req);
+    defer resp.deinit(allocator);
+
+    try std.testing.expectEqualStrings("stop", resp.finish_reason);
+    try std.testing.expectEqual(@as(u32, 148), resp.token_usage.prompt_tokens);
+    try std.testing.expectEqual(@as(u32, 187), resp.token_usage.completion_tokens);
+    try std.testing.expectEqual(@as(u32, 335), resp.token_usage.total_tokens);
+
+    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, resp.content, .{});
+    defer parsed.deinit();
+
+    const root = switch (parsed.value) {
+        .object => |o| o,
+        else => return error.TestUnexpectedResult,
+    };
+
+    const summary_v = root.get("thesis_summary") orelse return error.TestUnexpectedResult;
+    const summary = switch (summary_v) {
+        .string => |s| s,
+        else => return error.TestUnexpectedResult,
+    };
+    try std.testing.expect(summary.len > 0);
+
+    const tickers_v = root.get("recommended_tickers") orelse return error.TestUnexpectedResult;
+    const tickers = switch (tickers_v) {
+        .array => |a| a,
+        else => return error.TestUnexpectedResult,
+    };
+
+    // All tickers from the captured fixture must be present.
+    const expected = [_][]const u8{ "NVDA", "AMD", "AVGO", "MSFT", "AMZN", "BOTZ", "SOXX" };
+    for (expected) |sym| {
+        var found = false;
+        for (tickers.items) |item| {
+            switch (item) {
+                .string => |s| { if (std.mem.eql(u8, s, sym)) found = true; },
+                else => {},
+            }
+        }
+        try std.testing.expect(found);
+    }
+
+    // Captured fixture must not contain restricted instruments.
+    for (tickers.items) |item| {
+        const ticker = switch (item) {
+            .string => |s| s,
+            else => return error.TestUnexpectedResult,
+        };
+        for (restricted_tickers) |r| {
+            if (std.mem.eql(u8, ticker, r)) {
+                std.log.err("restricted ticker in captured fixture: {s}", .{ticker});
+                return error.TestUnexpectedResult;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Live server tests: structured JSON, restricted ticker exclusion, rationale.
+// Skipped when llama.cpp is not reachable.
+// ---------------------------------------------------------------------------
+
+test "model tile http: ai infrastructure response is valid JSON with required fields" {
+    const allocator = std.testing.allocator;
+    var backend = makeBackend();
+    const req = makeAiInfraRequest(getModelId());
+    const resp = backend.call(allocator, req) catch |err| switch (err) {
+        error.ServerUnreachable => return error.SkipZigTest,
+        else => return err,
+    };
+    defer resp.deinit(allocator);
+
+    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, resp.content, .{});
+    defer parsed.deinit();
+
+    const root = switch (parsed.value) {
+        .object => |o| o,
+        else => return error.TestUnexpectedResult,
+    };
+
+    const summary_v = root.get("thesis_summary") orelse return error.TestUnexpectedResult;
+    const summary = switch (summary_v) {
+        .string => |s| s,
+        else => return error.TestUnexpectedResult,
+    };
+    try std.testing.expect(summary.len > 0);
+
+    const tickers_v = root.get("recommended_tickers") orelse return error.TestUnexpectedResult;
+    const tickers = switch (tickers_v) {
+        .array => |a| a,
+        else => return error.TestUnexpectedResult,
+    };
+    try std.testing.expect(tickers.items.len > 0);
+
+    const rationale_v = root.get("rationale") orelse return error.TestUnexpectedResult;
+    const rationale = switch (rationale_v) {
+        .object => |o| o,
+        else => return error.TestUnexpectedResult,
+    };
+    try std.testing.expect(rationale.count() > 0);
+}
+
+test "model tile http: ai infrastructure recommended tickers exclude restricted instruments" {
+    const allocator = std.testing.allocator;
+    var backend = makeBackend();
+    const req = makeAiInfraRequest(getModelId());
+    const resp = backend.call(allocator, req) catch |err| switch (err) {
+        error.ServerUnreachable => return error.SkipZigTest,
+        else => return err,
+    };
+    defer resp.deinit(allocator);
+
+    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, resp.content, .{});
+    defer parsed.deinit();
+
+    const root = switch (parsed.value) {
+        .object => |o| o,
+        else => return error.TestUnexpectedResult,
+    };
+    const tickers_v = root.get("recommended_tickers") orelse return error.TestUnexpectedResult;
+    const tickers = switch (tickers_v) {
+        .array => |a| a,
+        else => return error.TestUnexpectedResult,
+    };
+
+    for (tickers.items) |item| {
+        const ticker = switch (item) {
+            .string => |s| s,
+            else => return error.TestUnexpectedResult,
+        };
+        for (restricted_tickers) |r| {
+            if (std.mem.eql(u8, ticker, r)) {
+                std.log.err("restricted instrument in response: {s}", .{ticker});
+                return error.TestUnexpectedResult;
+            }
+        }
+    }
+}
+
+test "model tile http: ai infrastructure rationale covers all recommended tickers" {
+    const allocator = std.testing.allocator;
+    var backend = makeBackend();
+    const req = makeAiInfraRequest(getModelId());
+    const resp = backend.call(allocator, req) catch |err| switch (err) {
+        error.ServerUnreachable => return error.SkipZigTest,
+        else => return err,
+    };
+    defer resp.deinit(allocator);
+
+    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, resp.content, .{});
+    defer parsed.deinit();
+
+    const root = switch (parsed.value) {
+        .object => |o| o,
+        else => return error.TestUnexpectedResult,
+    };
+
+    const tickers_v = root.get("recommended_tickers") orelse return error.TestUnexpectedResult;
+    const tickers = switch (tickers_v) {
+        .array => |a| a,
+        else => return error.TestUnexpectedResult,
+    };
+
+    const rationale_v = root.get("rationale") orelse return error.TestUnexpectedResult;
+    const rationale = switch (rationale_v) {
+        .object => |o| o,
+        else => return error.TestUnexpectedResult,
+    };
+
+    for (tickers.items) |item| {
+        const ticker = switch (item) {
+            .string => |s| s,
+            else => return error.TestUnexpectedResult,
+        };
+        try std.testing.expect(rationale.contains(ticker));
+    }
+}
