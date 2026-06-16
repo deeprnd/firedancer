@@ -101,9 +101,6 @@ infra-run-llamacpp:
   bash contrib/test/ensure_hf_model.sh
   exec bash contrib/test/run_llm_server.sh "$backend"
 
-test-integration-tk-client:
-  zig build integration-test
-
 test-integration-all:
   python3 contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"
 
