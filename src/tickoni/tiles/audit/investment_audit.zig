@@ -265,7 +265,7 @@ pub fn buildAllowedTradeChain(
         .replay_result = .{
             .capsule_id = hashBytes(replay_capsule_id),
             .divergences = replay_result.divergence_count,
-            .first_divergent_seq = if (replay_result.divergence_count == 0) 0 else 8,
+            .first_divergent_seq = replay_result.first_divergent_seq,
         },
     });
 
@@ -383,7 +383,7 @@ pub fn buildOversizedTradeBlockedChain(
         .replay_result = .{
             .capsule_id = hashBytes("replay_capsule_ai_infra_oversized_25000"),
             .divergences = replay_result.divergence_count,
-            .first_divergent_seq = if (replay_result.divergence_count == 0) 0 else 9,
+            .first_divergent_seq = replay_result.first_divergent_seq,
         },
     });
 
@@ -456,7 +456,7 @@ pub fn buildRestrictedInstrumentBlockedChain(
         .replay_result = .{
             .capsule_id = hashBytes("replay_capsule_ai_infra_restricted_soxl"),
             .divergences = replay_result.divergence_count,
-            .first_divergent_seq = if (replay_result.divergence_count == 0) 0 else 5,
+            .first_divergent_seq = replay_result.first_divergent_seq,
         },
     });
 

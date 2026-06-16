@@ -22,6 +22,7 @@ const policy_max_notional_per_order_cents: i64 = 250_000;
 const expected_ticket_id = "ticket_v1_1_ai_infra_2000_market";
 const expected_blocked_ticket_id = "ticket_v1_1_ai_infra_25000_blocked";
 const restricted_ticker = "SOXL";
+const tampered_replay_capsule_path = "src/tickoni/test/fixtures/investment/replay_capsule_tampered_paper_fill.json";
 
 const ExpectedLine = struct {
     ticker: []const u8,
@@ -208,6 +209,8 @@ test "allowed_trade_e2e: replay succeeds with fixture substitutions and no live 
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(replay_result.replay_match);
     try std.testing.expectEqual(@as(u64, 0), replay_result.divergence_count);
+    try std.testing.expectEqualStrings("", replay_result.first_divergent_field);
+    try std.testing.expectEqual(@as(u64, 0), replay_result.first_divergent_seq);
 
     const audit_chain = investment_audit.buildAllowedTradeChain(
         &input,
@@ -232,6 +235,84 @@ test "allowed_trade_e2e: replay succeeds with fixture substitutions and no live 
     try std.testing.expectEqual(
         @as(u64, 0),
         audit_chain.events[8].payload.replay_result.divergences,
+    );
+    try std.testing.expectEqual(
+        @as(u64, 0),
+        audit_chain.events[8].payload.replay_result.first_divergent_seq,
+    );
+}
+
+test "allowed_trade_e2e: replay tamper detection reports first divergent hash and sequence" {
+    const allocator = std.testing.allocator;
+    const input = demoOpsThesisInput();
+    const thesis_id = thesis.computeThesisInputHash(input);
+    const intent = try thesis.normalize(input);
+    const basket = try basket_mod.build(intent, thesis_id);
+
+    var model_backend = model.Backend{ .fixture = .{} };
+    const model_response = try model_backend.call(allocator, .{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{.{ .role = "user", .content = "ai infrastructure demo" }},
+    });
+    defer model_response.deinit(allocator);
+
+    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    const account_result = try adapter_backend.call(tool.normalizePortfolioRead(demo_ops_account_id));
+    const account = switch (account_result) {
+        .portfolio_snapshot => |snapshot| snapshot,
+        else => unreachable,
+    };
+    const affordability = try portfolio.checkBasketAffordability(&account, &basket);
+    const quote_result = try adapter_backend.call(tool.normalizeQuoteRead(&basket));
+    const quote_snapshot = switch (quote_result) {
+        .quote_snapshot => |snapshot| snapshot,
+        else => unreachable,
+    };
+    const ticket = try trade_ticket.buildMarketBuyTicket(
+        &basket,
+        &quote_snapshot,
+        affordability,
+        policy_max_notional_per_order_cents,
+        expected_ticket_id,
+    );
+    const paper_result = try adapter_backend.call(tool.normalizePaperOrder(&ticket));
+    const execution = switch (paper_result) {
+        .paper_order => |result| result,
+        else => unreachable,
+    };
+
+    const replay_result = try replay.verifyAllowedTradeWithCapsulePath(
+        allocator,
+        std.testing.io,
+        tampered_replay_capsule_path,
+        &basket,
+        &ticket,
+        &execution,
+        &model_response,
+    );
+    try std.testing.expect(replay_result.external_effects_disabled);
+    try std.testing.expect(!replay_result.replay_match);
+    try std.testing.expectEqual(@as(u64, 1), replay_result.divergence_count);
+    try std.testing.expectEqualStrings("adapter_response_hash", replay_result.first_divergent_field);
+    try std.testing.expectEqual(@as(u64, 7), replay_result.first_divergent_seq);
+
+    const audit_chain = investment_audit.buildAllowedTradeChain(
+        &input,
+        &basket,
+        &quote_snapshot,
+        affordability,
+        &model_response,
+        &ticket,
+        &execution,
+        &replay_result,
+    );
+    try std.testing.expectEqual(
+        @as(u64, 1),
+        audit_chain.events[8].payload.replay_result.divergences,
+    );
+    try std.testing.expectEqual(
+        @as(u64, 7),
+        audit_chain.events[8].payload.replay_result.first_divergent_seq,
     );
 }
 
@@ -344,6 +425,8 @@ test "allowed_trade_e2e: oversized trade replay and audit reproduce the deny" {
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(replay_result.replay_match);
     try std.testing.expectEqual(@as(u64, 0), replay_result.divergence_count);
+    try std.testing.expectEqualStrings("", replay_result.first_divergent_field);
+    try std.testing.expectEqual(@as(u64, 0), replay_result.first_divergent_seq);
 
     const audit_chain = investment_audit.buildOversizedTradeBlockedChain(
         &input,
@@ -439,6 +522,8 @@ test "allowed_trade_e2e: restricted ticker replay and audit reproduce the deny" 
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(replay_result.replay_match);
     try std.testing.expectEqual(@as(u64, 0), replay_result.divergence_count);
+    try std.testing.expectEqualStrings("", replay_result.first_divergent_field);
+    try std.testing.expectEqual(@as(u64, 0), replay_result.first_divergent_seq);
 
     const audit_chain = investment_audit.buildRestrictedInstrumentBlockedChain(
         &input,
