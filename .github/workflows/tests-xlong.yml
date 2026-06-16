@@ -75,6 +75,8 @@ jobs:
           apt-packages: 'cmake libopenblas-dev libopenblas64-dev'
           python-tools: 'huggingface_hub[cli]'
 
+      - uses: ./.github/actions/build-fd-tk-libs
+
       - name: Build llama.cpp
         run: just infra-ensure-llamacpp
 
