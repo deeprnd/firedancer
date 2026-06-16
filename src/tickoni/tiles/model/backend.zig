@@ -38,6 +38,34 @@ pub const FixtureBackend = struct {
     }
 };
 
+// Strip thinking-channel prefix emitted by some models (e.g. Gemma-4):
+//   <|channel>thought\n...<channel|>ACTUAL_CONTENT
+// Returns the slice starting after <channel|>, or the original string.
+fn stripThinkingChannel(s: []const u8) []const u8 {
+    const delim = "<channel|>";
+    if (std.mem.indexOf(u8, s, delim)) |pos| {
+        return s[pos + delim.len ..];
+    }
+    return s;
+}
+
+// Strip ```json or ``` fences when they wrap the entire content.
+fn stripMarkdownFence(s: []const u8) []const u8 {
+    const prefixes = [_][]const u8{ "```json\n", "```\n" };
+    const suffix = "\n```";
+    for (prefixes) |prefix| {
+        if (std.mem.startsWith(u8, s, prefix) and std.mem.endsWith(u8, s, suffix)) {
+            return s[prefix.len .. s.len - suffix.len];
+        }
+    }
+    return s;
+}
+
+fn normalizeModelContent(raw: []const u8) []const u8 {
+    const after_channel = std.mem.trim(u8, stripThinkingChannel(raw), " \t\r\n");
+    return stripMarkdownFence(after_channel);
+}
+
 // Wire types for the OpenAI-compatible chat completions API.
 const WireRequest = struct {
     model: []const u8,
@@ -125,7 +153,7 @@ pub const HttpBackend = struct {
         const model_id = try allocator.dupe(u8, parsed.value.model orelse req.model_id);
         errdefer allocator.free(model_id);
 
-        const content = try allocator.dupe(u8, choice.message.content);
+        const content = try allocator.dupe(u8, normalizeModelContent(choice.message.content));
         errdefer allocator.free(content);
 
         const finish_reason = try allocator.dupe(u8, choice.finish_reason orelse "unknown");
@@ -163,6 +191,28 @@ pub const Backend = union(enum) {
 // ---------------------------------------------------------------------------
 // Unit tests: MockBackend and Backend dispatch. No network calls.
 // ---------------------------------------------------------------------------
+
+test "normalizeModelContent strips json fence" {
+    try std.testing.expectEqualStrings("{}", normalizeModelContent("```json\n{}\n```"));
+}
+
+test "normalizeModelContent strips plain fence" {
+    try std.testing.expectEqualStrings("{}", normalizeModelContent("```\n{}\n```"));
+}
+
+test "normalizeModelContent passes through plain JSON" {
+    try std.testing.expectEqualStrings("{\"a\":1}", normalizeModelContent("{\"a\":1}"));
+}
+
+test "normalizeModelContent strips thinking channel then fence" {
+    const input = "<|channel>thought\nsome reasoning<channel|>```json\n{\"k\":\"v\"}\n```";
+    try std.testing.expectEqualStrings("{\"k\":\"v\"}", normalizeModelContent(input));
+}
+
+test "normalizeModelContent strips thinking channel plain text" {
+    const input = "<|channel>thought\nsome reasoning<channel|>hello";
+    try std.testing.expectEqualStrings("hello", normalizeModelContent(input));
+}
 
 test "MockBackend returns canned response" {
     const allocator = std.testing.allocator;
@@ -219,7 +269,7 @@ test "Backend union dispatches to mock" {
     try std.testing.expectEqualStrings("from mock backend", resp.content);
 }
 
-test "FixtureBackend returns deterministic ai infrastructure response" {
+test "FixtureBackend returns deterministic response" {
     const allocator = std.testing.allocator;
     const fixture = FixtureBackend{};
     const req = ModelRequest{ .model_id = "fixture", .messages = &.{} };

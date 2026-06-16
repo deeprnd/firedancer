@@ -11,12 +11,12 @@ command matrix can be documented without merging those two views.
 
 The repository currently has:
 
-- Harness unit tests for Tickoni-owned supervisor, topology, queue, sandbox, and
-  Phase 0 payment pipeline behavior
+- Harness unit tests for Tickoni-owned supervisor, topology, queue, sandbox,
+  Phase 0 payment pipeline, audit, case, disp, schema, model, and adapter behavior
+- Tickoni integration tests for schema pipeline fixture contracts and
+  tile-boundary scenario coverage (tkcase, tkdisp, tkagnt, replay, audit)
 - Firedancer-derived C unit tests through the upstream unit-test Make target
 - Firedancer-derived e2e/integration-test build and run target
-- placeholder integration recipes for components that do not yet have a real
-  Tickoni integration layer
 - aggregate gates that compose build, quality, security, and test checks
 
 ## Core Commands
@@ -185,7 +185,16 @@ standalone test roots for:
 - `src/tickoni/runtime/tile.zig`
 - `src/tickoni/c_abi/queue.zig`
 - `src/tickoni/c_abi/sandbox.zig`
-- `src/tickoni/tiles/payment_pipeline.zig`
+- `src/tickoni/tiles/audit/mod.zig`
+- `src/tickoni/tiles/payment_pipeline/mod.zig`
+- `src/tickoni/tiles/case/mod.zig`
+- `src/tickoni/tiles/disp/mod.zig`
+- `src/tickoni/schema/thesis.zig`
+- `src/tickoni/schema/catalog.zig`
+- `src/tickoni/schema/basket.zig`
+- `src/tickoni/schema/portfolio.zig`
+- `src/tickoni/tiles/model/mod.zig`
+- `src/tickoni/tiles/adapter/mod.zig`
 
 It also builds a supervisor test binary for:
 
@@ -239,18 +248,29 @@ testing a small intermediate group of tiles.
 
 ## Integration Layer
 
-Both current integration component recipes are placeholders:
+`just test-integration-fd` is a placeholder (`@true`). Firedancer does not have
+a separate repo-facing intermediate integration layer between tile/unit tests
+and full-topology `integration-test` binaries.
 
-- `just test-integration-fd`
-- `just test-integration-tk`
+`just test-integration-tk` runs:
 
-`just test-integration-fd` is intentionally `@true` because Firedancer does not
-have a separate repo-facing intermediate integration layer between tile/unit
-tests and full-topology `integration-test` binaries. `just test-integration-tk`
-is also `@true` until Tickoni grows its own harness-level tests.
+```bash
+zig build integration-test
+```
 
-`just test-integration-all` still composes both so the command shape stays
-stable as real Tickoni integration coverage is added.
+This executes two real test binaries:
+
+- `src/tickoni/test/fixtures/investment/allowed_trade.zig` — fixture contract
+  tests for the schema pipeline (thesis → basket → portfolio) with external
+  systems replaced by recorded fixtures; no live model, adapter, or execution
+  call.
+- `src/tickoni/test/integration/allowed_trade.zig` — tile-boundary integration
+  tests covering tkcase, tkdisp, tkagnt, replay, and audit scenarios. Tickoni
+  internals run through production-like paths; model and adapter backends are
+  substituted with fixture backends so no network calls are made.
+
+`just test-integration-all` composes both lanes so the aggregate command shape
+stays stable as coverage grows.
 
 ## Quality And Security Gates
 

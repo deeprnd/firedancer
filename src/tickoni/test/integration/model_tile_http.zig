@@ -27,7 +27,7 @@ const system_prompt =
 
 // User prompt from model_request.json.
 const user_prompt =
-    "Thesis: I want to invest USD 2,000 in AI infrastructure, but avoid single-name concentration " ++
+    "Thesis: I want to invest USD 2,000 in sector, but avoid single-name concentration " ++
     "and keep it to US-listed ETFs or large-cap equities.\n" ++
     "Target notional: USD 2,000\n" ++
     "Asset classes: equity, etf\n" ++
@@ -88,7 +88,7 @@ test "model tile http: hello round-trip" {
     try std.testing.expect(resp.token_usage.total_tokens > 0);
 }
 
-test "model tile http: ai infrastructure thesis returns non-empty content" {
+test "model tile http: thesis returns non-empty content" {
     const allocator = std.testing.allocator;
     var backend = makeBackend();
     const req = makeAiInfraRequest(getModelId());
@@ -188,7 +188,7 @@ test "model tile http: two sequential calls both succeed" {
 // Leveraged ETFs and inverse ETFs prohibited by the system prompt.
 const restricted_tickers = [_][]const u8{
     "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",
-    "UVXY", "SVXY", "LABU", "LABD", "FAS", "FAZ",
+    "UVXY", "SVXY", "LABU", "LABD", "FAS",  "FAZ",
 };
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,9 @@ test "model tile fixture: captured response JSON matches fixture tickers and usa
         var found = false;
         for (tickers.items) |item| {
             switch (item) {
-                .string => |s| { if (std.mem.eql(u8, s, sym)) found = true; },
+                .string => |s| {
+                    if (std.mem.eql(u8, s, sym)) found = true;
+                },
                 else => {},
             }
         }
@@ -282,7 +284,7 @@ test "model tile fixture: captured response JSON matches fixture tickers and usa
 // Skipped when llama.cpp is not reachable.
 // ---------------------------------------------------------------------------
 
-test "model tile http: ai infrastructure response is valid JSON with required fields" {
+test "model tile http: response is valid JSON with required fields" {
     const allocator = std.testing.allocator;
     var backend = makeBackend();
     const req = makeAiInfraRequest(getModelId());
@@ -322,7 +324,7 @@ test "model tile http: ai infrastructure response is valid JSON with required fi
     try std.testing.expect(rationale.count() > 0);
 }
 
-test "model tile http: ai infrastructure recommended tickers exclude restricted instruments" {
+test "model tile http: recommended tickers exclude restricted instruments" {
     const allocator = std.testing.allocator;
     var backend = makeBackend();
     const req = makeAiInfraRequest(getModelId());
@@ -359,7 +361,7 @@ test "model tile http: ai infrastructure recommended tickers exclude restricted 
     }
 }
 
-test "model tile http: ai infrastructure rationale covers all recommended tickers" {
+test "model tile http: rationale covers all recommended tickers" {
     const allocator = std.testing.allocator;
     var backend = makeBackend();
     const req = makeAiInfraRequest(getModelId());

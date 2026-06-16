@@ -1,4 +1,4 @@
-// End-to-end tile-boundary test: AI infrastructure investment scenarios.
+// Integration tile-boundary test: investment scenarios.
 //
 // All paths flow through tkcase (run_id derivation), tkdisp (work item dispatch),
 // and tkagnt (model + adapter calls) so every assertion touches the tile boundary,
@@ -48,7 +48,7 @@ fn operationsThesisInput() thesis.ThesisInput {
 
 fn operationsRestrictedTickerInput() thesis.ThesisInput {
     var input = operationsThesisInput();
-    const user_text = "Buy SOXL in the AI infrastructure basket.";
+    const user_text = "Buy SOXL in the basket.";
     @memset(&input.user_text, 0);
     @memcpy(input.user_text[0..user_text.len], user_text);
     input.user_text_len = user_text.len;
@@ -79,7 +79,7 @@ fn findRejectedCandidate(
     return null;
 }
 
-test "allowed_trade_e2e: tkcase tkdisp tkagnt build the allowed paper trade" {
+test "allowed_trade_integration: tkcase tkdisp tkagnt build the allowed paper trade" {
     const allocator = std.testing.allocator;
     const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
@@ -138,7 +138,7 @@ test "allowed_trade_e2e: tkcase tkdisp tkagnt build the allowed paper trade" {
     try std.testing.expectEqual(@as(i64, 200_000), execution.resulting_account_snapshot.day_notional_used_cents);
 }
 
-test "allowed_trade_e2e: replay succeeds with fixture substitutions and no live effects" {
+test "allowed_trade_integration: replay succeeds with fixture substitutions and no live effects" {
     const allocator = std.testing.allocator;
     const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
@@ -209,7 +209,7 @@ test "allowed_trade_e2e: replay succeeds with fixture substitutions and no live 
     );
 }
 
-test "allowed_trade_e2e: replay tamper detection reports first divergent hash and sequence" {
+test "allowed_trade_integration: replay tamper detection reports first divergent hash and sequence" {
     const allocator = std.testing.allocator;
     const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
@@ -269,7 +269,7 @@ test "allowed_trade_e2e: replay tamper detection reports first divergent hash an
     );
 }
 
-test "allowed_trade_e2e: oversized trade is blocked before paper execution" {
+test "allowed_trade_integration: oversized trade is blocked before paper execution" {
     const allocator = std.testing.allocator;
     const input = operationsThesisInputWithTarget(oversized_target_notional_cents);
     const thesis_id = thesis.computeThesisInputHash(input);
@@ -317,7 +317,7 @@ test "allowed_trade_e2e: oversized trade is blocked before paper execution" {
     try std.testing.expect(agent_result.paper_result == null);
 }
 
-test "allowed_trade_e2e: oversized trade replay and audit reproduce the deny" {
+test "allowed_trade_integration: oversized trade replay and audit reproduce the deny" {
     const allocator = std.testing.allocator;
     const input = operationsThesisInputWithTarget(oversized_target_notional_cents);
     const thesis_id = thesis.computeThesisInputHash(input);
@@ -390,7 +390,7 @@ test "allowed_trade_e2e: oversized trade replay and audit reproduce the deny" {
     }
 }
 
-test "allowed_trade_e2e: direct restricted ticker request is denied before adapter work" {
+test "allowed_trade_integration: direct restricted ticker request is denied before adapter work" {
     const allocator = std.testing.allocator;
     const input = operationsRestrictedTickerInput();
     const thesis_id = thesis.computeThesisInputHash(input);
@@ -417,7 +417,7 @@ test "allowed_trade_e2e: direct restricted ticker request is denied before adapt
     try std.testing.expectEqual(run_id, block_result.run_id);
 }
 
-test "allowed_trade_e2e: restricted ticker replay and audit reproduce the deny" {
+test "allowed_trade_integration: restricted ticker replay and audit reproduce the deny" {
     const allocator = std.testing.allocator;
     const input = operationsRestrictedTickerInput();
     const thesis_id = thesis.computeThesisInputHash(input);

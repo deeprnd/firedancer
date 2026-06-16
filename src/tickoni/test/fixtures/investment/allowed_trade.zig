@@ -1,4 +1,4 @@
-// Scenario fixture contract: AI infrastructure allowed trade.
+// Scenario fixture contract: sector allowed trade.
 //
 // Per doc/testing/v1-1-investment-integration.md (S6-P1), this test
 // exercises the real Tickoni schema pipeline with external systems replaced
@@ -17,7 +17,7 @@
 //
 // Assertions (S6-P1):
 //   - thesis normalization succeeds
-//   - basket contains >= 4 eligible AI infrastructure instruments
+//   - basket contains >= 4 eligible instruments
 //   - restricted instruments (SOXL, BULZ) do not appear in basket
 //   - basket total allocated == target notional (USD 2,000)
 //   - affordability outcome is allow for ops account
@@ -30,8 +30,9 @@ const std = @import("std");
 const thesis = @import("thesis");
 const basket_mod = @import("basket");
 const portfolio = @import("portfolio");
+const portfolio_fixtures = @import("portfolio_fixtures");
 
-// Numeric id for "brokerage.operations" as stored in portfolio.fixtures.cash_rich.
+// Numeric id for "brokerage.operations" as stored in portfolio_fixtures.fixtures.cash_rich.
 const operations_account_id: u32 = 2001;
 
 // Target notional from thesis_allowed_2000.json.
@@ -40,7 +41,7 @@ const target_notional_cents: i64 = 200_000;
 // Maximum notional per order from policy_investment.json (limits.max_notional_per_order_cents).
 const policy_max_notional_per_order_cents: i64 = 250_000;
 
-// Expected basket instrument count: 7 eligible AI infrastructure instruments.
+// Expected basket instrument count: 7 eligible instruments.
 // NVDA, AMD, AVGO, MSFT (equity) + AMZN (equity) + BOTZ, SOXX (ETF).
 // SOXL and BULZ are restricted leveraged ETFs and are excluded.
 const expected_instrument_count: u8 = 7;
@@ -111,7 +112,7 @@ test "allowed_trade: thesis hash changes when target notional changes" {
 // Basket construction assertions
 // ---------------------------------------------------------------------------
 
-test "allowed_trade: basket contains >= 4 eligible AI infrastructure instruments" {
+test "allowed_trade: basket contains >= 4 eligible instruments" {
     const input = operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
@@ -242,8 +243,8 @@ test "allowed_trade: affordability outcome is allow for ops account" {
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
-    // portfolio.fixtures.cash_rich.account_id == operations_account_id == 2001
-    const result = try portfolio.checkBasketAffordability(&portfolio.fixtures.cash_rich, &b);
+    // portfolio_fixtures.fixtures.cash_rich.account_id == operations_account_id == 2001
+    const result = try portfolio.checkBasketAffordability(&portfolio_fixtures.fixtures.cash_rich, &b);
     try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, result.outcome);
     try std.testing.expectEqual(target_notional_cents, result.requested_notional_cents);
 }
@@ -251,7 +252,7 @@ test "allowed_trade: affordability outcome is allow for ops account" {
 test "allowed_trade: max affordable is day-limit-bound at USD 25000" {
     // cash_rich: cash=5M, buying_power=5M, day_remaining=2.5M, month_remaining=10M.
     // max_affordable = min(5M, 5M, 2.5M, 10M) = 2.5M (day limit binds).
-    const result = portfolio.checkAffordability(&portfolio.fixtures.cash_rich, target_notional_cents);
+    const result = portfolio.checkAffordability(&portfolio_fixtures.fixtures.cash_rich, target_notional_cents);
     try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, result.outcome);
     try std.testing.expectEqual(@as(i64, 2_500_000), result.max_affordable_cents);
     try std.testing.expectEqual(@as(i64, 5_000_000), result.cash_available_cents);
@@ -263,7 +264,7 @@ test "allowed_trade: max affordable is day-limit-bound at USD 25000" {
 test "allowed_trade: effective max paper trade is policy-per-order-bound at USD 2500" {
     // effective_max = min(max_affordable=2.5M, policy_per_order=250K) = 250K.
     // Target (200K) <= effective_max (250K): allowed.
-    const result = portfolio.checkAffordability(&portfolio.fixtures.cash_rich, target_notional_cents);
+    const result = portfolio.checkAffordability(&portfolio_fixtures.fixtures.cash_rich, target_notional_cents);
     const effective_max = @min(result.max_affordable_cents, policy_max_notional_per_order_cents);
     try std.testing.expectEqual(@as(i64, 250_000), effective_max);
     try std.testing.expect(target_notional_cents <= effective_max);

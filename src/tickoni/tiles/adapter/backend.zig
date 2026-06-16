@@ -1,54 +1,11 @@
 const std = @import("std");
-const basket = @import("basket");
 const portfolio = @import("portfolio");
+const portfolio_fixtures = @import("portfolio_fixtures");
 const trade_ticket = @import("trade_ticket");
+const schema = @import("schema.zig");
+const mock_module = @import("mock.zig");
 
-pub const AdapterOperation = enum(u8) {
-    portfolio_snapshot,
-    quote_snapshot,
-    paper_order,
-};
-
-pub const AdapterRequest = struct {
-    operation: AdapterOperation,
-    account_id: u32 = 0,
-    tickers: [basket.max_basket_instruments][portfolio.max_ticker_len]u8 = std.mem.zeroes([basket.max_basket_instruments][portfolio.max_ticker_len]u8),
-    ticker_count: u8 = 0,
-    ticket: ?*const trade_ticket.TradeTicket = null,
-};
-
-pub const AdapterResult = union(AdapterOperation) {
-    portfolio_snapshot: portfolio.BrokerageAccount,
-    quote_snapshot: trade_ticket.QuoteSnapshot,
-    paper_order: trade_ticket.PaperExecutionResult,
-};
-
-pub const FixtureBackendError = error{
-    UnknownAccount,
-    UnsupportedTicker,
-    MissingTicket,
-    PolicyBlocked,
-};
-
-pub const MockBackend = struct {
-    portfolio_snapshot: ?portfolio.BrokerageAccount = null,
-    quote_snapshot: ?trade_ticket.QuoteSnapshot = null,
-    paper_order: ?trade_ticket.PaperExecutionResult = null,
-
-    pub fn call(self: MockBackend, req: AdapterRequest) error{MissingMockResponse}!AdapterResult {
-        return switch (req.operation) {
-            .portfolio_snapshot => .{
-                .portfolio_snapshot = self.portfolio_snapshot orelse return error.MissingMockResponse,
-            },
-            .quote_snapshot => .{
-                .quote_snapshot = self.quote_snapshot orelse return error.MissingMockResponse,
-            },
-            .paper_order => .{
-                .paper_order = self.paper_order orelse return error.MissingMockResponse,
-            },
-        };
-    }
-};
+pub const MockBackend = mock_module.MockBackend;
 
 fn tickerBuf(comptime s: []const u8) [portfolio.max_ticker_len]u8 {
     var buf = [_]u8{0} ** portfolio.max_ticker_len;
@@ -77,7 +34,7 @@ pub const QuoteLoader = struct {
         return null;
     }
 
-    pub fn loadSnapshot(self: QuoteLoader, req: AdapterRequest) FixtureBackendError!trade_ticket.QuoteSnapshot {
+    pub fn loadSnapshot(self: QuoteLoader, req: schema.AdapterRequest) schema.BackendError!trade_ticket.QuoteSnapshot {
         var snapshot: trade_ticket.QuoteSnapshot = std.mem.zeroes(trade_ticket.QuoteSnapshot);
         snapshot.as_of_ns = self.as_of_ns;
         snapshot.quote_count = req.ticker_count;
@@ -90,10 +47,10 @@ pub const QuoteLoader = struct {
 };
 
 pub const FixtureBackend = struct {
-    account_snapshot: portfolio.BrokerageAccount = portfolio.fixtures.cash_rich,
+    account_snapshot: portfolio.BrokerageAccount = portfolio_fixtures.fixtures.cash_rich,
     quote_loader: QuoteLoader = .{},
 
-    pub fn call(self: FixtureBackend, req: AdapterRequest) FixtureBackendError!AdapterResult {
+    pub fn call(self: FixtureBackend, req: schema.AdapterRequest) schema.BackendError!schema.AdapterResult {
         return switch (req.operation) {
             .portfolio_snapshot => blk: {
                 if (req.account_id != self.account_snapshot.account_id) {
@@ -139,7 +96,7 @@ pub const Backend = union(enum) {
     mock: MockBackend,
     fixture: FixtureBackend,
 
-    pub fn call(self: *Backend, req: AdapterRequest) anyerror!AdapterResult {
+    pub fn call(self: *Backend, req: schema.AdapterRequest) anyerror!schema.AdapterResult {
         return switch (self.*) {
             .mock => |m| m.call(req),
             .fixture => |f| f.call(req),
@@ -157,7 +114,7 @@ test "QuoteLoader finds fixture quote by ticker" {
 }
 
 test "FixtureBackend builds quote snapshot from loader" {
-    var req = AdapterRequest{
+    var req = schema.AdapterRequest{
         .operation = .quote_snapshot,
         .ticker_count = 2,
     };
@@ -179,28 +136,12 @@ test "Backend union dispatches to fixture backend" {
     var backend = Backend{ .fixture = .{} };
     const result = try backend.call(.{
         .operation = .portfolio_snapshot,
-        .account_id = portfolio.fixtures.cash_rich.account_id,
+        .account_id = portfolio_fixtures.fixtures.cash_rich.account_id,
     });
 
     const snapshot = switch (result) {
         .portfolio_snapshot => |value| value,
         else => unreachable,
     };
-    try std.testing.expectEqual(portfolio.fixtures.cash_rich.account_id, snapshot.account_id);
-}
-
-test "MockBackend returns configured response for requested operation" {
-    const expected = portfolio.fixtures.cash_rich;
-    const result = try (MockBackend{
-        .portfolio_snapshot = expected,
-    }).call(.{
-        .operation = .portfolio_snapshot,
-        .account_id = expected.account_id,
-    });
-
-    const snapshot = switch (result) {
-        .portfolio_snapshot => |value| value,
-        else => unreachable,
-    };
-    try std.testing.expectEqual(expected.account_id, snapshot.account_id);
+    try std.testing.expectEqual(portfolio_fixtures.fixtures.cash_rich.account_id, snapshot.account_id);
 }

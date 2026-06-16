@@ -182,6 +182,38 @@ pub fn build(b: *std.Build) void {
     const portfolio_run = b.addRunArtifact(portfolio_test);
     test_step.dependOn(&portfolio_run.step);
 
+    // portfolio_fixtures.zig: test companion for portfolio.zig.
+    // Uses dedicated basket and portfolio named modules so basket.zig belongs
+    // to exactly one module instance in this binary.
+    const basket_pf_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/basket.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "thesis_cabi", .module = thesis_cabi_mod }},
+    });
+    const portfolio_pf_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/portfolio.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket.zig", .module = basket_pf_test_mod },
+        },
+    });
+    const portfolio_fixtures_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/portfolio_fixtures.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "portfolio.zig", .module = portfolio_pf_test_mod },
+                .{ .name = "basket.zig", .module = basket_pf_test_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, portfolio_fixtures_test, fd_lib_dir);
+    const portfolio_fixtures_run = b.addRunArtifact(portfolio_fixtures_test);
+    test_step.dependOn(&portfolio_fixtures_run.step);
+
     // model tile: unit tests use MockBackend only, no network calls.
     const model_test = b.addTest(.{
         .root_module = b.createModule(.{
@@ -216,6 +248,15 @@ pub fn build(b: *std.Build) void {
             .{ .name = "basket.zig", .module = basket_adapter_test_mod },
         },
     });
+    const portfolio_fixtures_adapter_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/portfolio_fixtures.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "portfolio.zig", .module = portfolio_adapter_test_mod },
+            .{ .name = "basket.zig", .module = basket_adapter_test_mod },
+        },
+    });
     const trade_ticket_adapter_test_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/schema/trade_ticket.zig"),
         .target = target,
@@ -223,6 +264,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "basket", .module = basket_adapter_test_mod },
             .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+            .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_adapter_test_mod },
             .{ .name = "thesis", .module = thesis_adapter_test_mod },
         },
     });
@@ -234,6 +276,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "basket", .module = basket_adapter_test_mod },
                 .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+                .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_adapter_test_mod },
                 .{ .name = "trade_ticket", .module = trade_ticket_adapter_test_mod },
             },
         }),
@@ -306,6 +349,15 @@ pub fn build(b: *std.Build) void {
             .{ .name = "basket.zig", .module = basket_int_mod },
         },
     });
+    const portfolio_fixtures_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/portfolio_fixtures.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "portfolio.zig", .module = portfolio_int_mod },
+            .{ .name = "basket.zig", .module = basket_int_mod },
+        },
+    });
     const trade_ticket_int_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/schema/trade_ticket.zig"),
         .target = target,
@@ -313,6 +365,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "basket", .module = basket_int_mod },
             .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_int_mod },
             .{ .name = "thesis", .module = thesis_int_mod },
         },
     });
@@ -326,6 +379,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "thesis", .module = thesis_int_mod },
                 .{ .name = "basket", .module = basket_int_mod },
                 .{ .name = "portfolio", .module = portfolio_int_mod },
+                .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_int_mod },
             },
         }),
     });
@@ -345,6 +399,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "basket", .module = basket_int_mod },
             .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_int_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
         },
     });
@@ -356,6 +411,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "adapter", .module = adapter_int_mod },
             .{ .name = "basket", .module = basket_int_mod },
             .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_int_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
         },
     });
@@ -409,7 +465,7 @@ pub fn build(b: *std.Build) void {
     });
     const allowed_trade_e2e_test = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test/e2e/allowed_trade.zig"),
+            .root_source_file = b.path("src/tickoni/test/integration/allowed_trade.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -544,6 +600,38 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, portfolio_cov_test, fd_lib_dir);
     cov_step.dependOn(&b.addInstallArtifact(portfolio_cov_test, .{
+        .dest_dir = .{ .override = .{ .custom = "cov" } },
+    }).step);
+
+    // portfolio_fixtures coverage binary.
+    const basket_pf_cov_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/basket.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "thesis_cabi", .module = thesis_cabi_mod }},
+    });
+    const portfolio_pf_cov_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/portfolio.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket.zig", .module = basket_pf_cov_mod },
+        },
+    });
+    const portfolio_fixtures_cov_test = b.addTest(.{
+        .name = "test-portfolio-fixtures",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/portfolio_fixtures.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "portfolio.zig", .module = portfolio_pf_cov_mod },
+                .{ .name = "basket.zig", .module = basket_pf_cov_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, portfolio_fixtures_cov_test, fd_lib_dir);
+    cov_step.dependOn(&b.addInstallArtifact(portfolio_fixtures_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
 

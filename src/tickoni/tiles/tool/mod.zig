@@ -2,6 +2,7 @@ const std = @import("std");
 const adapter = @import("adapter");
 const basket = @import("basket");
 const portfolio = @import("portfolio");
+const portfolio_fixtures = @import("portfolio_fixtures");
 const trade_ticket = @import("trade_ticket");
 
 pub fn normalizePortfolioRead(account_id: u32) adapter.AdapterRequest {
@@ -32,7 +33,7 @@ pub fn normalizePaperOrder(ticket: *const trade_ticket.TradeTicket) adapter.Adap
 }
 
 test "normalizePortfolioRead sets account and operation" {
-    const req = normalizePortfolioRead(portfolio.fixtures.cash_rich.account_id);
+    const req = normalizePortfolioRead(portfolio_fixtures.fixtures.cash_rich.account_id);
     try std.testing.expectEqual(adapter.AdapterOperation.portfolio_snapshot, req.operation);
-    try std.testing.expectEqual(portfolio.fixtures.cash_rich.account_id, req.account_id);
+    try std.testing.expectEqual(portfolio_fixtures.fixtures.cash_rich.account_id, req.account_id);
 }

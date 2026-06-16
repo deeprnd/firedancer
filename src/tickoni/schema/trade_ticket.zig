@@ -1,6 +1,7 @@
 const std = @import("std");
 const basket = @import("basket");
 const portfolio = @import("portfolio");
+const portfolio_fixtures = @import("portfolio_fixtures");
 const thesis = @import("thesis");
 
 pub const max_ticket_id_len: usize = 64;
@@ -298,7 +299,7 @@ test "buildMarketBuyTicket: oversized notional produces per-order block reason" 
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const proposed_basket = try basket.build(intent, thesis_id);
-    const affordability = portfolio.checkAffordability(&portfolio.fixtures.cash_rich, proposed_basket.total_allocated_cents);
+    const affordability = portfolio.checkAffordability(&portfolio_fixtures.fixtures.cash_rich, proposed_basket.total_allocated_cents);
 
     var quotes: QuoteSnapshot = std.mem.zeroes(QuoteSnapshot);
     quotes.quote_count = proposed_basket.instrument_count;
