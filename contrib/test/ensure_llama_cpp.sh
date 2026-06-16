@@ -3,11 +3,14 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: contrib/test/ensure_llama_cpp.sh [--check-only]
+Usage: contrib/test/ensure_llama_cpp.sh [--gpu] [--check-only]
 
 Ensures llama.cpp is cloned and built locally. If the directory is missing,
-clones from https://github.com/ggml-org/llama.cpp and builds for CPU with
-OpenBLAS.
+clones from https://github.com/ggml-org/llama.cpp and builds.
+
+Flags:
+  --gpu           build with CUDA support (default: CPU + OpenBLAS)
+  --check-only    exit 0 if present, exit 1 if missing (no build)
 
 Environment overrides:
   TK_LLAMA_CPP_DIR    local directory for the llama.cpp checkout
@@ -18,15 +21,15 @@ USAGE
 }
 
 check_only=0
-if [[ "${1:-}" == "--check-only" ]]; then
-  check_only=1
-elif [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-  usage
-  exit 0
-elif [[ $# -gt 0 ]]; then
-  usage >&2
-  exit 2
-fi
+gpu_build=0
+for arg in "$@"; do
+  case "$arg" in
+    --check-only) check_only=1 ;;
+    --gpu)        gpu_build=1 ;;
+    --help|-h)    usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+  esac
+done
 
 llama_dir="${TK_LLAMA_CPP_DIR:-$HOME/work/git/llama.cpp}"
 
@@ -61,9 +64,14 @@ else
   echo "directory exists, skipping clone: ${llama_dir}"
 fi
 
-echo "building llama.cpp (CPU + OpenBLAS) in ${llama_dir}/build"
-cmake -B "${llama_dir}/build" -S "$llama_dir" -G Ninja \
-  -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS
+if (( gpu_build )); then
+  echo "building llama.cpp (CUDA) in ${llama_dir}/build"
+  cmake -B "${llama_dir}/build" -S "$llama_dir" -DGGML_CUDA=ON
+else
+  echo "building llama.cpp (CPU + OpenBLAS) in ${llama_dir}/build"
+  cmake -B "${llama_dir}/build" -S "$llama_dir" \
+    -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS
+fi
 cmake --build "${llama_dir}/build" --config Release -j 4
 
 echo "copying llama-* binaries to ${llama_dir}"

@@ -43,45 +43,70 @@ model_path="${model_dir}/${model_file}"
 
 if [[ ! -x "$server_bin" ]]; then
   echo "llama-server not found: ${server_bin}" >&2
-  echo "Run: just test-integration-llama-ensure" >&2
+  echo "Run: just infra-ensure-llamacpp" >&2
   exit 1
 fi
 
 if [[ ! -f "$model_path" ]]; then
   echo "model not found: ${model_path}" >&2
-  echo "Run: just test-integration-model-ensure" >&2
+  echo "Run: just infra-ensure-model" >&2
   exit 1
 fi
 
+cpu_cmd=(
+  "$server_bin"
+  -m "$model_path"
+  --no-mmproj
+  --reasoning-format none
+  --ctx-size 4096
+  --cache-type-k q4_0
+  --cache-type-v q4_0
+  --threads 4
+  --batch-size 64
+  --ubatch-size 32
+  --metrics
+  --slots
+)
+
 if [[ "$backend" == "cpu" ]]; then
-  exec "$server_bin" \
-    -m "$model_path" \
-    --no-mmproj \
-    --ctx-size 4096 \
-    --cache-type-k q4_0 \
-    --cache-type-v q4_0 \
-    --threads 4 \
-    --batch-size 64 \
-    --ubatch-size 32 \
-    --metrics \
-    --slots
-else
-  exec "$server_bin" \
-    -m "$model_path" \
-    --no-mmproj \
-    --device CUDA0,CUDA1 \
-    --split-mode layer \
-    --tensor-split 1,1 \
-    -ngl all \
-    --ctx-size 8192 \
-    --cache-type-k q4_0 \
-    --cache-type-v q4_0 \
-    --threads 8 \
-    --threads-batch 8 \
-    --batch-size 256 \
-    --ubatch-size 128 \
-    --metrics \
-    --slots \
-    --verbose \
-    --log-file gemma4-e2b-2gpu.log
+  echo "running: ${cpu_cmd[*]}"
+  exec "${cpu_cmd[@]}"
 fi
+
+# GPU: check if GPU 0 has enough free VRAM for the model before committing.
+model_mb=$(( $(stat -c%s "$model_path") / 1024 / 1024 ))
+gpu_free_mb=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits -i 0 2>/dev/null \
+  | tr -d ' ' | head -1 || echo 0)
+echo "GPU 0 free: ${gpu_free_mb} MiB  model: ${model_mb} MiB"
+
+if (( gpu_free_mb < model_mb )); then
+  echo "GPU 0 does not have enough free VRAM; falling back to cpu" >&2
+  echo "running: ${cpu_cmd[*]}"
+  exec "${cpu_cmd[@]}"
+fi
+
+export CUDA_VISIBLE_DEVICES=0
+gpu_cmd=(
+  "$server_bin"
+  -m "$model_path"
+  --no-mmproj
+  --reasoning-format none
+  --device cuda0
+  --split-mode none
+  --main-gpu 0
+  -ngl all
+  --ctx-size 8192
+  --cache-type-k q4_0
+  --cache-type-v q4_0
+  --threads 8
+  --threads-batch 8
+  --batch-size 64
+  --ubatch-size 32
+  -np 1
+  -fit off
+  --metrics
+  --slots
+  --verbose
+)
+echo "running: CUDA_VISIBLE_DEVICES=0 ${gpu_cmd[*]}"
+exec "${gpu_cmd[@]}"

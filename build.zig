@@ -124,7 +124,8 @@ pub fn build(b: *std.Build) void {
         {
             linkTickoniCodec(b, t, fd_lib_dir);
         }
-        test_step.dependOn(&b.addRunArtifact(t).step);
+        const t_run = b.addRunArtifact(t);
+        test_step.dependOn(&t_run.step);
     }
 
     // thesis.zig imports thesis_cabi: dedicated test binary with codec link.
@@ -137,7 +138,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, thesis_test, fd_lib_dir);
-    test_step.dependOn(&b.addRunArtifact(thesis_test).step);
+    const thesis_run = b.addRunArtifact(thesis_test);
+    test_step.dependOn(&thesis_run.step);
 
     // catalog.zig imports thesis.zig which imports thesis_cabi.
     const catalog_test = b.addTest(.{
@@ -149,7 +151,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, catalog_test, fd_lib_dir);
-    test_step.dependOn(&b.addRunArtifact(catalog_test).step);
+    const catalog_run = b.addRunArtifact(catalog_test);
+    test_step.dependOn(&catalog_run.step);
 
     // basket.zig imports catalog.zig and thesis.zig which imports thesis_cabi.
     const basket_test = b.addTest(.{
@@ -161,7 +164,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, basket_test, fd_lib_dir);
-    test_step.dependOn(&b.addRunArtifact(basket_test).step);
+    const basket_run = b.addRunArtifact(basket_test);
+    test_step.dependOn(&basket_run.step);
 
     // portfolio.zig imports basket.zig, which imports thesis.zig / thesis_cabi.
     const portfolio_test = b.addTest(.{
@@ -173,7 +177,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, portfolio_test, fd_lib_dir);
-    test_step.dependOn(&b.addRunArtifact(portfolio_test).step);
+    const portfolio_run = b.addRunArtifact(portfolio_test);
+    test_step.dependOn(&portfolio_run.step);
 
     // model tile: unit tests use MockBackend only, no network calls.
     const model_test = b.addTest(.{
@@ -183,7 +188,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    test_step.dependOn(&b.addRunArtifact(model_test).step);
+    const model_run = b.addRunArtifact(model_test);
+    test_step.dependOn(&model_run.step);
 
     // supervisor.zig imports runtime and tiles modules.
     const sup_mod = b.createModule(.{
@@ -197,7 +203,8 @@ pub fn build(b: *std.Build) void {
     });
     const sup_test = b.addTest(.{ .root_module = sup_mod });
     linkTickoniCodec(b, sup_test, fd_lib_dir);
-    test_step.dependOn(&b.addRunArtifact(sup_test).step);
+    const sup_run = b.addRunArtifact(sup_test);
+    test_step.dependOn(&sup_run.step);
 
     // ---------------------------------------------------------------------------
     // Integration-test step — V1.1 simple lane tests
@@ -263,11 +270,12 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, v1_1_allowed_2000_test, fd_lib_dir);
-    integration_step.dependOn(&b.addRunArtifact(v1_1_allowed_2000_test).step);
+    const v1_1_run = b.addRunArtifact(v1_1_allowed_2000_test);
+    integration_step.dependOn(&v1_1_run.step);
 
     // model tile integration tests: require a running llama.cpp server.
     // Tests skip (not fail) when the server is unreachable so unit-test CI
-    // lanes are not broken. Start the server with: just run-llm-server-cpu
+    // lanes are not broken. Start the server with: just infra-run-llamacpp-cpu
     const model_int_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
         .target = target,
@@ -282,7 +290,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
     model_http_test.root_module.link_libc = true;
-    integration_step.dependOn(&b.addRunArtifact(model_http_test).step);
+    const model_http_run = b.addRunArtifact(model_http_test);
+    integration_step.dependOn(&model_http_run.step);
 
     // ---------------------------------------------------------------------------
     // Coverage step — install test binaries to zig-out/cov/ for kcov

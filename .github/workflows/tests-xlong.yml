@@ -72,14 +72,14 @@ jobs:
         uses: ./.github/actions/setup-public-gh-runner
         with:
           zig: 'true'
-          apt-packages: 'cmake ninja-build libopenblas-dev libopenblas64-dev'
+          apt-packages: 'cmake libopenblas-dev libopenblas64-dev'
           python-tools: 'huggingface_hub[cli]'
 
       - name: Build llama.cpp
-        run: just test-integration-llama-ensure
+        run: just infra-ensure-llamacpp
 
       - name: Download model
-        run: just test-integration-model-ensure
+        run: just infra-ensure-model
 
       - name: Run integration tests
         run: just test-integration-tk

@@ -150,10 +150,10 @@ Contains long-running tests that require additional infrastructure or model asse
 
 **Harness Integration Tests** — runs the Tickoni Zig integration test suite against a real CPU-hosted LLM. Steps in order:
 
-1. Install `cmake`, `ninja-build`, `libopenblas-dev`, `libopenblas64-dev` via apt.
-2. `just test-integration-llama-ensure` — clones `https://github.com/ggml-org/llama.cpp` into `~/work/git/llama.cpp` (if absent), builds for CPU with OpenBLAS via cmake + Ninja, and copies `llama-*` binaries to the clone root.
-3. `just test-integration-model-ensure` — downloads the GGUF model via the `hf` CLI (Hugging Face Hub) if not already present.
-4. `just test-integration-tk` — runs `zig build integration-test`.
+1. Install `cmake`, `libopenblas-dev`, `libopenblas64-dev` via apt.
+2. `just infra-ensure-llamacpp` — clones `https://github.com/ggml-org/llama.cpp` into `~/work/git/llama.cpp` (if absent), builds for CPU with OpenBLAS via cmake, and copies `llama-*` binaries to the clone root.
+3. `just infra-ensure-model` — downloads the GGUF model via the `hf` CLI (Hugging Face Hub) if not already present.
+4. `just test-integration-tk` — ensures llama.cpp and model are present, starts the server, runs `zig build integration-test`, and stops the server.
 
 The llama.cpp path and model path can be overridden with `TK_LLAMA_CPP_DIR`, `TK_HF_MODEL_DIR`, and `TK_HF_MODEL_FILE` environment variables (see `contrib/test/ensure_llama_cpp.sh` and `contrib/test/ensure_hf_model.sh`).
 

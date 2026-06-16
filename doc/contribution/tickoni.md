@@ -578,6 +578,128 @@ define capacity. A type does not define process isolation.
 - Malformed input should become explicit rejection, metric, and audit behavior;
   internal invariant failures should remain loud.
 
+### Dependency Injection
+
+Tickoni uses tagged unions as the primary DI mechanism. A tagged union names the
+available implementations as enum tags and stores each implementation's
+configuration as a struct field. This keeps dispatch explicit, avoids hidden
+global state, and makes the swap point readable at the call site.
+
+#### Tagged union backend pattern
+
+Define a tagged union for any tile boundary that needs to be swappable between a
+stub or mock and a real external call:
+
+```zig
+// Naming: <Noun>Backend for the union, <Noun>Backend.<variant> for each impl.
+pub const Backend = union(enum) {
+    mock: MockBackend,      // stub used in unit tests
+    http: HttpBackend,      // real HTTP call used in integration tests and prod
+
+    pub fn call(self: *Backend, allocator: std.mem.Allocator, req: Request) anyerror!Response {
+        return switch (self.*) {
+            .mock => |m| m.call(allocator, req),
+            .http => |h| h.call(allocator, req),
+        };
+    }
+};
+```
+
+Rules:
+
+- The dispatch function signature must be identical across all variants.
+  Callers see one surface.
+- Use `anyerror!T` for the return type when variants have disjoint error sets.
+  Avoid creating a union error set just to satisfy the type checker.
+- Keep the dispatch function in `Backend`, not spread across call sites.
+
+#### Storing external context in the impl struct
+
+Each implementation struct carries the context it needs to do its job. The
+struct is the DI container.
+
+```zig
+pub const HttpBackend = struct {
+    endpoint: []const u8,   // where to call
+    io: std.Io,             // how to open TCP connections
+
+    pub fn call(self: HttpBackend, allocator: std.mem.Allocator, req: Request) !Response {
+        var client = std.http.Client{ .allocator = allocator, .io = self.io };
+        ...
+    }
+};
+```
+
+Rules:
+
+- All context needed by an implementation must be stored in its struct, not
+  read from globals or thread-locals inside `call`.
+- Pass `std.Io` explicitly as a struct field. In tests, callers pass
+  `std.testing.io`. In the supervisor, callers pass the tile's io from the
+  Firedancer-style runtime context. Neither the struct nor the function guesses.
+- Pass `std.mem.Allocator` as a function argument, not as a struct field, so
+  call-scoped allocations are bounded to the call's lifetime. Store an
+  allocator as a struct field only when the struct manages long-lived memory
+  (e.g., a connection pool) and the caller transfers ownership explicitly.
+- Keep `MockBackend` minimal: a set of pre-loaded canned responses and no side
+  effects. If a test needs to vary responses, add a field, not a global counter.
+
+#### Test layer consequences
+
+| Test layer | Backend variant | `std.Io` source |
+| --- | --- | --- |
+| unit test (`zig build test`) | `.mock` | not needed |
+| integration test (`zig build integration-test`) | `.http` | `std.testing.io` |
+| supervisor (future production) | `.http` (or real variant) | tile runtime io |
+
+Unit tests should never construct a real backend. Integration tests should never
+construct a mock backend except to verify skip behavior when the real service is
+absent. If an integration test finds the real server unreachable, it returns
+`error.SkipZigTest`; it does not silently fall back to the mock.
+
+#### What to avoid
+
+- **Service locator**: do not resolve the backend from a global registry keyed
+  by string or type. The caller passes the backend; the callee does not discover
+  it.
+- **Vtable-heavy interface structs**: a struct with function-pointer fields is
+  harder to read and adds indirection without benefit when a tagged union covers
+  the same ground with less boilerplate.
+- **Runtime `anytype` dispatch**: an `anytype` parameter that secretly branches
+  on type at comptime hides the backend contract from reviewers and tests.
+- **Implicit fallback inside `call`**: if the real service is absent, return an
+  error. Do not silently switch to the mock path. Implicit fallback means
+  integration tests can pass without ever reaching the real service.
+- **Comptime-only switch**: comptime backend selection via a build flag or
+  comptime parameter is appropriate only when the two implementations cannot
+  coexist in the same binary. The tagged union is preferred because it keeps
+  both paths tested in the same test binary.
+
+#### Example: swapping from unit test to integration test
+
+Unit test (no real service required):
+
+```zig
+var backend = Backend{ .mock = .{ .canned_content = "test output" } };
+const resp = try backend.call(allocator, req);
+defer resp.deinit(allocator);
+try std.testing.expectEqualStrings("test output", resp.content);
+```
+
+Integration test (real service, skip if absent):
+
+```zig
+var backend = Backend{ .http = .{ .endpoint = endpoint, .io = std.testing.io } };
+const resp = backend.call(allocator, req) catch |err| switch (err) {
+    error.ServerUnreachable => return error.SkipZigTest,
+    else => return err,
+};
+defer resp.deinit(allocator);
+try std.testing.expect(resp.content.len > 0);
+```
+
+The swap is a single struct literal at construction. Nothing else changes.
+
 ## Memory And Allocation
 
 Runtime allocations must be bounded by topology or startup configuration.

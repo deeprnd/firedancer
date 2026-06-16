@@ -1,7 +1,7 @@
 // Integration tests for the tkmodl tile against a real llama.cpp server.
 //
 // These tests require a running llama.cpp OpenAI-compatible server.
-// Start one with: just run-llm-server-cpu
+// Start one with: just infra-run-llamacpp-cpu
 //
 // If the server is not reachable, tests are skipped (not failed) so they
 // do not block unit-test CI lanes.
@@ -60,10 +60,32 @@ fn makeAiInfraRequest(model_id: []const u8) model.ModelRequest {
         .sampling = .{
             .temperature = 0,
             .top_p = 1.0,
-            .max_output_tokens = 512,
+            .max_output_tokens = 2048,
             .seed = 42,
         },
     };
+}
+
+test "model tile http: hello round-trip" {
+    const allocator = std.testing.allocator;
+    var backend = makeBackend();
+    const req = model.ModelRequest{
+        .model_id = getModelId(),
+        .messages = &.{.{ .role = "user", .content = "Reply with the single word: hello" }},
+        .sampling = .{ .temperature = 0, .max_output_tokens = 256, .seed = 1 },
+    };
+
+    const resp = backend.call(allocator, req) catch |err| switch (err) {
+        error.ServerUnreachable => {
+            std.log.info("skipping: llama.cpp not reachable at {s} (run: just infra-run-llamacpp-cpu)", .{getEndpoint()});
+            return error.SkipZigTest;
+        },
+        else => return err,
+    };
+    defer resp.deinit(allocator);
+
+    try std.testing.expect(resp.content.len > 0);
+    try std.testing.expect(resp.token_usage.total_tokens > 0);
 }
 
 test "model tile http: ai infrastructure thesis returns non-empty content" {
@@ -73,7 +95,7 @@ test "model tile http: ai infrastructure thesis returns non-empty content" {
 
     const resp = backend.call(allocator, req) catch |err| switch (err) {
         error.ServerUnreachable => {
-            std.log.info("skipping: llama.cpp not reachable at {s} (run: just run-llm-server-cpu)", .{getEndpoint()});
+            std.log.info("skipping: llama.cpp not reachable at {s} (run: just infra-run-llamacpp-cpu)", .{getEndpoint()});
             return error.SkipZigTest;
         },
         else => return err,
