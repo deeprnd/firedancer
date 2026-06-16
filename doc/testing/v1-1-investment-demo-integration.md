@@ -149,6 +149,26 @@ usage, prompt hash, response hash, model id, and runtime metadata into fixture
 output so the replay lane can validate the same run without invoking the
 model again.
 
+The real-LLM lane must check for the GGUF before starting the local model
+server:
+
+```bash
+just test-integration-tk
+```
+
+That command checks for:
+
+```text
+model_dir = ~/work/models/gemma/gemma-4-E2B-it-qat-GGUF
+model_file = gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf
+```
+
+If the file exists and is non-empty, it does nothing. If the file is missing,
+it downloads only `gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf` from
+`unsloth/gemma-4-E2B-it-qat-GGUF` using `hf download`. CI can use
+`just test-integration-tk` when it needs a no-network
+preflight that fails if the model is absent.
+
 Simple integration tests in the normal gate:
 
 - `v1_1_allowed_2000`: allowed thesis, account, quotes, and recorded model
@@ -307,7 +327,7 @@ Chosen fixture values:
 Suggested fixture directory:
 
 ```text
-src/tickoni/test/fixtures/v1_1_investment_demo/
+src/tickoni/test/fixtures/investment/
 ```
 
 Suggested fixture files:

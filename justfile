@@ -84,7 +84,25 @@ test-integration-fd:
   @true
 
 test-integration-tk:
-  @true
+  zig build integration-test
+
+test-integration-model-check:
+  bash contrib/test/ensure_hf_model.sh --check-only
+
+test-integration-model-ensure:
+  bash contrib/test/ensure_hf_model.sh
+
+test-integration-llama-check:
+  bash contrib/test/ensure_llama_cpp.sh --check-only
+
+test-integration-llama-ensure:
+  bash contrib/test/ensure_llama_cpp.sh
+
+run-llm-server-cpu:
+  bash contrib/test/run_llm_server.sh cpu
+
+run-llm-server-gpu:
+  bash contrib/test/run_llm_server.sh gpu
 
 test-integration-all:
   python3 contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"

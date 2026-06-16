@@ -190,6 +190,72 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&b.addRunArtifact(sup_test).step);
 
     // ---------------------------------------------------------------------------
+    // Integration-test step — V1.1 simple lane tests
+    // Run with: zig build integration-test
+    // ---------------------------------------------------------------------------
+    const integration_step = b.step("integration-test", "Run V1.1 investment demo integration tests");
+
+    // Schema modules for the integration test.
+    //
+    // thesis.zig, basket.zig, and portfolio.zig use relative file imports
+    // (@import("thesis.zig"), @import("basket.zig")) internally.  When each
+    // schema file is simultaneously the root of its own named module AND a
+    // relative-file import target inside another module, Zig rejects the build
+    // with "file exists in modules X and Y".
+    //
+    // The fix is to register each relative import target as a *named* import
+    // inside the module that would otherwise pick it up as a file.  When a
+    // named import matches the path string passed to @import(), Zig uses the
+    // module instead of the file, so each .zig file belongs to exactly one
+    // module.
+    //
+    // Ownership chain:
+    //   thesis_int_mod   owns thesis.zig (needs thesis_cabi)
+    //   basket_int_mod   owns basket.zig (needs thesis_cabi; "thesis.zig" → thesis_int_mod
+    //                    so basket.zig's @import("thesis.zig") and catalog.zig's
+    //                    @import("thesis.zig") both resolve to thesis_int_mod)
+    //   portfolio_int_mod owns portfolio.zig ("basket.zig" → basket_int_mod so
+    //                    portfolio.zig's @import("basket.zig") resolves to basket_int_mod)
+    const thesis_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/thesis.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "thesis_cabi", .module = thesis_cabi_mod }},
+    });
+    const basket_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/basket.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "thesis_cabi", .module = thesis_cabi_mod },
+            .{ .name = "thesis.zig", .module = thesis_int_mod },
+        },
+    });
+    const portfolio_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/portfolio.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket.zig", .module = basket_int_mod },
+        },
+    });
+
+    const v1_1_allowed_2000_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/fixtures/investment/v1_1_allowed_2000.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "thesis", .module = thesis_int_mod },
+                .{ .name = "basket", .module = basket_int_mod },
+                .{ .name = "portfolio", .module = portfolio_int_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, v1_1_allowed_2000_test, fd_lib_dir);
+    integration_step.dependOn(&b.addRunArtifact(v1_1_allowed_2000_test).step);
+
+    // ---------------------------------------------------------------------------
     // Coverage step — install test binaries to zig-out/cov/ for kcov
     // Run with: zig build cov
     // Then: bash contrib/coverage.sh coverage-tk

@@ -1,0 +1,54 @@
+{
+  "fixture_id": "replay_capsule_ai_infra",
+  "schema": "tickoni.v1_1.replay_capsule",
+  "capsule_id": "replay_capsule_ai_infra",
+  "run_id": "run_v1_1_ai_infra_demo_0001",
+  "policy_version": "v1.1.demo.investment",
+  "catalog_schema_version": 1,
+  "thesis_input_hash": "thesis_hash_allowed_2000",
+  "normalized_intent_hash": "intent_hash_allowed_2000",
+  "basket_id": "basket_v1_1_ai_infra_2000",
+  "ticket_id": "ticket_v1_1_ai_infra_2000_market",
+  "proposal_hash": "proposal_hash_ticket_v1_1_ai_infra_2000_market",
+  "audit_chain_hash": "audit_chain_hash_allowed_2000",
+  "model_substitutions": [
+    {
+      "request_hash": "model_request_hash_ai_infra",
+      "response_hash": "model_response_hash_ai_infra_gemma4",
+      "fixture_file": "model_response_ai_infra_gemma4.json"
+    }
+  ],
+  "adapter_substitutions": [
+    {
+      "adapter_id": "paper_broker_demo",
+      "operation": "quote_snapshot",
+      "request_hash": "adapter_request_hash_quote_ai_infra",
+      "response_hash": "adapter_response_hash_quote_ai_infra",
+      "fixture_file": "quotes_ai_infra.json"
+    },
+    {
+      "adapter_id": "paper_broker_demo",
+      "operation": "portfolio_snapshot",
+      "request_hash": "adapter_request_hash_portfolio_demo_ops",
+      "response_hash": "adapter_response_hash_portfolio_demo_ops",
+      "fixture_file": "account_demo_ops.json"
+    },
+    {
+      "adapter_id": "paper_broker_demo",
+      "operation": "paper_order",
+      "request_hash": "adapter_request_hash_paper_place_allowed_2000",
+      "response_hash": "adapter_response_hash_paper_place_allowed_2000",
+      "fixture_file": "paper_execution_allowed_2000.json"
+    }
+  ],
+  "replay_assertions": {
+    "no_live_model_call": true,
+    "no_live_adapter_call": true,
+    "no_paper_fill_emitted": true,
+    "basket_id_matches": "basket_v1_1_ai_infra_2000",
+    "ticket_id_matches": "ticket_v1_1_ai_infra_2000_market",
+    "proposal_hash_matches": "proposal_hash_ticket_v1_1_ai_infra_2000_market",
+    "affordability_outcome_matches": "allow",
+    "policy_outcome_matches": "allow"
+  }
+}

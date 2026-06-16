@@ -55,3 +55,31 @@ jobs:
 
       - name: Run test suite
         run: just test-e2e-fd
+
+  integration-tests-tk:
+    name: Harness Integration Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+          apt-packages: 'cmake ninja-build libopenblas-dev libopenblas64-dev'
+          python-tools: 'huggingface_hub[cli]'
+
+      - name: Build llama.cpp
+        run: just test-integration-llama-ensure
+
+      - name: Download model
+        run: just test-integration-model-ensure
+
+      - name: Run integration tests
+        run: just test-integration-tk
