@@ -1,3 +1,8 @@
+// End-to-end tile-boundary test: AI infrastructure allowed trade.
+//
+// This file exercises the fixture-backed tkmodl/tktool/tkadpt/tkrepl path and
+// audit chain generation on top of the deterministic scenario inputs.
+
 const std = @import("std");
 const adapter = @import("adapter");
 const audit = @import("audit_tile");
@@ -43,7 +48,7 @@ fn basketRejects(proposed_basket: *const basket_mod.Basket, ticker: []const u8) 
     return false;
 }
 
-test "v1_1_allowed_2000_e2e: tkmodl tktool tkadpt build the allowed paper trade" {
+test "allowed_trade_e2e: tkmodl tktool tkadpt build the allowed paper trade" {
     const allocator = std.testing.allocator;
     const input = demoOpsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
@@ -63,10 +68,10 @@ test "v1_1_allowed_2000_e2e: tkmodl tktool tkadpt build the allowed paper trade"
     try std.testing.expect(std.mem.indexOf(u8, model_response.content, "SOXX") != null);
     try std.testing.expectEqual(@as(u32, 335), model_response.token_usage.total_tokens);
 
-    const fixture_adapter = adapter.FixtureAdapter{};
+    var adapter_backend = adapter.Backend{ .fixture = .{} };
 
     const portfolio_req = tool.normalizePortfolioRead(demo_ops_account_id);
-    const portfolio_result = try fixture_adapter.call(portfolio_req);
+    const portfolio_result = try adapter_backend.call(portfolio_req);
     const account = switch (portfolio_result) {
         .portfolio_snapshot => |snapshot| snapshot,
         else => unreachable,
@@ -75,7 +80,7 @@ test "v1_1_allowed_2000_e2e: tkmodl tktool tkadpt build the allowed paper trade"
     try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, affordability.outcome);
 
     const quote_req = tool.normalizeQuoteRead(&basket);
-    const quote_result = try fixture_adapter.call(quote_req);
+    const quote_result = try adapter_backend.call(quote_req);
     const quote_snapshot = switch (quote_result) {
         .quote_snapshot => |snapshot| snapshot,
         else => unreachable,
@@ -111,7 +116,7 @@ test "v1_1_allowed_2000_e2e: tkmodl tktool tkadpt build the allowed paper trade"
     }
 
     const paper_req = tool.normalizePaperOrder(&ticket);
-    const paper_result = try fixture_adapter.call(paper_req);
+    const paper_result = try adapter_backend.call(paper_req);
     const execution = switch (paper_result) {
         .paper_order => |result| result,
         else => unreachable,
@@ -124,7 +129,7 @@ test "v1_1_allowed_2000_e2e: tkmodl tktool tkadpt build the allowed paper trade"
     try std.testing.expectEqual(@as(i64, 200_000), execution.resulting_account_snapshot.day_notional_used_cents);
 }
 
-test "v1_1_allowed_2000_e2e: replay succeeds with fixture substitutions and no live effects" {
+test "allowed_trade_e2e: replay succeeds with fixture substitutions and no live effects" {
     const allocator = std.testing.allocator;
     const input = demoOpsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
@@ -140,14 +145,14 @@ test "v1_1_allowed_2000_e2e: replay succeeds with fixture substitutions and no l
     });
     defer model_response.deinit(allocator);
 
-    const fixture_adapter = adapter.FixtureAdapter{};
-    const account_result = try fixture_adapter.call(tool.normalizePortfolioRead(demo_ops_account_id));
+    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    const account_result = try adapter_backend.call(tool.normalizePortfolioRead(demo_ops_account_id));
     const account = switch (account_result) {
         .portfolio_snapshot => |snapshot| snapshot,
         else => unreachable,
     };
     const affordability = try portfolio.checkBasketAffordability(&account, &basket);
-    const quote_result = try fixture_adapter.call(tool.normalizeQuoteRead(&basket));
+    const quote_result = try adapter_backend.call(tool.normalizeQuoteRead(&basket));
     const quote_snapshot = switch (quote_result) {
         .quote_snapshot => |snapshot| snapshot,
         else => unreachable,
@@ -159,7 +164,7 @@ test "v1_1_allowed_2000_e2e: replay succeeds with fixture substitutions and no l
         policy_max_notional_per_order_cents,
         expected_ticket_id,
     );
-    const paper_result = try fixture_adapter.call(tool.normalizePaperOrder(&ticket));
+    const paper_result = try adapter_backend.call(tool.normalizePaperOrder(&ticket));
     const execution = switch (paper_result) {
         .paper_order => |result| result,
         else => unreachable,

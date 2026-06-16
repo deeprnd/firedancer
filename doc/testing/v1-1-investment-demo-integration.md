@@ -171,7 +171,7 @@ preflight that fails if the model is absent.
 
 Simple integration tests in the normal gate:
 
-- `v1_1_allowed_2000`: allowed thesis, account, quotes, and recorded model
+- `ai_infrastructure_allowed_trade`: allowed thesis, account, quotes, and recorded model
   response produce basket, ticket, affordability `allow`, paper execution,
   audit, and replay.
 - `v1_1_oversized_25000`: oversized thesis plus account or policy limit fixture

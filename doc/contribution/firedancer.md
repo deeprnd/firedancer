@@ -951,6 +951,274 @@ or scheduler-rate path.  It is less important for setup code, tests, or
 operator-only command paths, where clarity and error reporting usually
 matter more than removing every branch or call.
 
+## Structural Patterns
+
+Firedancer does not use C++ classes or inheritance, but the classic
+GoF patterns still appear — expressed in the idioms already covered
+in this guide: function pointer structs, macro-based template
+instantiation, NULL-terminated registration arrays, and workspace
+injection.  Knowing which pattern solves which problem lets contributors
+pick the right tool without inventing a new one.
+
+### Strategy — tile vtable
+
+The central strategy type is `fd_topo_run_tile_t`
+(`src/disco/topo/fd_topo.h:717`):
+
+```c
+typedef struct {
+  char const * name;
+
+  ulong (*scratch_align    )( void );
+  ulong (*scratch_footprint)( fd_topo_tile_t const * tile );
+  void  (*privileged_init  )( fd_topo_t const * topo,
+                               fd_topo_tile_t const * tile );
+  void  (*unprivileged_init)( fd_topo_t const * topo,
+                               fd_topo_tile_t const * tile );
+  void  (*run              )( fd_topo_t * topo,
+                               fd_topo_tile_t * tile );
+  ulong (*populate_allowed_seccomp)( fd_topo_t const * topo,
+                                     fd_topo_tile_t const * tile,
+                                     ulong out_cnt,
+                                     struct sock_filter * out );
+  /* ... */
+} fd_topo_run_tile_t;
+```
+
+Each tile defines one named global instance and fills in the function
+pointers it needs:
+
+```c
+/* src/disco/dedup/fd_dedup_tile.c */
+fd_topo_run_tile_t fd_tile_dedup = {
+  .name                = "dedup",
+  .scratch_align       = scratch_align,
+  .scratch_footprint   = scratch_footprint,
+  .privileged_init     = privileged_init,
+  .unprivileged_init   = unprivileged_init,
+  .run                 = stem_run,
+};
+```
+
+The dispatcher in `src/disco/topo/fd_topo_run.c` calls
+`tile->run( topo, tile )` without knowing which tile kind it is.
+No switch statement, no heap-allocated vtable pointer, no inheritance
+chain.
+
+**Problem solved:** identical lifecycle shape (init, sandbox, run loop)
+with per-tile behavior.  Dispatch cost is one pointer dereference at
+tile startup, not per fragment.
+
+The same pattern appears for shared-memory object types.
+`fd_topo_obj_callbacks_t` (`src/disco/topo/fd_topo.h:740`) stores
+`footprint`, `align`, and `new` function pointers for each object kind
+(mcache, dcache, fseq, metrics, …).
+
+### Factory / Registry — NULL-terminated tile array
+
+`src/app/firedancer-dev/main.h:112` lists every tile the binary knows:
+
+```c
+fd_topo_run_tile_t * TILES[] = {
+  &fd_tile_net,
+  &fd_tile_quic,
+  &fd_tile_dedup,
+  &fd_tile_pack,
+  /* ... */
+  NULL,
+};
+```
+
+The runner walks the array once at startup to match topology tile names
+to implementations.  Adding a new tile is two lines: an `extern`
+declaration and a pointer in the array.
+
+**Problem solved:** open-ended extensibility without a string-keyed hash
+map or `#ifdef` chains.  The compiler sees every tile; the linker removes
+unused ones.
+
+### Template Method — macro-based stem instantiation
+
+`src/disco/stem/fd_stem.c` is the reusable hot-loop backbone.  A tile
+does not call it like a library; it instantiates it by defining callback
+macros and including the file:
+
+```c
+/* src/disco/dedup/fd_dedup_tile.c */
+#define STEM_BURST                  1UL
+#define STEM_CALLBACK_CONTEXT_TYPE  fd_dedup_ctx_t
+#define STEM_CALLBACK_CONTEXT_ALIGN alignof(fd_dedup_ctx_t)
+#define STEM_CALLBACK_METRICS_WRITE metrics_write
+#define STEM_CALLBACK_DURING_FRAG   during_frag
+#define STEM_CALLBACK_AFTER_FRAG    after_frag
+
+#include "../stem/fd_stem.c"
+```
+
+This generates a specialized `stem_run` for the dedup tile with direct
+calls to `during_frag` and `after_frag` — no function-pointer dispatch,
+no `void *` context cast, the exact type inlined by the compiler.
+
+**Problem solved:** shared polling loop, fan-in shuffling, credit
+accounting, and housekeeping — without a per-fragment function-pointer
+call overhead.  Each tile gets a separately compiled copy matched to its
+context type and burst size.
+
+Available callbacks and their purpose:
+
+- `STEM_CALLBACK_BEFORE_CREDIT`: runs every loop iteration, including
+  when the tile is backpressured.  Use for socket or timer service.
+- `STEM_CALLBACK_AFTER_CREDIT`: runs when downstream credits are
+  available.  Use for publishing data not triggered by an inbound
+  fragment.
+- `STEM_CALLBACK_BEFORE_FRAG`: fast signature check before reading
+  payload.
+- `STEM_CALLBACK_DURING_FRAG`: copy or read payload while overrun
+  checks still protect the consumer.
+- `STEM_CALLBACK_AFTER_FRAG`: publish downstream or update state after
+  the fragment is accepted.
+- `STEM_CALLBACK_DURING_HOUSEKEEPING`: lower-frequency work — publish
+  metrics, update fseq, service control state.
+
+### Adapter — wrapping fd_aio into a tango producer
+
+`src/waltz/aio/fd_aio_tango.h` adapts the generic AIO interface so
+callers that know only `fd_aio_t` end up writing into a tango
+mcache/dcache pair:
+
+```c
+struct fd_aio_tango_tx {
+  fd_aio_t         aio;     /* must be first — callers hold fd_aio_t * */
+  fd_frag_meta_t * mcache;
+  void *           dcache;
+  void *           base;
+  ulong            chunk0;
+  ulong            wmark;
+  /* ... */
+};
+
+/* Caller receives only the narrow fd_aio_t interface. */
+FD_FN_CONST static inline fd_aio_t const *
+fd_aio_tango_tx_aio( fd_aio_tango_tx_t const * self ) {
+  return &self->aio;
+}
+```
+
+Placing `fd_aio_t` as the first struct member makes the
+`(fd_aio_tango_tx_t *)aio_ptr` cast valid under C's
+common-initial-sequence rule.  The caller never sees tango internals.
+
+**Problem solved:** network-protocol code written against `fd_aio_t`
+works unchanged when the backing transport is a tango link instead of
+a socket.
+
+### Bridge — protocol discriminant in the fragment signature
+
+`src/disco/fd_disco_base.h:67` packs a protocol tag into the 64-bit
+tango fragment signature, letting multiple protocols share one physical
+link:
+
+```c
+FD_FN_CONST static inline ulong
+fd_disco_netmux_sig( uint   hash_ip_addr,
+                     ushort hash_port,
+                     uint   ip_addr,
+                     ulong  proto,
+                     ulong  hdr_sz ) {
+  ulong hdr_sz_i = ((hdr_sz - 42UL)>>2)&0xFUL;
+  ulong hash     = 0xfffffUL & fd_ulong_hash(
+                     (ulong)hash_ip_addr | ((ulong)hash_port<<32) );
+  return (hash<<44) | ((hdr_sz_i&0xFUL)<<40UL)
+                    | ((proto&0xFFUL)<<32UL)
+                    | ((ulong)ip_addr);
+}
+
+FD_FN_CONST static inline ulong
+fd_disco_netmux_sig_proto( ulong sig ) {
+  return (sig>>32UL) & 0xFFUL;
+}
+```
+
+Protocol constants (`DST_PROTO_TPU_UDP`, `DST_PROTO_TPU_QUIC`,
+`DST_PROTO_SHRED`, `DST_PROTO_GOSSIP`, …) are defined in the same
+header.  Consumers call `fd_disco_netmux_sig_proto` on an incoming
+fragment's `sig` to decide whether to process it or skip it.
+
+**Problem solved:** a single link carries UDP, QUIC, shred, gossip, and
+repair traffic without per-protocol links or extra copying.  The
+abstraction is the link; the protocol tag is an attribute of each
+fragment, extracted with zero allocation.
+
+### Observer / Callback — QUIC async events
+
+`src/waltz/quic/fd_quic.h:286` registers callbacks before starting the
+QUIC engine:
+
+```c
+struct fd_quic_callbacks {
+  void * quic_ctx;                                    /* passed to each callback */
+
+  fd_quic_cb_conn_new_t                conn_new;      /* non-NULL */
+  fd_quic_cb_conn_handshake_complete_t conn_hs_complete; /* non-NULL */
+  fd_quic_cb_conn_final_t              conn_final;    /* non-NULL */
+  fd_quic_cb_stream_notify_t           stream_notify; /* non-NULL */
+  fd_quic_cb_stream_rx_t               stream_rx;     /* non-NULL */
+  fd_quic_cb_tls_keylog_t              tls_keylog;    /* nullable  */
+};
+```
+
+The QUIC tile installs its own functions into `quic->callbacks` during
+`unprivileged_init`.  The QUIC engine fires them on connection and
+stream events without owning or knowing the tile context type.
+
+**Problem solved:** single-threaded, non-blocking QUIC implementation
+that notifies application logic of async lifecycle events through a
+registered struct rather than a blocking queue or thread.
+
+### Dependency Injection — workspace injection
+
+Tiles never allocate their own backing memory.  The topology builder
+creates named workspace regions; the runner maps them into each tile
+process before the run loop starts.  The tile receives pre-formatted,
+NUMA-placed memory for scratch, metrics, and link objects:
+
+```c
+/* Topology side: declare workspace and tile */
+fd_topob_wksp( topo, "dedup_wksp" );
+fd_topob_tile( topo, "dedup", "dedup_wksp", "metrics",
+               cpu_idx, 0, 0, 0 );
+
+/* Tile side: memory already exists at init time */
+static void
+unprivileged_init( fd_topo_t const *      topo,
+                   fd_topo_tile_t const * tile ) {
+  fd_dedup_ctx_t * ctx = fd_topo_obj_laddr( topo, tile->tile_obj_id );
+  /* ctx points into the pre-allocated workspace — no malloc. */
+}
+```
+
+**Problem solved:** tiles stay independent of memory-management policy.
+NUMA placement, huge-page backing, alignment, and TOML-driven capacity
+are topology decisions, not tile code decisions.
+
+### Pattern Summary
+
+| Pattern | C mechanism | Primary source | Swap point |
+|---------|-------------|----------------|------------|
+| Strategy | function pointer struct | `fd_topo_run_tile_t` | global tile instance, matched by name at startup |
+| Factory | NULL-terminated pointer array | `TILES[]` in `main.h` | compile-time; add `extern` + array entry |
+| Template Method | `#define` + `#include` | `fd_stem.c` | macros defined before the include |
+| Adapter | first-member struct embedding | `fd_aio_tango_tx_t` | construction site |
+| Bridge | sig field protocol bits | `fd_disco_netmux_sig` | encoding at send, decoding at receive |
+| Observer | function pointer struct | `fd_quic_callbacks_t` | `quic->callbacks` before run |
+| Dependency Injection | workspace injection | `fd_topo_run_tile` launch | topology builder |
+
+Each pattern has one or zero dynamic dispatch points.  None rely on heap
+allocation as the enabling mechanism, none use type-erased `void *`
+pointers beyond narrowly owned adapter boundaries, and none require a
+global registry at runtime.  When writing new Firedancer-style C code,
+reach for these patterns before inventing a new mechanism.
+
 ## Isolation
 
 ### Tiles
