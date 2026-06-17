@@ -15,6 +15,7 @@ This document describes the GitHub Actions CI workflows for Tickoni.
 - [Tests / Short](#tests--short)
 - [Tests / Long](#tests--long)
 - [Tests / XLong](#tests--xlong)
+- [Integration Tests: Secrets](#integration-tests-secrets)
 - [Upstream Firedancer Workflows](#upstream-firedancer-workflows)
 
 ---
@@ -34,9 +35,9 @@ Upstream Firedancer workflows co-exist in `.github/workflows/` and are described
 | `.github/workflows/build.yml`         | `ubuntu-24.04`, `ubuntu-24.04-arm`  | Engine Build (GCC, Clang, ARM), Harness Build                | 20–30 m |
 | `.github/workflows/quality.yml`       | `ubuntu-24.04`                      | Format Check, Lint Check                                     | 20–30 m |
 | `.github/workflows/security.yml`      | `ubuntu-24.04`                      | Gitleaks, Sanitizers                                         | 20–45 m |
-| `.github/workflows/tests-short.yml`   | `ubuntu-24.04`                      | Harness Unit Tests, Harness Coverage                         | 20 m    |
+| `.github/workflows/tests-short.yml`   | `ubuntu-24.04`                      | Harness Unit Tests, Harness Integration Tests, Harness Coverage | 20 m    |
 | `.github/workflows/tests-long.yml`    | `ubuntu-24.04`                      | Engine Unit Tests, Engine Coverage                           | 45–90 m |
-| `.github/workflows/tests-xlong.yml`   | `ubuntu-24.04`                      | Engine E2E Tests (disabled — `if: false`)                    | 60 m    |
+| `.github/workflows/tests-xlong.yml`   | `ubuntu-latest`                     | Engine E2E Tests (disabled), LLM System Tests                | 60–90 m |
 
 All `detect-changes` jobs run on `ubuntu-slim`.
 
@@ -110,10 +111,11 @@ The Sanitizers job installs Clang 18, builds shared libs, then runs `just securi
 
 Covers the Tickoni Zig harness (`src/app/tickoni/`, `src/tickoni/`). Path filter is scoped to Tickoni sources only so these jobs do not re-run on pure Firedancer C changes.
 
-| Job                    | Command              | Output artifact                               |
-| ---------------------- | -------------------- | --------------------------------------------- |
-| Harness Unit Tests     | `just test-unit-tk`  | —                                             |
-| Harness Tests Coverage | `just test-cov-tk`   | `coverage-tk` — `build/coverage/tk/coverage-summary.json` |
+| Job                       | Command                    | Output artifact                               |
+| ------------------------- | -------------------------- | --------------------------------------------- |
+| Harness Unit Tests        | `just test-unit-tk`        | —                                             |
+| Harness Integration Tests | `just test-integration-tk` | —                                             |
+| Harness Tests Coverage    | `just test-cov-tk`         | `coverage-tk` — `build/coverage/tk/coverage-summary.json` |
 
 Coverage artifact is uploaded even on failure (`if: always()`).
 
@@ -138,13 +140,33 @@ The coverage job installs `llvm-18` and sets up `llvm-profdata`, `llvm-objdump`,
 
 **File:** `.github/workflows/tests-xlong.yml`
 
-Intended for full engine E2E tests requiring hugepages and all CPUs online.
+Contains long-running tests that require additional infrastructure or model assets.
 
-| Job               | Command             | Timeout | Status                       |
-| ----------------- | ------------------- | ------- | ---------------------------- |
-| Engine E2E Tests  | `just test-e2e-fd`  | 60 m    | **Disabled** (`if: false`)   |
+| Job              | Runner          | Command              | Timeout | Status                     |
+| ---------------- | --------------- | -------------------- | ------- | -------------------------- |
+| Engine E2E Tests | `ubuntu-24.04`  | `just test-e2e-fd`   | 60 m    | **Disabled** (`if: false`) |
+| LLM System Tests | `ubuntu-latest` | see steps below      | 90 m    | Active                     |
 
-The job condition is hard-coded `if: false && needs.detect-changes.outputs.run == 'true'`, so it never runs regardless of path changes or dispatch. The workflow file and detect-changes job remain so the job can be re-enabled by removing `false &&`.
+**Engine E2E Tests** — condition is hard-coded `if: false && …`, so it never runs. Remove `false &&` to re-enable.
+
+**LLM System Tests** — runs the explicit live-model compatibility lane against a real local `llama.cpp` server. Steps in order:
+
+1. Install `cmake`, `libopenblas-dev`, `libopenblas64-dev` via apt.
+2. `just infra-ensure-llamacpp` — clones `https://github.com/ggml-org/llama.cpp` into `~/work/git/llama.cpp` (if absent), builds for CPU with OpenBLAS via cmake, and copies `llama-*` binaries to the clone root.
+3. `just infra-ensure-model` — downloads the GGUF model via the `hf` CLI (Hugging Face Hub) if not already present.
+4. `just test-system-tk` — ensures llama.cpp and model are present, starts the server, runs `zig build integration-test-live-model`, and stops the server.
+
+The llama.cpp path and model path can be overridden with `TK_LLAMA_CPP_DIR`, `TK_HF_MODEL_DIR`, and `TK_HF_MODEL_FILE` environment variables (see `contrib/test/ensure_llama_cpp.sh` and `contrib/test/ensure_hf_model.sh`).
+
+---
+
+## LLM System Tests: Secrets
+
+The LLM System Tests job uses `HF_TOKEN` to authenticate with Hugging Face when downloading the model. Public models (e.g. unsloth repos) do not strictly require a token, but setting one avoids rate-limiting and allows access to gated models.
+
+To configure it: **GitHub → Repository → Settings → Secrets and variables → Actions → New repository secret**, name `HF_TOKEN`, value: a Hugging Face access token with at least read scope.
+
+The job passes the secret as `env: HF_TOKEN: ${{ secrets.HF_TOKEN }}`. If the secret is absent the `hf` CLI falls back to unauthenticated access; the job will still pass for public models but may hit rate limits on busy runners.
 
 ---
 

@@ -1,0 +1,61 @@
+{
+  "fixture_id": "paper_execution_allowed_2000",
+  "schema": "tickoni.v1_1.paper_execution_result",
+  "paper_order_id": "paper_order_v1_1_ai_infra_2000_0001",
+  "ticket_id": "ticket_v1_1_ai_infra_2000_market",
+  "account_id": "brokerage.demo_ops",
+  "status": "filled",
+  "filled_at_ns": 1765792805000000000,
+  "currency": "USD",
+  "total_filled_cents": 200000,
+  "fills": [
+    {
+      "ticker": "NVDA",
+      "quantity": "2.000000",
+      "fill_price_cents": 12500,
+      "filled_notional_cents": 25000
+    },
+    {
+      "ticker": "AMD",
+      "quantity": "1.562500",
+      "fill_price_cents": 16000,
+      "filled_notional_cents": 25000
+    },
+    {
+      "ticker": "AVGO",
+      "quantity": "1.000000",
+      "fill_price_cents": 25000,
+      "filled_notional_cents": 25000
+    },
+    {
+      "ticker": "MSFT",
+      "quantity": "0.500000",
+      "fill_price_cents": 50000,
+      "filled_notional_cents": 25000
+    },
+    {
+      "ticker": "AMZN",
+      "quantity": "1.250000",
+      "fill_price_cents": 20000,
+      "filled_notional_cents": 25000
+    },
+    {
+      "ticker": "BOTZ",
+      "quantity": "12.500000",
+      "fill_price_cents": 3000,
+      "filled_notional_cents": 37500
+    },
+    {
+      "ticker": "SOXX",
+      "quantity": "1.500000",
+      "fill_price_cents": 25000,
+      "filled_notional_cents": 37500
+    }
+  ],
+  "resulting_account_snapshot": {
+    "cash_cents": 4800000,
+    "buying_power_cents": 4800000,
+    "day_notional_used_cents": 200000,
+    "month_notional_used_cents": 200000
+  }
+}

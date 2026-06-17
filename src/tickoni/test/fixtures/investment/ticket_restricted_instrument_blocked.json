@@ -1,0 +1,52 @@
+{
+  "fixture_id": "ticket_restricted_instrument_blocked",
+  "schema": "tickoni.v1_1.trade_ticket",
+  "ticket_id": "",
+  "basket_id": null,
+  "thesis_id": "thesis_restricted_instrument",
+  "account_id": "brokerage.demo_ops",
+  "policy_version": "v1.1.demo.investment",
+  "capability": "trading_order.propose",
+  "environment": "demo",
+  "execution_mode": "paper",
+  "side": "buy",
+  "order_type": "market",
+  "time_in_force": "day",
+  "currency": "USD",
+  "target_notional_cents": 200000,
+  "estimated_cost_cents": 0,
+  "requested_symbols": [
+    "SOXL"
+  ],
+  "recognized_symbols": [],
+  "rejected_candidates": [
+    {
+      "symbol": "SOXL",
+      "reason_code": "leveraged_etf",
+      "failed_scope_dim": "restricted_instrument"
+    }
+  ],
+  "affordability_result": {
+    "outcome": null,
+    "max_affordable_cents": null,
+    "effective_max_paper_trade_cents": null
+  },
+  "policy_outcome": "deny",
+  "blocked_reasons": [
+    {
+      "code": "restricted_instrument",
+      "failed_scope_dim": "restricted_instrument",
+      "user_message": "SOXL is a leveraged ETF and is denied in the V1.1 paper trading demo."
+    }
+  ],
+  "paper_execution": null,
+  "proposal_hash": null,
+  "approval_state": "not_placeable",
+  "evidence_hashes": [
+    "thesis_hash_restricted_instrument",
+    "policy_hash_demo_investment",
+    "catalog_hash_v1_1"
+  ],
+  "adapter_request_hash": null,
+  "adapter_response_hash": null
+}

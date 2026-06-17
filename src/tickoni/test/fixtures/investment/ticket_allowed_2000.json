@@ -1,0 +1,121 @@
+{
+  "fixture_id": "ticket_allowed_2000",
+  "schema": "tickoni.v1_1.trade_ticket",
+  "ticket_id": "ticket_v1_1_ai_infra_2000_market",
+  "basket_id": "basket_v1_1_ai_infra_2000",
+  "thesis_id": "thesis_allowed_2000",
+  "account_id": "brokerage.demo_ops",
+  "policy_version": "v1.1.demo.investment",
+  "capability": "trading_order.place",
+  "environment": "demo",
+  "execution_mode": "paper",
+  "side": "buy",
+  "order_type": "market",
+  "time_in_force": "day",
+  "currency": "USD",
+  "target_notional_cents": 200000,
+  "estimated_cost_cents": 200000,
+  "line_items": [
+    {
+      "ticker": "NVDA",
+      "asset_class": "equity",
+      "venue": "NASDAQ",
+      "side": "buy",
+      "quantity": "2.000000",
+      "price_cents": 12500,
+      "line_notional_cents": 25000,
+      "allocation_weight_bp": 1250,
+      "rationale_hash": "rationale_nvda_ai_infra"
+    },
+    {
+      "ticker": "AMD",
+      "asset_class": "equity",
+      "venue": "NASDAQ",
+      "side": "buy",
+      "quantity": "1.562500",
+      "price_cents": 16000,
+      "line_notional_cents": 25000,
+      "allocation_weight_bp": 1250,
+      "rationale_hash": "rationale_amd_ai_infra"
+    },
+    {
+      "ticker": "AVGO",
+      "asset_class": "equity",
+      "venue": "NASDAQ",
+      "side": "buy",
+      "quantity": "1.000000",
+      "price_cents": 25000,
+      "line_notional_cents": 25000,
+      "allocation_weight_bp": 1250,
+      "rationale_hash": "rationale_avgo_ai_infra"
+    },
+    {
+      "ticker": "MSFT",
+      "asset_class": "equity",
+      "venue": "NASDAQ",
+      "side": "buy",
+      "quantity": "0.500000",
+      "price_cents": 50000,
+      "line_notional_cents": 25000,
+      "allocation_weight_bp": 1250,
+      "rationale_hash": "rationale_msft_cloud_ai"
+    },
+    {
+      "ticker": "AMZN",
+      "asset_class": "equity",
+      "venue": "NASDAQ",
+      "side": "buy",
+      "quantity": "1.250000",
+      "price_cents": 20000,
+      "line_notional_cents": 25000,
+      "allocation_weight_bp": 1250,
+      "rationale_hash": "rationale_amzn_cloud_ai"
+    },
+    {
+      "ticker": "BOTZ",
+      "asset_class": "etf",
+      "venue": "NASDAQ",
+      "side": "buy",
+      "quantity": "12.500000",
+      "price_cents": 3000,
+      "line_notional_cents": 37500,
+      "allocation_weight_bp": 1875,
+      "rationale_hash": "rationale_botz_ai_etf"
+    },
+    {
+      "ticker": "SOXX",
+      "asset_class": "etf",
+      "venue": "NASDAQ",
+      "side": "buy",
+      "quantity": "1.500000",
+      "price_cents": 25000,
+      "line_notional_cents": 37500,
+      "allocation_weight_bp": 1875,
+      "rationale_hash": "rationale_soxx_semiconductor_etf"
+    }
+  ],
+  "affordability_result": {
+    "outcome": "allow",
+    "cash_available_cents": 5000000,
+    "buying_power_cents": 5000000,
+    "remaining_daily_notional_cents": 2500000,
+    "remaining_monthly_notional_cents": 10000000,
+    "max_affordable_cents": 2500000,
+    "effective_max_paper_trade_cents": 250000
+  },
+  "policy_outcome": "allow",
+  "blocked_reasons": [],
+  "proposal_hash": "proposal_hash_ticket_v1_1_ai_infra_2000_market",
+  "approval_state": "not_required_for_paper_demo",
+  "evidence_hashes": [
+    "thesis_hash_allowed_2000",
+    "model_response_hash_ai_infra_gemma4",
+    "quote_snapshot_hash_ai_infra",
+    "policy_hash_demo_investment",
+    "account_hash_demo_ops"
+  ],
+  "model_request_hash": "model_request_hash_ai_infra",
+  "model_response_hash": "model_response_hash_ai_infra_gemma4",
+  "adapter_request_hash": "adapter_request_hash_paper_place_allowed_2000",
+  "adapter_response_hash": "adapter_response_hash_paper_place_allowed_2000"
+}

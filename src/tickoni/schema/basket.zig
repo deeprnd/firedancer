@@ -499,7 +499,7 @@ test "basket_schema_version is 1" {
     try std.testing.expectEqual(@as(u16, 1), basket_schema_version);
 }
 
-// --- Acceptance: >= 4 eligible, >= 2 rejected for AI infrastructure demo ---
+// --- Acceptance: >= 4 eligible, >= 2 rejected for scenario ---
 
 test "build: ai_infrastructure produces >= 4 instruments and >= 2 rejected" {
     const input = thesis.fixtures.ai_infrastructure;
@@ -584,7 +584,7 @@ test "build: no instrument exceeds max_single_name_pct (non-binding cap)" {
 }
 
 test "build: cap is enforced when all instruments exceed it (binding cap)" {
-    // AI infrastructure has 5 eligible equity instruments (equity-only filter
+    // Sector has 5 eligible equity instruments (equity-only filter
     // removes the 2 ETFs).  Equal weight = 2000 bp each.  With a 10% cap (1000 bp)
     // every instrument exceeds the cap; applyCap caps all.  Because 5 × 10% = 50%,
     // total_allocated_cents will be half of target; no instrument should exceed 10%.
@@ -608,7 +608,7 @@ test "build: cap is enforced when all instruments exceed it (binding cap)" {
 }
 
 test "build: ETF instruments receive higher allocation than equities when etf_preferred" {
-    // AI infrastructure intent allows both equity and ETF → ETF preference.
+    // intent allows both equity and ETF → ETF preference.
     const input = thesis.fixtures.ai_infrastructure;
     const hash = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);

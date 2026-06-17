@@ -1,0 +1,56 @@
+{
+  "fixture_id": "market_events_ai_infra",
+  "schema": "tickoni.v1_1.market_event_fixture",
+  "as_of_ns": 1765792800000000000,
+  "events": [
+    {
+      "ticker": "NVDA",
+      "event_type": "earnings",
+      "headline": "NVDA Q1 beat: data center revenue up 427% YoY on AI accelerator demand.",
+      "sentiment": "positive",
+      "source": "fixture"
+    },
+    {
+      "ticker": "AMD",
+      "event_type": "product",
+      "headline": "AMD MI300X GPU sees strong AI inference adoption from hyperscalers.",
+      "sentiment": "positive",
+      "source": "fixture"
+    },
+    {
+      "ticker": "AVGO",
+      "event_type": "earnings",
+      "headline": "AVGO custom AI silicon revenue on track; networking pipeline grows.",
+      "sentiment": "positive",
+      "source": "fixture"
+    },
+    {
+      "ticker": "MSFT",
+      "event_type": "partnership",
+      "headline": "MSFT Azure AI services integrated with OpenAI platform; enterprise adoption rising.",
+      "sentiment": "positive",
+      "source": "fixture"
+    },
+    {
+      "ticker": "AMZN",
+      "event_type": "product",
+      "headline": "AWS Trainium3 custom AI chip announced for large-scale model training.",
+      "sentiment": "positive",
+      "source": "fixture"
+    },
+    {
+      "ticker": "BOTZ",
+      "event_type": "flow",
+      "headline": "BOTZ ETF sees net inflows as AI infrastructure theme attracts retail interest.",
+      "sentiment": "neutral",
+      "source": "fixture"
+    },
+    {
+      "ticker": "SOXX",
+      "event_type": "flow",
+      "headline": "SOXX semiconductor ETF broadly tracks AI capex cycle strength.",
+      "sentiment": "neutral",
+      "source": "fixture"
+    }
+  ]
+}

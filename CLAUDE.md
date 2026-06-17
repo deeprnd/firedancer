@@ -6,7 +6,7 @@ Use it to understand:
 
 - what Tickoni is and how it relates to Firedancer,
 - which parts of the repo are the current source of truth,
-- how the demo workspace, tiles, harness, agents, and tools are structured,
+- how the workspace, tiles, harness, agents, and tools are structured,
 - which engineering standards are mandatory here,
 - how to test and validate changes before handoff.
 

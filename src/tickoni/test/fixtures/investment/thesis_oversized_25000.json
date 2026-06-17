@@ -1,0 +1,23 @@
+{
+  "fixture_id": "thesis_oversized_25000",
+  "schema": "tickoni.v1_1.thesis_input",
+  "account_id": "brokerage.demo_ops",
+  "target_notional_cents": 2500000,
+  "currency": "USD",
+  "market_scope": "US",
+  "asset_class_preferences": [
+    "equity",
+    "etf"
+  ],
+  "sector_theme": "ai_infrastructure",
+  "risk_preference": "moderate",
+  "max_single_name_weight_bp": 2500,
+  "exclusions": [
+    "option",
+    "future",
+    "leveraged_etf",
+    "inverse_etf",
+    "crypto"
+  ],
+  "user_text": "I want to invest USD 25,000 in AI infrastructure, but avoid single-name concentration and keep it to US-listed ETFs or large-cap equities."
+}

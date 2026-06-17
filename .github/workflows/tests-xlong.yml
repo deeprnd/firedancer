@@ -55,3 +55,33 @@ jobs:
 
       - name: Run test suite
         run: just test-e2e-fd
+
+  system-tests-tk:
+    name: LLM System Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+          apt-packages: 'cmake libopenblas-dev libopenblas64-dev'
+          python-tools: 'huggingface_hub[cli]'
+
+      - uses: ./.github/actions/build-fd-tk-libs
+
+      - name: Build llama.cpp
+        run: just infra-ensure-llamacpp
+
+      - name: Download model
+        run: just infra-ensure-model
+
+      - name: Run test suite
+        run: just test-system-tk

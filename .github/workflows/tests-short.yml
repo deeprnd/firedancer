@@ -49,6 +49,26 @@ jobs:
       - name: Run test suite
         run: just test-unit-tk
 
+  integration-tests-tk:
+    name: Harness Integration Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - uses: ./.github/actions/build-fd-tk-libs
+
+      - name: Run test suite
+        run: just test-integration-tk
+
   cov-tk:
     name: Harness Tests Coverage
     needs: detect-changes
