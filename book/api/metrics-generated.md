@@ -48,6 +48,7 @@
 | <span class="metrics-name">tile_&#8203;cpu_&#8203;duration_&#8203;nanos</span><br/>{cpu_&#8203;regime="<span class="metrics-enum">user</span>"} | counter | CPU time spent in each CPU regime, in nanoseconds (User (task was scheduled and executing in user mode)) |
 | <span class="metrics-name">tile_&#8203;cpu_&#8203;duration_&#8203;nanos</span><br/>{cpu_&#8203;regime="<span class="metrics-enum">system</span>"} | counter | CPU time spent in each CPU regime, in nanoseconds (System (task was scheduled and executing in kernel mode)) |
 | <span class="metrics-name">tile_&#8203;irq_&#8203;preempted</span> | counter | Times the tile was interrupted by an IRQ (fixed tiles only) |
+| <span class="metrics-name">tile_&#8203;tlb_&#8203;shootdown</span> | counter | TLB shootdowns observed on the tile CPU (fixed tiles only) |
 
 </div>
 
@@ -146,6 +147,7 @@
 | <span class="metrics-name">snapwr_&#8203;full_&#8203;bytes_&#8203;read</span> | gauge | Number of decompressed snapshot bytes consumed from the full snapshot. Might decrease if snapshot load is aborted and restarted |
 | <span class="metrics-name">snapwr_&#8203;incremental_&#8203;bytes_&#8203;read</span> | gauge | Number of decompressed snapshot bytes consumed from the incremental snapshot. Might decrease if snapshot load is aborted and restarted |
 | <span class="metrics-name">snapwr_&#8203;bytes_&#8203;written</span> | gauge | Number of bytes written to the accounts database on disk. Monotonically increasing across snapshot loads. |
+| <span class="metrics-name">snapwr_&#8203;accounts_&#8203;written</span> | gauge | Number of accounts written to the accounts database on disk. Might decrease if snapshot load is aborted and restarted |
 
 </div>
 
@@ -1547,12 +1549,14 @@
 | Metric | Type | Description |
 |--------|------|-------------|
 | <span class="metrics-name">event_&#8203;conn_&#8203;state</span> | gauge | 0=disconnected, 1=connecting, 2=connected |
-| <span class="metrics-name">event_&#8203;queue_&#8203;depth</span> | gauge | Events in the event queue waiting to be sent to the event service |
+| <span class="metrics-name">event_&#8203;queue_&#8203;depth</span> | gauge | Total events in the event queue (sent-but-unacknowledged plus unsent) |
+| <span class="metrics-name">event_&#8203;queue_&#8203;unsent</span> | gauge | Events in the event queue not yet sent to the event service |
 | <span class="metrics-name">event_&#8203;queue_&#8203;dropped</span> | counter | Events dropped because the event queue was full |
 | <span class="metrics-name">event_&#8203;queue_&#8203;bytes_&#8203;used</span> | gauge | Bytes used in the event queue |
 | <span class="metrics-name">event_&#8203;queue_&#8203;bytes_&#8203;capacity</span> | gauge | Total capacity of the event queue, in bytes |
 | <span class="metrics-name">event_&#8203;sent</span> | counter | Events sent to the event service |
 | <span class="metrics-name">event_&#8203;acked</span> | counter | Events acknowledged by the event service |
+| <span class="metrics-name">event_&#8203;last_&#8203;acked_&#8203;id</span> | gauge | Event id (nonce) of the most recently acknowledged event |
 | <span class="metrics-name">event_&#8203;bytes_&#8203;written</span> | counter | Bytes written to the event service |
 | <span class="metrics-name">event_&#8203;bytes_&#8203;read</span> | counter | Bytes read from the event service |
 | <span class="metrics-name">event_&#8203;auth_&#8203;failed</span> | counter | Authentication failures with the event service |
@@ -1615,6 +1619,13 @@
 | <span class="metrics-name">rpc_&#8203;request_&#8203;served</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getTransactionCount</span>"} | counter | Number of RPC requests served (getTransactionCount) |
 | <span class="metrics-name">rpc_&#8203;request_&#8203;served</span><br/>{rpc_&#8203;method="<span class="metrics-enum">getVersion</span>"} | counter | Number of RPC requests served (getVersion) |
 | <span class="metrics-name">rpc_&#8203;conn_&#8203;active</span> | gauge | The number of active HTTP connections to the RPC service |
+| <span class="metrics-name">rpc_&#8203;websocket_&#8203;conn_&#8203;active</span> | gauge | The number of active WebSocket connections to the RPC service |
+| <span class="metrics-name">rpc_&#8203;websocket_&#8203;subscription_&#8203;active</span><br/>{rpc_&#8203;event_&#8203;type="<span class="metrics-enum">vote</span>"} | gauge | The number of active WebSocket subscriptions to the RPC service, broken down by subscription type (vote) |
+| <span class="metrics-name">rpc_&#8203;websocket_&#8203;subscription_&#8203;active</span><br/>{rpc_&#8203;event_&#8203;type="<span class="metrics-enum">slot</span>"} | gauge | The number of active WebSocket subscriptions to the RPC service, broken down by subscription type (slot) |
+| <span class="metrics-name">rpc_&#8203;websocket_&#8203;event_&#8203;unique_&#8203;sent</span><br/>{rpc_&#8203;event_&#8203;type="<span class="metrics-enum">vote</span>"} | counter | Number of unique WebSocket events sent by the RPC service (vote) |
+| <span class="metrics-name">rpc_&#8203;websocket_&#8203;event_&#8203;unique_&#8203;sent</span><br/>{rpc_&#8203;event_&#8203;type="<span class="metrics-enum">slot</span>"} | counter | Number of unique WebSocket events sent by the RPC service (slot) |
+| <span class="metrics-name">rpc_&#8203;websocket_&#8203;event_&#8203;sent</span><br/>{rpc_&#8203;event_&#8203;type="<span class="metrics-enum">vote</span>"} | counter | Number of WebSocket events sent by the RPC service across all subscriptions (vote) |
+| <span class="metrics-name">rpc_&#8203;websocket_&#8203;event_&#8203;sent</span><br/>{rpc_&#8203;event_&#8203;type="<span class="metrics-enum">slot</span>"} | counter | Number of WebSocket events sent by the RPC service across all subscriptions (slot) |
 | <span class="metrics-name">rpc_&#8203;accdb_&#8203;account_&#8203;acquired</span><br/>{accdb_&#8203;cache_&#8203;class="<span class="metrics-enum">class0</span>"} | counter | Number of accounts read from the account database, attributed to the cache size class of the account's current data size (0-128 B) |
 | <span class="metrics-name">rpc_&#8203;accdb_&#8203;account_&#8203;acquired</span><br/>{accdb_&#8203;cache_&#8203;class="<span class="metrics-enum">class1</span>"} | counter | Number of accounts read from the account database, attributed to the cache size class of the account's current data size (129-512 B) |
 | <span class="metrics-name">rpc_&#8203;accdb_&#8203;account_&#8203;acquired</span><br/>{accdb_&#8203;cache_&#8203;class="<span class="metrics-enum">class2</span>"} | counter | Number of accounts read from the account database, attributed to the cache size class of the account's current data size (513 B-2 KiB) |
@@ -1765,5 +1776,20 @@
 | Metric | Type | Description |
 |--------|------|-------------|
 | <span class="metrics-name">benchs_&#8203;txn_&#8203;tx</span> | counter | Benchmark transactions sent |
+
+</div>
+
+## Guih Tile
+
+<div class="metrics">
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| <span class="metrics-name">guih_&#8203;conn_&#8203;active</span> | gauge | Active HTTP connections to the GUI service, excluding connections that have been upgraded to a WebSocket connection |
+| <span class="metrics-name">guih_&#8203;websocket_&#8203;conn_&#8203;active</span> | gauge | Active WebSocket connections to the GUI service |
+| <span class="metrics-name">guih_&#8203;websocket_&#8203;frame_&#8203;tx</span> | counter | WebSocket frames sent to all connections to the GUI service |
+| <span class="metrics-name">guih_&#8203;websocket_&#8203;frame_&#8203;rx</span> | counter | WebSocket frames received from all connections to the GUI service |
+| <span class="metrics-name">guih_&#8203;bytes_&#8203;written</span> | counter | Bytes written to all connections to the GUI service |
+| <span class="metrics-name">guih_&#8203;bytes_&#8203;read</span> | counter | Bytes read from all connections to the GUI service |
 
 </div>

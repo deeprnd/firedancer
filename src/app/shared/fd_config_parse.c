@@ -31,7 +31,6 @@ fd_config_extract_podf( uchar *        pod,
   CFG_POP      ( ulong,  accounts.max_accounts                               );
   CFG_POP      ( ulong,  accounts.cache_size_gib                             );
 
-  CFG_POP      ( bool,   runtime.fixed_fec_sets                              );
   CFG_POP      ( ulong,  runtime.max_live_slots                              );
   CFG_POP      ( ulong,  runtime.max_fork_width                              );
 
@@ -54,6 +53,7 @@ fd_config_extract_podf( uchar *        pod,
   CFG_POP      ( uint,   snapshots.min_download_speed_mibs                   );
 
   CFG_POP      ( bool,   development.hard_fork_fatal                         );
+  CFG_POP      ( bool,   development.fixed_fec_sets                          );
 
   CFG_POP      ( bool,   development.genesis.validate_genesis_hash           );
 
@@ -193,11 +193,12 @@ fd_config_extract_pod( uchar *       pod,
   CFG_POP      ( cstr,   tiles.rpc.rpc_listen_address                     );
   CFG_POP      ( ushort, tiles.rpc.rpc_listen_port                        );
   CFG_POP      ( ulong,  tiles.rpc.max_http_connections                   );
+  CFG_POP      ( ulong,  tiles.rpc.max_websocket_connections              );
   CFG_POP      ( ulong,  tiles.rpc.max_http_request_length                );
   CFG_POP      ( ulong,  tiles.rpc.send_buffer_size_mb                    );
   CFG_POP      ( bool,   tiles.rpc.delay_startup                          );
 
-  CFG_POP      ( ushort, tiles.repair.repair_intake_listen_port           );
+  CFG_POP      ( ushort, tiles.repair.repair_client_listen_port           );
   CFG_POP      ( ulong,  tiles.repair.slot_max                            );
 
   CFG_POP      ( bool,   tiles.rserve.enabled                             );
@@ -257,7 +258,6 @@ fd_config_extract_pod( uchar *       pod,
   if( FD_UNLIKELY( !config->is_firedancer ) ) {
     CFG_POP    ( bool,   development.gui.websocket_compression            );
   }
-  CFG_POP      ( cstr,   development.gui.frontend_release_channel         );
 
   CFG_POP      ( ulong,  development.accdb.partition_size_gib             );
 
@@ -296,6 +296,8 @@ fd_config_extract_pod( uchar *       pod,
   CFG_RENAMED( development.net.provider,                 net.provider                   );
   CFG_RENAMED( development.net.sock_receive_buffer_size, net.socket.receive_buffer_size );
   CFG_RENAMED( development.net.sock_send_buffer_size,    net.socket.send_buffer_size    );
+
+  CFG_RENAMED( tiles.repair.repair_intake_listen_port,   tiles.repair.repair_client_listen_port );
 
 # undef CFG_RENAMED
 

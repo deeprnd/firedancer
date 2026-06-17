@@ -55,9 +55,16 @@ struct fd_snapwr_tile {
   fd_snapwr_out_t ct_out;
 
   struct {
+    ulong accounts_off;
+    ulong flush_off;
+  } recovery;
+
+  struct {
     ulong full_bytes_read;
     ulong incremental_bytes_read;
     ulong bytes_written;
+    ulong accounts_written;
+    ulong full_accounts_written;
   } metrics;
 
   fd_snapshot_manifest_t manifest[1];
@@ -75,6 +82,7 @@ metrics_write( fd_snapwr_tile_t * ctx ) {
   FD_MGAUGE_SET( SNAPWR, FULL_BYTES_READ,        ctx->metrics.full_bytes_read );
   FD_MGAUGE_SET( SNAPWR, INCREMENTAL_BYTES_READ, ctx->metrics.incremental_bytes_read );
   FD_MGAUGE_SET( SNAPWR, BYTES_WRITTEN,          ctx->metrics.bytes_written );
+  FD_MGAUGE_SET( SNAPWR, ACCOUNTS_WRITTEN,       ctx->metrics.accounts_written );
 }
 
 static ulong
@@ -159,6 +167,7 @@ process_account_header( fd_snapwr_tile_t *            ctx,
   fd_memcpy( data+32UL, &result->account_header.data_len, 4UL );
   fd_memcpy( data+36UL, result->account_header.owner, 32UL );
   buffer_write( ctx, data, 68UL );
+  ctx->metrics.accounts_written++;
 }
 
 static void
@@ -267,11 +276,14 @@ handle_control_frag( fd_snapwr_tile_t *  ctx,
       fd_ssparse_init( ctx->ssparse );
       fd_ssmanifest_parser_init( ctx->manifest_parser, ctx->manifest );
 
+      /* Rewind metric counters (no-op unless recovering from a fail) */
       if( sig==FD_SNAPSHOT_MSG_CTRL_INIT_FULL ) {
         ctx->metrics.full_bytes_read        = 0UL;
         ctx->metrics.incremental_bytes_read = 0UL;
+        ctx->metrics.accounts_written       = ctx->metrics.full_accounts_written = 0UL;
       } else {
         ctx->metrics.incremental_bytes_read = 0UL;
+        ctx->metrics.accounts_written       = ctx->metrics.full_accounts_written;
       }
       break;
     }
@@ -287,6 +299,9 @@ handle_control_frag( fd_snapwr_tile_t *  ctx,
     case FD_SNAPSHOT_MSG_CTRL_NEXT: {
       FD_TEST( ctx->state==FD_SNAPSHOT_STATE_FINISHING );
       ctx->state = FD_SNAPSHOT_STATE_IDLE;
+      ctx->recovery.accounts_off = ctx->accounts_off;
+      ctx->recovery.flush_off    = ctx->flush_off;
+      ctx->metrics.full_accounts_written = ctx->metrics.accounts_written;
       break;
     }
 
@@ -304,8 +319,10 @@ handle_control_frag( fd_snapwr_tile_t *  ctx,
 
     case FD_SNAPSHOT_MSG_CTRL_FAIL: {
       FD_TEST( ctx->state!=FD_SNAPSHOT_STATE_SHUTDOWN );
+      ctx->write_buf_used = 0UL;
+      ctx->accounts_off = ctx->full ? 0UL : ctx->recovery.accounts_off;
+      ctx->flush_off    = ctx->full ? 0UL : ctx->recovery.flush_off;
       ctx->state = FD_SNAPSHOT_STATE_IDLE;
-      FD_LOG_ERR((( "TODO: UNIMPLEMENTED: snapshot load failure handling (TODO: reset accdb to last known good state, etc)" )));
       break;
     }
 
@@ -413,10 +430,12 @@ unprivileged_init( fd_topo_t const *      topo,
   ctx->partition_sz = tile->snapwr.partition_sz;
   if( FD_UNLIKELY( !ctx->partition_sz ) ) FD_LOG_ERR(( "tile `" NAME "` partition_sz is 0" ));
 
-  ctx->accounts_off    = 0UL;
-  ctx->flush_off       = 0UL;
-  ctx->write_buf       = _write_buf;
-  ctx->write_buf_used  = 0UL;
+  ctx->accounts_off          = 0UL;
+  ctx->flush_off             = 0UL;
+  ctx->recovery.accounts_off = 0UL;
+  ctx->recovery.flush_off    = 0UL;
+  ctx->write_buf             = _write_buf;
+  ctx->write_buf_used        = 0UL;
 
   ctx->manifest_parser = fd_ssmanifest_parser_join( fd_ssmanifest_parser_new( _manifest_parser ) );
   FD_TEST( ctx->manifest_parser );
