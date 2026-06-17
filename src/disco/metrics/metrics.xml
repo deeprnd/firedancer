@@ -407,6 +407,7 @@ EXAMPLES
     <counter name="RegimeDurationNanos" enum="TileRegime" converter="nanoseconds" summary="Mutually exclusive and exhaustive duration the tile spent in each regime, in nanoseconds" />
     <counter name="CpuDurationNanos" enum="CpuRegime" summary="CPU time spent in each CPU regime, in nanoseconds" />
     <counter name="IrqPreempted" summary="Times the tile was interrupted by an IRQ (fixed tiles only)" />
+    <counter name="TlbShootdown" summary="TLB shootdowns observed on the tile CPU (fixed tiles only)" />
 </common>
 
 <tile name="net">
@@ -1623,6 +1624,7 @@ EXAMPLES
     <gauge name="FullBytesRead" summary="Number of decompressed snapshot bytes consumed from the full snapshot. Might decrease if snapshot load is aborted and restarted" />
     <gauge name="IncrementalBytesRead" summary="Number of decompressed snapshot bytes consumed from the incremental snapshot. Might decrease if snapshot load is aborted and restarted" />
     <gauge name="BytesWritten" summary="Number of bytes written to the accounts database on disk. Monotonically increasing across snapshot loads." />
+    <gauge name="AccountsWritten" summary="Number of accounts written to the accounts database on disk. Might decrease if snapshot load is aborted and restarted" />
 </tile>
 
 <tile name="metric">
@@ -1653,12 +1655,21 @@ EXAMPLES
     <int value="14" name="getVersion" label="getVersion" />
 </enum>
 
+<enum name="RpcEventType">
+    <int value="0" name="Vote" label="vote" />
+    <int value="1" name="Slot" label="slot" />
+</enum>
+
 <tile name="rpc">
     <histogram name="RequestDurationSeconds" min="0.000001" max="0.1" converter="seconds">
       <summary>Duration spent in service</summary>
     </histogram>
     <counter name="RequestServed" enum="RpcMethod" summary="Number of RPC requests served" />
     <gauge name="ConnActive" summary="The number of active HTTP connections to the RPC service" />
+    <gauge name="WebsocketConnActive" summary="The number of active WebSocket connections to the RPC service" />
+    <gauge name="WebsocketSubscriptionActive" enum="RpcEventType" summary="The number of active WebSocket subscriptions to the RPC service, broken down by subscription type" />
+    <counter name="WebsocketEventUniqueSent" enum="RpcEventType" summary="Number of unique WebSocket events sent by the RPC service" />
+    <counter name="WebsocketEventSent" enum="RpcEventType" summary="Number of WebSocket events sent by the RPC service across all subscriptions" />
     <counter name="AccdbAccountAcquired" enum="AccdbCacheClass" summary="Number of accounts read from the account database, attributed to the cache size class of the account's current data size" />
     <counter name="AccdbAccountNotFound" enum="AccdbCacheClass" summary="Number of accounts that were not found in the account database cache and had to be read from disk, broken down by cache size class" />
     <counter name="AccdbAccountWaited" summary="Number of accounts that had to wait for a concurrent writer to publish a disk offset before being read" />
@@ -1911,9 +1922,21 @@ EXAMPLES
     <counter name="BytesRead" summary="Bytes read from all connections to the GUI service" />
 </tile>
 
+<tile name="guih">
+  <gauge name="ConnActive" summary="Active HTTP connections to the GUI service, excluding connections that have been upgraded to a WebSocket connection" />
+  <gauge name="WebsocketConnActive" summary="Active WebSocket connections to the GUI service" />
+
+  <counter name="WebsocketFrameTx" summary="WebSocket frames sent to all connections to the GUI service" />
+  <counter name="WebsocketFrameRx" summary="WebSocket frames received from all connections to the GUI service" />
+
+  <counter name="BytesWritten" summary="Bytes written to all connections to the GUI service" />
+  <counter name="BytesRead" summary="Bytes read from all connections to the GUI service" />
+</tile>
+
 <tile name="event">
     <gauge name="ConnState" summary="0=disconnected, 1=connecting, 2=connected" />
-    <gauge name="QueueDepth" summary="Events in the event queue waiting to be sent to the event service" />
+    <gauge name="QueueDepth" summary="Total events in the event queue (sent-but-unacknowledged plus unsent)" />
+    <gauge name="QueueUnsent" summary="Events in the event queue not yet sent to the event service" />
 
     <counter name="QueueDropped" summary="Events dropped because the event queue was full" />
     <gauge name="QueueBytesUsed" summary="Bytes used in the event queue" />
@@ -1921,6 +1944,7 @@ EXAMPLES
 
     <counter name="Sent" summary="Events sent to the event service" />
     <counter name="Acked" summary="Events acknowledged by the event service" />
+    <gauge name="LastAckedId" summary="Event id (nonce) of the most recently acknowledged event" />
 
     <counter name="BytesWritten" summary="Bytes written to the event service" />
     <counter name="BytesRead" summary="Bytes read from the event service" />

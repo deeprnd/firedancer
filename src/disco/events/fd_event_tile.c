@@ -3,15 +3,16 @@
 #include "fd_event_client.h"
 
 #include "../fd_txn_m.h"
+#include "../fd_clock_tile.h"
 #include "../metrics/fd_metrics.h"
 #include "../net/fd_net_tile.h"
 #include "../../discof/genesis/fd_genesi_tile.h"
+#include "generated/fd_event_gen.h"
 #include "../keyguard/fd_keyload.h"
 #include "../keyguard/fd_keyswitch.h"
 #include "../topo/fd_topo.h"
 #include "../../waltz/resolv/fd_netdb.h"
 #include "../../waltz/http/fd_url.h"
-#include "../../util/cstr/fd_cstr.h"
 #include "../../ballet/lthash/fd_lthash.h"
 #include "../../ballet/pb/fd_pb_encode.h"
 #include "../../tango/tempo/fd_tempo.h"
@@ -41,6 +42,11 @@
 #define IN_KIND_SIGN   (2)
 #define IN_KIND_GENESI (3)
 #define IN_KIND_IPECHO (4)
+#define IN_KIND_EVENT  (5)
+
+#define FD_EVENT_TYPE_TXN         1
+#define FD_EVENT_TYPE_SHRED       2
+#define FD_EVENT_TYPE_SIGNED_VOTE 3
 
 union fd_event_tile_in {
   struct {
@@ -77,6 +83,10 @@ struct fd_event_tile {
   ulong shred_buf_sz;
   uchar shred_buf[ FD_NET_MTU ];
 
+  ulong event_type;
+  ulong event_sz;
+  uchar event_buf[ FD_EVENT_GEN_STRUCT_MAX ];
+
   uchar identity_pubkey[ 32UL ];
 
   int use_tls;
@@ -89,9 +99,7 @@ struct fd_event_tile {
 
   fd_netdb_fds_t netdb_fds[1];
 
-  long   reference_wallclock;
-  long   reference_tickcount;
-  double tick_per_ns;
+  fd_clock_tile_t clock[1];
 
   ulong in_cnt;
   int in_kind[ 64UL ];
@@ -137,6 +145,7 @@ loose_footprint( fd_topo_tile_t const * tile ) {
 static inline void
 metrics_write( fd_event_tile_t * ctx ) {
   FD_MGAUGE_SET( EVENT, QUEUE_DEPTH, ctx->circq->cnt );
+  FD_MGAUGE_SET( EVENT, QUEUE_UNSENT, fd_circq_unsent_cnt( ctx->circq ) );
   FD_MCNT_SET( EVENT, QUEUE_DROPPED, ctx->circq->metrics.drop_cnt );
   FD_MGAUGE_SET( EVENT, QUEUE_BYTES_USED, fd_circq_bytes_used( ctx->circq ) );
   FD_MGAUGE_SET( EVENT, QUEUE_BYTES_CAPACITY, ctx->circq->size );
@@ -144,6 +153,7 @@ metrics_write( fd_event_tile_t * ctx ) {
   fd_event_client_metrics_t const * metrics = fd_event_client_metrics( ctx->client );
   FD_MCNT_SET( EVENT, SENT,          metrics->events_sent );
   FD_MCNT_SET( EVENT, ACKED,         metrics->events_acked );
+  FD_MGAUGE_SET( EVENT, LAST_ACKED_ID, metrics->last_acked_id );
   FD_MCNT_SET( EVENT, BYTES_WRITTEN,       metrics->bytes_written );
   FD_MCNT_SET( EVENT, BYTES_READ,          metrics->bytes_read );
   FD_MCNT_SET( EVENT, AUTH_FAILED,         metrics->auth_fail_cnt );
@@ -175,8 +185,9 @@ during_frag( fd_event_tile_t * ctx,
              ulong             chunk,
              ulong             sz,
              ulong             ctl ) {
-  (void)seq; (void)sig; (void)ctl;
+  (void)seq; (void)ctl;
 
+  fd_event_tile_in_t const * in = &ctx->in[ in_idx ];
   switch( ctx->in_kind[ in_idx ] ) {
     case IN_KIND_SHRED: {
       uchar const * dcache_entry = fd_net_rx_translate_frag( &ctx->in[ in_idx ].net_rx, chunk, ctl, sz );
@@ -192,13 +203,20 @@ during_frag( fd_event_tile_t * ctx,
     case IN_KIND_DEDUP:
     case IN_KIND_GENESI:
     case IN_KIND_IPECHO:
-      if( FD_UNLIKELY( chunk<ctx->in[ in_idx ].chunk0 || chunk>ctx->in[ in_idx ].wmark || sz>ctx->in[ in_idx ].mtu ) )
-        FD_LOG_ERR(( "chunk %lu %lu corrupt, not in range [%lu,%lu]", chunk, sz, ctx->in[ in_idx ].chunk0, ctx->in[ in_idx ].wmark ));
-
+      if( FD_UNLIKELY( chunk<in->chunk0 || chunk>in->wmark || sz>in->mtu ) )
+        FD_LOG_CRIT(( "chunk %lu %lu corrupt, not in range [%lu,%lu]", chunk, sz, in->chunk0, in->wmark ));
       ctx->chunk = chunk;
       break;
+    case IN_KIND_EVENT: {
+      if( FD_UNLIKELY( chunk<in->chunk0 || chunk>in->wmark || sz>in->mtu ) )
+        FD_LOG_CRIT(( "chunk %lu corrupt, not in range [%lu,%lu]", chunk, in->chunk0, in->wmark ));
+      fd_memcpy( ctx->event_buf, fd_chunk_to_laddr_const( in->mem, chunk ), sz );
+      ctx->event_type = sig;
+      ctx->event_sz   = sz;
+      break;
+    }
     default:
-      FD_LOG_ERR(( "unexpected in_kind %d %lu", ctx->in_kind[ in_idx ], in_idx ));
+      FD_LOG_CRIT(( "unexpected in_kind %d %lu", ctx->in_kind[ in_idx ], in_idx ));
   }
 }
 
@@ -211,7 +229,7 @@ after_frag( fd_event_tile_t *   ctx,
             ulong               tsorig,
             ulong               tspub,
             fd_stem_context_t * stem ) {
-  (void)seq; (void)sz; (void)tsorig; (void)stem;
+  (void)sz; (void)tsorig; (void)stem;
 
   switch( ctx->in_kind[ in_idx ] ) {
     case IN_KIND_SHRED: {
@@ -239,7 +257,8 @@ after_frag( fd_event_tile_t *   ctx,
       }
 
       ulong event_id = fd_event_client_id_reserve( ctx->client );
-      long timestamp_nanos = ctx->reference_wallclock + (long)((double)(fd_frag_meta_ts_decomp( tspub, ctx->reference_tickcount ) - ctx->reference_tickcount) / ctx->tick_per_ns);
+      long timestamp_nanos = fd_clock_tile_tickcount_to_wallclock( ctx->clock,
+        fd_clock_tile_tickcount_decomp( ctx->clock, tspub ) );
 
       fd_pb_encoder_t encoder[1];
       fd_pb_encoder_init( encoder, buffer, 4096UL );
@@ -281,7 +300,8 @@ after_frag( fd_event_tile_t *   ctx,
       }
 
       ulong event_id = fd_event_client_id_reserve( ctx->client );
-      long timestamp_nanos = ctx->reference_wallclock + (long)((double)(fd_frag_meta_ts_decomp( tspub, ctx->reference_tickcount ) - ctx->reference_tickcount) / ctx->tick_per_ns);
+      long timestamp_nanos = fd_clock_tile_tickcount_to_wallclock( ctx->clock,
+        fd_clock_tile_tickcount_decomp( ctx->clock, tspub ) );
 
       fd_pb_encoder_t encoder[1];
       fd_pb_encoder_init( encoder, buffer, 4096UL );
@@ -323,6 +343,11 @@ after_frag( fd_event_tile_t *   ctx,
       FD_TEST( sig && sig<=USHORT_MAX );
       fd_event_client_init_shred_version( ctx->client, (ushort)sig );
       break;
+    case IN_KIND_EVENT: {
+      long timestamp_nanos = fd_clock_tile_tickcount_to_wallclock( ctx->clock, fd_clock_tile_tickcount_decomp( ctx->clock, tspub ) );
+      fd_event_serialize_by_type( ctx->event_type, ctx->circq, ctx->client, timestamp_nanos, seq, ctx->event_buf, ctx->event_sz );
+      break;
+    }
     default:
       FD_LOG_ERR(( "unexpected in_kind %d", ctx->in_kind[ in_idx ] ));
   }
@@ -415,6 +440,15 @@ privileged_init( fd_topo_t const *      topo,
 # endif
 }
 
+static int
+link_is_event_report( fd_topo_t const * topo,
+                      ulong             link_id ) {
+  for( ulong i=0UL; i<topo->tile_cnt; i++ ) {
+    if( FD_UNLIKELY( topo->tiles[ i ].event_link_id==link_id ) ) return 1;
+  }
+  return 0;
+}
+
 static void
 unprivileged_init( fd_topo_t const *      topo,
                    fd_topo_tile_t const * tile ) {
@@ -455,26 +489,12 @@ unprivileged_init( fd_topo_t const *      topo,
   ssl_ctx_ptr = ctx->ssl_ctx;
 # endif
 
-  /* Rewrite the URL to hardcode port 7878 regardless of the port in
-     the configured URL. */
-  fd_url_t _url[ 1UL ];
-  ushort   _port;
-  _Bool    _is_ssl = 0;
-  if( FD_UNLIKELY( fd_url_parse_endpoint( _url, tile->event.url, strlen( tile->event.url ), &_port, &_is_ssl, "[tiles.event.url]" ) ) ) {
-    FD_LOG_ERR(( "Could not parse [tiles.event.url]" ));
-  }
-  char url_buf[ 512UL ];
-  FD_TEST( fd_cstr_printf_check( url_buf, sizeof(url_buf), NULL, "%.*s%.*s:7878%.*s",
-                                 (int)_url->scheme_len, _url->scheme,
-                                 (int)_url->host_len,   _url->host,
-                                 (int)_url->tail_len,   _url->tail ) );
-
   ctx->client = fd_event_client_join( fd_event_client_new( _event_client,
                                                            ctx->keyguard_client,
                                                            ctx->rng,
                                                            ctx->circq,
                                                            2*(1UL<<20UL) /* 2 MiB */,
-                                                           url_buf,
+                                                           tile->event.url,
                                                            ctx->identity_pubkey,
                                                            fd_version_cstr,
                                                            fd_commit_ref_cstr,
@@ -492,35 +512,43 @@ unprivileged_init( fd_topo_t const *      topo,
 
   ctx->idle_cnt = 0UL;
 
-  ctx->in_cnt = tile->in_cnt;
+  FD_TEST( tile->in_cnt<=sizeof(ctx->in_kind)/sizeof(ctx->in_kind[0]) );
+  ulong polled_in_idx = 0UL;
   for( ulong i=0UL; i<tile->in_cnt; i++ ) {
+    if( FD_UNLIKELY( !tile->in_link_poll[ i ] ) ) continue;
+
     fd_topo_link_t const * link = &topo->links[ tile->in_link_id[ i ] ];
     fd_topo_wksp_t const * link_wksp = &topo->workspaces[ topo->objs[ link->dcache_obj_id ].wksp_id ];
 
     if( FD_LIKELY( !strcmp( link->name, "net_shred"         ) ) ) {
-      fd_net_rx_bounds_init( &ctx->in[ i ].net_rx, link->dcache );
-      ctx->in_kind[ i ] = IN_KIND_SHRED;
+      fd_net_rx_bounds_init( &ctx->in[ polled_in_idx ].net_rx, link->dcache );
+      ctx->in_kind[ polled_in_idx ] = IN_KIND_SHRED;
+      polled_in_idx++;
       continue; /* only net_rx needs to be set in this case. */
-    } else if( FD_LIKELY( !strcmp( link->name, "dedup_resolv" ) ) ) ctx->in_kind[ i ] = IN_KIND_DEDUP;
-    else if( FD_LIKELY( !strcmp( link->name, "sign_event"   ) ) ) ctx->in_kind[ i ] = IN_KIND_SIGN;
-    else if( FD_LIKELY( !strcmp( link->name, "genesi_out"   ) ) ) ctx->in_kind[ i ] = IN_KIND_GENESI;
-    else if( FD_LIKELY( !strcmp( link->name, "ipecho_out"   ) ) ) ctx->in_kind[ i ] = IN_KIND_IPECHO;
+    }
+    else if( FD_LIKELY( !strcmp( link->name, "dedup_resolv" ) ) ) ctx->in_kind[ polled_in_idx ] = IN_KIND_DEDUP;
+    else if( FD_LIKELY( !strcmp( link->name, "genesi_out"   ) ) ) ctx->in_kind[ polled_in_idx ] = IN_KIND_GENESI;
+    else if( FD_LIKELY( !strcmp( link->name, "ipecho_out"   ) ) ) ctx->in_kind[ polled_in_idx ] = IN_KIND_IPECHO;
+    else if( FD_LIKELY( link_is_event_report( topo, link->id ) ) ) {
+      ctx->in_kind[ polled_in_idx ] = IN_KIND_EVENT;
+      FD_TEST( link->mtu<=sizeof(ctx->event_buf) );
+    }
     else FD_LOG_ERR(( "event tile has unexpected input link %lu %s", i, link->name ));
 
-    ctx->in[ i ].mem = link_wksp->wksp;
-    ctx->in[ i ].mtu = link->mtu;
-    if( FD_UNLIKELY( ctx->in[ i ].mtu ) ) {
-      ctx->in[ i ].chunk0 = fd_dcache_compact_chunk0( ctx->in[ i ].mem, link->dcache );
-      ctx->in[ i ].wmark  = fd_dcache_compact_wmark ( ctx->in[ i ].mem, link->dcache, link->mtu );
+    ctx->in[ polled_in_idx ].mem = link_wksp->wksp;
+    ctx->in[ polled_in_idx ].mtu = link->mtu;
+    if( FD_UNLIKELY( ctx->in[ polled_in_idx ].mtu ) ) {
+      ctx->in[ polled_in_idx ].chunk0 = fd_dcache_compact_chunk0( ctx->in[ polled_in_idx ].mem, link->dcache );
+      ctx->in[ polled_in_idx ].wmark  = fd_dcache_compact_wmark ( ctx->in[ polled_in_idx ].mem, link->dcache, link->mtu );
     } else {
-      ctx->in[ i ].chunk0 = 0UL;
-      ctx->in[ i ].wmark  = 0UL;
+      ctx->in[ polled_in_idx ].chunk0 = 0UL;
+      ctx->in[ polled_in_idx ].wmark  = 0UL;
     }
+    polled_in_idx++;
   }
+  ctx->in_cnt = polled_in_idx;
 
-  ctx->tick_per_ns         = fd_tempo_tick_per_ns( NULL );
-  ctx->reference_wallclock = fd_log_wallclock();
-  ctx->reference_tickcount = fd_tickcount();
+  fd_clock_tile_init( ctx->clock );
 
   ulong scratch_top = FD_SCRATCH_ALLOC_FINI( l, scratch_align() );
   if( FD_UNLIKELY( scratch_top > (ulong)scratch + scratch_footprint( tile ) ) )
@@ -563,8 +591,9 @@ populate_allowed_fds( fd_topo_t const *      topo,
 
 static void
 during_housekeeping( fd_event_tile_t * ctx ) {
-  ctx->reference_wallclock = fd_log_wallclock();
-  ctx->reference_tickcount = fd_tickcount();
+  if( FD_UNLIKELY( fd_clock_tile_recal_due( ctx->clock ) ) ) {
+    fd_clock_tile_recal( ctx->clock );
+  }
 
   if( FD_UNLIKELY( fd_keyswitch_state_query( ctx->keyswitch )==FD_KEYSWITCH_STATE_SWITCH_PENDING ) ) {
     FD_LOG_DEBUG(( "keyswitch: switching identity" ));

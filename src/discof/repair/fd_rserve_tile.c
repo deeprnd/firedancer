@@ -513,11 +513,11 @@ privileged_init( fd_topo_t      const * topo,
 
   FD_TEST( fd_rng_secure( &ctx->seed, sizeof(ulong) ) );
 
-  FD_LOG_NOTICE(( "creating shredb (size_limit=%luGiB)", size_limit ));
+  FD_LOG_INFO(( "creating shredb (size_limit=%luGiB)", size_limit ));
   ctx->shredb = fd_shredb_join( fd_shredb_new( ctx->shredb, size_limit, tile->rserve.shredb_path, ctx->seed ) );
   if( FD_UNLIKELY( !ctx->shredb ) ) FD_LOG_ERR(( "failed to initialize shredb" ));
 
-  uchar const * identity_public_key = fd_keyload_load( tile->repair.identity_key_path, /* pubkey only: */ 1 );
+  uchar const * identity_public_key = fd_keyload_load( tile->rserve.identity_key_path, /* pubkey only: */ 1 );
   fd_memcpy( ctx->identity_public_key.uc, identity_public_key, sizeof(fd_pubkey_t) );
 }
 

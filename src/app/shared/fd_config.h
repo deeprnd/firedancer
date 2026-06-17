@@ -30,7 +30,6 @@ struct fd_configf {
 
   struct {
     ulong max_live_slots;
-    int   fixed_fec_sets;
     ulong max_fork_width;
 
     struct {
@@ -74,6 +73,7 @@ struct fd_configf {
 
   struct {
     int hard_fork_fatal;
+    int fixed_fec_sets;
     struct {
       int validate_genesis_hash;
     } genesis;
@@ -285,8 +285,6 @@ struct fd_config {
 
     struct {
       int websocket_compression;
-      char frontend_release_channel[ 16 ];
-      int  frontend_release_channel_enum;
     } gui;
 
     struct {
@@ -391,13 +389,14 @@ struct fd_config {
       char   rpc_listen_address[ 16 ];
       ushort rpc_listen_port;
       ulong  max_http_connections;
+      ulong  max_websocket_connections;
       ulong  max_http_request_length;
       ulong  send_buffer_size_mb;
       int    delay_startup;
     } rpc;
 
     struct {
-      ushort repair_intake_listen_port;
+      ushort repair_client_listen_port;
       ulong  slot_max;
     } repair;
 

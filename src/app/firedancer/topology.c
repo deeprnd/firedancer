@@ -33,6 +33,42 @@
 #include <netdb.h>
 
 extern fd_topo_obj_callbacks_t * CALLBACKS[];
+extern fd_topo_run_tile_t *      TILES[];
+
+static ulong
+tile_max_event_sz( char const * name ) {
+  for( fd_topo_run_tile_t ** t=TILES; *t; t++ ) {
+    if( FD_UNLIKELY( !strcmp( (*t)->name, name ) ) ) return (*t)->max_event_sz;
+  }
+  return 0UL;
+}
+
+static void
+wire_event_links( fd_topo_t * topo ) {
+  fd_topob_wksp( topo, "event_in" );
+
+  ulong tile_cnt = topo->tile_cnt;
+  for( ulong i=0UL; i<tile_cnt; i++ ) {
+    fd_topo_tile_t * tile = &topo->tiles[ i ];
+    if( FD_UNLIKELY( !strcmp( tile->name, "event" ) ) ) continue;
+
+    ulong max_sz = tile_max_event_sz( tile->name );
+    if( FD_LIKELY( !max_sz ) ) continue;
+
+    char link_name[ sizeof(((fd_topo_link_t *)0)->name) ];
+    FD_TEST( fd_cstr_printf_check( link_name, sizeof(link_name), NULL, "%s_event", tile->name ) );
+
+    fd_topo_link_t * link = fd_topob_link( topo, link_name, "event_in", 128UL, max_sz, 1UL );
+    link->permit_no_producers = 1; /* written outside fd_stem; topo sees no producer */
+
+    tile->event_link_id = link->id;
+
+    fd_topob_tile_uses( topo, tile, &topo->objs[ link->mcache_obj_id ], FD_SHMEM_JOIN_MODE_READ_WRITE );
+    fd_topob_tile_uses( topo, tile, &topo->objs[ link->dcache_obj_id ], FD_SHMEM_JOIN_MODE_READ_WRITE );
+
+    fd_topob_tile_in( topo, "event", 0UL, "metric_in", link_name, link->kind_id, FD_TOPOB_UNRELIABLE, FD_TOPOB_POLLED );
+  }
+}
 
 static void
 parse_ip_port( const char * name, const char * ip_port, fd_topo_ip_port_t *parsed_ip_port) {
@@ -824,7 +860,7 @@ fd_topo_initialize( config_t * config ) {
     fd_topob_wksp( topo, "event"      );
     fd_topob_wksp( topo, "event_sign" );
     fd_topob_wksp( topo, "sign_event" );
-    fd_topob_link( topo, "event_sign", "event_sign", 128UL, 32UL, 1UL );
+    fd_topob_link( topo, "event_sign", "event_sign", 128UL, 132UL, 1UL );
     fd_topob_link( topo, "sign_event", "sign_event", 128UL, 64UL, 1UL );
     fd_topob_tile( topo, "event", "event", "metric_in",  tile_to_cpu[ topo->tile_cnt ], 0, 1, 0 );
     fd_topob_tile_in(  topo, "event",  0UL, "metric_in", "genesi_out", 0UL, FD_TOPOB_RELIABLE,   FD_TOPOB_POLLED   );
@@ -845,6 +881,8 @@ fd_topo_initialize( config_t * config ) {
     fd_topob_tile_out( topo, "event",  0UL,              "event_sign", 0UL                                         );
     fd_topob_tile_in(  topo, "event",  0UL, "metric_in", "sign_event", 0UL, FD_TOPOB_UNRELIABLE, FD_TOPOB_UNPOLLED );
     fd_topob_tile_out( topo, "sign",   0UL,              "sign_event", 0UL                                         );
+
+    wire_event_links( topo );
   }
 
   if( FD_UNLIKELY( config->tiles.bundle.enabled ) ) {
@@ -1107,7 +1145,7 @@ fd_topo_initialize( config_t * config ) {
   /* 32 shreds * 995 payload bytes = 31840 bytes with fixed_fec_sets = true
      67 shreds * 955 payload bytes = 63985 bytes with fixed_fec_sets = false */
 
-  ulong store_fec_data_max = fd_ulong_if( config->firedancer.runtime.fixed_fec_sets, 31840UL, 63985UL );
+  ulong store_fec_data_max = fd_ulong_if( config->firedancer.development.fixed_fec_sets, 31840UL, 63985UL );
   fd_topo_obj_t * store_obj = setup_topo_store( topo, "store", store_fec_max, (uint)shred_tile_cnt, store_fec_data_max );
   FOR(shred_tile_cnt) fd_topob_tile_uses( topo, &topo->tiles[ fd_topo_find_tile( topo, "shred", i ) ], store_obj, FD_SHMEM_JOIN_MODE_READ_WRITE );
   fd_topob_tile_uses( topo, &topo->tiles[ fd_topo_find_tile( topo, "replay", 0UL ) ], store_obj, FD_SHMEM_JOIN_MODE_READ_WRITE );
@@ -1215,7 +1253,7 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
       tile->net.legacy_transaction_listen_port = config->tiles.quic.regular_transaction_listen_port;
     }
     tile->net.gossip_listen_port               = config->gossip.port;
-    tile->net.repair_intake_listen_port        = config->tiles.repair.repair_intake_listen_port;
+    tile->net.repair_client_listen_port        = config->tiles.repair.repair_client_listen_port;
     tile->net.repair_serve_listen_port         = config->tiles.rserve.repair_serve_listen_port;
     tile->net.txsend_src_port                  = config->tiles.txsend.txsend_src_port;
 
@@ -1279,6 +1317,7 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
     } else {
       tile->gossip.ip_addr = config->net.ip_addr;
     }
+    tile->gossip.bind_ip_addr        = config->net.ip_addr;
     fd_cstr_ncpy( tile->gossip.identity_key_path, config->paths.identity_key, sizeof(tile->gossip.identity_key_path) );
     tile->gossip.shred_version       = config->consensus.expected_shred_version;
     tile->gossip.max_entries         = config->tiles.gossip.max_entries;
@@ -1294,7 +1333,7 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
     tile->gossip.ports.tvu              = config->tiles.shred.shred_listen_port;
     tile->gossip.ports.tpu              = config->tiles.quic.regular_transaction_listen_port;
     tile->gossip.ports.tpu_quic         = config->tiles.quic.quic_transaction_listen_port;
-    tile->gossip.ports.repair           = config->tiles.repair.repair_intake_listen_port;
+    tile->gossip.ports.repair           = config->tiles.repair.repair_client_listen_port;
     tile->gossip.ports.rserve           = config->tiles.rserve.repair_serve_listen_port;
 
     tile->gossip.entrypoints_cnt        = config->gossip.entrypoints_cnt;
@@ -1370,7 +1409,7 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
 
   } else if( FD_UNLIKELY( !strcmp( tile->name, "repair" ) ) ) {
     tile->repair.max_pending_shred_sets    = config->tiles.shred.max_pending_shred_sets;
-    tile->repair.repair_intake_listen_port = config->tiles.repair.repair_intake_listen_port;
+    tile->repair.repair_client_listen_port = config->tiles.repair.repair_client_listen_port;
     tile->repair.slot_max                  = config->tiles.repair.slot_max;
     tile->repair.repair_sign_cnt           = config->firedancer.layout.sign_tile_count - 1; /* -1 because this excludes the keyguard client */
 
@@ -1478,7 +1517,7 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
 
     tile->accdb.rpc_epoch_obj_id = fd_pod_query_ulong( config->topo.props, "accdb_epoch.rpc", ULONG_MAX );
 
-    tile->accdb.resolv_epoch_obj_cnt = config->firedancer.layout.resolv_tile_count;
+    tile->accdb.resolv_epoch_obj_cnt = config->firedancer.layout.enable_block_production ? config->firedancer.layout.resolv_tile_count : 0UL;
     FD_TEST( tile->accdb.resolv_epoch_obj_cnt<=sizeof(tile->accdb.resolv_epoch_obj_ids)/sizeof(tile->accdb.resolv_epoch_obj_ids[0]) );
     for( ulong i=0UL; i<tile->accdb.resolv_epoch_obj_cnt; i++ ) {
       tile->accdb.resolv_epoch_obj_ids[ i ] = fd_pod_queryf_ulong( config->topo.props, ULONG_MAX, "accdb_epoch.resolv.%lu", i );
@@ -1609,7 +1648,6 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
     tile->gui.send_buffer_size_mb       = config->tiles.gui.send_buffer_size_mb;
     tile->gui.schedule_strategy         = config->tiles.pack.schedule_strategy_enum;
     tile->gui.websocket_compression     = 1;
-    tile->gui.frontend_release_channel  = config->development.gui.frontend_release_channel_enum;
     fd_cstr_ncpy( tile->gui.wfs_bank_hash, config->firedancer.consensus.wait_for_supermajority_with_bank_hash, sizeof(tile->gui.wfs_bank_hash) );
     tile->gui.expected_shred_version = config->consensus.expected_shred_version;
     tile->gui.cache_size_gib         = config->firedancer.accounts.cache_size_gib;
@@ -1623,6 +1661,7 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
     tile->rpc.listen_port = config->tiles.rpc.rpc_listen_port;
     tile->rpc.delay_startup = config->tiles.rpc.delay_startup;
     tile->rpc.max_http_connections      = config->tiles.rpc.max_http_connections;
+    tile->rpc.max_websocket_connections = config->tiles.rpc.max_websocket_connections;
     tile->rpc.max_http_request_length   = config->tiles.rpc.max_http_request_length;
     tile->rpc.send_buffer_size_mb       = config->tiles.rpc.send_buffer_size_mb;
 
