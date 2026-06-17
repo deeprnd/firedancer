@@ -61,7 +61,7 @@ test-unit-fd:
   fi
 
 test-unit-tk:
-  zig build test
+  zig build test --summary all
 
 # Print computed hash and wire bytes for every audit fixture event.
 # Use the output to understand or snapshot the current encoding after intentional changes.
@@ -84,7 +84,25 @@ test-integration-fd:
   @true
 
 test-integration-tk:
-  @true
+  zig build integration-test --summary all
+
+test-system-tk:
+  bash contrib/test/run_integration_model_tests.sh
+
+infra-run-llamacpp:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  llama_dir="${TK_LLAMA_CPP_DIR:-$HOME/work/git/llama.cpp}"
+  backend=cpu
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
+    if (( gpu_count > 0 )) && ldd "${llama_dir}/llama-server" 2>/dev/null | grep -qi 'cuda\|cublas'; then
+      backend=gpu
+    fi
+  fi
+  [[ "$backend" == "gpu" ]] && bash contrib/test/ensure_llama_cpp.sh --gpu || bash contrib/test/ensure_llama_cpp.sh
+  bash contrib/test/ensure_hf_model.sh
+  exec bash contrib/test/run_llm_server.sh "$backend"
 
 test-integration-all:
   python3 contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"
@@ -276,3 +294,23 @@ mem-free page_type="gigantic" numa="0":
   sync
   sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
   sudo sh -c 'echo 1 > /proc/sys/vm/compact_memory'
+
+# ── Infra (harness) ─────────────────────────────────────────────────────
+
+infra-check-model:
+  bash contrib/test/ensure_hf_model.sh --check-only
+
+infra-ensure-model:
+  bash contrib/test/ensure_hf_model.sh
+
+infra-check-llamacpp:
+  bash contrib/test/ensure_llama_cpp.sh --check-only
+
+infra-ensure-llamacpp:
+  bash contrib/test/ensure_llama_cpp.sh
+
+infra-run-llamacpp-cpu:
+  bash contrib/test/run_llm_server.sh cpu
+
+infra-run-llamacpp-gpu:
+  bash contrib/test/run_llm_server.sh gpu

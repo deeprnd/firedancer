@@ -1,9 +1,9 @@
-/// Demo brokerage account schema and affordability checks for V1.1.S4.
+/// Test brokerage account schema and affordability checks for V1.1.S4.
 ///
 /// BrokerageAccount: account id, cash, buying power, currency, holdings,
 /// open orders, day notional used, and month notional used (T1).
 ///
-/// fixtures: five deterministic demo accounts — cash_rich, low_cash,
+/// fixtures: five deterministic test accounts — cash_rich, low_cash,
 /// technology_heavy, diversified, and restricted_account (T2).
 ///
 /// checkAffordability(): derives cash available, buying power, remaining daily
@@ -66,10 +66,10 @@ pub const OpenOrder = struct {
     }
 };
 
-/// Demo brokerage account snapshot (T1).
+/// Test brokerage account snapshot (T1).
 ///
 /// buying_power_cents is already net of open-order commitments and any pending
-/// settlement holds as reported by the demo account provider.  It is the
+/// settlement holds as reported by the test account provider.  It is the
 /// binding limit for a new paper or sandbox order.  cash_cents is the raw
 /// balance before deductions; it may be higher than buying_power_cents when
 /// open orders have committed part of the balance.
@@ -204,7 +204,7 @@ pub fn checkAffordability(
 }
 
 /// Check affordability for a concrete basket and ensure the basket belongs to
-/// the same demo account fixture.
+/// the same test account fixture.
 pub fn checkBasketAffordability(
     account: *const BrokerageAccount,
     proposed_basket: *const basket.Basket,

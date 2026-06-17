@@ -1,0 +1,28 @@
+{
+  "fixture_id": "model_response_ai_infra_gemma4",
+  "schema": "tickoni.v1_1.model_response",
+  "run_id": "run_v1_1_ai_infra_demo_0001",
+  "model_id": "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL",
+  "request_hash": "model_request_hash_ai_infra",
+  "response_hash": "model_response_hash_ai_infra_gemma4",
+  "token_usage": {
+    "prompt_tokens": 148,
+    "completion_tokens": 187,
+    "total_tokens": 335
+  },
+  "latency_ms": 842,
+  "finish_reason": "stop",
+  "content": {
+    "thesis_summary": "USD 2,000 into AI infrastructure via diversified US-listed large-cap equities and ETFs. Focus on semiconductor leaders and AI-themed ETFs to capture infrastructure spend growth while avoiding single-name concentration.",
+    "recommended_tickers": ["NVDA", "AMD", "AVGO", "MSFT", "AMZN", "BOTZ", "SOXX"],
+    "rationale": {
+      "NVDA": "Leading GPU and AI accelerator provider; core AI infrastructure holding.",
+      "AMD": "Competing GPU and CPU platform; growing AI data center exposure.",
+      "AVGO": "Custom AI silicon and networking; high-margin AI infrastructure revenue.",
+      "MSFT": "Azure cloud AI platform; diversified large-cap AI infrastructure exposure.",
+      "AMZN": "AWS cloud AI services; largest cloud provider by revenue.",
+      "BOTZ": "Broad AI and robotics ETF; diversified theme exposure with moderate expense ratio.",
+      "SOXX": "Semiconductor ETF; captures the full AI chip supply chain."
+    }
+  }
+}

@@ -349,9 +349,9 @@ test "catalog: all entries are NYSE or NASDAQ" {
     }
 }
 
-// --- Acceptance criteria (V1.1.S2): AI infra demo >= 4 eligible, >= 2 rejected ---
+// --- Acceptance criteria (V1.1.S2): AI infra scenario >= 4 eligible, >= 2 rejected ---
 
-test "filterByTheme: ai_infrastructure demo yields >= 4 eligible and >= 2 restricted" {
+test "filterByTheme: ai_infrastructure scenario yields >= 4 eligible and >= 2 restricted" {
     var out: [catalog.len]*const InstrumentEntry = undefined;
     const n = filterByTheme(.ai_infrastructure, &out);
     var eligible: usize = 0;
