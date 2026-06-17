@@ -41,7 +41,7 @@
 #define FD_GUI_START_PROGRESS_TYPE_RUNNING                            (12)
 
 #define FD_GUI_NETWORK_EMA_HALF_LIFE_NS (1000000000L) /* 1 second in nanoseconds */
-#define FD_GUI_NET_PROTO_CNT            (5UL)         /* turbine, gossip, tpu, repair, metric */
+#define FD_GUI_NET_PROTO_CNT            (6UL)         /* turbine, gossip, tpu, repair, rserve, metric */
 #define FD_GUI_NET_RATE_MAX_WINDOW_NS   (300L*1000L*1000L*1000L) /* 5 minutes in nanoseconds */
 
 /* Monotonic deque element for sliding-window max tracking of
@@ -629,6 +629,10 @@ struct fd_gui_boot_progress {
     ulong insert_bytes_decompressed;
     char  insert_path[ PATH_MAX ];
     ulong insert_accounts_current;
+
+    ulong snapwr_in_bytes_decompressed;
+    ulong snapwr_out_bytes_decompressed;
+    ulong snapwr_accounts_current;
   } loading_snapshot[ FD_GUI_BOOT_PROGRESS_SNAPSHOT_CNT ];
 
   ulong wfs_total_stake;
@@ -932,6 +936,10 @@ struct fd_gui {
     ulong                     scheduler_counts_snap_idx_slot_start;
     /* Temporary storage for samples. Will be downsampled into leader history on slot end. */
     fd_gui_scheduler_counts_t scheduler_counts_snap[ FD_GUI_SCHEDULER_COUNT_SNAP_CNT ][ 1 ];
+
+    /* Topo tile indices in display order, built once on init. */
+    ulong tile[ FD_TOPO_MAX_TILES ];
+    ulong tile_cnt;
   } summary;
 
   fd_gui_slot_t slots[ FD_GUI_SLOTS_CNT ][ 1 ];
@@ -1076,12 +1084,6 @@ fd_gui_ws_message( fd_gui_t *    gui,
                    ulong         ws_conn_id,
                    uchar const * data,
                    ulong         data_len );
-
-void
-fd_gui_plugin_message( fd_gui_t *   gui,
-                       ulong        plugin_msg,
-                       void const * msg,
-                       long         now );
 
 void
 fd_gui_became_leader( fd_gui_t * gui,
