@@ -8,11 +8,9 @@
 
 #include "../../disco/gui/generated/http_import_dist.h"
 
-/* The list of files used to serve the frontend is set here.  This is a
-   global variable since is is populated at boot based on the
-   `development.gui.frontend_release_channel` option and is accessed in
-   the gui_http_request callback. */
-static fd_http_static_file_t * STATIC_FILES;
+/* STATIC_FILES is the null-terminated list of frontend assets baked into
+   the binary.  It is defined in generated/http_import_dist.c and accessed
+   in the gui_http_request callback. */
 
 #include <sys/socket.h> /* SOCK_CLOEXEC, SOCK_NONBLOCK needed for seccomp filter */
 
@@ -36,8 +34,6 @@ static fd_http_static_file_t * STATIC_FILES;
 #include "../../disco/shred/fd_shred_tile.h"
 #include "../../flamenco/accdb/fd_accdb_shmem.h"
 
-#define IN_KIND_PLUGIN        ( 0UL)
-#define IN_KIND_POH_PACK      ( 1UL)
 #define IN_KIND_PACK_EXECLE   ( 2UL)
 #define IN_KIND_PACK_POH      ( 3UL)
 #define IN_KIND_EXECLE_POH    ( 4UL)
@@ -220,7 +216,7 @@ before_credit( fd_gui_ctx_t *      ctx,
 
   int charge_poll = 0;
   charge_poll |= fd_gui_poll( ctx->gui, fd_clock_tile_now( ctx->clock ) );
-  if( FD_UNLIKELY( ctx->is_full_client ) ) charge_poll |= fd_gui_peers_poll( ctx->peers, fd_clock_tile_now( ctx->clock ) );
+  charge_poll |= fd_gui_peers_poll( ctx->peers, fd_clock_tile_now( ctx->clock ) );
 
   *charge_busy = charge_busy_server | charge_poll;
 }
@@ -251,25 +247,6 @@ during_frag( fd_gui_ctx_t * ctx,
 
   uchar * src = (uchar *)fd_chunk_to_laddr( ctx->in[ in_idx ].mem, chunk );
 
-  if( FD_LIKELY( ctx->in_kind[ in_idx ]==IN_KIND_PLUGIN ) ) {
-    /* ... todo... sigh, sz is not correct since it's too big */
-    if( FD_LIKELY( sig==FD_PLUGIN_MSG_GOSSIP_UPDATE ) ) {
-      ulong peer_cnt = FD_LOAD( ulong, src );
-      FD_TEST( peer_cnt<=FD_GUI_MAX_PEER_CNT );
-      sz = 8UL + peer_cnt*FD_GOSSIP_LINK_MSG_SIZE;
-    } else if( FD_LIKELY( sig==FD_PLUGIN_MSG_VOTE_ACCOUNT_UPDATE ) ) {
-      ulong peer_cnt = FD_LOAD( ulong, src );
-      FD_TEST( peer_cnt<=FD_GUI_MAX_PEER_CNT );
-      sz = 8UL + peer_cnt*112UL;
-    } else if( FD_UNLIKELY( sig==FD_PLUGIN_MSG_LEADER_SCHEDULE ) ) {
-      ulong staked_vote_cnt = FD_LOAD( ulong, src+8UL );
-      ulong staked_id_cnt   = FD_LOAD( ulong, src+16UL );
-      FD_TEST( staked_vote_cnt<=MAX_COMPRESSED_STAKE_WEIGHTS );
-      FD_TEST( staked_id_cnt<=MAX_SHRED_DESTS );
-      sz = fd_stake_weight_msg_sz( staked_vote_cnt, staked_id_cnt );
-    }
-  }
-
   if( FD_LIKELY( ctx->in_kind[ in_idx ]==IN_KIND_EPOCH ) ) {
     fd_epoch_info_msg_t * epoch_info = (fd_epoch_info_msg_t *)src;
     FD_TEST( epoch_info->staked_vote_cnt<=MAX_COMPRESSED_STAKE_WEIGHTS );
@@ -290,7 +267,6 @@ during_frag( fd_gui_ctx_t * ctx,
 
   switch( ctx->in_kind[ in_idx ] ) {
     case IN_KIND_REPAIR_NET: {
-      FD_TEST( ctx->is_full_client );
       ctx->parsed.repair_net.slot = ULONG_MAX;
       uchar * payload;
       ulong payload_sz;
@@ -305,14 +281,12 @@ during_frag( fd_gui_ctx_t * ctx,
       break;
     }
     case IN_KIND_NET_GOSSVF: {
-      FD_TEST( ctx->is_full_client );
       FD_TEST( sz<=sizeof(ctx->parsed.net_gossvf) );
       uchar const * net_src = fd_net_rx_translate_frag( &ctx->net_in_bounds[ in_idx ], chunk, ctl, sz );
       fd_memcpy( ctx->parsed.net_gossvf, net_src, sz );
       break;
     }
     case IN_KIND_GOSSIP_NET: {
-      FD_TEST( ctx->is_full_client );
       FD_TEST( sz<=sizeof(ctx->parsed.gossip_net) );
       fd_memcpy( ctx->parsed.gossip_net, src, sz );
       break;
@@ -337,14 +311,8 @@ after_frag( fd_gui_ctx_t *      ctx,
 
   uchar * src = (uchar *)fd_chunk_to_laddr( ctx->in[ in_idx ].mem, ctx->chunk );
 
-  switch ( ctx->in_kind[ in_idx ] ) {
-    case IN_KIND_PLUGIN: {
-      FD_TEST( !ctx->is_full_client );
-      fd_gui_plugin_message( ctx->gui, sig, src, fd_clock_tile_now( ctx->clock ) );
-      break;
-    }
+  switch( ctx->in_kind[ in_idx ] ) {
     case IN_KIND_EXECRP_REPLAY: {
-      FD_TEST( ctx->is_full_client );
       if( FD_LIKELY( sig>>32==FD_EXECRP_TT_TXN_EXEC ) ) {
         fd_execrp_task_done_msg_t * msg = (fd_execrp_task_done_msg_t *)src;
 
@@ -365,7 +333,6 @@ after_frag( fd_gui_ctx_t *      ctx,
       break;
     }
     case IN_KIND_REPLAY_OUT: {
-      FD_TEST( ctx->is_full_client );
       if( FD_UNLIKELY( sig==REPLAY_SIG_SLOT_COMPLETED ) ) {
         fd_replay_slot_completed_t const * slot_completed =  (fd_replay_slot_completed_t const *)src;
 
@@ -381,21 +348,16 @@ after_frag( fd_gui_ctx_t *      ctx,
       break;
     }
     case IN_KIND_EPOCH: {
-      FD_TEST( ctx->is_full_client );
-
       fd_epoch_info_msg_t * epoch_info = (fd_epoch_info_msg_t *)src;
       fd_gui_handle_epoch_info( ctx->gui, epoch_info, fd_clock_tile_now( ctx->clock ) );
       fd_gui_peers_handle_epoch_info( ctx->peers, epoch_info, fd_clock_tile_now( ctx->clock ) );
       break;
     }
     case IN_KIND_SNAPIN: {
-      FD_TEST( ctx->is_full_client );
       fd_gui_peers_handle_config_account( ctx->peers, src, sz );
       break;
     }
     case IN_KIND_SNAPIN_MANIF: {
-      FD_TEST( ctx->is_full_client );
-
       if( fd_ssmsg_sig_message( sig )==FD_SSMSG_DONE ) {
         fd_gui_peers_commit_snapshot_manifest( ctx->peers );
       } else {
@@ -405,13 +367,11 @@ after_frag( fd_gui_ctx_t *      ctx,
       break;
     }
     case IN_KIND_GENESI_OUT: {
-      FD_TEST( ctx->is_full_client );
       fd_genesis_meta_t const * meta = (fd_genesis_meta_t const *)src;
       fd_gui_handle_genesis_hash( ctx->gui, &meta->genesis_hash );
       break;
     }
     case IN_KIND_TOWER_OUT: {
-      FD_TEST( ctx->is_full_client );
       if( FD_LIKELY( sig==FD_TOWER_SIG_SLOT_DONE )) {
         fd_tower_slot_done_t const * tower = (fd_tower_slot_done_t const *)src;
         fd_gui_handle_tower_update( ctx->gui, tower, fd_clock_tile_now( ctx->clock ) );
@@ -422,7 +382,6 @@ after_frag( fd_gui_ctx_t *      ctx,
       break;
     }
     case IN_KIND_SHRED_OUT: {
-      FD_TEST( ctx->is_full_client );
       long tsorig_nanos = ctx->ref_wallclock + (long)((double)(fd_frag_meta_ts_decomp( tsorig, fd_tickcount() ) - ctx->ref_tickcount) / ctx->tick_per_ns);
       uint sig_src      = fd_shred_sig_src( sig );
       if( FD_LIKELY( sig_src==SHRED_SIG_SRC_TURBINE || sig_src==SHRED_SIG_SRC_REPAIR || sig_src==SHRED_SIG_SRC_BAD_REPAIR ) ) {
@@ -440,7 +399,6 @@ after_frag( fd_gui_ctx_t *      ctx,
       break;
     }
     case IN_KIND_SNAPCT: {
-      FD_TEST( ctx->is_full_client );
       fd_gui_handle_snapshot_update( ctx->gui, (fd_snapct_update_t *)src );
       break;
     }
@@ -451,7 +409,6 @@ after_frag( fd_gui_ctx_t *      ctx,
       break;
     }
     case IN_KIND_NET_GOSSVF: {
-      FD_TEST( ctx->is_full_client );
       uchar * payload;
       ulong payload_sz;
       fd_ip4_hdr_t * ip4_hdr;
@@ -467,7 +424,6 @@ after_frag( fd_gui_ctx_t *      ctx,
       break;
     }
     case IN_KIND_GOSSIP_NET: {
-      FD_TEST( ctx->is_full_client );
       uchar * payload;
       ulong payload_sz;
       fd_ip4_hdr_t * ip4_hdr;
@@ -482,15 +438,7 @@ after_frag( fd_gui_ctx_t *      ctx,
       break;
     }
     case IN_KIND_GOSSIP_OUT: {
-      FD_TEST( ctx->is_full_client );
       fd_gui_peers_handle_gossip_update( ctx->peers, (fd_gossip_update_message_t *)src, fd_clock_tile_now( ctx->clock ) );
-      break;
-    }
-    case IN_KIND_POH_PACK: {
-      FD_TEST( !ctx->is_full_client );
-      FD_TEST( fd_disco_poh_sig_pkt_type( sig )==POH_PKT_TYPE_BECAME_LEADER );
-      fd_became_leader_t * became_leader = (fd_became_leader_t *)src;
-      fd_gui_became_leader( ctx->gui, fd_disco_poh_sig_slot( sig ), became_leader->slot_start_ns, became_leader->slot_end_ns, became_leader->limits.slot_max_cost, became_leader->max_microblocks_in_slot );
       break;
     }
     case IN_KIND_PACK_POH: {
@@ -583,7 +531,6 @@ gui_http_request( fd_http_server_request_t const * request ) {
                      !strncmp( request->path, "/gossip?", strlen("/gossip?") ) ||
                      !strncmp( request->path, "/accounts?", strlen("/accounts?") );
 
-  FD_TEST( STATIC_FILES );
   for( fd_http_static_file_t const * f = STATIC_FILES; f->name; f++ ) {
     if( !strcmp( request->path, f->name ) ||
         (!strcmp( f->name, "/index.html" ) && is_vite_page) ) {
@@ -650,7 +597,7 @@ gui_ws_open( ulong  conn_id,
   fd_gui_ctx_t * ctx = (fd_gui_ctx_t *)_ctx;
 
   fd_gui_ws_open( ctx->gui, conn_id, fd_clock_tile_now( ctx->clock ) );
-  if( FD_UNLIKELY( ctx->is_full_client ) ) fd_gui_peers_ws_open( ctx->peers, conn_id, fd_clock_tile_now( ctx->clock ) );
+  fd_gui_peers_ws_open( ctx->peers, conn_id, fd_clock_tile_now( ctx->clock ) );
 }
 
 static void
@@ -659,7 +606,7 @@ gui_ws_close( ulong  conn_id,
               void * _ctx ) {
   (void) reason;
   fd_gui_ctx_t * ctx = (fd_gui_ctx_t *)_ctx;
-  if( FD_UNLIKELY( ctx->is_full_client ) ) fd_gui_peers_ws_close( ctx->peers, conn_id );
+  fd_gui_peers_ws_close( ctx->peers, conn_id );
 }
 
 static void
@@ -670,7 +617,7 @@ gui_ws_message( ulong         ws_conn_id,
   fd_gui_ctx_t * ctx = (fd_gui_ctx_t *)_ctx;
 
   int reason = fd_gui_ws_message( ctx->gui, ws_conn_id, data, data_len );
-  if( FD_UNLIKELY( ctx->is_full_client && reason==FD_HTTP_SERVER_CONNECTION_CLOSE_UNKNOWN_METHOD ) ) reason = fd_gui_peers_ws_message( ctx->peers, ws_conn_id, data, data_len );
+  if( FD_UNLIKELY( reason==FD_HTTP_SERVER_CONNECTION_CLOSE_UNKNOWN_METHOD ) ) reason = fd_gui_peers_ws_message( ctx->peers, ws_conn_id, data, data_len );
 
   if( FD_UNLIKELY( reason<0 ) ) fd_http_server_ws_close( ctx->gui_server, ws_conn_id, reason );
 }
@@ -717,14 +664,6 @@ static void
 unprivileged_init( fd_topo_t const *      topo,
                    fd_topo_tile_t const * tile ) {
   void * scratch = fd_topo_obj_laddr( topo, tile->tile_obj_id );
-
-  fd_topo_tile_t const * gui_tile = &topo->tiles[ fd_topo_find_tile( topo, "gui", 0UL ) ];
-  switch( gui_tile->gui.frontend_release_channel ) {
-    case 0: STATIC_FILES = STATIC_FILES_STABLE; break;
-    case 1: STATIC_FILES = STATIC_FILES_ALPHA;  break;
-    case 2: STATIC_FILES = STATIC_FILES_DEV;    break;
-    default: FD_LOG_CRIT(( "invalid frontend_release_channel %d", gui_tile->gui.frontend_release_channel ));
-  }
 
   fd_http_server_params_t http_param = derive_http_params( tile );
   FD_SCRATCH_ALLOC_INIT( l, scratch );
@@ -776,35 +715,29 @@ unprivileged_init( fd_topo_t const *      topo,
     fd_topo_link_t const * link = &topo->links[ tile->in_link_id[ i ] ];
     fd_topo_wksp_t const * link_wksp = &topo->workspaces[ topo->objs[ link->dcache_obj_id ].wksp_id ];
 
-    if( FD_LIKELY( !strcmp( link->name, "plugin_out"        ) ) ) ctx->in_kind[ i ] = IN_KIND_PLUGIN;
-    else if( FD_LIKELY( !strcmp( link->name, "poh_pack"     ) ) ) ctx->in_kind[ i ] = IN_KIND_POH_PACK;      /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "pohh_pack"    ) ) ) ctx->in_kind[ i ] = IN_KIND_POH_PACK;      /* frank only */
-    else if( FD_LIKELY( !strcmp( link->name, "pack_bank"    ) ) ) ctx->in_kind[ i ] = IN_KIND_PACK_EXECLE;
-    else if( FD_LIKELY( !strcmp( link->name, "pack_execle"  ) ) ) ctx->in_kind[ i ] = IN_KIND_PACK_EXECLE;
-    else if( FD_LIKELY( !strcmp( link->name, "pack_poh"     ) ) ) ctx->in_kind[ i ] = IN_KIND_PACK_POH;      /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "pack_pohh"    ) ) ) ctx->in_kind[ i ] = IN_KIND_PACK_POH;      /* frank only */
-    else if( FD_LIKELY( !strcmp( link->name, "execle_poh"   ) ) ) ctx->in_kind[ i ] = IN_KIND_EXECLE_POH;    /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "bank_pohh"    ) ) ) ctx->in_kind[ i ] = IN_KIND_EXECLE_POH;    /* frank only */
-    else if( FD_LIKELY( !strcmp( link->name, "shred_out"    ) ) ) ctx->in_kind[ i ] = IN_KIND_SHRED_OUT;     /* full client only */
+    if( FD_LIKELY( !strcmp( link->name, "pack_execle"  ) ) ) ctx->in_kind[ i ] = IN_KIND_PACK_EXECLE;
+    else if( FD_LIKELY( !strcmp( link->name, "pack_poh"     ) ) ) ctx->in_kind[ i ] = IN_KIND_PACK_POH;
+    else if( FD_LIKELY( !strcmp( link->name, "execle_poh"   ) ) ) ctx->in_kind[ i ] = IN_KIND_EXECLE_POH;
+    else if( FD_LIKELY( !strcmp( link->name, "shred_out"    ) ) ) ctx->in_kind[ i ] = IN_KIND_SHRED_OUT;
     else if( FD_LIKELY( !strcmp( link->name, "net_gossvf"   ) ) ) {
       ctx->in_kind[ i ] = IN_KIND_NET_GOSSVF;
       fd_net_rx_bounds_init( &ctx->net_in_bounds[ i ], link->dcache );
     }
-    else if( FD_LIKELY( !strcmp( link->name, "gossip_net"    ) ) ) ctx->in_kind[ i ] = IN_KIND_GOSSIP_NET;    /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "gossip_out"    ) ) ) ctx->in_kind[ i ] = IN_KIND_GOSSIP_OUT;    /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "snapct_gui"    ) ) ) ctx->in_kind[ i ] = IN_KIND_SNAPCT;        /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "repair_net"    ) ) ) ctx->in_kind[ i ] = IN_KIND_REPAIR_NET;    /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "tower_out"     ) ) ) ctx->in_kind[ i ] = IN_KIND_TOWER_OUT;     /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "replay_out"    ) ) ) ctx->in_kind[ i ] = IN_KIND_REPLAY_OUT;    /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "replay_epoch"  ) ) ) ctx->in_kind[ i ] = IN_KIND_EPOCH;         /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "genesi_out"    ) ) ) ctx->in_kind[ i ] = IN_KIND_GENESI_OUT;    /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "snapin_gui"    ) ) ) ctx->in_kind[ i ] = IN_KIND_SNAPIN;        /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "snapin_manif"  ) ) ) ctx->in_kind[ i ] = IN_KIND_SNAPIN_MANIF;  /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "execrp_replay" ) ) ) ctx->in_kind[ i ] = IN_KIND_EXECRP_REPLAY; /* full client only */
-    else if( FD_LIKELY( !strcmp( link->name, "bundle_status"  ) ) ) ctx->in_kind[ i ] = IN_KIND_BUNDLE;        /* full client only */
+    else if( FD_LIKELY( !strcmp( link->name, "gossip_net"    ) ) ) ctx->in_kind[ i ] = IN_KIND_GOSSIP_NET;
+    else if( FD_LIKELY( !strcmp( link->name, "gossip_out"    ) ) ) ctx->in_kind[ i ] = IN_KIND_GOSSIP_OUT;
+    else if( FD_LIKELY( !strcmp( link->name, "snapct_gui"    ) ) ) ctx->in_kind[ i ] = IN_KIND_SNAPCT;
+    else if( FD_LIKELY( !strcmp( link->name, "repair_net"    ) ) ) ctx->in_kind[ i ] = IN_KIND_REPAIR_NET;
+    else if( FD_LIKELY( !strcmp( link->name, "tower_out"     ) ) ) ctx->in_kind[ i ] = IN_KIND_TOWER_OUT;
+    else if( FD_LIKELY( !strcmp( link->name, "replay_out"    ) ) ) ctx->in_kind[ i ] = IN_KIND_REPLAY_OUT;
+    else if( FD_LIKELY( !strcmp( link->name, "replay_epoch"  ) ) ) ctx->in_kind[ i ] = IN_KIND_EPOCH;
+    else if( FD_LIKELY( !strcmp( link->name, "genesi_out"    ) ) ) ctx->in_kind[ i ] = IN_KIND_GENESI_OUT;
+    else if( FD_LIKELY( !strcmp( link->name, "snapin_gui"    ) ) ) ctx->in_kind[ i ] = IN_KIND_SNAPIN;
+    else if( FD_LIKELY( !strcmp( link->name, "snapin_manif"  ) ) ) ctx->in_kind[ i ] = IN_KIND_SNAPIN_MANIF;
+    else if( FD_LIKELY( !strcmp( link->name, "execrp_replay" ) ) ) ctx->in_kind[ i ] = IN_KIND_EXECRP_REPLAY;
+    else if( FD_LIKELY( !strcmp( link->name, "bundle_status"  ) ) ) ctx->in_kind[ i ] = IN_KIND_BUNDLE;
     else FD_LOG_ERR(( "gui tile has unexpected input link %lu %s", i, link->name ));
 
-    if( FD_LIKELY( !strcmp( link->name, "bank_pohh" ) || !strcmp( link->name, "execle_poh" ) ) ) {
+    if( FD_LIKELY( !strcmp( link->name, "execle_poh" ) ) ) {
       ulong producer = fd_topo_find_link_producer( topo, &topo->links[ tile->in_link_id[ i ] ] );
       ctx->in_bank_idx[ i ] = topo->tiles[ producer ].kind_id;
     }

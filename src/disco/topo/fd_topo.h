@@ -108,7 +108,7 @@ struct fd_topo_net_tile {
   ushort quic_transaction_listen_port;
   ushort legacy_transaction_listen_port;
   ushort gossip_listen_port;
-  ushort repair_intake_listen_port;
+  ushort repair_client_listen_port;
   ushort repair_serve_listen_port;
   ushort txsend_src_port;
 };
@@ -143,6 +143,10 @@ struct fd_topo_tile {
 
   ulong out_cnt;                                   /* The number of links that this tile writes to. */
   ulong out_link_id[ FD_TOPO_MAX_TILE_OUT_LINKS ]; /* The link_id of each link that this tile writes to, indexed in [0, link_cnt). */
+
+  ulong event_link_id; /* If not ULONG_MAX, the link_id of a dedicated unreliable link to the event tile that this tile reports
+                          telemetry events on via the thread-local fd_event_report_* macros.  This link is deliberately NOT part
+                          of out_link_id[] / out_cnt: it is written directly (outside fd_stem) by the thread-local reporter. */
 
   ulong tile_obj_id;
   ulong metrics_obj_id;
@@ -236,6 +240,7 @@ struct fd_topo_tile {
       long boot_timestamp_nanos;
 
       uint   ip_addr;
+      uint   bind_ip_addr;
       ushort shred_version;
 
       ulong  max_entries;
@@ -373,7 +378,6 @@ struct fd_topo_tile {
       int    schedule_strategy;
 
       int websocket_compression;
-      int frontend_release_channel;
       ulong tile_cnt;
 
       char   wfs_bank_hash[ FD_BASE58_ENCODED_32_SZ ];
@@ -387,6 +391,7 @@ struct fd_topo_tile {
       ushort listen_port;
 
       ulong max_http_connections;
+      ulong max_websocket_connections;
       ulong send_buffer_size_mb;
       ulong max_http_request_length;
 
@@ -489,7 +494,7 @@ struct fd_topo_tile {
     } benchg;
 
     struct {
-      ushort  repair_intake_listen_port;
+      ushort  repair_client_listen_port;
       char    identity_key_path[ PATH_MAX ];
       ulong   max_pending_shred_sets;
       ulong   slot_max;
@@ -725,6 +730,8 @@ typedef struct {
   ulong        rlimit_data;
   ulong        rlimit_nproc;
   int          for_tpool;
+
+  ulong        max_event_sz;
 
   ulong (*populate_allowed_seccomp)( fd_topo_t const * topo, fd_topo_tile_t const * tile, ulong out_cnt, struct sock_filter * out );
   ulong (*populate_allowed_fds    )( fd_topo_t const * topo, fd_topo_tile_t const * tile, ulong out_fds_sz, int * out_fds );

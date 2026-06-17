@@ -113,6 +113,9 @@ backtest_topo( config_t * config ) {
     fd_topob_tile( topo, "solcap", "solcap", "metric_in", cpu_idx++, 0, 0, 0 );
   }
 
+  fd_topob_wksp( topo, "diag" );
+  fd_topob_tile( topo, "diag", "diag", "metric_in", ULONG_MAX, 0, 0, 0 );
+
   /**********************************************************************/
   /* Add the snapshot tiles to topo                                       */
   /**********************************************************************/
@@ -279,7 +282,7 @@ backtest_topo( config_t * config ) {
   }
 
   fd_topob_wksp( topo, "store" );
-  ulong store_fec_data_max = fd_ulong_if( config->firedancer.runtime.fixed_fec_sets, 31840UL, 63985UL );
+  ulong store_fec_data_max = fd_ulong_if( config->firedancer.development.fixed_fec_sets, 31840UL, 63985UL );
   fd_topo_obj_t * store_obj = setup_topo_store( topo, "store", config->firedancer.runtime.max_live_slots * FD_SHRED_BLK_MAX, 1, store_fec_data_max );
   fd_topob_tile_uses( topo, backt_tile, store_obj, FD_SHMEM_JOIN_MODE_READ_WRITE );
   fd_topob_tile_uses( topo, replay_tile, store_obj, FD_SHMEM_JOIN_MODE_READ_WRITE );
