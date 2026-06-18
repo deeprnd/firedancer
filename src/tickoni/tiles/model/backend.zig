@@ -22,9 +22,22 @@ pub const MockBackend = struct {
     }
 };
 
+const fixture_allowed_model_ids = [_][]const u8{
+    "fixture.ai_infra",
+};
+
 pub const FixtureBackend = struct {
-    pub fn call(_: FixtureBackend, allocator: std.mem.Allocator, req: ModelRequest) error{OutOfMemory}!ModelResponse {
-        _ = req;
+    pub fn call(_: FixtureBackend, allocator: std.mem.Allocator, req: ModelRequest) !ModelResponse {
+        var model_allowed = false;
+        for (fixture_allowed_model_ids) |id| {
+            if (std.mem.eql(u8, req.model_id, id)) {
+                model_allowed = true;
+                break;
+            }
+        }
+        if (!model_allowed) return error.ModelNotAllowed;
+        if (req.budget_id.len == 0) return error.MissingBudgetId;
+        if (req.policy_version.len == 0) return error.MissingPolicyVersion;
         return .{
             .model_id = try allocator.dupe(u8, "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL"),
             .content = try allocator.dupe(
@@ -99,11 +112,25 @@ const WireResponse = struct {
 // HttpBackend calls an OpenAI-compatible llama.cpp server.
 // endpoint must be a base URL like "http://127.0.0.1:8080/v1".
 // io is the std.Io instance for TCP connections (use std.testing.io in tests).
+// allowed_model_ids: non-empty slice restricts which model IDs are accepted; empty allows any.
 pub const HttpBackend = struct {
     endpoint: []const u8,
     io: std.Io,
+    allowed_model_ids: []const []const u8 = &.{},
 
     pub fn call(self: HttpBackend, allocator: std.mem.Allocator, req: ModelRequest) !ModelResponse {
+        if (req.budget_id.len == 0) return error.MissingBudgetId;
+        if (req.policy_version.len == 0) return error.MissingPolicyVersion;
+        if (self.allowed_model_ids.len > 0) {
+            var model_allowed = false;
+            for (self.allowed_model_ids) |id| {
+                if (std.mem.eql(u8, req.model_id, id)) {
+                    model_allowed = true;
+                    break;
+                }
+            }
+            if (!model_allowed) return error.ModelNotAllowed;
+        }
         const url = try std.fmt.allocPrint(allocator, "{s}/chat/completions", .{self.endpoint});
         defer allocator.free(url);
 
@@ -281,7 +308,13 @@ test "Backend union dispatches to mock" {
 test "FixtureBackend returns deterministic response" {
     const allocator = std.testing.allocator;
     const fixture = FixtureBackend{};
-    const req = ModelRequest{ .model_id = "fixture", .messages = &.{} };
+    const req = ModelRequest{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{},
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "capenv.trading_order.propose.demo",
+    };
 
     const resp = try fixture.call(allocator, req);
     defer resp.deinit(allocator);
@@ -293,6 +326,42 @@ test "FixtureBackend returns deterministic response" {
     try std.testing.expect(std.mem.indexOf(u8, resp.content, "NVDA") != null);
     try std.testing.expectEqual(@as(u32, 335), resp.token_usage.total_tokens);
     try std.testing.expectEqual(@as(u64, 842), resp.latency_ms);
+}
+
+test "FixtureBackend rejects unknown model_id" {
+    const allocator = std.testing.allocator;
+    const fixture = FixtureBackend{};
+    const req = ModelRequest{
+        .model_id = "unknown-model",
+        .messages = &.{},
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+    };
+    try std.testing.expectError(error.ModelNotAllowed, fixture.call(allocator, req));
+}
+
+test "FixtureBackend rejects empty budget_id" {
+    const allocator = std.testing.allocator;
+    const fixture = FixtureBackend{};
+    const req = ModelRequest{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{},
+        .budget_id = "",
+        .policy_version = "v1.1",
+    };
+    try std.testing.expectError(error.MissingBudgetId, fixture.call(allocator, req));
+}
+
+test "FixtureBackend rejects empty policy_version" {
+    const allocator = std.testing.allocator;
+    const fixture = FixtureBackend{};
+    const req = ModelRequest{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{},
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "",
+    };
+    try std.testing.expectError(error.MissingPolicyVersion, fixture.call(allocator, req));
 }
 
 test "MockBackend ignores request model_id and messages" {

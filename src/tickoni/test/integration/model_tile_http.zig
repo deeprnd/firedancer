@@ -63,6 +63,9 @@ fn makeAiInfraRequest(model_id: []const u8) model.ModelRequest {
             .max_output_tokens = 2048,
             .seed = 42,
         },
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "capenv.trading_order.propose.demo",
     };
 }
 
@@ -73,6 +76,9 @@ test "model tile http: hello round-trip" {
         .model_id = getModelId(),
         .messages = &.{.{ .role = "user", .content = "Reply with the single word: hello" }},
         .sampling = .{ .temperature = 0, .max_output_tokens = 256, .seed = 1 },
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "capenv.trading_order.propose.demo",
     };
 
     const resp = backend.call(allocator, req) catch |err| switch (err) {
@@ -198,7 +204,7 @@ const restricted_tickers = [_][]const u8{
 
 test "model tile fixture: replay substitution content is deterministic" {
     const allocator = std.testing.allocator;
-    const req = makeAiInfraRequest("any-model");
+    const req = makeAiInfraRequest("fixture.ai_infra");
 
     var b1 = model.Backend{ .fixture = .{} };
     const r1 = try b1.call(allocator, req);
@@ -219,7 +225,7 @@ test "model tile fixture: replay substitution content is deterministic" {
 test "model tile fixture: captured response JSON matches fixture tickers and usage" {
     const allocator = std.testing.allocator;
     var backend = model.Backend{ .fixture = .{} };
-    const req = makeAiInfraRequest("any-model");
+    const req = makeAiInfraRequest("fixture.ai_infra");
     const resp = try backend.call(allocator, req);
     defer resp.deinit(allocator);
 

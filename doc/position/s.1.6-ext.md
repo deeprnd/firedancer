@@ -421,7 +421,7 @@ audit_allowed_2000.jsonl has thesis_deduped (tkdedu, seq 3) and basket_construct
 The spec requires tktool to "reject any unknown tool name." The current module has three bare normalize functions with no dispatch or guard against unrecognized operations.-fixed
 
 8. tkmodl has no model allowlist, budget, or policy version enforcement
-ModelRequest has no budget_id, policy_version, or capability_envelope_id fields. FixtureBackend ignores model_id entirely. The spec says tkmodl must "validate model request scope, policy version, budget id, and model id."
+ModelRequest has no budget_id, policy_version, or capability_envelope_id fields. FixtureBackend ignores model_id entirely. The spec says tkmodl must "validate model request scope, policy version, budget id, and model id."-fixed
 
 9. tkadpt fixture backend loads from in-memory data, not the JSON files referenced in capsules
 FixtureBackend uses hardcoded in-process data. The replay capsule's fixture_file fields ("paper_execution_allowed_2000.json", "quotes.json", "account_ops.json") are only compared as name strings, never loaded from disk.-fixed

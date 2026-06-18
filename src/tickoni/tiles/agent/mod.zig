@@ -50,6 +50,9 @@ pub fn runInvestmentAgent(
     const model_response = try model_backend.call(allocator, .{
         .model_id = "fixture.ai_infra",
         .messages = &.{.{ .role = "user", .content = "ai infrastructure" }},
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "capenv.trading_order.propose.demo",
     });
     errdefer model_response.deinit(allocator);
 
@@ -110,6 +113,9 @@ pub fn runRestrictedInstrumentDenialAgent(
     const model_response = try model_backend.call(allocator, .{
         .model_id = "fixture.ai_infra",
         .messages = &.{.{ .role = "user", .content = "ai infrastructure" }},
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "capenv.trading_order.propose.demo",
     });
     return .{
         .run_id = work_item.run_id,
