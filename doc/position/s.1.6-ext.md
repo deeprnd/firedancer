@@ -409,7 +409,7 @@ These three tiles appear in investmentDemo() and as tile_id labels in audit even
 The spec and the static audit_allowed_2000.jsonl both have run_id on every event. The Zig Header struct has no run_id field; the generated audit chain uses capability_envelope_id and seq instead. This is a structural mismatch with the intended V1.1 audit record format.-fixed
 
 4. Replay capsule hash fields are symbolic strings — no hash verification runs on the normal path
-The capsule JSONs use string placeholders ("proposal_hash_ticket_v1_1_ai_infra_2000_market") in fields declared as ?u64 in ReplayCapsuleWire. When parsed, these strings produce null, so expected_basket_id, expected_proposal_hash, and expected_response_hash are all null in the normal capsule — meaning every optional hash comparison in verifyAllowedTrade is skipped. The tamper test works only because the tampered capsule sets "expected_response_hash": 1 (a literal integer that doesn't match the computed hash). The spec's requirement to "recompute expected basket/ticket/policy/audit references" is only partially met: structural checks (count of substitutions, fixture file names, outcome strings) pass, but real computed hash comparisons never execute for the main capsule.
+The capsule JSONs use string placeholders ("proposal_hash_ticket_v1_1_ai_infra_2000_market") in fields declared as ?u64 in ReplayCapsuleWire. When parsed, these strings produce null, so expected_basket_id, expected_proposal_hash, and expected_response_hash are all null in the normal capsule — meaning every optional hash comparison in verifyAllowedTrade is skipped. The tamper test works only because the tampered capsule sets "expected_response_hash": 1 (a literal integer that doesn't match the computed hash). The spec's requirement to "recompute expected basket/ticket/policy/audit references" is only partially met: structural checks (count of substitutions, fixture file names, outcome strings) pass, but real computed hash comparisons never execute for the main capsule.-fixed
 
 5. audit_allowed_2000.jsonl is hand-authored, stale, and untested
 This file has symbolic string hashes throughout and represents a narrative, not a generated artifact. No test compares generated audit events against it. It will drift. The spec says "audit hash-chain generation for the allowed run" should produce "real or explicitly deterministic hashes."-fixed
@@ -418,7 +418,7 @@ This file has symbolic string hashes throughout and represents a narrative, not 
 audit_allowed_2000.jsonl has thesis_deduped (tkdedu, seq 3) and basket_constructed (tkcase, seq 4) events. buildAllowedTradeChain emits 9 events: tkings → tknorm → tkpoly → tkmodl → tkadpt×3 → tkagnt → tkrepl. Dedup and case-creation audit events are absent from the Zig-generated chain.-fixed
 
 7. tktool has no unknown-tool rejection
-The spec requires tktool to "reject any unknown tool name." The current module has three bare normalize functions with no dispatch or guard against unrecognized operations.
+The spec requires tktool to "reject any unknown tool name." The current module has three bare normalize functions with no dispatch or guard against unrecognized operations.-fixed
 
 8. tkmodl has no model allowlist, budget, or policy version enforcement
 ModelRequest has no budget_id, policy_version, or capability_envelope_id fields. FixtureBackend ignores model_id entirely. The spec says tkmodl must "validate model request scope, policy version, budget id, and model id."
@@ -434,7 +434,7 @@ Work Order item tracking
 #	Work Order Item	Status
 1	V1.1 topology with all tile IDs	Done
 2	tkmodl fixture/replay mode; live llama.cpp in smoke recipe	Done
-3	Minimal tktool for three operations	Partial — no unknown-tool rejection
+3	Minimal tktool for three operations	Done
 4	Minimal fixture-backed tkadpt	Done — JSON file loading via initFromDir
 5	Ticket generation for all three flows	Done
 6	V1.1 audit generation with real hashes	Partial — chain exists with Wyhash, but missing tkdedu/tkcase events and no run_id

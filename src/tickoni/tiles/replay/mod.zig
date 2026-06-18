@@ -105,11 +105,11 @@ fn updateValue(hasher: *std.hash.Wyhash, value: anytype) void {
     hasher.update(std.mem.asBytes(&copy));
 }
 
-fn hashBytes(bytes: []const u8) u64 {
+pub fn hashBytes(bytes: []const u8) u64 {
     return std.hash.Wyhash.hash(0, bytes);
 }
 
-fn hashTicket(ticket: *const trade_ticket.TradeTicket) u64 {
+pub fn hashTicket(ticket: *const trade_ticket.TradeTicket) u64 {
     var hasher = std.hash.Wyhash.init(0);
     hasher.update(ticket.ticketIdSlice());
     updateValue(&hasher, ticket.account_id);
@@ -137,7 +137,7 @@ fn hashTicket(ticket: *const trade_ticket.TradeTicket) u64 {
     return hasher.final();
 }
 
-fn hashPaperResult(result: *const trade_ticket.PaperExecutionResult) u64 {
+pub fn hashPaperResult(result: *const trade_ticket.PaperExecutionResult) u64 {
     var hasher = std.hash.Wyhash.init(0);
     hasher.update(result.paperOrderIdSlice());
     hasher.update(result.ticketIdSlice());
@@ -202,18 +202,26 @@ pub fn verifyAllowedTradeWithCapsulePath(
 
     if (capsule.expected_basket_id) |expected| {
         if (proposed_basket.basket_id != expected) divergences.note("basket_id", 1);
+    } else {
+        divergences.note("basket_id_missing", 1);
     }
     if (capsule.expected_proposal_hash) |expected| {
         if (hashTicket(ticket) != expected) divergences.note("proposal_hash", 6);
+    } else {
+        divergences.note("proposal_hash_missing", 6);
     }
     if (capsule.model_substitutions.len > 0) {
         if (capsule.model_substitutions[0].expected_response_hash) |expected| {
             if (hashBytes(model_response.content) != expected) divergences.note("model_response_hash", 3);
+        } else {
+            divergences.note("model_response_hash_missing", 3);
         }
     }
     if (findAdapterSubstitution(capsule, "paper_order")) |substitution| {
         if (substitution.expected_response_hash) |expected| {
             if (hashPaperResult(paper_result) != expected) divergences.note("adapter_response_hash", 7);
+        } else {
+            divergences.note("paper_order_hash_missing", 7);
         }
     }
 

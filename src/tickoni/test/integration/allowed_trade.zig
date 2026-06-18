@@ -500,3 +500,4 @@ test "allowed_trade_integration: restricted ticker replay and audit reproduce th
         try std.testing.expectEqual(audit_chain.events[i - 1].header.record_hash, event.header.prev_hash);
     }
 }
+

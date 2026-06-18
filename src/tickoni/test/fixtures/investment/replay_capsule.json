@@ -11,11 +11,14 @@
   "ticket_id": "ticket_v1_1_ai_infra_2000_market",
   "proposal_hash": "proposal_hash_ticket_v1_1_ai_infra_2000_market",
   "audit_chain_hash": "audit_chain_hash_allowed_2000",
+  "expected_basket_id": 4319626036801027209,
+  "expected_proposal_hash": 1207484427160239519,
   "model_substitutions": [
     {
       "request_hash": "model_request_hash_ai_infra",
       "response_hash": "model_response_hash_ai_infra_gemma4",
-      "fixture_file": "model_response_gemma4.json"
+      "fixture_file": "model_response_gemma4.json",
+      "expected_response_hash": 7345123171217229527
     }
   ],
   "adapter_substitutions": [
@@ -38,7 +41,8 @@
       "operation": "paper_order",
       "request_hash": "adapter_request_hash_paper_place_allowed_2000",
       "response_hash": "adapter_response_hash_paper_place_allowed_2000",
-      "fixture_file": "paper_execution_allowed_2000.json"
+      "fixture_file": "paper_execution_allowed_2000.json",
+      "expected_response_hash": 127583528638236084
     }
   ],
   "replay_assertions": {
