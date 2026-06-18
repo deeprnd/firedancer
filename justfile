@@ -89,6 +89,9 @@ test-integration-tk:
 test-system-tk:
   bash contrib/test/run_integration_model_tests.sh
 
+demo-investment-s1-6:
+  zig build investment-demo
+
 infra-run-llamacpp:
   #!/usr/bin/env bash
   set -euo pipefail
