@@ -26,8 +26,78 @@ const fixture_allowed_model_ids = [_][]const u8{
     "fixture.ai_infra",
 };
 
+const fixture_model_id_max: usize = 128;
+const fixture_content_max: usize = 2048;
+const fixture_finish_reason_max: usize = 32;
+
+const default_model_id_str = "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL";
+const default_content_str = "{\"thesis_summary\":\"USD 2,000 into AI infrastructure via diversified US-listed large-cap equities and ETFs.\",\"recommended_tickers\":[\"NVDA\",\"AMD\",\"AVGO\",\"MSFT\",\"AMZN\",\"BOTZ\",\"SOXX\"]}";
+const default_finish_reason_str = "stop";
+
+const default_model_id_buf: [fixture_model_id_max]u8 = blk: {
+    var buf = [_]u8{0} ** fixture_model_id_max;
+    for (default_model_id_str, 0..) |c, i| buf[i] = c;
+    break :blk buf;
+};
+const default_content_buf: [fixture_content_max]u8 = blk: {
+    var buf = [_]u8{0} ** fixture_content_max;
+    for (default_content_str, 0..) |c, i| buf[i] = c;
+    break :blk buf;
+};
+const default_finish_reason_buf: [fixture_finish_reason_max]u8 = blk: {
+    var buf = [_]u8{0} ** fixture_finish_reason_max;
+    for (default_finish_reason_str, 0..) |c, i| buf[i] = c;
+    break :blk buf;
+};
+
+const ModelResponseFileWire = struct {
+    model_id: []const u8,
+    token_usage: schema.TokenUsage,
+    latency_ms: u64,
+    finish_reason: []const u8,
+    content: std.json.Value,
+};
+
 pub const FixtureBackend = struct {
-    pub fn call(_: FixtureBackend, allocator: std.mem.Allocator, req: ModelRequest) !ModelResponse {
+    model_id: [fixture_model_id_max]u8 = default_model_id_buf,
+    model_id_len: u8 = default_model_id_str.len,
+    content: [fixture_content_max]u8 = default_content_buf,
+    content_len: u16 = default_content_str.len,
+    finish_reason: [fixture_finish_reason_max]u8 = default_finish_reason_buf,
+    finish_reason_len: u8 = default_finish_reason_str.len,
+    token_usage: schema.TokenUsage = .{ .prompt_tokens = 148, .completion_tokens = 187, .total_tokens = 335 },
+    latency_ms: u64 = 842,
+
+    pub fn initFromDir(
+        allocator: std.mem.Allocator,
+        io: std.Io,
+        fixture_dir: []const u8,
+    ) !FixtureBackend {
+        var path_buf: [512]u8 = undefined;
+        const path = try std.fmt.bufPrint(&path_buf, "{s}/model_response_gemma4.json", .{fixture_dir});
+        const raw = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(32 * 1024));
+        defer allocator.free(raw);
+        const parsed = try std.json.parseFromSlice(ModelResponseFileWire, allocator, raw, .{ .ignore_unknown_fields = true });
+        defer parsed.deinit();
+        const w = parsed.value;
+        var self = FixtureBackend{};
+        if (w.model_id.len > fixture_model_id_max) return error.ModelIdTooLong;
+        self.model_id_len = @intCast(w.model_id.len);
+        @memcpy(self.model_id[0..w.model_id.len], w.model_id);
+        if (w.finish_reason.len > fixture_finish_reason_max) return error.FinishReasonTooLong;
+        self.finish_reason_len = @intCast(w.finish_reason.len);
+        @memcpy(self.finish_reason[0..w.finish_reason.len], w.finish_reason);
+        self.token_usage = w.token_usage;
+        self.latency_ms = w.latency_ms;
+        const content_json = try std.json.Stringify.valueAlloc(allocator, w.content, .{});
+        defer allocator.free(content_json);
+        if (content_json.len > fixture_content_max) return error.ContentTooLarge;
+        self.content_len = @intCast(content_json.len);
+        @memcpy(self.content[0..content_json.len], content_json);
+        return self;
+    }
+
+    pub fn call(self: FixtureBackend, allocator: std.mem.Allocator, req: ModelRequest) !ModelResponse {
         var model_allowed = false;
         for (fixture_allowed_model_ids) |id| {
             if (std.mem.eql(u8, req.model_id, id)) {
@@ -38,15 +108,13 @@ pub const FixtureBackend = struct {
         if (!model_allowed) return error.ModelNotAllowed;
         if (req.budget_id.len == 0) return error.MissingBudgetId;
         if (req.policy_version.len == 0) return error.MissingPolicyVersion;
+        if (req.capability_envelope_id.len == 0) return error.MissingCapabilityEnvelopeId;
         return .{
-            .model_id = try allocator.dupe(u8, "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL"),
-            .content = try allocator.dupe(
-                u8,
-                "{\"thesis_summary\":\"USD 2,000 into AI infrastructure via diversified US-listed large-cap equities and ETFs.\",\"recommended_tickers\":[\"NVDA\",\"AMD\",\"AVGO\",\"MSFT\",\"AMZN\",\"BOTZ\",\"SOXX\"]}",
-            ),
-            .finish_reason = try allocator.dupe(u8, "stop"),
-            .token_usage = .{ .prompt_tokens = 148, .completion_tokens = 187, .total_tokens = 335 },
-            .latency_ms = 842,
+            .model_id = try allocator.dupe(u8, self.model_id[0..self.model_id_len]),
+            .content = try allocator.dupe(u8, self.content[0..self.content_len]),
+            .finish_reason = try allocator.dupe(u8, self.finish_reason[0..self.finish_reason_len]),
+            .token_usage = self.token_usage,
+            .latency_ms = self.latency_ms,
         };
     }
 };
@@ -362,6 +430,44 @@ test "FixtureBackend rejects empty policy_version" {
         .policy_version = "",
     };
     try std.testing.expectError(error.MissingPolicyVersion, fixture.call(allocator, req));
+}
+
+test "FixtureBackend rejects empty capability_envelope_id" {
+    const allocator = std.testing.allocator;
+    const fixture = FixtureBackend{};
+    const req = ModelRequest{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{},
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "",
+    };
+    try std.testing.expectError(error.MissingCapabilityEnvelopeId, fixture.call(allocator, req));
+}
+
+test "FixtureBackend.initFromDir loads model_response_gemma4.json" {
+    const allocator = std.testing.allocator;
+    const fixture = try FixtureBackend.initFromDir(
+        allocator,
+        std.testing.io,
+        "src/tickoni/test/fixtures/investment",
+    );
+    const req = ModelRequest{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{},
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "capenv.trading_order.propose.demo",
+    };
+    const resp = try fixture.call(allocator, req);
+    defer resp.deinit(allocator);
+
+    try std.testing.expectEqualStrings("unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL", resp.model_id);
+    try std.testing.expectEqualStrings("stop", resp.finish_reason);
+    try std.testing.expectEqual(@as(u32, 335), resp.token_usage.total_tokens);
+    try std.testing.expectEqual(@as(u64, 842), resp.latency_ms);
+    try std.testing.expect(std.mem.indexOf(u8, resp.content, "NVDA") != null);
+    try std.testing.expect(std.mem.indexOf(u8, resp.content, "rationale") != null);
 }
 
 test "MockBackend ignores request model_id and messages" {
