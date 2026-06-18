@@ -11,6 +11,7 @@ pub const status_invalid_field: c_int = 4;
 
 pub const Header = extern struct {
     schema_version: u16,
+    run_id: u64,
     seq: u64,
     source_offset: u64,
     tile_id: [6]u8,
@@ -98,6 +99,18 @@ pub const ReplayResultPayload = extern struct {
     first_divergent_seq: u64,
 };
 
+pub const DeduplicationPayload = extern struct {
+    idempotency_key: u64,
+    is_duplicate: u8,
+};
+
+pub const CaseCreationPayload = extern struct {
+    basket_id: u64,
+    instrument_count: u8,
+    rejected_count: u8,
+    total_allocated_cents: i64,
+};
+
 pub const Payload = extern union {
     source_event: SourceEventPayload,
     normalization: NormalizationPayload,
@@ -111,6 +124,8 @@ pub const Payload = extern union {
     denial: DenialPayload,
     telemetry_checkpoint: TelemetryCheckpointPayload,
     replay_result: ReplayResultPayload,
+    deduplication: DeduplicationPayload,
+    case_creation: CaseCreationPayload,
 };
 
 pub const Event = extern struct {

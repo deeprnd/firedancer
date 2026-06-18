@@ -35,6 +35,8 @@ pub const RecordType = enum(u8) {
     denial = 9,
     telemetry_checkpoint = 10,
     replay_result = 11,
+    deduplication = 12,
+    case_creation = 13,
 };
 
 pub const SourceEventPayload = struct {
@@ -113,8 +115,21 @@ pub const ReplayResultPayload = struct {
     first_divergent_seq: u64,
 };
 
+pub const DeduplicationPayload = struct {
+    idempotency_key: u64,
+    is_duplicate: bool,
+};
+
+pub const CaseCreationPayload = struct {
+    basket_id: u64,
+    instrument_count: u8,
+    rejected_count: u8,
+    total_allocated_cents: i64,
+};
+
 pub const Header = struct {
     schema_version: u16,
+    run_id: u64,
     seq: u64,
     source_offset: u64,
     tile_id: [6]u8,
@@ -143,5 +158,7 @@ pub const AuditEvent = struct {
         denial: DenialPayload,
         telemetry_checkpoint: TelemetryCheckpointPayload,
         replay_result: ReplayResultPayload,
+        deduplication: DeduplicationPayload,
+        case_creation: CaseCreationPayload,
     };
 };
