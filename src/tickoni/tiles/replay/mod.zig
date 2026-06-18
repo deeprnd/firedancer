@@ -1,4 +1,5 @@
 const std = @import("std");
+const adapter = @import("adapter");
 const basket = @import("basket");
 const model = @import("model");
 const trade_ticket = @import("trade_ticket");
@@ -157,9 +158,9 @@ fn hashPaperResult(result: *const trade_ticket.PaperExecutionResult) u64 {
     return hasher.final();
 }
 
-fn buildReplayVerification(divergences: DivergenceTracker) ReplayVerification {
+fn buildReplayVerification(divergences: DivergenceTracker, external_effects_disabled: bool) ReplayVerification {
     return .{
-        .external_effects_disabled = true,
+        .external_effects_disabled = external_effects_disabled,
         .replay_match = divergences.count == 0,
         .divergence_count = divergences.count,
         .first_divergent_field = divergences.first_field,
@@ -171,6 +172,8 @@ pub fn verifyAllowedTradeWithCapsulePath(
     allocator: std.mem.Allocator,
     io: std.Io,
     capsule_path: []const u8,
+    model_backend: *const model.Backend,
+    adapter_backend: *const adapter.Backend,
     proposed_basket: *const basket.Basket,
     ticket: *const trade_ticket.TradeTicket,
     paper_result: *const trade_ticket.PaperExecutionResult,
@@ -214,12 +217,15 @@ pub fn verifyAllowedTradeWithCapsulePath(
         }
     }
 
-    return buildReplayVerification(divergences);
+    const external_effects_disabled = model_backend.isEffectFree() and adapter_backend.isEffectFree();
+    return buildReplayVerification(divergences, external_effects_disabled);
 }
 
 pub fn verifyAllowedTrade(
     allocator: std.mem.Allocator,
     io: std.Io,
+    model_backend: *const model.Backend,
+    adapter_backend: *const adapter.Backend,
     proposed_basket: *const basket.Basket,
     ticket: *const trade_ticket.TradeTicket,
     paper_result: *const trade_ticket.PaperExecutionResult,
@@ -229,6 +235,8 @@ pub fn verifyAllowedTrade(
         allocator,
         io,
         "src/tickoni/test/fixtures/investment/replay_capsule.json",
+        model_backend,
+        adapter_backend,
         proposed_basket,
         ticket,
         paper_result,
@@ -239,6 +247,8 @@ pub fn verifyAllowedTrade(
 pub fn verifyOversizedTradeBlock(
     allocator: std.mem.Allocator,
     io: std.Io,
+    model_backend: *const model.Backend,
+    adapter_backend: *const adapter.Backend,
     proposed_basket: *const basket.Basket,
     ticket: *const trade_ticket.TradeTicket,
     model_response: *const model.ModelResponse,
@@ -284,12 +294,14 @@ pub fn verifyOversizedTradeBlock(
             divergences.note("failed_scope_dim", 8);
     }
 
-    return buildReplayVerification(divergences);
+    const external_effects_disabled = model_backend.isEffectFree() and adapter_backend.isEffectFree();
+    return buildReplayVerification(divergences, external_effects_disabled);
 }
 
 pub fn verifyRestrictedInstrumentBlock(
     allocator: std.mem.Allocator,
     io: std.Io,
+    model_backend: *const model.Backend,
     proposed_basket: *const basket.Basket,
     requested_ticker: []const u8,
     model_response: *const model.ModelResponse,
@@ -323,5 +335,7 @@ pub fn verifyRestrictedInstrumentBlock(
         divergences.note("failed_scope_dim", 4);
     }
 
-    return buildReplayVerification(divergences);
+    // Restricted-instrument path uses only the model backend; no adapter calls occur.
+    const external_effects_disabled = model_backend.isEffectFree();
+    return buildReplayVerification(divergences, external_effects_disabled);
 }

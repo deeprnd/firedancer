@@ -168,6 +168,8 @@ test "allowed_trade_integration: replay succeeds with fixture substitutions and 
     const replay_result = try replay.verifyAllowedTrade(
         allocator,
         std.testing.io,
+        &model_backend,
+        &adapter_backend,
         &basket,
         &agent_result.ticket,
         &execution,
@@ -242,6 +244,8 @@ test "allowed_trade_integration: replay tamper detection reports first divergent
         allocator,
         std.testing.io,
         tampered_replay_capsule_path,
+        &model_backend,
+        &adapter_backend,
         &basket,
         &agent_result.ticket,
         &execution,
@@ -348,6 +352,8 @@ test "allowed_trade_integration: oversized trade replay and audit reproduce the 
     const replay_result = try replay.verifyOversizedTradeBlock(
         allocator,
         std.testing.io,
+        &model_backend,
+        &adapter_backend,
         &basket,
         &agent_result.ticket,
         &agent_result.model_response,
@@ -449,6 +455,7 @@ test "allowed_trade_integration: restricted ticker replay and audit reproduce th
     const replay_result = try replay.verifyRestrictedInstrumentBlock(
         allocator,
         std.testing.io,
+        &model_backend,
         &basket,
         restricted_ticker,
         &block_result.model_response,

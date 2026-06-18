@@ -403,19 +403,19 @@ The lean demo is done when one command can show:
 
 Gaps and deficiencies: 
 2. tkcase, tkdisp, tkagnt: topology IDs only, no implementation
-These three tiles appear in investmentDemo() and as tile_id labels in audit events, but there are no source files under tiles/case/, tiles/disp/, or tiles/agent/. The "initial demo implementation" described in the spec — tkcase deriving a run_id, tkdisp dispatching one work item, tkagnt calling tkmodl and tktool — does not exist. The e2e tests skip these tiles entirely by calling functions directly.
+These three tiles appear in investmentDemo() and as tile_id labels in audit events, but there are no source files under tiles/case/, tiles/disp/, or tiles/agent/. The "initial demo implementation" described in the spec — tkcase deriving a run_id, tkdisp dispatching one work item, tkagnt calling tkmodl and tktool — does not exist. The e2e tests skip these tiles entirely by calling functions directly.-fixed
 
 3. No run_id in the V1.1 audit chain
-The spec and the static audit_allowed_2000.jsonl both have run_id on every event. The Zig Header struct has no run_id field; the generated audit chain uses capability_envelope_id and seq instead. This is a structural mismatch with the intended V1.1 audit record format.
+The spec and the static audit_allowed_2000.jsonl both have run_id on every event. The Zig Header struct has no run_id field; the generated audit chain uses capability_envelope_id and seq instead. This is a structural mismatch with the intended V1.1 audit record format.-fixed
 
 4. Replay capsule hash fields are symbolic strings — no hash verification runs on the normal path
 The capsule JSONs use string placeholders ("proposal_hash_ticket_v1_1_ai_infra_2000_market") in fields declared as ?u64 in ReplayCapsuleWire. When parsed, these strings produce null, so expected_basket_id, expected_proposal_hash, and expected_response_hash are all null in the normal capsule — meaning every optional hash comparison in verifyAllowedTrade is skipped. The tamper test works only because the tampered capsule sets "expected_response_hash": 1 (a literal integer that doesn't match the computed hash). The spec's requirement to "recompute expected basket/ticket/policy/audit references" is only partially met: structural checks (count of substitutions, fixture file names, outcome strings) pass, but real computed hash comparisons never execute for the main capsule.
 
 5. audit_allowed_2000.jsonl is hand-authored, stale, and untested
-This file has symbolic string hashes throughout and represents a narrative, not a generated artifact. No test compares generated audit events against it. It will drift. The spec says "audit hash-chain generation for the allowed run" should produce "real or explicitly deterministic hashes."
+This file has symbolic string hashes throughout and represents a narrative, not a generated artifact. No test compares generated audit events against it. It will drift. The spec says "audit hash-chain generation for the allowed run" should produce "real or explicitly deterministic hashes."-fixed
 
 6. Missing tkdedu and tkcase events in the generated V1.1 audit chain
-audit_allowed_2000.jsonl has thesis_deduped (tkdedu, seq 3) and basket_constructed (tkcase, seq 4) events. buildAllowedTradeChain emits 9 events: tkings → tknorm → tkpoly → tkmodl → tkadpt×3 → tkagnt → tkrepl. Dedup and case-creation audit events are absent from the Zig-generated chain.
+audit_allowed_2000.jsonl has thesis_deduped (tkdedu, seq 3) and basket_constructed (tkcase, seq 4) events. buildAllowedTradeChain emits 9 events: tkings → tknorm → tkpoly → tkmodl → tkadpt×3 → tkagnt → tkrepl. Dedup and case-creation audit events are absent from the Zig-generated chain.-fixed
 
 7. tktool has no unknown-tool rejection
 The spec requires tktool to "reject any unknown tool name." The current module has three bare normalize functions with no dispatch or guard against unrecognized operations.
@@ -424,10 +424,10 @@ The spec requires tktool to "reject any unknown tool name." The current module h
 ModelRequest has no budget_id, policy_version, or capability_envelope_id fields. FixtureBackend ignores model_id entirely. The spec says tkmodl must "validate model request scope, policy version, budget id, and model id."
 
 9. tkadpt fixture backend loads from in-memory data, not the JSON files referenced in capsules
-FixtureBackend uses hardcoded in-process data. The replay capsule's fixture_file fields ("paper_execution_allowed_2000.json", "quotes.json", "account_ops.json") are only compared as name strings, never loaded from disk.
+FixtureBackend uses hardcoded in-process data. The replay capsule's fixture_file fields ("paper_execution_allowed_2000.json", "quotes.json", "account_ops.json") are only compared as name strings, never loaded from disk.-fixed
 
 10. external_effects_disabled in replay is vacuously true
-buildReplayVerification hardcodes external_effects_disabled = true regardless of how the replay was run. There is no guard that prevents an HttpBackend from being passed to replay. The proof that no external effects occur during replay is structural (fixture backends don't call HTTP) but not enforced by the engine itself.
+buildReplayVerification hardcodes external_effects_disabled = true regardless of how the replay was run. There is no guard that prevents an HttpBackend from being passed to replay. The proof that no external effects occur during replay is structural (fixture backends don't call HTTP) but not enforced by the engine itself.-fixed
 
 
 Work Order item tracking
@@ -435,7 +435,7 @@ Work Order item tracking
 1	V1.1 topology with all tile IDs	Done
 2	tkmodl fixture/replay mode; live llama.cpp in smoke recipe	Done
 3	Minimal tktool for three operations	Partial — no unknown-tool rejection
-4	Minimal fixture-backed tkadpt	Partial — no JSON file loading
+4	Minimal fixture-backed tkadpt	Done — JSON file loading via initFromDir
 5	Ticket generation for all three flows	Done
 6	V1.1 audit generation with real hashes	Partial — chain exists with Wyhash, but missing tkdedu/tkcase events and no run_id
 7	V1.1 replay and tamper detection	Partial — works but hash comparisons only fire in the tamper case

@@ -449,6 +449,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
+            .{ .name = "adapter", .module = adapter_int_mod },
             .{ .name = "basket", .module = basket_int_mod },
             .{ .name = "model", .module = model_int_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },

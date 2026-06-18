@@ -186,6 +186,15 @@ pub const Backend = union(enum) {
             .http => |h| h.call(allocator, req),
         };
     }
+
+    /// Returns true when no live network calls can occur.
+    /// Replay must only run with effect-free backends.
+    pub fn isEffectFree(self: Backend) bool {
+        return switch (self) {
+            .mock, .fixture => true,
+            .http => false,
+        };
+    }
 };
 
 // ---------------------------------------------------------------------------

@@ -326,6 +326,14 @@ pub const Backend = union(enum) {
             .fixture => |f| f.call(req),
         };
     }
+
+    /// Returns true when no live network calls can occur.
+    /// Replay must only run with effect-free backends.
+    pub fn isEffectFree(self: Backend) bool {
+        return switch (self) {
+            .mock, .fixture => true,
+        };
+    }
 };
 
 test "QuoteLoader finds fixture quote by ticker" {
