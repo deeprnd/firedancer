@@ -21,6 +21,14 @@ pub const thesis_schema_version: u16 = 1;
 /// Maximum bytes stored in the user_text field.
 pub const max_user_text_len: usize = 512;
 
+/// Byte width of each ticker slot in requested_tickers.
+/// Must match TK_THESIS_MAX_TICKER_LEN in thesis_codec.h and max_ticker_len in catalog.zig.
+pub const max_ticker_len: usize = 8;
+
+/// Maximum number of explicitly requested tickers in one ThesisInput.
+/// Must match TK_THESIS_MAX_REQUESTED_TICKERS in thesis_codec.h.
+pub const max_requested_tickers: usize = 8;
+
 /// Minimum allowed target notional: USD 1.00 = 100 cents.
 pub const min_target_notional_cents: i64 = 100;
 /// Maximum allowed target notional: USD 10 billion = 1_000_000_000_000 cents.
@@ -124,6 +132,12 @@ pub const ThesisInput = struct {
     max_single_name_pct: u8,
     /// Explicit user exclusions; always merged with denied_asset_classes in normalize().
     exclusions: AssetClassSet,
+    /// Tickers the user explicitly named in their request (e.g. "Buy SOXL").
+    /// Each slot is zero-padded to max_ticker_len bytes.
+    /// normalize() passes these through to InvestorIntent unchanged; basket.build()
+    /// checks them against the catalog restricted list as an explicit-request denial.
+    requested_tickers: [max_requested_tickers][max_ticker_len]u8 = std.mem.zeroes([max_requested_tickers][max_ticker_len]u8),
+    requested_ticker_count: u8 = 0,
 
     pub fn text(self: *const ThesisInput) []const u8 {
         return self.user_text[0..self.user_text_len];
@@ -156,6 +170,9 @@ pub const InvestorIntent = struct {
     risk_preference: RiskPreference,
     /// Maximum single-name allocation as a percentage of the basket notional.
     max_single_name_pct: u8,
+    /// Explicitly requested tickers forwarded from ThesisInput unchanged.
+    requested_tickers: [max_requested_tickers][max_ticker_len]u8,
+    requested_ticker_count: u8,
 };
 
 // ---------------------------------------------------------------------------
@@ -269,6 +286,8 @@ pub fn normalize(input: ThesisInput) ThesisError!InvestorIntent {
         .venue_count = 2,
         .risk_preference = input.risk_preference,
         .max_single_name_pct = input.max_single_name_pct,
+        .requested_tickers = input.requested_tickers,
+        .requested_ticker_count = input.requested_ticker_count,
     };
 }
 
@@ -288,6 +307,8 @@ pub fn normalize(input: ThesisInput) ThesisError!InvestorIntent {
 /// 0 in that case and set error_code to user_text_too_long.
 pub fn computeThesisInputHash(input: ThesisInput) u64 {
     if (@as(usize, input.user_text_len) > max_user_text_len) return 0;
+    // Flatten the 2-D requested_tickers array to a contiguous byte pointer for the C call.
+    const tickers_flat: [*]const u8 = @ptrCast(&input.requested_tickers);
     return thesis_cabi.tk_thesis_input_hash(
         input.user_text_len,
         &input.user_text,
@@ -299,6 +320,8 @@ pub fn computeThesisInputHash(input: ThesisInput) u64 {
         @intFromEnum(input.risk_preference),
         input.max_single_name_pct,
         @bitCast(input.exclusions),
+        input.requested_ticker_count,
+        tickers_flat,
     );
 }
 

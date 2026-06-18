@@ -48,10 +48,17 @@ fn operationsThesisInput() thesis.ThesisInput {
 
 fn operationsRestrictedTickerInput() thesis.ThesisInput {
     var input = operationsThesisInput();
+    // Set user_text to match the structured request for source-event distinguishability.
     const user_text = "Buy SOXL in the basket.";
     @memset(&input.user_text, 0);
     @memcpy(input.user_text[0..user_text.len], user_text);
     input.user_text_len = user_text.len;
+    // Structured requested_tickers field: this is the machine-readable proof that
+    // the user explicitly named SOXL, independent of user_text parsing.
+    input.requested_ticker_count = 1;
+    @memset(&input.requested_tickers[0], 0);
+    const ticker = restricted_ticker;
+    @memcpy(input.requested_tickers[0][0..ticker.len], ticker);
     return input;
 }
 
@@ -407,8 +414,16 @@ test "allowed_trade_integration: oversized trade replay and audit reproduce the 
 test "allowed_trade_integration: direct restricted ticker request is denied before adapter work" {
     const allocator = std.testing.allocator;
     const input = operationsRestrictedTickerInput();
+    // Prove the explicit request is a structured field, not just free-form text.
+    try std.testing.expectEqual(@as(u8, 1), input.requested_ticker_count);
+    try std.testing.expectEqualSlices(u8, restricted_ticker, input.requested_tickers[0][0..restricted_ticker.len]);
+
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
+    // Prove the structured request passes through normalize() unchanged.
+    try std.testing.expectEqual(@as(u8, 1), intent.requested_ticker_count);
+    try std.testing.expectEqualSlices(u8, restricted_ticker, intent.requested_tickers[0][0..restricted_ticker.len]);
+
     const basket = try basket_mod.build(intent, thesis_id);
 
     const rejected = findRejectedCandidate(&basket, restricted_ticker) orelse return error.TestUnexpectedResult;
@@ -419,7 +434,9 @@ test "allowed_trade_integration: direct restricted ticker request is denied befo
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
 
-    // Policy denies: only tkmodl is called; no adapter work occurs.
+    // basket.hasRestrictedRejections() drives the policy routing; not chosen manually.
+    try std.testing.expect(basket.hasRestrictedRejections());
+
     var model_backend = model.Backend{ .fixture = .{} };
     const block_result = try tkagnt.runRestrictedInstrumentDenialAgent(
         allocator,
@@ -434,12 +451,16 @@ test "allowed_trade_integration: direct restricted ticker request is denied befo
 test "allowed_trade_integration: restricted ticker replay and audit reproduce the deny" {
     const allocator = std.testing.allocator;
     const input = operationsRestrictedTickerInput();
+    // Prove the explicit request is structured and survives normalize().
+    try std.testing.expectEqual(@as(u8, 1), input.requested_ticker_count);
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
+    try std.testing.expectEqual(@as(u8, 1), intent.requested_ticker_count);
     const basket = try basket_mod.build(intent, thesis_id);
 
     const rejected = findRejectedCandidate(&basket, restricted_ticker) orelse return error.TestUnexpectedResult;
     try std.testing.expectEqual(basket_mod.RejectionReason.restricted_instrument, rejected.reason_code);
+    try std.testing.expect(basket.hasRestrictedRejections());
 
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);

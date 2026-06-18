@@ -11,7 +11,7 @@
   "ticket_id": "ticket_v1_1_ai_infra_2000_market",
   "proposal_hash": "proposal_hash_ticket_v1_1_ai_infra_2000_market",
   "audit_chain_hash": "audit_chain_hash_allowed_2000",
-  "expected_basket_id": 4319626036801027209,
+  "expected_basket_id": 11652673630910894805,
   "expected_proposal_hash": 1207484427160239519,
   "model_substitutions": [
     {

@@ -127,6 +127,16 @@ pub const Basket = struct {
     /// Set to target_notional_cents.  The rounding remainder is added to
     /// instrument[0] so the actual sum of allocation_cents equals this value.
     total_allocated_cents: i64,
+
+    /// Returns true when at least one rejected candidate carries the
+    /// restricted_instrument reason.  Used by the agent dispatcher to route
+    /// to the denial path rather than the normal investment path.
+    pub fn hasRestrictedRejections(self: *const Basket) bool {
+        for (self.rejected[0..self.rejected_count]) |r| {
+            if (r.reason_code == .restricted_instrument) return true;
+        }
+        return false;
+    }
 };
 
 pub const BasketError = error{
@@ -246,10 +256,24 @@ pub fn build(intent: thesis.InvestorIntent, thesis_id: u64) BasketError!Basket {
     basket.target_notional_cents = intent.target_amount_cents;
     basket.catalog_schema_version = cat.catalog_schema_version;
 
+    // Phase 0 – deny explicitly requested restricted tickers (T3 capability gate).
+    // Covers tickers the user named directly that are not in the current theme catalog,
+    // so the denial is provably request-driven independent of theme catalog iteration.
+    for (intent.requested_tickers[0..@as(usize, intent.requested_ticker_count)]) |slot| {
+        const ticker_str = std.mem.sliceTo(&slot, 0);
+        if (ticker_str.len == 0) continue;
+        if (isAlreadyRejected(&basket, ticker_str)) continue;
+        const entry = cat.lookupByTicker(ticker_str) orelse continue;
+        if (entry.restricted) {
+            addRejected(&basket, entry, .restricted_instrument, restrictionMsg(entry.restriction_reason));
+        }
+    }
+
     // Phase 1 – scope-check each theme match (T3).
     for (theme_buf[0..theme_n]) |e| {
         if (e.restricted) {
-            addRejected(&basket, e, .restricted_instrument, restrictionMsg(e.restriction_reason));
+            if (!isAlreadyRejected(&basket, e.ticker[0..e.ticker_len]))
+                addRejected(&basket, e, .restricted_instrument, restrictionMsg(e.restriction_reason));
             continue;
         }
         if (!intent.allowed_asset_classes.has(e.asset_class)) {
@@ -418,6 +442,13 @@ fn applyCap(weights: []u32, cap_bp: u32) void {
             }
         }
     }
+}
+
+fn isAlreadyRejected(basket: *const Basket, ticker_str: []const u8) bool {
+    for (basket.rejected[0..basket.rejected_count]) |*r| {
+        if (std.mem.eql(u8, r.ticker[0..r.ticker_len], ticker_str)) return true;
+    }
+    return false;
 }
 
 fn addRejected(
