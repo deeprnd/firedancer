@@ -179,8 +179,6 @@ test "allowed_trade_integration: replay succeeds with fixture substitutions and 
         &adapter_backend,
         &basket,
         &agent_result.ticket,
-        &execution,
-        &agent_result.model_response,
     );
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(replay_result.replay_match);
@@ -255,8 +253,6 @@ test "allowed_trade_integration: replay tamper detection reports first divergent
         &adapter_backend,
         &basket,
         &agent_result.ticket,
-        &execution,
-        &agent_result.model_response,
     );
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(!replay_result.replay_match);
@@ -363,7 +359,6 @@ test "allowed_trade_integration: oversized trade replay and audit reproduce the 
         &adapter_backend,
         &basket,
         &agent_result.ticket,
-        &agent_result.model_response,
     );
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(replay_result.replay_match);
@@ -479,7 +474,6 @@ test "allowed_trade_integration: restricted ticker replay and audit reproduce th
         &model_backend,
         &basket,
         restricted_ticker,
-        &block_result.model_response,
     );
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(replay_result.replay_match);

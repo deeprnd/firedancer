@@ -168,6 +168,131 @@ fn buildReplayVerification(divergences: DivergenceTracker, external_effects_disa
     };
 }
 
+// ---------------------------------------------------------------------------
+// Fixture loading for substitution replay
+// ---------------------------------------------------------------------------
+
+fn fixtureDir(capsule_path: []const u8) []const u8 {
+    const last_slash = std.mem.lastIndexOfScalar(u8, capsule_path, '/') orelse return ".";
+    return capsule_path[0..last_slash];
+}
+
+const ModelFixtureContentWire = struct {
+    content: std.json.Value,
+};
+
+const ModelFixtureContent = struct {
+    len: usize,
+    hash: u64,
+};
+
+fn loadModelFixtureContent(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    fixture_dir: []const u8,
+    filename: []const u8,
+) !ModelFixtureContent {
+    var path_buf: [512]u8 = undefined;
+    const path = try std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ fixture_dir, filename });
+    const raw = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(32 * 1024));
+    defer allocator.free(raw);
+    const parsed = try std.json.parseFromSlice(ModelFixtureContentWire, allocator, raw, .{
+        .ignore_unknown_fields = true,
+    });
+    defer parsed.deinit();
+    const content_json = try std.json.Stringify.valueAlloc(allocator, parsed.value.content, .{});
+    defer allocator.free(content_json);
+    return .{ .len = content_json.len, .hash = hashBytes(content_json) };
+}
+
+fn parseQuantityMicros(s: []const u8) !u64 {
+    const dot_pos = std.mem.indexOfScalar(u8, s, '.') orelse {
+        const whole = try std.fmt.parseInt(u64, s, 10);
+        return whole * 1_000_000;
+    };
+    const whole = try std.fmt.parseInt(u64, s[0..dot_pos], 10);
+    const frac_str = s[dot_pos + 1 ..];
+    var frac: u64 = 0;
+    var multiplier: u64 = 100_000;
+    for (frac_str) |c| {
+        if (c < '0' or c > '9') return error.InvalidQuantity;
+        frac += (c - '0') * multiplier;
+        multiplier /= 10;
+        if (multiplier == 0) break;
+    }
+    return whole * 1_000_000 + frac;
+}
+
+const PaperFillFixtureWire = struct {
+    ticker: []const u8,
+    quantity: []const u8,
+    fill_price_cents: i64,
+    filled_notional_cents: i64,
+};
+
+const PaperFixtureWire = struct {
+    paper_order_id: []const u8,
+    ticket_id: []const u8,
+    total_filled_cents: i64,
+    fills: []const PaperFillFixtureWire,
+    resulting_account_snapshot: struct {
+        cash_cents: i64,
+        buying_power_cents: i64,
+        day_notional_used_cents: i64,
+        month_notional_used_cents: i64,
+    },
+};
+
+fn loadPaperFixture(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    fixture_dir: []const u8,
+    filename: []const u8,
+    account_id: u32,
+) !trade_ticket.PaperExecutionResult {
+    var path_buf: [512]u8 = undefined;
+    const path = try std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ fixture_dir, filename });
+    const raw = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(32 * 1024));
+    defer allocator.free(raw);
+    const parsed = try std.json.parseFromSlice(PaperFixtureWire, allocator, raw, .{
+        .ignore_unknown_fields = true,
+    });
+    defer parsed.deinit();
+    const w = parsed.value;
+    if (w.fills.len > basket.max_basket_instruments) return error.TooManyFills;
+    var result: trade_ticket.PaperExecutionResult = std.mem.zeroes(trade_ticket.PaperExecutionResult);
+    if (w.paper_order_id.len > trade_ticket.max_paper_order_id_len) return error.PaperOrderIdTooLong;
+    result.paper_order_id_len = @intCast(w.paper_order_id.len);
+    @memcpy(result.paper_order_id[0..result.paper_order_id_len], w.paper_order_id);
+    if (w.ticket_id.len > trade_ticket.max_ticket_id_len) return error.TicketIdTooLong;
+    result.ticket_id_len = @intCast(w.ticket_id.len);
+    @memcpy(result.ticket_id[0..result.ticket_id_len], w.ticket_id);
+    result.account_id = account_id;
+    result.status = .filled;
+    result.total_filled_cents = w.total_filled_cents;
+    result.fill_count = @intCast(w.fills.len);
+    for (w.fills, 0..) |wf, i| {
+        if (wf.ticker.len > trade_ticket.max_ticker_len) return error.TickerTooLong;
+        result.fills[i].ticker = std.mem.zeroes([trade_ticket.max_ticker_len]u8);
+        @memcpy(result.fills[i].ticker[0..wf.ticker.len], wf.ticker);
+        result.fills[i].ticker_len = @intCast(wf.ticker.len);
+        result.fills[i].quantity_micros = try parseQuantityMicros(wf.quantity);
+        result.fills[i].fill_price_cents = wf.fill_price_cents;
+        result.fills[i].filled_notional_cents = wf.filled_notional_cents;
+    }
+    result.resulting_account_snapshot = .{
+        .cash_cents = w.resulting_account_snapshot.cash_cents,
+        .buying_power_cents = w.resulting_account_snapshot.buying_power_cents,
+        .day_notional_used_cents = w.resulting_account_snapshot.day_notional_used_cents,
+        .month_notional_used_cents = w.resulting_account_snapshot.month_notional_used_cents,
+    };
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// Public verify functions
+// ---------------------------------------------------------------------------
+
 pub fn verifyAllowedTradeWithCapsulePath(
     allocator: std.mem.Allocator,
     io: std.Io,
@@ -176,13 +301,12 @@ pub fn verifyAllowedTradeWithCapsulePath(
     adapter_backend: *const adapter.Backend,
     proposed_basket: *const basket.Basket,
     ticket: *const trade_ticket.TradeTicket,
-    paper_result: *const trade_ticket.PaperExecutionResult,
-    model_response: *const model.ModelResponse,
 ) !ReplayVerification {
     var loaded = try loadReplayCapsule(allocator, io, capsule_path);
     defer loaded.deinit(allocator);
 
     const capsule = loaded.parsed.value;
+    const fixture_dir = fixtureDir(capsule_path);
     var divergences = DivergenceTracker{};
 
     if (!capsule.replay_assertions.no_live_model_call) divergences.note("no_live_model_call", 8);
@@ -192,8 +316,6 @@ pub fn verifyAllowedTradeWithCapsulePath(
     if (!std.mem.eql(u8, capsule.replay_assertions.policy_outcome_matches, "allow")) divergences.note("policy_outcome", 2);
     if (!std.mem.eql(u8, ticket.ticketIdSlice(), capsule.ticket_id)) divergences.note("ticket_id", 6);
     if (ticket.target_notional_cents != proposed_basket.total_allocated_cents) divergences.note("target_notional_cents", 6);
-    if (paper_result.total_filled_cents != ticket.target_notional_cents) divergences.note("paper_fill_total", 7);
-    if (model_response.content.len == 0) divergences.note("model_response_content", 3);
     if (capsule.model_substitutions.len != 1) divergences.note("model_substitution_count", 3);
     if (capsule.adapter_substitutions.len != 3) divergences.note("adapter_substitution_count", 4);
     if (capsule.model_substitutions.len > 0 and
@@ -210,16 +332,35 @@ pub fn verifyAllowedTradeWithCapsulePath(
     } else {
         divergences.note("proposal_hash_missing", 6);
     }
+
+    // Load model fixture and verify substituted content hash.
     if (capsule.model_substitutions.len > 0) {
+        const model_content = try loadModelFixtureContent(
+            allocator,
+            io,
+            fixture_dir,
+            capsule.model_substitutions[0].fixture_file,
+        );
+        if (model_content.len == 0) divergences.note("model_response_content", 3);
         if (capsule.model_substitutions[0].expected_response_hash) |expected| {
-            if (hashBytes(model_response.content) != expected) divergences.note("model_response_hash", 3);
+            if (model_content.hash != expected) divergences.note("model_response_hash", 3);
         } else {
             divergences.note("model_response_hash_missing", 3);
         }
     }
+
+    // Load paper order fixture and verify substituted result hash.
     if (findAdapterSubstitution(capsule, "paper_order")) |substitution| {
+        const paper_result = try loadPaperFixture(
+            allocator,
+            io,
+            fixture_dir,
+            substitution.fixture_file,
+            ticket.account_id,
+        );
+        if (paper_result.total_filled_cents != ticket.target_notional_cents) divergences.note("paper_fill_total", 7);
         if (substitution.expected_response_hash) |expected| {
-            if (hashPaperResult(paper_result) != expected) divergences.note("adapter_response_hash", 7);
+            if (hashPaperResult(&paper_result) != expected) divergences.note("adapter_response_hash", 7);
         } else {
             divergences.note("paper_order_hash_missing", 7);
         }
@@ -236,8 +377,6 @@ pub fn verifyAllowedTrade(
     adapter_backend: *const adapter.Backend,
     proposed_basket: *const basket.Basket,
     ticket: *const trade_ticket.TradeTicket,
-    paper_result: *const trade_ticket.PaperExecutionResult,
-    model_response: *const model.ModelResponse,
 ) !ReplayVerification {
     return verifyAllowedTradeWithCapsulePath(
         allocator,
@@ -247,8 +386,6 @@ pub fn verifyAllowedTrade(
         adapter_backend,
         proposed_basket,
         ticket,
-        paper_result,
-        model_response,
     );
 }
 
@@ -259,16 +396,13 @@ pub fn verifyOversizedTradeBlock(
     adapter_backend: *const adapter.Backend,
     proposed_basket: *const basket.Basket,
     ticket: *const trade_ticket.TradeTicket,
-    model_response: *const model.ModelResponse,
 ) !ReplayVerification {
-    var loaded = try loadReplayCapsule(
-        allocator,
-        io,
-        "src/tickoni/test/fixtures/investment/replay_capsule_oversized_25000.json",
-    );
+    const capsule_path = "src/tickoni/test/fixtures/investment/replay_capsule_oversized_25000.json";
+    var loaded = try loadReplayCapsule(allocator, io, capsule_path);
     defer loaded.deinit(allocator);
 
     const capsule = loaded.parsed.value;
+    const fixture_dir = fixtureDir(capsule_path);
     var divergences = DivergenceTracker{};
 
     if (!capsule.replay_assertions.no_live_model_call) divergences.note("no_live_model_call", 9);
@@ -280,7 +414,6 @@ pub fn verifyOversizedTradeBlock(
     if (ticket.target_notional_cents != proposed_basket.total_allocated_cents) divergences.note("target_notional_cents", 6);
     if (ticket.policy_outcome != .deny) divergences.note("ticket_policy_outcome", 6);
     if (ticket.blocked_reason_count != 1) divergences.note("blocked_reason_count", 8);
-    if (model_response.content.len == 0) divergences.note("model_response_content", 3);
     if (capsule.model_substitutions.len != 1) divergences.note("model_substitution_count", 3);
     if (capsule.adapter_substitutions.len != 2) divergences.note("adapter_substitution_count", 4);
     if (hasAdapterOperation(capsule, "paper_order")) divergences.note("paper_order_substitution_present", 9);
@@ -302,6 +435,22 @@ pub fn verifyOversizedTradeBlock(
             divergences.note("failed_scope_dim", 8);
     }
 
+    // Load model fixture and verify substituted content hash.
+    if (capsule.model_substitutions.len > 0) {
+        const model_content = try loadModelFixtureContent(
+            allocator,
+            io,
+            fixture_dir,
+            capsule.model_substitutions[0].fixture_file,
+        );
+        if (model_content.len == 0) divergences.note("model_response_content", 3);
+        if (capsule.model_substitutions[0].expected_response_hash) |expected| {
+            if (model_content.hash != expected) divergences.note("model_response_hash", 3);
+        } else {
+            divergences.note("model_response_hash_missing", 3);
+        }
+    }
+
     const external_effects_disabled = model_backend.isEffectFree() and adapter_backend.isEffectFree();
     return buildReplayVerification(divergences, external_effects_disabled);
 }
@@ -312,16 +461,13 @@ pub fn verifyRestrictedInstrumentBlock(
     model_backend: *const model.Backend,
     proposed_basket: *const basket.Basket,
     requested_ticker: []const u8,
-    model_response: *const model.ModelResponse,
 ) !ReplayVerification {
-    var loaded = try loadReplayCapsule(
-        allocator,
-        io,
-        "src/tickoni/test/fixtures/investment/replay_capsule_restricted_soxl.json",
-    );
+    const capsule_path = "src/tickoni/test/fixtures/investment/replay_capsule_restricted_soxl.json";
+    var loaded = try loadReplayCapsule(allocator, io, capsule_path);
     defer loaded.deinit(allocator);
 
     const capsule = loaded.parsed.value;
+    const fixture_dir = fixtureDir(capsule_path);
     var divergences = DivergenceTracker{};
 
     if (!capsule.replay_assertions.no_live_model_call) divergences.note("no_live_model_call", 5);
@@ -330,10 +476,11 @@ pub fn verifyRestrictedInstrumentBlock(
     if (!std.mem.eql(u8, capsule.replay_assertions.policy_outcome_matches, "deny")) divergences.note("policy_outcome", 2);
     if (capsule.replay_assertions.affordability_outcome_matches.len != 0) divergences.note("affordability_outcome", 5);
     if (capsule.ticket_id.len != 0) divergences.note("ticket_id", 5);
-    if (model_response.content.len == 0) divergences.note("model_response_content", 3);
     if (capsule.model_substitutions.len != 1) divergences.note("model_substitution_count", 3);
     if (capsule.adapter_substitutions.len != 0) divergences.note("adapter_substitution_count", 5);
-    if (!std.mem.eql(u8, capsule.model_substitutions[0].fixture_file, "model_response_gemma4.json")) divergences.note("model_fixture_file", 3);
+    if (capsule.model_substitutions.len > 0 and
+        !std.mem.eql(u8, capsule.model_substitutions[0].fixture_file, "model_response_gemma4.json"))
+        divergences.note("model_fixture_file", 3);
     if (proposed_basket.rejected_count == 0) divergences.note("rejected_count", 2);
     if (!std.mem.eql(u8, requested_ticker, "SOXL")) divergences.note("requested_ticker", 2);
 
@@ -341,6 +488,22 @@ pub fn verifyRestrictedInstrumentBlock(
         if (!std.mem.eql(u8, expected, "restricted_instrument")) divergences.note("failed_scope_dim", 4);
     } else {
         divergences.note("failed_scope_dim", 4);
+    }
+
+    // Load model fixture and verify substituted content hash.
+    if (capsule.model_substitutions.len > 0) {
+        const model_content = try loadModelFixtureContent(
+            allocator,
+            io,
+            fixture_dir,
+            capsule.model_substitutions[0].fixture_file,
+        );
+        if (model_content.len == 0) divergences.note("model_response_content", 3);
+        if (capsule.model_substitutions[0].expected_response_hash) |expected| {
+            if (model_content.hash != expected) divergences.note("model_response_hash", 3);
+        } else {
+            divergences.note("model_response_hash_missing", 3);
+        }
     }
 
     // Restricted-instrument path uses only the model backend; no adapter calls occur.

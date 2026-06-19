@@ -494,33 +494,6 @@ pub fn build(b: *std.Build) void {
     const allowed_trade_e2e_run = b.addRunArtifact(allowed_trade_e2e_test);
     integration_step.dependOn(&allowed_trade_e2e_run.step);
 
-    const investment_demo_exe = b.addExecutable(.{
-        .name = "tickoni-investment-demo",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/app/tickoni/investment_demo.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "adapter", .module = adapter_int_mod },
-                .{ .name = "basket", .module = basket_int_mod },
-                .{ .name = "investment_audit", .module = investment_audit_int_mod },
-                .{ .name = "model", .module = model_int_mod },
-                .{ .name = "replay", .module = replay_int_mod },
-                .{ .name = "thesis", .module = thesis_int_mod },
-                .{ .name = "tkcase", .module = case_int_mod },
-                .{ .name = "tkdisp", .module = disp_int_mod },
-                .{ .name = "tkagnt", .module = agent_int_mod },
-            },
-        }),
-    });
-    linkTickoniCodec(b, investment_demo_exe, fd_lib_dir);
-    b.installArtifact(investment_demo_exe);
-
-    const investment_demo_run = b.addRunArtifact(investment_demo_exe);
-    if (b.args) |argv| investment_demo_run.addArgs(argv);
-    const investment_demo_step = b.step("investment-demo", "Run the V1.1 investment demo scenarios");
-    investment_demo_step.dependOn(&investment_demo_run.step);
-
     // model tile integration tests: require a running llama.cpp server.
     // Run with: zig build integration-test-live-model
     const live_model_step = b.step("integration-test-live-model", "Run live tkmodl llama.cpp smoke tests");
