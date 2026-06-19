@@ -33,6 +33,13 @@ const user_prompt =
     "Risk preference: moderate\n" ++
     "Max single-name weight: 25%";
 
+const live_actor_role = "trading_ops_reviewer";
+const live_workflow = "trading_control";
+const live_capability = "trading_order.propose";
+const live_capability_envelope_id = "capenv.trading_order.propose.demo";
+const live_policy_version = "v1.1";
+const live_budget_id = "budget.demo_paper.v1_1.live";
+
 const LiveModelResult = struct {
     excerpt: []u8,
     matched_ticker: []u8,
@@ -50,8 +57,33 @@ fn envOrDefault(allocator: std.mem.Allocator, name: []const u8, fallback: []cons
     return allocator.dupe(u8, std.mem.span(raw));
 }
 
-fn makeLiveRequest(model_id: []const u8) model.ProviderRequest {
+fn makeLiveConfig(allowed_model_id: []const u8) model.TkModlConfig {
+    var config = model.TkModlConfig{
+        .live_provider_enabled = true,
+        .hard_max_context_tokens = 4096,
+        .hard_max_output_tokens = 1024,
+        .hard_max_retry_count = 1,
+        .hard_timeout_ms = 30_000,
+        .per_run_token_budget = 4096,
+    };
+    config.allowed_model_ids[0] = allowed_model_id;
+    config.allowed_model_id_count = 1;
+    return config;
+}
+
+fn makeLiveRequest(model_id: []const u8) model.TkModlRequest {
     return .{
+        .request_id = 1,
+        .run_id = 1,
+        .actor_id = 2001,
+        .actor_role = live_actor_role,
+        .workflow = live_workflow,
+        .account_id = 2001,
+        .capability = live_capability,
+        .capability_envelope_id = live_capability_envelope_id,
+        .policy_version = live_policy_version,
+        .policy_decision_id = 0,
+        .budget_id = live_budget_id,
         .model_id = model_id,
         .messages = &.{
             .{ .role = "system", .content = system_prompt },
@@ -63,9 +95,11 @@ fn makeLiveRequest(model_id: []const u8) model.ProviderRequest {
             .max_output_tokens = 768,
             .seed = 42,
         },
-        .budget_id = "budget.demo_paper.v1_1.live",
-        .policy_version = "v1.1",
-        .capability_envelope_id = "capenv.trading_order.propose.demo",
+        .max_context_tokens = 2048,
+        .max_output_tokens = 768,
+        .retry_limit = 0,
+        .timeout_ms = 30_000,
+        .replay_mode = .live,
     };
 }
 
@@ -273,7 +307,16 @@ test "system demo live: real tkmodl plus V1.1 allowed blocked restricted replay 
         .endpoint = endpoint,
         .io = std.testing.io,
     } };
-    const response = try live_model_backend.call(allocator, makeLiveRequest(request_model_id));
+    var tkmodl_result = try model.runTkModlRequest(
+        allocator,
+        makeLiveConfig(request_model_id),
+        &live_model_backend,
+        makeLiveRequest(request_model_id),
+    );
+    defer tkmodl_result.deinit(allocator);
+    try std.testing.expectEqual(model.TkModlDecision.allow_live, tkmodl_result.outcome);
+    const response = tkmodl_result.response orelse return error.TestUnexpectedResult;
+    tkmodl_result.response = null;
     defer response.deinit(allocator);
 
     var live_result = try assertLiveModelResponse(allocator, &response);
