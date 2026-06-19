@@ -14,7 +14,7 @@ const default_model_id = "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL";
 
 const restricted_tickers = [_][]const u8{
     "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",
-    "UVXY", "SVXY", "LABU", "LABD", "FAS", "FAZ",
+    "UVXY", "SVXY", "LABU", "LABD", "FAS",  "FAZ",
 };
 
 const system_prompt =

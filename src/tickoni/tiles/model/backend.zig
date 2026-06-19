@@ -538,7 +538,7 @@ test "FixtureBackend response JSON matches expected tickers and excludes restric
 
     const restricted = [_][]const u8{
         "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",
-        "UVXY", "SVXY", "LABU", "LABD", "FAS", "FAZ",
+        "UVXY", "SVXY", "LABU", "LABD", "FAS",  "FAZ",
     };
     for (tickers.items) |item| {
         const ticker = switch (item) {

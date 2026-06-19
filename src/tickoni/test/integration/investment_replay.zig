@@ -129,7 +129,8 @@ test "investment_replay_integration: allowed trade audit chain hashes are real a
     // Tile ID at each sequence position must match the owning tile.
     const expected_tile_ids = [investment_audit.allowed_trade_event_count][]const u8{
         "tkings", "tknorm", "tkdedu", "tkcase", "tkpoly",
-        "tkmodl", "tkadpt", "tkadpt", "tkagnt", "tkadpt", "tkrepl",
+        "tkmodl", "tkadpt", "tkadpt", "tkagnt", "tkadpt",
+        "tkrepl",
     };
     for (chain.events, expected_tile_ids) |event, expected| {
         try std.testing.expectEqualStrings(expected, std.mem.sliceTo(&event.header.tile_id, 0));

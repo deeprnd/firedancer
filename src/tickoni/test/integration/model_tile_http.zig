@@ -29,7 +29,7 @@ const user_prompt =
 
 const restricted_tickers = [_][]const u8{
     "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",
-    "UVXY", "SVXY", "LABU", "LABD", "FAS", "FAZ",
+    "UVXY", "SVXY", "LABU", "LABD", "FAS",  "FAZ",
 };
 
 const mock_model_content =
