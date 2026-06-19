@@ -9,6 +9,7 @@ package tickoni.audit.v1;
 // derived from the oneof field number on decode (field - 12).
 message AuditEvent {
   uint32 schema_version            = 1;
+  uint64 run_id                    = 2;
   uint64 seq                       = 3;
   uint64 source_offset             = 4;
   bytes  tile_id                   = 5;
@@ -31,6 +32,8 @@ message AuditEvent {
     DenialPayload               denial                = 21;
     TelemetryCheckpointPayload  telemetry_checkpoint  = 22;
     ReplayResultPayload         replay_result         = 23;
+    DeduplicationPayload        deduplication         = 24;
+    CaseCreationPayload         case_creation         = 25;
   }
 }
 
@@ -108,4 +111,16 @@ message ReplayResultPayload {
   uint64 capsule_id          = 1;
   uint64 divergences         = 2;
   uint64 first_divergent_seq = 3;
+}
+
+message DeduplicationPayload {
+  uint64 idempotency_key = 1;
+  bool   is_duplicate    = 2;
+}
+
+message CaseCreationPayload {
+  uint64 basket_id             = 1;
+  uint32 instrument_count      = 2;
+  uint32 rejected_count        = 3;
+  int64  total_allocated_cents = 4;
 }

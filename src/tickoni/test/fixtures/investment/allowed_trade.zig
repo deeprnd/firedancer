@@ -12,7 +12,7 @@
 //     -> thesis.normalize()             [real tknorm logic]
 //     -> basket.build()                 [real basket construction]
 //     -> portfolio.checkAffordability() [real affordability check]
-//     -> policy limits from fixture     [policy_investment.json]
+//     -> policy limits (hardcoded)
 //     -> paper execution fixture        [paper_execution_allowed_2000.json]
 //
 // Assertions (S6-P1):
@@ -35,10 +35,7 @@ const portfolio_fixtures = @import("portfolio_fixtures");
 // Numeric id for "brokerage.operations" as stored in portfolio_fixtures.fixtures.cash_rich.
 const operations_account_id: u32 = 2001;
 
-// Target notional from thesis_allowed_2000.json.
 const target_notional_cents: i64 = 200_000;
-
-// Maximum notional per order from policy_investment.json (limits.max_notional_per_order_cents).
 const policy_max_notional_per_order_cents: i64 = 250_000;
 
 // Expected basket instrument count: 7 eligible instruments.
@@ -64,7 +61,6 @@ const expected_etf_alloc_cents: i64 = 37_500;
 fn operationsThesisInput() thesis.ThesisInput {
     var input = thesis.fixtures.ai_infrastructure;
     input.account_id = operations_account_id;
-    // max_single_name_weight_bp in policy_investment.json = 2500 bp = 25%
     input.max_single_name_pct = 25;
     return input;
 }

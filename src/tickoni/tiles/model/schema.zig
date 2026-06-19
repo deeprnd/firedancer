@@ -16,6 +16,9 @@ pub const ModelRequest = struct {
     model_id: []const u8,
     messages: []const Message,
     sampling: SamplingParams = .{},
+    budget_id: []const u8 = "",
+    policy_version: []const u8 = "",
+    capability_envelope_id: []const u8 = "",
 };
 
 pub const TokenUsage = struct {

@@ -15,7 +15,8 @@
     {
       "request_hash": "model_request_hash_ai_infra_oversized_25000",
       "response_hash": "model_response_hash_ai_infra_gemma4",
-      "fixture_file": "model_response_gemma4.json"
+      "fixture_file": "model_response_gemma4.json",
+      "expected_response_hash": 12340958204495727724
     }
   ],
   "adapter_substitutions": [

@@ -79,10 +79,11 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_exe.step);
 
     // ---------------------------------------------------------------------------
-    // Test step — not wired into 'make run-unit-test'
+    // Test step — offline Tickoni unit tests only.
+    // Pure logic and fixture/mock-backed proofs belong here; no running servers.
     // Run with: zig build test
     // ---------------------------------------------------------------------------
-    const test_step = b.step("test", "Run harness unit tests");
+    const test_step = b.step("test", "Run offline Tickoni unit tests");
 
     // Files with no cross-module imports: standalone test binaries.
     for ([_][]const u8{
@@ -214,13 +215,14 @@ pub fn build(b: *std.Build) void {
     const portfolio_fixtures_run = b.addRunArtifact(portfolio_fixtures_test);
     test_step.dependOn(&portfolio_fixtures_run.step);
 
-    // model tile: unit tests use MockBackend only, no network calls.
+    // model tile: unit tests are mock/fixture-backed and must not start servers.
+    const model_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const model_test = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = model_test_mod,
     });
     const model_run = b.addRunArtifact(model_test);
     test_step.dependOn(&model_run.step);
@@ -268,18 +270,19 @@ pub fn build(b: *std.Build) void {
             .{ .name = "thesis", .module = thesis_adapter_test_mod },
         },
     });
+    const adapter_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/adapter/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_adapter_test_mod },
+            .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+            .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_adapter_test_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_adapter_test_mod },
+        },
+    });
     const adapter_test = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/tiles/adapter/mod.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "basket", .module = basket_adapter_test_mod },
-                .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
-                .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_adapter_test_mod },
-                .{ .name = "trade_ticket", .module = trade_ticket_adapter_test_mod },
-            },
-        }),
+        .root_module = adapter_test_mod,
     });
     const adapter_run = b.addRunArtifact(adapter_test);
     test_step.dependOn(&adapter_run.step);
@@ -288,6 +291,90 @@ pub fn build(b: *std.Build) void {
     const trade_ticket_test = b.addTest(.{ .root_module = trade_ticket_adapter_test_mod });
     linkTickoniCodec(b, trade_ticket_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(trade_ticket_test).step);
+
+    const allowed_trade_fixture_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/fixtures/investment/allowed_trade.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "thesis", .module = thesis_adapter_test_mod },
+                .{ .name = "basket", .module = basket_adapter_test_mod },
+                .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+                .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_adapter_test_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, allowed_trade_fixture_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(allowed_trade_fixture_test).step);
+
+    const denied_trade_fixture_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/fixtures/investment/denied_trade.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "thesis", .module = thesis_adapter_test_mod },
+                .{ .name = "basket", .module = basket_adapter_test_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, denied_trade_fixture_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(denied_trade_fixture_test).step);
+
+    const tool_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/tool/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "adapter", .module = adapter_test_mod },
+            .{ .name = "basket", .module = basket_adapter_test_mod },
+            .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+            .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_adapter_test_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_adapter_test_mod },
+        },
+    });
+    const tool_test = b.addTest(.{ .root_module = tool_test_mod });
+    test_step.dependOn(&b.addRunArtifact(tool_test).step);
+
+    const disp_unit_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/disp/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const agent_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/tiles/agent/mod.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "adapter", .module = adapter_test_mod },
+                .{ .name = "basket", .module = basket_adapter_test_mod },
+                .{ .name = "disp", .module = disp_unit_mod },
+                .{ .name = "model", .module = model_test_mod },
+                .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+                .{ .name = "tool", .module = tool_test_mod },
+                .{ .name = "trade_ticket", .module = trade_ticket_adapter_test_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(agent_test).step);
+
+    const replay_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/tiles/replay/mod.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "adapter", .module = adapter_test_mod },
+                .{ .name = "basket", .module = basket_adapter_test_mod },
+                .{ .name = "model", .module = model_test_mod },
+                .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+                .{ .name = "trade_ticket", .module = trade_ticket_adapter_test_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(replay_test).step);
 
     // supervisor.zig imports runtime and tiles modules.
     const sup_mod = b.createModule(.{
@@ -305,10 +392,11 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&sup_run.step);
 
     // ---------------------------------------------------------------------------
-    // Integration-test step — simple lane tests
+    // Integration-test step — transport and boundary wiring against local mocks.
+    // Local mock HTTP servers live here; this lane must stay deterministic.
     // Run with: zig build integration-test
     // ---------------------------------------------------------------------------
-    const integration_step = b.step("integration-test", "Run investment integration tests");
+    const integration_step = b.step("integration-test", "Run Tickoni mock-backed integration tests");
 
     // Schema modules for the integration test.
     //
@@ -375,23 +463,6 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const allowed_trade_fixture_test = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test/fixtures/investment/allowed_trade.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "thesis", .module = thesis_int_mod },
-                .{ .name = "basket", .module = basket_int_mod },
-                .{ .name = "portfolio", .module = portfolio_int_mod },
-                .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_int_mod },
-            },
-        }),
-    });
-    linkTickoniCodec(b, allowed_trade_fixture_test, fd_lib_dir);
-    const allowed_trade_fixture_run = b.addRunArtifact(allowed_trade_fixture_test);
-    integration_step.dependOn(&allowed_trade_fixture_run.step);
-
     const model_int_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
         .target = target,
@@ -449,6 +520,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
+            .{ .name = "adapter", .module = adapter_int_mod },
             .{ .name = "basket", .module = basket_int_mod },
             .{ .name = "model", .module = model_int_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
@@ -468,45 +540,76 @@ pub fn build(b: *std.Build) void {
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
         },
     });
-    const allowed_trade_e2e_test = b.addTest(.{
+    const investment_support_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test/integration/investment_support.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "thesis", .module = thesis_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+        },
+    });
+    for ([_][]const u8{
+        "src/tickoni/test/integration/investment_allowed_trade.zig",
+        "src/tickoni/test/integration/investment_replay.zig",
+        "src/tickoni/test/integration/investment_blocked_limits.zig",
+        "src/tickoni/test/integration/investment_restricted_instrument.zig",
+        "src/tickoni/test/integration/model_tile_http.zig",
+        "src/tickoni/test/integration/mock_servers.zig",
+    }) |path| {
+        const integration_test = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(path),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "adapter", .module = adapter_int_mod },
+                    .{ .name = "audit_tile", .module = audit_tile_mod },
+                    .{ .name = "basket", .module = basket_int_mod },
+                    .{ .name = "investment_audit", .module = investment_audit_int_mod },
+                    .{ .name = "investment_support", .module = investment_support_int_mod },
+                    .{ .name = "model", .module = model_int_mod },
+                    .{ .name = "portfolio", .module = portfolio_int_mod },
+                    .{ .name = "replay", .module = replay_int_mod },
+                    .{ .name = "thesis", .module = thesis_int_mod },
+                    .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+                    .{ .name = "tkcase", .module = case_int_mod },
+                    .{ .name = "tkdisp", .module = disp_int_mod },
+                    .{ .name = "tkagnt", .module = agent_int_mod },
+                },
+            }),
+        });
+        linkTickoniCodec(b, integration_test, fd_lib_dir);
+        integration_step.dependOn(&b.addRunArtifact(integration_test).step);
+    }
+
+    const system_step = b.step("system-test", "Run live V1.1 system/demo proofs");
+    const system_test = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test/integration/allowed_trade.zig"),
+            .root_source_file = b.path("src/tickoni/test/system/v1_1_demo_live.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "adapter", .module = adapter_int_mod },
-                .{ .name = "audit_tile", .module = audit_tile_mod },
                 .{ .name = "basket", .module = basket_int_mod },
-                .{ .name = "investment_audit", .module = investment_audit_int_mod },
+                .{ .name = "investment_support", .module = investment_support_int_mod },
                 .{ .name = "model", .module = model_int_mod },
                 .{ .name = "portfolio", .module = portfolio_int_mod },
                 .{ .name = "replay", .module = replay_int_mod },
                 .{ .name = "thesis", .module = thesis_int_mod },
+                .{ .name = "tool", .module = tool_int_mod },
                 .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
-                .{ .name = "tkcase", .module = case_int_mod },
-                .{ .name = "tkdisp", .module = disp_int_mod },
-                .{ .name = "tkagnt", .module = agent_int_mod },
             },
         }),
     });
-    linkTickoniCodec(b, allowed_trade_e2e_test, fd_lib_dir);
-    const allowed_trade_e2e_run = b.addRunArtifact(allowed_trade_e2e_test);
-    integration_step.dependOn(&allowed_trade_e2e_run.step);
+    linkTickoniCodec(b, system_test, fd_lib_dir);
+    system_test.root_module.link_libc = true;
+    system_step.dependOn(&b.addRunArtifact(system_test).step);
 
-    // model tile integration tests: require a running llama.cpp server.
-    // Run with: zig build integration-test-live-model
-    const live_model_step = b.step("integration-test-live-model", "Run live tkmodl llama.cpp smoke tests");
-    const model_http_test = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test/integration/model_tile_http.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{.{ .name = "model", .module = model_int_mod }},
-        }),
-    });
-    model_http_test.root_module.link_libc = true;
-    const model_http_run = b.addRunArtifact(model_http_test);
-    live_model_step.dependOn(&model_http_run.step);
+    // Compatibility alias for the old live-model smoke command.
+    const live_model_step = b.step("integration-test-live-model", "Alias for the live V1.1 system/demo lane");
+    live_model_step.dependOn(system_step);
 
     // ---------------------------------------------------------------------------
     // Coverage step — install test binaries to zig-out/cov/ for kcov

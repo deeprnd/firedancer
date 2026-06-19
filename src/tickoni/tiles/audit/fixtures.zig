@@ -21,9 +21,11 @@ fn fixtureHeader(
     capability_envelope_id: u128,
     timestamp_ns: u64,
     prev_hash: u64,
+    run_id: u64,
 ) schema.Header {
     return .{
         .schema_version = schema.audit_schema_version,
+        .run_id = run_id,
         .seq = seq,
         .source_offset = source_offset,
         .tile_id = parseFixedAsciiBytes(6, tile_id) catch unreachable,
@@ -38,18 +40,18 @@ fn fixtureHeader(
 
 pub fn makeFixtures() [12]schema.AuditEvent {
     const headers = [_]schema.Header{
-        fixtureHeader(1, 10, "tkings", 1001, "policy_ingress_v1", 1, 111, 500),
-        fixtureHeader(2, 11, "tknorm", 1002, "policy_norm_v1", 2, 222, 501),
-        fixtureHeader(3, 12, "tkpoly", 1003, "policy_poly_v1", 3, 333, 502),
-        fixtureHeader(4, 13, "tkmodl", 1004, "policy_model_v1", 4, 444, 503),
-        fixtureHeader(5, 14, "tkadpt", 1005, "policy_adpt_v1", 5, 555, 504),
-        fixtureHeader(6, 15, "tkagnt", 1006, "policy_prop_v1", 6, 666, 505),
-        fixtureHeader(7, 16, "tkpoly", 1007, "policy_dest_v1", 7, 777, 506),
-        fixtureHeader(8, 17, "tkpoly", 1008, "policy_limt_v1", 8, 888, 507),
-        fixtureHeader(9, 18, "tkpoly", 1009, "policy_aprv_v1", 9, 999, 508),
-        fixtureHeader(10, 19, "tkpoly", 1010, "policy_deny_v1", 10, 1110, 509),
-        fixtureHeader(11, 20, "tkmetr", 1011, "policy_metr_v1", 11, 1221, 510),
-        fixtureHeader(12, 21, "tkrepl", 1012, "policy_repl_v1", 12, 1332, 511),
+        fixtureHeader(1, 10, "tkings", 1001, "policy_ingress_v1", 1, 111, 500, 0),
+        fixtureHeader(2, 11, "tknorm", 1002, "policy_norm_v1", 2, 222, 501, 0),
+        fixtureHeader(3, 12, "tkpoly", 1003, "policy_poly_v1", 3, 333, 502, 0),
+        fixtureHeader(4, 13, "tkmodl", 1004, "policy_model_v1", 4, 444, 503, 0),
+        fixtureHeader(5, 14, "tkadpt", 1005, "policy_adpt_v1", 5, 555, 504, 0),
+        fixtureHeader(6, 15, "tkagnt", 1006, "policy_prop_v1", 6, 666, 505, 0),
+        fixtureHeader(7, 16, "tkpoly", 1007, "policy_dest_v1", 7, 777, 506, 0),
+        fixtureHeader(8, 17, "tkpoly", 1008, "policy_limt_v1", 8, 888, 507, 0),
+        fixtureHeader(9, 18, "tkpoly", 1009, "policy_aprv_v1", 9, 999, 508, 0),
+        fixtureHeader(10, 19, "tkpoly", 1010, "policy_deny_v1", 10, 1110, 509, 0),
+        fixtureHeader(11, 20, "tkmetr", 1011, "policy_metr_v1", 11, 1221, 510, 0),
+        fixtureHeader(12, 21, "tkrepl", 1012, "policy_repl_v1", 12, 1332, 511, 0),
     };
 
     const events = [_]schema.AuditEvent{
@@ -123,7 +125,7 @@ pub fn makeFixtures() [12]schema.AuditEvent {
 }
 
 test "computeRecordHash excludes timestamp_ns" {
-    const header = fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0);
+    const header = fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0, 0);
     const payload = schema.AuditEvent.Payload{ .policy_decision = .{
         .outcome = .allow,
         .rule_id = 1,
@@ -138,13 +140,13 @@ test "computeRecordHash excludes timestamp_ns" {
 }
 
 test "hash chain mutation changes downstream records" {
-    const first = codec.buildEvent(fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0), .{ .policy_decision = .{
+    const first = codec.buildEvent(fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0, 0), .{ .policy_decision = .{
         .outcome = .allow,
         .rule_id = 1,
         .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
         .source_event_hash = 3,
     } });
-    var second_header = fixtureHeader(1, 1, "tkpoly", 0, "policy", 0, 0, first.header.record_hash);
+    var second_header = fixtureHeader(1, 1, "tkpoly", 0, "policy", 0, 0, first.header.record_hash, 0);
     const second = codec.buildEvent(second_header, .{ .policy_decision = .{
         .outcome = .allow,
         .rule_id = 1,
@@ -152,7 +154,7 @@ test "hash chain mutation changes downstream records" {
         .source_event_hash = 3,
     } });
 
-    const mutated_first = codec.buildEvent(fixtureHeader(0, 9, "tkpoly", 0, "policy", 0, 0, 0), .{ .policy_decision = .{
+    const mutated_first = codec.buildEvent(fixtureHeader(0, 9, "tkpoly", 0, "policy", 0, 0, 0, 0), .{ .policy_decision = .{
         .outcome = .allow,
         .rule_id = 1,
         .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,

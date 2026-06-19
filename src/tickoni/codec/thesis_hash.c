@@ -20,7 +20,9 @@ tk_thesis_input_hash( uint16_t              user_text_len,
                       uint8_t               sector_theme,
                       uint8_t               risk_preference,
                       uint8_t               max_single_name_pct,
-                      uint8_t               exclusions ) {
+                      uint8_t               exclusions,
+                      uint8_t               requested_ticker_count,
+                      unsigned char const * requested_tickers ) {
   fd_siphash13_t _sip[1];
   fd_siphash13_t * sip = fd_siphash13_init( _sip, TK_THESIS_HASH_K0, TK_THESIS_HASH_K1 );
 
@@ -35,6 +37,14 @@ tk_thesis_input_hash( uint16_t              user_text_len,
   TK_HASH( &risk_preference,       sizeof(uint8_t)  );
   TK_HASH( &max_single_name_pct,   sizeof(uint8_t)  );
   TK_HASH( &exclusions,            sizeof(uint8_t)  );
+  /* Explicitly requested tickers: count followed by each ticker zero-padded to
+     TK_THESIS_MAX_TICKER_LEN bytes.  Two inputs that differ only in which tickers
+     were explicitly named produce different hashes. */
+  TK_HASH( &requested_ticker_count, sizeof(uint8_t) );
+  ulong stride = TK_THESIS_MAX_TICKER_LEN;
+  for( uint8_t i = 0; i < requested_ticker_count; i++ ) {
+    TK_HASH( requested_tickers + (ulong)i * stride, stride );
+  }
   /* user_text follows so two different phrasings of the same thesis are
      distinguishable at the source-event level even when intent normalizes
      identically. */
