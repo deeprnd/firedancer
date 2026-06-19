@@ -13,25 +13,24 @@
   "audit_chain_hash": "audit_chain_hash_oversized_25000",
   "model_substitutions": [
     {
-      "request_hash": "model_request_hash_ai_infra_oversized_25000",
-      "response_hash": "model_response_hash_ai_infra_gemma4",
-      "fixture_file": "model_response_gemma4.json",
-      "expected_response_hash": 12340958204495727724
+      "request_hash": 12817999446150238994,
+      "response_hash": 12340958204495727724,
+      "fixture_file": "model_response_gemma4.json"
     }
   ],
   "adapter_substitutions": [
     {
       "adapter_id": "paper_broker_demo",
       "operation": "quote_snapshot",
-      "request_hash": "adapter_request_hash_quote_ai_infra",
-      "response_hash": "adapter_response_hash_quote_ai_infra",
+      "request_hash": 17844936811726487061,
+      "response_hash": 3837264155678659392,
       "fixture_file": "quotes.json"
     },
     {
       "adapter_id": "paper_broker_demo",
       "operation": "portfolio_snapshot",
-      "request_hash": "adapter_request_hash_portfolio_demo_ops",
-      "response_hash": "adapter_response_hash_portfolio_demo_ops",
+      "request_hash": 11880919757726111843,
+      "response_hash": 11722998568291785962,
       "fixture_file": "account_ops.json"
     }
   ],

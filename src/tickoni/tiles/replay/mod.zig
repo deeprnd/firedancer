@@ -2,6 +2,7 @@ const std = @import("std");
 const adapter = @import("adapter");
 const basket = @import("basket");
 const model = @import("model");
+const portfolio = @import("portfolio");
 const trade_ticket = @import("trade_ticket");
 const tkpoly = @import("tkpoly");
 
@@ -10,13 +11,16 @@ const ReplayCapsuleWire = struct {
     expected_basket_id: ?u64 = null,
     expected_proposal_hash: ?u64 = null,
     model_substitutions: []const struct {
+        request_hash: u64,
+        response_hash: u64,
         fixture_file: []const u8,
-        expected_response_hash: ?u64 = null,
     },
     adapter_substitutions: []const struct {
+        adapter_id: []const u8,
         operation: []const u8,
+        request_hash: u64,
+        response_hash: u64,
         fixture_file: []const u8,
-        expected_response_hash: ?u64 = null,
     },
     replay_assertions: struct {
         no_live_model_call: bool,
@@ -108,6 +112,32 @@ fn updateValue(hasher: *std.hash.Wyhash, value: anytype) void {
 
 pub fn hashBytes(bytes: []const u8) u64 {
     return std.hash.Wyhash.hash(0, bytes);
+}
+
+fn hashQuoteSnapshot(snapshot: *const trade_ticket.QuoteSnapshot) u64 {
+    var hasher = std.hash.Wyhash.init(0);
+    updateValue(&hasher, snapshot.as_of_ns);
+    updateValue(&hasher, snapshot.quote_count);
+    for (snapshot.quotes[0..snapshot.quote_count]) |quote| {
+        hasher.update(quote.tickerSlice());
+        updateValue(&hasher, quote.venue);
+        updateValue(&hasher, quote.bid_cents);
+        updateValue(&hasher, quote.ask_cents);
+        updateValue(&hasher, quote.last_cents);
+    }
+    return hasher.final();
+}
+
+fn hashAffordability(result: portfolio.AffordabilityResult) u64 {
+    var hasher = std.hash.Wyhash.init(0);
+    updateValue(&hasher, result.outcome);
+    updateValue(&hasher, result.requested_notional_cents);
+    updateValue(&hasher, result.max_affordable_cents);
+    updateValue(&hasher, result.cash_available_cents);
+    updateValue(&hasher, result.buying_power_cents);
+    updateValue(&hasher, result.remaining_daily_notional_cents);
+    updateValue(&hasher, result.remaining_monthly_notional_cents);
+    return hasher.final();
 }
 
 pub fn hashTicket(ticket: *const trade_ticket.TradeTicket) u64 {
@@ -322,6 +352,10 @@ pub fn verifyAllowedTradeWithCapsulePath(
     if (capsule.model_substitutions.len > 0 and
         !std.mem.eql(u8, capsule.model_substitutions[0].fixture_file, "model_response_gemma4.json"))
         divergences.note("model_fixture_file", 3);
+    if (proposed_basket.thesis_id != 0 and
+        capsule.model_substitutions.len > 0 and
+        proposed_basket.thesis_id != capsule.model_substitutions[0].request_hash)
+        divergences.note("model_request_hash", 3);
 
     if (capsule.expected_basket_id) |expected| {
         if (proposed_basket.basket_id != expected) divergences.note("basket_id", 1);
@@ -343,11 +377,50 @@ pub fn verifyAllowedTradeWithCapsulePath(
             capsule.model_substitutions[0].fixture_file,
         );
         if (model_content.len == 0) divergences.note("model_response_content", 3);
-        if (capsule.model_substitutions[0].expected_response_hash) |expected| {
-            if (model_content.hash != expected) divergences.note("model_response_hash", 3);
-        } else {
-            divergences.note("model_response_hash_missing", 3);
-        }
+        if (model_content.hash != capsule.model_substitutions[0].response_hash)
+            divergences.note("model_response_hash", 3);
+    }
+
+    var fixture_backend = try adapter.FixtureBackend.initFromDir(allocator, io, fixture_dir);
+    const account = switch (try fixture_backend.call(.{
+        .operation = .portfolio_snapshot,
+        .account_id = ticket.account_id,
+    })) {
+        .portfolio_snapshot => |snapshot| snapshot,
+        else => return error.TestUnexpectedResult,
+    };
+    const affordability = try portfolio.checkBasketAffordability(&account, proposed_basket);
+    if (findAdapterSubstitution(capsule, "portfolio_snapshot")) |substitution| {
+        if (substitution.request_hash != hashBytes("portfolio.read"))
+            divergences.note("portfolio_request_hash", 4);
+        if (substitution.response_hash != hashAffordability(affordability))
+            divergences.note("portfolio_response_hash", 4);
+    } else {
+        divergences.note("portfolio_substitution_missing", 4);
+    }
+
+    const quote_snapshot = switch (try fixture_backend.call(.{
+        .operation = .quote_snapshot,
+        .account_id = proposed_basket.account_id,
+        .ticker_count = proposed_basket.instrument_count,
+        .tickers = blk: {
+            var tickers = std.mem.zeroes([basket.max_basket_instruments][portfolio.max_ticker_len]u8);
+            for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |instrument, i| {
+                @memcpy(tickers[i][0..instrument.ticker_len], instrument.tickerSlice());
+            }
+            break :blk tickers;
+        },
+    })) {
+        .quote_snapshot => |snapshot| snapshot,
+        else => return error.TestUnexpectedResult,
+    };
+    if (findAdapterSubstitution(capsule, "quote_snapshot")) |substitution| {
+        if (substitution.request_hash != proposed_basket.basket_id)
+            divergences.note("quote_request_hash", 5);
+        if (substitution.response_hash != hashQuoteSnapshot(&quote_snapshot))
+            divergences.note("quote_response_hash", 5);
+    } else {
+        divergences.note("quote_substitution_missing", 5);
     }
 
     // Load paper order fixture and verify substituted result hash.
@@ -359,12 +432,10 @@ pub fn verifyAllowedTradeWithCapsulePath(
             substitution.fixture_file,
             ticket.account_id,
         );
+        if (substitution.request_hash != hashTicket(ticket)) divergences.note("paper_request_hash", 7);
         if (paper_result.total_filled_cents != ticket.target_notional_cents) divergences.note("paper_fill_total", 7);
-        if (substitution.expected_response_hash) |expected| {
-            if (hashPaperResult(&paper_result) != expected) divergences.note("adapter_response_hash", 7);
-        } else {
-            divergences.note("paper_order_hash_missing", 7);
-        }
+        if (hashPaperResult(&paper_result) != substitution.response_hash)
+            divergences.note("adapter_response_hash", 7);
     }
 
     const external_effects_disabled = model_backend.isEffectFree() and adapter_backend.isEffectFree();
@@ -418,6 +489,10 @@ pub fn verifyOversizedTradeBlock(
     if (capsule.model_substitutions.len != 1) divergences.note("model_substitution_count", 3);
     if (capsule.adapter_substitutions.len != 2) divergences.note("adapter_substitution_count", 4);
     if (hasAdapterOperation(capsule, "paper_order")) divergences.note("paper_order_substitution_present", 9);
+    if (proposed_basket.thesis_id != 0 and
+        capsule.model_substitutions.len > 0 and
+        proposed_basket.thesis_id != capsule.model_substitutions[0].request_hash)
+        divergences.note("model_request_hash", 3);
 
     if (capsule.replay_assertions.max_affordable_cents) |expected| {
         if (ticket.affordability_result.max_affordable_cents != expected) divergences.note("max_affordable_cents", 4);
@@ -445,11 +520,50 @@ pub fn verifyOversizedTradeBlock(
             capsule.model_substitutions[0].fixture_file,
         );
         if (model_content.len == 0) divergences.note("model_response_content", 3);
-        if (capsule.model_substitutions[0].expected_response_hash) |expected| {
-            if (model_content.hash != expected) divergences.note("model_response_hash", 3);
-        } else {
-            divergences.note("model_response_hash_missing", 3);
-        }
+        if (model_content.hash != capsule.model_substitutions[0].response_hash)
+            divergences.note("model_response_hash", 3);
+    }
+
+    var fixture_backend = try adapter.FixtureBackend.initFromDir(allocator, io, fixture_dir);
+    const account = switch (try fixture_backend.call(.{
+        .operation = .portfolio_snapshot,
+        .account_id = ticket.account_id,
+    })) {
+        .portfolio_snapshot => |snapshot| snapshot,
+        else => return error.TestUnexpectedResult,
+    };
+    const affordability = try portfolio.checkBasketAffordability(&account, proposed_basket);
+    if (findAdapterSubstitution(capsule, "portfolio_snapshot")) |substitution| {
+        if (substitution.request_hash != hashBytes("portfolio.read"))
+            divergences.note("portfolio_request_hash", 4);
+        if (substitution.response_hash != hashAffordability(affordability))
+            divergences.note("portfolio_response_hash", 4);
+    } else {
+        divergences.note("portfolio_substitution_missing", 4);
+    }
+
+    const quote_snapshot = switch (try fixture_backend.call(.{
+        .operation = .quote_snapshot,
+        .account_id = proposed_basket.account_id,
+        .ticker_count = proposed_basket.instrument_count,
+        .tickers = blk: {
+            var tickers = std.mem.zeroes([basket.max_basket_instruments][portfolio.max_ticker_len]u8);
+            for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |instrument, i| {
+                @memcpy(tickers[i][0..instrument.ticker_len], instrument.tickerSlice());
+            }
+            break :blk tickers;
+        },
+    })) {
+        .quote_snapshot => |snapshot| snapshot,
+        else => return error.TestUnexpectedResult,
+    };
+    if (findAdapterSubstitution(capsule, "quote_snapshot")) |substitution| {
+        if (substitution.request_hash != proposed_basket.basket_id)
+            divergences.note("quote_request_hash", 5);
+        if (substitution.response_hash != hashQuoteSnapshot(&quote_snapshot))
+            divergences.note("quote_response_hash", 5);
+    } else {
+        divergences.note("quote_substitution_missing", 5);
     }
 
     const external_effects_disabled = model_backend.isEffectFree() and adapter_backend.isEffectFree();
@@ -482,6 +596,10 @@ pub fn verifyRestrictedInstrumentBlock(
     if (capsule.model_substitutions.len > 0 and
         !std.mem.eql(u8, capsule.model_substitutions[0].fixture_file, "model_response_gemma4.json"))
         divergences.note("model_fixture_file", 3);
+    if (proposed_basket.thesis_id != 0 and
+        capsule.model_substitutions.len > 0 and
+        proposed_basket.thesis_id != capsule.model_substitutions[0].request_hash)
+        divergences.note("model_request_hash", 3);
     if (proposed_basket.rejected_count == 0) divergences.note("rejected_count", 2);
     if (!std.mem.eql(u8, requested_ticker, "SOXL")) divergences.note("requested_ticker", 2);
 
@@ -500,11 +618,8 @@ pub fn verifyRestrictedInstrumentBlock(
             capsule.model_substitutions[0].fixture_file,
         );
         if (model_content.len == 0) divergences.note("model_response_content", 3);
-        if (capsule.model_substitutions[0].expected_response_hash) |expected| {
-            if (model_content.hash != expected) divergences.note("model_response_hash", 3);
-        } else {
-            divergences.note("model_response_hash_missing", 3);
-        }
+        if (model_content.hash != capsule.model_substitutions[0].response_hash)
+            divergences.note("model_response_hash", 3);
     }
 
     // Restricted-instrument path uses only the model backend; no adapter calls occur.
@@ -529,11 +644,17 @@ fn loadExpectedAllowedBasketId(allocator: std.mem.Allocator, io: std.Io) !u64 {
 }
 
 fn buildAllowedReplayFixture(allocator: std.mem.Allocator, io: std.Io) !AllowedReplayFixture {
-    const portfolio = @import("portfolio");
     const expected_basket_id = try loadExpectedAllowedBasketId(allocator, io);
+    var loaded = try loadReplayCapsule(
+        allocator,
+        io,
+        "src/tickoni/test/fixtures/investment/replay_capsule.json",
+    );
+    defer loaded.deinit(allocator);
 
     var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
     proposed_basket.basket_id = expected_basket_id;
+    proposed_basket.thesis_id = loaded.parsed.value.model_substitutions[0].request_hash;
     proposed_basket.account_id = 2001;
     proposed_basket.target_notional_cents = 200_000;
     proposed_basket.catalog_schema_version = 1;

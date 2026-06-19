@@ -15,34 +15,32 @@
   "expected_proposal_hash": 1207484427160239519,
   "model_substitutions": [
     {
-      "request_hash": "model_request_hash_ai_infra",
-      "response_hash": "model_response_hash_ai_infra_gemma4",
-      "fixture_file": "model_response_gemma4.json",
-      "expected_response_hash": 12340958204495727724
+      "request_hash": 5782848427954506623,
+      "response_hash": 12340958204495727724,
+      "fixture_file": "model_response_gemma4.json"
     }
   ],
   "adapter_substitutions": [
     {
       "adapter_id": "paper_broker_demo",
       "operation": "quote_snapshot",
-      "request_hash": "adapter_request_hash_quote_ai_infra",
-      "response_hash": "adapter_response_hash_quote_ai_infra",
+      "request_hash": 11652673630910894805,
+      "response_hash": 3837264155678659392,
       "fixture_file": "quotes.json"
     },
     {
       "adapter_id": "paper_broker_demo",
       "operation": "portfolio_snapshot",
-      "request_hash": "adapter_request_hash_portfolio_demo_ops",
-      "response_hash": "adapter_response_hash_portfolio_demo_ops",
+      "request_hash": 11880919757726111843,
+      "response_hash": 12174377330011764409,
       "fixture_file": "account_ops.json"
     },
     {
       "adapter_id": "paper_broker_demo",
       "operation": "paper_order",
-      "request_hash": "adapter_request_hash_paper_place_allowed_2000",
-      "response_hash": "adapter_response_hash_paper_place_allowed_2000",
-      "fixture_file": "paper_execution_allowed_2000.json",
-      "expected_response_hash": 3139732945832584363
+      "request_hash": 1207484427160239519,
+      "response_hash": 3139732945832584363,
+      "fixture_file": "paper_execution_allowed_2000.json"
     }
   ],
   "replay_assertions": {

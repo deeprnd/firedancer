@@ -13,10 +13,9 @@
   "audit_chain_hash": "audit_chain_hash_restricted_soxl",
   "model_substitutions": [
     {
-      "request_hash": "model_request_hash_ai_infra_restricted_soxl",
-      "response_hash": "model_response_hash_ai_infra_gemma4",
-      "fixture_file": "model_response_gemma4.json",
-      "expected_response_hash": 12340958204495727724
+      "request_hash": 10637886937405873159,
+      "response_hash": 12340958204495727724,
+      "fixture_file": "model_response_gemma4.json"
     }
   ],
   "adapter_substitutions": [],
