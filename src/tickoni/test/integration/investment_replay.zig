@@ -77,6 +77,93 @@ test "investment_replay_integration: succeeds with fixture substitutions and no 
     try std.testing.expectEqual(@as(u64, 0), audit_chain.events[10].payload.replay_result.first_divergent_seq);
 }
 
+test "investment_replay_integration: allowed trade audit chain hashes are real and deterministic" {
+    const allocator = std.testing.allocator;
+    const input = support.operationsThesisInput();
+    const thesis_id = thesis.computeThesisInputHash(input);
+    const intent = try thesis.normalize(input);
+    const basket = try basket_mod.build(intent, thesis_id);
+
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+    const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
+
+    var model_backend = model.Backend{ .fixture = .{} };
+    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    const agent_result = try tkagnt.runInvestmentAgent(
+        allocator,
+        work_item,
+        &basket,
+        &model_backend,
+        &adapter_backend,
+        support.policy_max_notional_per_order_cents,
+        support.expected_ticket_id,
+    );
+    defer agent_result.deinit(allocator);
+    const execution = agent_result.paper_result orelse return error.TestUnexpectedResult;
+
+    const no_divergence = replay.ReplayVerification{
+        .external_effects_disabled = true,
+        .replay_match = true,
+        .divergence_count = 0,
+        .first_divergent_field = "",
+        .first_divergent_seq = 0,
+    };
+    const chain = investment_audit.buildAllowedTradeChain(
+        run_id,
+        &input,
+        &basket,
+        &agent_result.quote_snapshot,
+        agent_result.affordability,
+        &agent_result.model_response,
+        &agent_result.ticket,
+        &execution,
+        &no_divergence,
+    );
+
+    // Every record_hash must be a real computed value, not an unset zero.
+    for (chain.events) |event| {
+        try std.testing.expect(event.header.record_hash != 0);
+        try std.testing.expectEqual(run_id, event.header.run_id);
+    }
+
+    // Tile ID at each sequence position must match the owning tile.
+    const expected_tile_ids = [investment_audit.allowed_trade_event_count][]const u8{
+        "tkings", "tknorm", "tkdedu", "tkcase", "tkpoly",
+        "tkmodl", "tkadpt", "tkadpt", "tkagnt", "tkadpt", "tkrepl",
+    };
+    for (chain.events, expected_tile_ids) |event, expected| {
+        try std.testing.expectEqualStrings(expected, std.mem.sliceTo(&event.header.tile_id, 0));
+    }
+
+    // Key payload hash fields must carry real content (non-zero).
+    try std.testing.expect(chain.events[0].payload.source_event.raw_hash != 0);
+    try std.testing.expect(chain.events[1].payload.normalization.normalized_hash != 0);
+    try std.testing.expect(chain.events[2].payload.deduplication.idempotency_key != 0);
+    try std.testing.expect(chain.events[3].payload.case_creation.basket_id != 0);
+    try std.testing.expect(chain.events[5].payload.model_call.response_hash != 0);
+    try std.testing.expect(chain.events[6].payload.financial_adapter_call.response_hash != 0);
+    try std.testing.expect(chain.events[7].payload.financial_adapter_call.response_hash != 0);
+    try std.testing.expect(chain.events[8].payload.proposal.proposal_hash != 0);
+    try std.testing.expect(chain.events[9].payload.financial_adapter_call.response_hash != 0);
+    try std.testing.expect(chain.events[10].payload.replay_result.capsule_id != 0);
+
+    // The chain is deterministic: identical inputs must produce identical record_hash values.
+    const chain2 = investment_audit.buildAllowedTradeChain(
+        run_id,
+        &input,
+        &basket,
+        &agent_result.quote_snapshot,
+        agent_result.affordability,
+        &agent_result.model_response,
+        &agent_result.ticket,
+        &execution,
+        &no_divergence,
+    );
+    for (chain.events, chain2.events) |e1, e2| {
+        try std.testing.expectEqual(e1.header.record_hash, e2.header.record_hash);
+    }
+}
+
 test "investment_replay_integration: tamper detection reports first divergent hash and sequence" {
     const allocator = std.testing.allocator;
     const input = support.operationsThesisInput();
