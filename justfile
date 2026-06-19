@@ -93,6 +93,9 @@ test-integration-tk:
 test-system-tk:
   bash contrib/test/run_integration_model_tests.sh
 
+test-cli-tk:
+  bash contrib/test/run_cli_demo_tests.sh
+
 test-system-fd:
   @true
 

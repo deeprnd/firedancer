@@ -16,6 +16,8 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const fd_lib_dir = b.option([]const u8, "fd-lib-dir", "Firedancer lib dir (default: build/native/gcc/lib)") orelse "build/native/gcc/lib";
+    const clap_dep = b.dependency("clap", .{});
+    const clap_mod = clap_dep.module("clap");
 
     // Shared modules used by both the exe and test binaries.
     const runtime_mod = b.addModule("runtime", .{
@@ -577,6 +579,26 @@ pub fn build(b: *std.Build) void {
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
         },
     });
+    const v1_demo_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/demo/v1_1.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "adapter", .module = adapter_int_mod },
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "investment_support", .module = investment_support_int_mod },
+            .{ .name = "model", .module = model_int_mod },
+            .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "replay", .module = replay_int_mod },
+            .{ .name = "thesis", .module = thesis_int_mod },
+            .{ .name = "tkpoly", .module = tkpoly_int_mod },
+            .{ .name = "tool", .module = tool_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+        },
+    });
+    const v1_demo_test = b.addTest(.{ .root_module = v1_demo_mod });
+    linkTickoniCodec(b, v1_demo_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(v1_demo_test).step);
     for ([_][]const u8{
         "src/tickoni/test/integration/investment_allowed_trade.zig",
         "src/tickoni/test/integration/investment_replay.zig",
@@ -621,26 +643,37 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "adapter", .module = adapter_int_mod },
-                .{ .name = "basket", .module = basket_int_mod },
-                .{ .name = "investment_support", .module = investment_support_int_mod },
-                .{ .name = "model", .module = model_int_mod },
-                .{ .name = "portfolio", .module = portfolio_int_mod },
-                .{ .name = "replay", .module = replay_int_mod },
-                .{ .name = "thesis", .module = thesis_int_mod },
-                .{ .name = "tkpoly", .module = tkpoly_int_mod },
-                .{ .name = "tool", .module = tool_int_mod },
-                .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+                .{ .name = "v1_demo", .module = v1_demo_mod },
             },
         }),
     });
     linkTickoniCodec(b, system_test, fd_lib_dir);
-    system_test.root_module.link_libc = true;
     system_step.dependOn(&b.addRunArtifact(system_test).step);
 
     // Compatibility alias for the old live-model smoke command.
     const live_model_step = b.step("integration-test-live-model", "Alias for the live V1.1 system/demo lane");
     live_model_step.dependOn(system_step);
+
+    const cli_main_mod = b.createModule(.{
+        .root_source_file = b.path("src/app/tickoni_cli/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "clap", .module = clap_mod },
+            .{ .name = "v1_demo", .module = v1_demo_mod },
+        },
+    });
+    const cli_exe = b.addExecutable(.{
+        .name = "tickoni",
+        .root_module = cli_main_mod,
+    });
+    linkTickoniCodec(b, cli_exe, fd_lib_dir);
+    b.installArtifact(cli_exe);
+
+    const run_cli = b.addRunArtifact(cli_exe);
+    if (b.args) |argv| run_cli.addArgs(argv);
+    const run_cli_step = b.step("run-cli", "Run tickoni demo CLI");
+    run_cli_step.dependOn(&run_cli.step);
 
     // ---------------------------------------------------------------------------
     // Coverage step — install test binaries to zig-out/cov/ for kcov

@@ -84,6 +84,7 @@ venv
 
 # Zig
 .zig-cache
+zig-pkg/
 zig-out/
 
 # Fuchsia trace format
