@@ -582,6 +582,7 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/test/integration/investment_replay.zig",
         "src/tickoni/test/integration/investment_blocked_limits.zig",
         "src/tickoni/test/integration/investment_restricted_instrument.zig",
+        "src/tickoni/test/integration/investment_input_policy_denials.zig",
         "src/tickoni/test/integration/model_tile_http.zig",
         "src/tickoni/test/integration/mock_servers.zig",
     }) |path| {
@@ -601,6 +602,7 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "replay", .module = replay_int_mod },
                     .{ .name = "thesis", .module = thesis_int_mod },
                     .{ .name = "tkpoly", .module = tkpoly_int_mod },
+                    .{ .name = "tool", .module = tool_int_mod },
                     .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
                     .{ .name = "tkcase", .module = case_int_mod },
                     .{ .name = "tkdisp", .module = disp_int_mod },
