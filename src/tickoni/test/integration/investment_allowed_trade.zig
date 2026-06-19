@@ -1,6 +1,5 @@
 const std = @import("std");
 const adapter = @import("adapter");
-const basket_mod = @import("basket");
 const model = @import("model");
 const portfolio = @import("portfolio");
 const thesis = @import("thesis");
@@ -9,13 +8,14 @@ const support = @import("investment_support");
 const tkagnt = @import("tkagnt");
 const tkcase = @import("tkcase");
 const tkdisp = @import("tkdisp");
+const tkpoly = @import("tkpoly");
 
 test "investment_allowed_trade_integration: tkcase tkdisp tkagnt build the allowed paper trade" {
     const allocator = std.testing.allocator;
     const input = support.operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
     try std.testing.expect(support.basketRejects(&basket, "SOXL"));
     try std.testing.expect(support.basketRejects(&basket, "BULZ"));
 

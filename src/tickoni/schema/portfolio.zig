@@ -1,4 +1,4 @@
-/// Test brokerage account schema and affordability checks for V1.1.S4.
+/// Test brokerage account schema and affordability checks
 ///
 /// BrokerageAccount: account id, cash, buying power, currency, holdings,
 /// open orders, day notional used, and month notional used (T1).
@@ -264,7 +264,7 @@ fn mkOpenOrder(comptime ticker_s: []const u8, side: Side, notional_cents: i64) O
 // Demo fixtures (T2)
 // ---------------------------------------------------------------------------
 
-/// Deterministic demo fixtures for the five canonical V1.1.S4 account scenarios.
+/// Deterministic demo fixtures for the five canonical account scenarios.
 pub const fixtures = struct {
     /// cash_rich: USD 50,000 cash/buying power, no holdings, no open orders.
     /// USD 25,000/day and USD 100,000/month notional limits.  The canonical

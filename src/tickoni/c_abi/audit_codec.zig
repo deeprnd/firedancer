@@ -48,6 +48,10 @@ pub const ModelCallPayload = extern struct {
     response_hash: u64,
     token_estimate: u32,
     retry_count: u8,
+    actor_role: [16]u8,
+    workflow: [16]u8,
+    policy_decision_id: u64,
+    replay_substitution_id: u64,
 };
 
 pub const FinancialAdapterCallPayload = extern struct {

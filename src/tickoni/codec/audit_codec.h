@@ -51,6 +51,10 @@ typedef struct {
   uint64_t response_hash;
   uint32_t token_estimate;
   uint8_t retry_count;
+  unsigned char actor_role[ 16 ];
+  unsigned char workflow[ 16 ];
+  uint64_t policy_decision_id;
+  uint64_t replay_substitution_id;
 } tk_audit_model_call_t;
 
 typedef struct {

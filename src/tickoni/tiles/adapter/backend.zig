@@ -287,8 +287,8 @@ pub const FixtureBackend = struct {
                     break :blk .{ .paper_order = result };
                 }
                 var result: trade_ticket.PaperExecutionResult = std.mem.zeroes(trade_ticket.PaperExecutionResult);
-                result.paper_order_id_len = @intCast("paper_order_v1_1_ai_infra_2000_0001".len);
-                @memcpy(result.paper_order_id[0..result.paper_order_id_len], "paper_order_v1_1_ai_infra_2000_0001");
+                result.paper_order_id_len = @intCast("paper_order_ai_infra_2000_0001".len);
+                @memcpy(result.paper_order_id[0..result.paper_order_id_len], "paper_order_ai_infra_2000_0001");
                 result.ticket_id_len = ticket.ticket_id_len;
                 @memcpy(result.ticket_id[0..ticket.ticket_id_len], ticket.ticket_id[0..ticket.ticket_id_len]);
                 result.account_id = ticket.account_id;
@@ -455,8 +455,8 @@ test "FixtureBackend.initFromDir loads paper_execution_allowed_2000.json" {
         "src/tickoni/test/fixtures/investment",
     );
     const pe = backend.paper_execution orelse return error.TestUnexpectedResult;
-    try std.testing.expectEqualStrings("paper_order_v1_1_ai_infra_2000_0001", pe.paperOrderIdSlice());
-    try std.testing.expectEqualStrings("ticket_v1_1_ai_infra_2000_market", pe.ticketIdSlice());
+    try std.testing.expectEqualStrings("paper_order_ai_infra_2000_0001", pe.paperOrderIdSlice());
+    try std.testing.expectEqualStrings("ticket_ai_infra_2000_market", pe.ticketIdSlice());
     try std.testing.expectEqual(@as(i64, 200_000), pe.total_filled_cents);
     try std.testing.expectEqual(@as(u8, 7), pe.fill_count);
     try std.testing.expectEqual(@as(u64, 2_000_000), pe.fills[0].quantity_micros);

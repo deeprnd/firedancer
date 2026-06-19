@@ -1,7 +1,7 @@
 {
   "fixture_id": "model_response_ai_infra_gemma4",
-  "schema": "tickoni.v1_1.model_response",
-  "run_id": "run_v1_1_ai_infra_demo_0001",
+  "schema": "tickoni.model_response",
+  "run_id": "run_ai_infra_demo_0001",
   "model_id": "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL",
   "request_hash": "model_request_hash_ai_infra",
   "response_hash": "model_response_hash_ai_infra_gemma4",

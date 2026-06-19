@@ -1,6 +1,6 @@
 {
   "fixture_id": "quotes_ai_infra",
-  "schema": "tickoni.v1_1.quote_snapshot",
+  "schema": "tickoni.quote_snapshot",
   "currency": "USD",
   "as_of_ns": 1765792800000000000,
   "quotes": [

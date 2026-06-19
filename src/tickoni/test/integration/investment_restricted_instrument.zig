@@ -9,6 +9,7 @@ const support = @import("investment_support");
 const tkagnt = @import("tkagnt");
 const tkcase = @import("tkcase");
 const tkdisp = @import("tkdisp");
+const tkpoly = @import("tkpoly");
 
 test "investment_restricted_instrument_integration: direct restricted ticker request is denied before adapter work" {
     const allocator = std.testing.allocator;
@@ -21,7 +22,7 @@ test "investment_restricted_instrument_integration: direct restricted ticker req
     try std.testing.expectEqual(@as(u8, 1), intent.requested_ticker_count);
     try std.testing.expectEqualSlices(u8, support.restricted_ticker, intent.requested_tickers[0][0..support.restricted_ticker.len]);
 
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
     const rejected = support.findRejectedCandidate(&basket, support.restricted_ticker) orelse return error.TestUnexpectedResult;
     try std.testing.expectEqual(basket_mod.RejectionReason.restricted_instrument, rejected.reason_code);
     try std.testing.expect(std.mem.indexOf(u8, rejected.reasonSlice(), "leveraged ETF") != null);
@@ -50,7 +51,7 @@ test "investment_restricted_instrument_integration: restricted ticker replay and
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     try std.testing.expectEqual(@as(u8, 1), intent.requested_ticker_count);
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
 
     const rejected = support.findRejectedCandidate(&basket, support.restricted_ticker) orelse return error.TestUnexpectedResult;
     try std.testing.expectEqual(basket_mod.RejectionReason.restricted_instrument, rejected.reason_code);
@@ -82,6 +83,8 @@ test "investment_restricted_instrument_integration: restricted ticker replay and
 
     const audit_chain = investment_audit.buildRestrictedInstrumentBlockedChain(
         run_id,
+        "ops_reviewer",
+        "trading_control",
         &input,
         &basket,
         &block_result.model_response,

@@ -1,7 +1,6 @@
 const std = @import("std");
 const adapter = @import("adapter");
 const audit = @import("audit_tile");
-const basket_mod = @import("basket");
 const investment_audit = @import("investment_audit");
 const model = @import("model");
 const portfolio = @import("portfolio");
@@ -12,13 +11,14 @@ const support = @import("investment_support");
 const tkagnt = @import("tkagnt");
 const tkcase = @import("tkcase");
 const tkdisp = @import("tkdisp");
+const tkpoly = @import("tkpoly");
 
 test "investment_blocked_limits_integration: oversized trade is blocked before paper execution" {
     const allocator = std.testing.allocator;
     const input = support.operationsThesisInputWithTarget(support.oversized_target_notional_cents);
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
     try std.testing.expect(support.basketRejects(&basket, "SOXL"));
     try std.testing.expect(support.basketRejects(&basket, "BULZ"));
 
@@ -57,7 +57,7 @@ test "investment_blocked_limits_integration: oversized trade replay and audit re
     const input = support.operationsThesisInputWithTarget(support.oversized_target_notional_cents);
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
 
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
@@ -91,6 +91,8 @@ test "investment_blocked_limits_integration: oversized trade replay and audit re
 
     const audit_chain = investment_audit.buildOversizedTradeBlockedChain(
         run_id,
+        "ops_reviewer",
+        "trading_control",
         &input,
         &basket,
         &agent_result.quote_snapshot,

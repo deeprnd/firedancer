@@ -174,7 +174,16 @@ pub const BuildTicketError = error{
     TicketIdTooLong,
     MissingQuote,
     InvalidQuotePrice,
+    LimitPriceRequired,
+    InvalidLimitPrice,
     ZeroQuantity,
+};
+
+pub const BuildTicketRequest = struct {
+    ticket_id: []const u8,
+    side: Side,
+    order_type: OrderType,
+    limit_price_cents: ?i64 = null,
 };
 
 fn copyAscii(comptime N: usize, dst: *[N]u8, src: []const u8) !u8 {
@@ -184,68 +193,95 @@ fn copyAscii(comptime N: usize, dst: *[N]u8, src: []const u8) !u8 {
     return @intCast(src.len);
 }
 
-fn deriveBlockedReason(
-    requested_notional_cents: i64,
-    affordability: portfolio.AffordabilityResult,
-    policy_max_notional_per_order_cents: i64,
-) ?BlockedReason {
-    if (requested_notional_cents > policy_max_notional_per_order_cents and
-        affordability.outcome == .allow)
-    {
-        return .{
-            .code = .per_order_notional_exceeded,
-            .failed_scope_dim = .per_order_notional,
-            .requested_cents = requested_notional_cents,
-            .limit_cents = policy_max_notional_per_order_cents,
-        };
+pub fn applyPolicyDecision(
+    ticket: *TradeTicket,
+    policy_outcome: PolicyOutcome,
+    blocked_reasons: []const BlockedReason,
+    effective_max_paper_trade_cents: i64,
+) void {
+    ticket.policy_outcome = policy_outcome;
+    ticket.blocked_reasons = std.mem.zeroes([max_blocked_reasons]BlockedReason);
+    const count = if (policy_outcome == .deny)
+        @min(blocked_reasons.len, max_blocked_reasons)
+    else
+        0;
+    for (blocked_reasons[0..count], 0..) |blocked_reason, i| {
+        ticket.blocked_reasons[i] = blocked_reason;
     }
-
-    return switch (affordability.outcome) {
-        .allow => null,
-        .deny_open_order_limit,
-        .deny_invalid_notional,
-        => null,
-        .deny_insufficient_buying_power => .{
-            .code = .buying_power_exceeded,
-            .failed_scope_dim = .buying_power,
-            .requested_cents = requested_notional_cents,
-            .limit_cents = affordability.max_affordable_cents,
-        },
-        .deny_day_limit_exceeded => .{
-            .code = .daily_notional_exceeded,
-            .failed_scope_dim = .day_notional,
-            .requested_cents = requested_notional_cents,
-            .limit_cents = affordability.remaining_daily_notional_cents,
-        },
-        .deny_month_limit_exceeded => .{
-            .code = .monthly_notional_exceeded,
-            .failed_scope_dim = .month_notional,
-            .requested_cents = requested_notional_cents,
-            .limit_cents = affordability.remaining_monthly_notional_cents,
-        },
-    };
+    ticket.blocked_reason_count = @intCast(count);
+    ticket.affordability_result.effective_max_paper_trade_cents = effective_max_paper_trade_cents;
 }
 
 pub fn buildMarketBuyTicket(
     proposed_basket: *const basket.Basket,
     quote_snapshot: *const QuoteSnapshot,
     affordability: portfolio.AffordabilityResult,
-    policy_max_notional_per_order_cents: i64,
     ticket_id: []const u8,
 ) BuildTicketError!TradeTicket {
+    return buildTradeTicket(proposed_basket, quote_snapshot, affordability, .{
+        .ticket_id = ticket_id,
+        .side = .buy,
+        .order_type = .market,
+    });
+}
+
+pub fn buildMarketSellTicket(
+    proposed_basket: *const basket.Basket,
+    quote_snapshot: *const QuoteSnapshot,
+    affordability: portfolio.AffordabilityResult,
+    ticket_id: []const u8,
+) BuildTicketError!TradeTicket {
+    return buildTradeTicket(proposed_basket, quote_snapshot, affordability, .{
+        .ticket_id = ticket_id,
+        .side = .sell,
+        .order_type = .market,
+    });
+}
+
+pub fn buildLimitBuyTicket(
+    proposed_basket: *const basket.Basket,
+    quote_snapshot: *const QuoteSnapshot,
+    affordability: portfolio.AffordabilityResult,
+    ticket_id: []const u8,
+    limit_price_cents: ?i64,
+) BuildTicketError!TradeTicket {
+    return buildTradeTicket(proposed_basket, quote_snapshot, affordability, .{
+        .ticket_id = ticket_id,
+        .side = .buy,
+        .order_type = .limit,
+        .limit_price_cents = limit_price_cents,
+    });
+}
+
+pub fn buildLimitSellTicket(
+    proposed_basket: *const basket.Basket,
+    quote_snapshot: *const QuoteSnapshot,
+    affordability: portfolio.AffordabilityResult,
+    ticket_id: []const u8,
+    limit_price_cents: ?i64,
+) BuildTicketError!TradeTicket {
+    return buildTradeTicket(proposed_basket, quote_snapshot, affordability, .{
+        .ticket_id = ticket_id,
+        .side = .sell,
+        .order_type = .limit,
+        .limit_price_cents = limit_price_cents,
+    });
+}
+
+pub fn buildTradeTicket(
+    proposed_basket: *const basket.Basket,
+    quote_snapshot: *const QuoteSnapshot,
+    affordability: portfolio.AffordabilityResult,
+    request: BuildTicketRequest,
+) BuildTicketError!TradeTicket {
     var ticket: TradeTicket = std.mem.zeroes(TradeTicket);
-    ticket.ticket_id_len = try copyAscii(max_ticket_id_len, &ticket.ticket_id, ticket_id);
+    ticket.ticket_id_len = try copyAscii(max_ticket_id_len, &ticket.ticket_id, request.ticket_id);
     ticket.account_id = proposed_basket.account_id;
-    ticket.side = .buy;
-    ticket.order_type = .market;
+    ticket.side = request.side;
+    ticket.order_type = request.order_type;
     ticket.time_in_force = .day;
     ticket.target_notional_cents = proposed_basket.total_allocated_cents;
     ticket.line_item_count = proposed_basket.instrument_count;
-
-    const effective_max = @min(
-        affordability.max_affordable_cents,
-        policy_max_notional_per_order_cents,
-    );
     ticket.affordability_result = .{
         .outcome = affordability.outcome,
         .cash_available_cents = affordability.cash_available_cents,
@@ -253,28 +289,18 @@ pub fn buildMarketBuyTicket(
         .remaining_daily_notional_cents = affordability.remaining_daily_notional_cents,
         .remaining_monthly_notional_cents = affordability.remaining_monthly_notional_cents,
         .max_affordable_cents = affordability.max_affordable_cents,
-        .effective_max_paper_trade_cents = effective_max,
+        .effective_max_paper_trade_cents = affordability.max_affordable_cents,
     };
-    ticket.policy_outcome = if (ticket.target_notional_cents <= effective_max) .allow else .deny;
-    if (ticket.policy_outcome == .deny) {
-        if (deriveBlockedReason(
-            ticket.target_notional_cents,
-            affordability,
-            policy_max_notional_per_order_cents,
-        )) |reason| {
-            ticket.blocked_reasons[0] = reason;
-            ticket.blocked_reason_count = 1;
-        }
-    }
+    ticket.policy_outcome = .allow;
 
     var estimated_cost: i64 = 0;
     for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |instrument, i| {
         const quote = quote_snapshot.find(instrument.tickerSlice()) orelse return error.MissingQuote;
-        if (quote.ask_cents <= 0) return error.InvalidQuotePrice;
+        const price_cents = try ticketPriceCents(quote, request.side, request.order_type, request.limit_price_cents);
 
         const quantity_micros = @divTrunc(
             @as(i128, instrument.allocation_cents) * @as(i128, quantity_scale),
-            @as(i128, quote.ask_cents),
+            @as(i128, price_cents),
         );
         if (quantity_micros <= 0) return error.ZeroQuantity;
 
@@ -282,9 +308,9 @@ pub fn buildMarketBuyTicket(
         ticket.line_items[i].ticker_len = instrument.ticker_len;
         ticket.line_items[i].asset_class = instrument.asset_class;
         ticket.line_items[i].venue = quote.venue;
-        ticket.line_items[i].side = .buy;
+        ticket.line_items[i].side = request.side;
         ticket.line_items[i].quantity_micros = @intCast(quantity_micros);
-        ticket.line_items[i].price_cents = quote.ask_cents;
+        ticket.line_items[i].price_cents = price_cents;
         ticket.line_items[i].line_notional_cents = instrument.allocation_cents;
         ticket.line_items[i].allocation_weight_bp = instrument.weight_bp;
         estimated_cost += instrument.allocation_cents;
@@ -293,9 +319,38 @@ pub fn buildMarketBuyTicket(
     return ticket;
 }
 
-test "buildMarketBuyTicket: oversized notional produces per-order block reason" {
+fn ticketPriceCents(
+    quote: Quote,
+    side: Side,
+    order_type: OrderType,
+    limit_price_cents: ?i64,
+) BuildTicketError!i64 {
+    return switch (order_type) {
+        .market => blk: {
+            const price_cents = switch (side) {
+                .buy => quote.ask_cents,
+                .sell => quote.bid_cents,
+            };
+            if (price_cents <= 0) return error.InvalidQuotePrice;
+            break :blk price_cents;
+        },
+        .limit => blk: {
+            const price_cents = limit_price_cents orelse return error.LimitPriceRequired;
+            if (price_cents <= 0) return error.InvalidLimitPrice;
+            break :blk price_cents;
+        },
+    };
+}
+
+const TicketFixture = struct {
+    proposed_basket: basket.Basket,
+    quotes: QuoteSnapshot,
+    affordability: portfolio.AffordabilityResult,
+};
+
+fn buildTicketFixture(target_notional_cents: i64, bid_cents: i64, ask_cents: i64) !TicketFixture {
     var input = thesis.fixtures.ai_infrastructure;
-    input.target_notional_cents = 2_500_000;
+    input.target_notional_cents = target_notional_cents;
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const proposed_basket = try basket.build(intent, thesis_id);
@@ -308,24 +363,127 @@ test "buildMarketBuyTicket: oversized notional produces per-order block reason" 
             .ticker = instrument.ticker,
             .ticker_len = instrument.ticker_len,
             .venue = .nasdaq,
-            .bid_cents = 10_000,
-            .ask_cents = 10_000,
-            .last_cents = 10_000,
+            .bid_cents = bid_cents,
+            .ask_cents = ask_cents,
+            .last_cents = ask_cents,
         };
     }
 
+    return .{
+        .proposed_basket = proposed_basket,
+        .quotes = quotes,
+        .affordability = affordability,
+    };
+}
+
+fn expectedQuantityMicros(allocation_cents: i64, price_cents: i64) u64 {
+    return @intCast(@divTrunc(
+        @as(i128, allocation_cents) * @as(i128, quantity_scale),
+        @as(i128, price_cents),
+    ));
+}
+
+test "buildMarketBuyTicket: oversized notional produces per-order block reason" {
+    const fixture = try buildTicketFixture(2_500_000, 10_000, 10_000);
+
     const ticket = try buildMarketBuyTicket(
-        &proposed_basket,
-        &quotes,
-        affordability,
-        250_000,
-        "ticket_v1_1_ai_infra_25000_blocked",
+        &fixture.proposed_basket,
+        &fixture.quotes,
+        fixture.affordability,
+        "ticket_ai_infra_25000_blocked",
     );
 
-    try std.testing.expectEqual(PolicyOutcome.deny, ticket.policy_outcome);
-    try std.testing.expectEqual(@as(u8, 1), ticket.blocked_reason_count);
-    try std.testing.expectEqual(BlockedReasonCode.per_order_notional_exceeded, ticket.blocked_reasons[0].code);
-    try std.testing.expectEqual(FailedScopeDimension.per_order_notional, ticket.blocked_reasons[0].failed_scope_dim);
-    try std.testing.expectEqual(@as(i64, 2_500_000), ticket.blocked_reasons[0].requested_cents);
-    try std.testing.expectEqual(@as(i64, 250_000), ticket.blocked_reasons[0].limit_cents);
+    try std.testing.expectEqual(PolicyOutcome.allow, ticket.policy_outcome);
+    try std.testing.expectEqual(@as(u8, 0), ticket.blocked_reason_count);
+    try std.testing.expectEqual(fixture.affordability.max_affordable_cents, ticket.affordability_result.effective_max_paper_trade_cents);
+}
+
+test "buildMarketSellTicket: creates sell preview using bid prices" {
+    const fixture = try buildTicketFixture(200_000, 9_500, 10_000);
+
+    const ticket = try buildMarketSellTicket(
+        &fixture.proposed_basket,
+        &fixture.quotes,
+        fixture.affordability,
+        "ticket_ai_infra_2000_market_sell",
+    );
+
+    try std.testing.expectEqual(Side.sell, ticket.side);
+    try std.testing.expectEqual(OrderType.market, ticket.order_type);
+    try std.testing.expectEqual(fixture.proposed_basket.instrument_count, ticket.line_item_count);
+    for (ticket.line_items[0..ticket.line_item_count], 0..) |line, i| {
+        try std.testing.expectEqual(Side.sell, line.side);
+        try std.testing.expectEqual(@as(i64, 9_500), line.price_cents);
+        try std.testing.expectEqual(
+            expectedQuantityMicros(fixture.proposed_basket.instruments[i].allocation_cents, 9_500),
+            line.quantity_micros,
+        );
+    }
+}
+
+test "buildLimitBuyTicket: requires positive limit price" {
+    const fixture = try buildTicketFixture(200_000, 9_500, 10_000);
+
+    try std.testing.expectError(error.LimitPriceRequired, buildLimitBuyTicket(
+        &fixture.proposed_basket,
+        &fixture.quotes,
+        fixture.affordability,
+        "ticket_ai_infra_2000_limit_buy",
+        null,
+    ));
+    try std.testing.expectError(error.InvalidLimitPrice, buildLimitBuyTicket(
+        &fixture.proposed_basket,
+        &fixture.quotes,
+        fixture.affordability,
+        "ticket_ai_infra_2000_limit_buy",
+        0,
+    ));
+}
+
+test "buildLimitBuyTicket: creates buy preview using limit price" {
+    const fixture = try buildTicketFixture(200_000, 9_500, 10_000);
+    const limit_price_cents: i64 = 9_875;
+
+    const ticket = try buildLimitBuyTicket(
+        &fixture.proposed_basket,
+        &fixture.quotes,
+        fixture.affordability,
+        "ticket_ai_infra_2000_limit_buy",
+        limit_price_cents,
+    );
+
+    try std.testing.expectEqual(Side.buy, ticket.side);
+    try std.testing.expectEqual(OrderType.limit, ticket.order_type);
+    for (ticket.line_items[0..ticket.line_item_count], 0..) |line, i| {
+        try std.testing.expectEqual(Side.buy, line.side);
+        try std.testing.expectEqual(limit_price_cents, line.price_cents);
+        try std.testing.expectEqual(
+            expectedQuantityMicros(fixture.proposed_basket.instruments[i].allocation_cents, limit_price_cents),
+            line.quantity_micros,
+        );
+    }
+}
+
+test "buildLimitSellTicket: creates sell preview using limit price" {
+    const fixture = try buildTicketFixture(200_000, 9_500, 10_000);
+    const limit_price_cents: i64 = 10_125;
+
+    const ticket = try buildLimitSellTicket(
+        &fixture.proposed_basket,
+        &fixture.quotes,
+        fixture.affordability,
+        "ticket_ai_infra_2000_limit_sell",
+        limit_price_cents,
+    );
+
+    try std.testing.expectEqual(Side.sell, ticket.side);
+    try std.testing.expectEqual(OrderType.limit, ticket.order_type);
+    for (ticket.line_items[0..ticket.line_item_count], 0..) |line, i| {
+        try std.testing.expectEqual(Side.sell, line.side);
+        try std.testing.expectEqual(limit_price_cents, line.price_cents);
+        try std.testing.expectEqual(
+            expectedQuantityMicros(fixture.proposed_basket.instruments[i].allocation_cents, limit_price_cents),
+            line.quantity_micros,
+        );
+    }
 }

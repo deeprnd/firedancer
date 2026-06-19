@@ -41,7 +41,7 @@ fn mkOpenOrder(comptime ticker_s: []const u8, side: Side, notional_cents: i64) O
     };
 }
 
-/// Deterministic test accounts for the five canonical V1.1.S4 account scenarios.
+/// Deterministic test accounts for the five canonical account scenarios.
 pub const fixtures = struct {
     /// cash_rich: USD 50,000 cash/buying power, no holdings, no open orders.
     /// USD 25,000/day and USD 100,000/month notional limits.  The canonical

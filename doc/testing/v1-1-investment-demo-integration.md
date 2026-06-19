@@ -1,9 +1,9 @@
-# V1.1 Investment Demo Integration Tests
+# V1.11 Investment Demo Release Closure Integration Tests
 
 ## Purpose
 
-This document defines the Tickoni integration-test scenarios for
-`V1.1.S6: Investment demo and proof`.
+This document defines the Tickoni integration-test scenarios for roadmap
+`V1.11`, the release-closure proof contract for the V1.1 investment demo.
 
 The goal is to prove the V1.1 product story end to end:
 
@@ -25,7 +25,8 @@ the harness boundary with deterministic local fixtures.
 
 ## Assumptions
 
-- This closes the `V1.1 Investment Intent To Paper Trade` epic from
+- This closes the `V1.11 Investment Demo Release Closure` increment for the
+  V1.1 investment story from
   [roadmap.md](../position/roadmap.md) and
   [wbs.md](../position/wbs.md).
 - The test command should become a real Tickoni integration recipe behind the
@@ -35,6 +36,9 @@ the harness boundary with deterministic local fixtures.
   assertion layer should validate machine-readable output, not terminal copy.
 - `trading_order.place` is paper-only in V1.1 and must not imply broker
   sandbox or live execution authority.
+- Paper placement must be tied to the exact validated ticket, proposal hash,
+  capability envelope id, policy decision id, account, environment, and
+  deterministic action id. A caller-provided allow flag is not sufficient.
 - Replay must not call an LLM server, broker, market-data provider, payment
   system, trading API, or executor.
 - The live model lane should use
@@ -128,7 +132,8 @@ Required links:
 
 ## Test Lanes
 
-The V1.1 suite should split the demo into three lanes so it stays useful in
+The V1.11 closure suite should split the demo into three lanes so it stays
+useful in
 developer loops and credible in CI:
 
 - `simple integration`: `just test-integration-tk` or a delegated V1.1 command
@@ -422,6 +427,7 @@ Required evidence fields:
 - normalized intent hash
 - basket id
 - ticket id
+- deterministic action id
 - proposal hash
 - policy version
 - capability envelope id
@@ -430,12 +436,16 @@ Required evidence fields:
 - adapter request and response hashes
 - quote fixture id
 - paper execution fixture id when present
+- paper execution timestamp and resulting cash and holdings snapshot when
+  present
 - affordability outcome
 - max affordable amount
 - effective max paper-trade amount after account and policy limits
 - rejected instrument reasons
 - audit record hashes
 - replay capsule id
+- metrics artifact location
+- diagnostics artifact location
 
 ## Positive Tests
 
@@ -744,7 +754,7 @@ What it shows:
 
 ## Demo Checklist
 
-The exec-facing V1.1.S6 demo should show:
+The exec-facing V1.11 demo should show:
 
 1. The user enters one AI infrastructure thesis.
 2. Tickoni shows the model-assisted thesis summary.
@@ -756,10 +766,15 @@ The exec-facing V1.1.S6 demo should show:
 7. Tickoni paper-places the allowed USD 2,000 ticket.
 8. Tickoni runs the USD 25,000 variant and blocks it with the max affordable
    amount and effective max paper-trade amount.
-9. Tickoni exports audit-ready ticket evidence for allowed, oversized, and
-   restricted-instrument flows.
-10. Tickoni replays the run with model, broker, market, trading, payment, and
+9. Tickoni denies a direct restricted-instrument request before quote or paper
+   placement work.
+10. Tickoni denies a direct paper-placement bypass before any adapter call.
+11. Tickoni exports audit, metrics, diagnostics, and ticket evidence artifact
+    locations for allowed, oversized, restricted-instrument, and bypass flows.
+12. Tickoni replays the run with model, broker, market, trading, payment, and
     execution effects disabled.
+13. Tickoni shows deliberate tamper detection with the first divergent field or
+    record.
 
 ## Implementation Notes
 
@@ -783,7 +798,7 @@ The exec-facing V1.1.S6 demo should show:
 
 ## Completion Criteria
 
-V1.1.S6 is complete when:
+V1.11 release closure is complete when:
 
 - one local command or test fixture produces the full AI infrastructure demo
 - the simple integration lane validates recorded model output and real ticket
@@ -793,6 +808,8 @@ V1.1.S6 is complete when:
   GitHub public-runner-sized budget or as a documented opt-in job
 - positive and negative integration scenarios above pass
 - allowed, oversized, and restricted-instrument flows emit audit-ready evidence
+- direct paper-placement bypass is denied before any adapter call
+- audit, metrics, and diagnostics artifacts agree with the rendered demo output
 - replay succeeds without live model or adapter effects
 - at least one intentional divergence test proves replay detects drift
 - `just test-integration-tk` or its delegated V1.1 command runs these scenarios

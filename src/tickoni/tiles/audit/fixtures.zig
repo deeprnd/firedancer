@@ -77,6 +77,10 @@ pub fn makeFixtures() [12]schema.AuditEvent {
             .response_hash = 9101,
             .token_estimate = 512,
             .retry_count = 2,
+            .actor_role = parseFixedAsciiBytes(16, "ops_reviewer") catch unreachable,
+            .workflow = parseFixedAsciiBytes(16, "replay_demo") catch unreachable,
+            .policy_decision_id = 77,
+            .replay_substitution_id = 88,
         } }),
         codec.buildEvent(headers[4], .{ .financial_adapter_call = .{
             .adapter_id = parseFixedAsciiBytes(16, "broker") catch unreachable,
@@ -168,6 +172,7 @@ test "hash chain mutation changes downstream records" {
 }
 
 test "binary and wire format pinned" {
+    if (std.c.getenv("TK_GEN_FIXTURES") != null) return error.SkipZigTest;
     const golden = @import("audit_fixtures_gen").values;
     for (makeFixtures(), &golden) |event, g| {
         try std.testing.expectEqual(g.expected_hash, event.header.record_hash);

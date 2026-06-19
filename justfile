@@ -65,10 +65,11 @@ test-unit-fd:
 test-unit-tk:
   ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build test --summary all
 
-# Print computed hash and wire bytes for every audit fixture event.
+# Print computed hash and wire bytes for every audit fixture event, and emit audit JSONL.
 # Use the output to understand or snapshot the current encoding after intentional changes.
 gen-audit-fixtures:
-  TK_GEN_FIXTURES=1 zig build test 2>&1
+  TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build test 2>&1
+  TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build integration-test 2>&1
 
 test-unit-all:
   python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
@@ -89,9 +90,17 @@ test-integration-fd:
 test-integration-tk:
   ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build integration-test --summary all
 
-# Tickoni system lane: opt-in real-LLM V1.1 demo proof.
+# Deterministic offline investment demo — no llama.cpp required.
+demo-tk:
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build
+  zig-out/bin/tickoni demo investment --fixture --thesis "I want to invest USD 2,000 in AI infrastructure through US-listed ETFs and large-cap equities."
+
+# Tickoni system lane: opt-in real-LLM investment demo proof.
 test-system-tk:
   bash contrib/test/run_integration_model_tests.sh
+
+test-cli-tk:
+  bash contrib/test/run_cli_demo_tests.sh
 
 test-system-fd:
   @true
