@@ -61,6 +61,7 @@ pub fn buildPolicyDecisionEvent(
     };
     return audit.buildEvent(.{
         .schema_version = audit.audit_schema_version,
+        .run_id = 0,
         .seq = seq,
         .source_offset = source_offset,
         .tile_id = tkpoly_tile_id,

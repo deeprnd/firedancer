@@ -71,6 +71,10 @@ message ThesisInput {
   RiskPreference risk_preference        = 7;
   uint32         max_single_name_pct    = 8;
   uint32         exclusions             = 9;
+  // Tickers the user explicitly named in their request (e.g. "Buy SOXL").
+  // Each entry is the ticker string; basket construction checks these against
+  // the catalog restricted list before theme-based scope checks.
+  repeated bytes requested_tickers      = 10;
 }
 
 // Validated, structured intent produced by normalize().
@@ -85,6 +89,8 @@ message InvestorIntent {
   repeated Venue venues                 = 7;
   RiskPreference risk_preference        = 8;
   uint32         max_single_name_pct    = 9;
+  // Forwarded from ThesisInput unchanged; basket construction checks these.
+  repeated bytes requested_tickers      = 10;
 }
 
 // Audit payload for a successful thesis normalization.

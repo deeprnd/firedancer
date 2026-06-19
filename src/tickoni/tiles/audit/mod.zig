@@ -17,6 +17,8 @@ pub const ApprovalRequiredPayload = schema.ApprovalRequiredPayload;
 pub const DenialPayload = schema.DenialPayload;
 pub const TelemetryCheckpointPayload = schema.TelemetryCheckpointPayload;
 pub const ReplayResultPayload = schema.ReplayResultPayload;
+pub const DeduplicationPayload = schema.DeduplicationPayload;
+pub const CaseCreationPayload = schema.CaseCreationPayload;
 pub const Header = schema.Header;
 pub const AuditEvent = schema.AuditEvent;
 

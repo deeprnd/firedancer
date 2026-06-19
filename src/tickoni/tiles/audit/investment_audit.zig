@@ -7,9 +7,9 @@ const replay = @import("replay");
 const thesis = @import("thesis");
 const trade_ticket = @import("trade_ticket");
 
-pub const allowed_trade_event_count: usize = 9;
-pub const oversized_trade_blocked_event_count: usize = 10;
-pub const restricted_instrument_blocked_event_count: usize = 6;
+pub const allowed_trade_event_count: usize = 11;
+pub const oversized_trade_blocked_event_count: usize = 12;
+pub const restricted_instrument_blocked_event_count: usize = 8;
 
 pub const AllowedTradeAuditChain = struct {
     events: [allowed_trade_event_count]audit.AuditEvent,
@@ -146,10 +146,12 @@ fn header(
     tile_id: []const u8,
     logical_actor_id: u64,
     capability_envelope_id: u128,
+    run_id: u64,
     prev_hash: u64,
 ) audit.Header {
     return .{
         .schema_version = audit.audit_schema_version,
+        .run_id = run_id,
         .seq = seq,
         .source_offset = seq + 1,
         .tile_id = parseFixedAsciiBytes(6, tile_id),
@@ -163,6 +165,7 @@ fn header(
 }
 
 pub fn buildAllowedTradeChain(
+    run_id: u64,
     thesis_input: *const thesis.ThesisInput,
     proposed_basket: *const basket.Basket,
     quote_snapshot: *const trade_ticket.QuoteSnapshot,
@@ -183,7 +186,7 @@ pub fn buildAllowedTradeChain(
     var events: [allowed_trade_event_count]audit.AuditEvent = undefined;
     var prev_hash: u64 = 0;
 
-    events[0] = audit.buildEvent(header(0, "tkings", thesis_input.account_id, capability_id, prev_hash), .{
+    events[0] = audit.buildEvent(header(0, "tkings", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .source_event = .{
             .source_system = parseFixedAsciiBytes(16, source_system),
             .event_type = parseFixedAsciiBytes(32, source_event_type),
@@ -192,7 +195,7 @@ pub fn buildAllowedTradeChain(
     });
     prev_hash = events[0].header.record_hash;
 
-    events[1] = audit.buildEvent(header(1, "tknorm", thesis_input.account_id, capability_id, prev_hash), .{
+    events[1] = audit.buildEvent(header(1, "tknorm", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .normalization = .{
             .source_event_hash = raw_hash,
             .normalized_hash = normalized_hash,
@@ -201,7 +204,25 @@ pub fn buildAllowedTradeChain(
     });
     prev_hash = events[1].header.record_hash;
 
-    events[2] = audit.buildEvent(header(2, "tkpoly", thesis_input.account_id, capability_id, prev_hash), .{
+    events[2] = audit.buildEvent(header(2, "tkdedu", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+        .deduplication = .{
+            .idempotency_key = raw_hash,
+            .is_duplicate = false,
+        },
+    });
+    prev_hash = events[2].header.record_hash;
+
+    events[3] = audit.buildEvent(header(3, "tkcase", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+        .case_creation = .{
+            .basket_id = proposed_basket.basket_id,
+            .instrument_count = proposed_basket.instrument_count,
+            .rejected_count = proposed_basket.rejected_count,
+            .total_allocated_cents = proposed_basket.total_allocated_cents,
+        },
+    });
+    prev_hash = events[3].header.record_hash;
+
+    events[4] = audit.buildEvent(header(4, "tkpoly", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .policy_decision = .{
             .outcome = if (ticket.policy_outcome == .allow) .allow else .deny,
             .rule_id = 1101,
@@ -209,9 +230,9 @@ pub fn buildAllowedTradeChain(
             .source_event_hash = normalized_hash,
         },
     });
-    prev_hash = events[2].header.record_hash;
+    prev_hash = events[4].header.record_hash;
 
-    events[3] = audit.buildEvent(header(3, "tkmodl", thesis_input.account_id, capability_id, prev_hash), .{
+    events[5] = audit.buildEvent(header(5, "tkmodl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .model_call = .{
             .model_id = parseFixedAsciiBytes(32, model_backend_id),
             .prompt_hash = raw_hash,
@@ -220,9 +241,9 @@ pub fn buildAllowedTradeChain(
             .retry_count = 0,
         },
     });
-    prev_hash = events[3].header.record_hash;
+    prev_hash = events[5].header.record_hash;
 
-    events[4] = audit.buildEvent(header(4, "tkadpt", thesis_input.account_id, capability_id, prev_hash), .{
+    events[6] = audit.buildEvent(header(6, "tkadpt", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .financial_adapter_call = .{
             .adapter_id = parseFixedAsciiBytes(16, "portfolio"),
             .request_hash = hashBytes("portfolio.read"),
@@ -230,9 +251,9 @@ pub fn buildAllowedTradeChain(
             .fixture_id = 1,
         },
     });
-    prev_hash = events[4].header.record_hash;
+    prev_hash = events[6].header.record_hash;
 
-    events[5] = audit.buildEvent(header(5, "tkadpt", thesis_input.account_id, capability_id, prev_hash), .{
+    events[7] = audit.buildEvent(header(7, "tkadpt", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .financial_adapter_call = .{
             .adapter_id = parseFixedAsciiBytes(16, "quotes"),
             .request_hash = normalized_hash,
@@ -240,18 +261,18 @@ pub fn buildAllowedTradeChain(
             .fixture_id = 2,
         },
     });
-    prev_hash = events[5].header.record_hash;
+    prev_hash = events[7].header.record_hash;
 
-    events[6] = audit.buildEvent(header(6, "tkagnt", thesis_input.account_id, capability_id, prev_hash), .{
+    events[8] = audit.buildEvent(header(8, "tkagnt", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .proposal = .{
             .proposal_type = parseFixedAsciiBytes(32, proposal_type),
             .proposal_hash = proposal_hash,
             .approval_state = 0,
         },
     });
-    prev_hash = events[6].header.record_hash;
+    prev_hash = events[8].header.record_hash;
 
-    events[7] = audit.buildEvent(header(7, "tkadpt", thesis_input.account_id, capability_id, prev_hash), .{
+    events[9] = audit.buildEvent(header(9, "tkadpt", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .financial_adapter_call = .{
             .adapter_id = parseFixedAsciiBytes(16, "paper_fill"),
             .request_hash = proposal_hash,
@@ -259,9 +280,9 @@ pub fn buildAllowedTradeChain(
             .fixture_id = 3,
         },
     });
-    prev_hash = events[7].header.record_hash;
+    prev_hash = events[9].header.record_hash;
 
-    events[8] = audit.buildEvent(header(8, "tkrepl", thesis_input.account_id, capability_id, prev_hash), .{
+    events[10] = audit.buildEvent(header(10, "tkrepl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .replay_result = .{
             .capsule_id = hashBytes(replay_capsule_id),
             .divergences = replay_result.divergence_count,
@@ -273,6 +294,7 @@ pub fn buildAllowedTradeChain(
 }
 
 pub fn buildOversizedTradeBlockedChain(
+    run_id: u64,
     thesis_input: *const thesis.ThesisInput,
     proposed_basket: *const basket.Basket,
     quote_snapshot: *const trade_ticket.QuoteSnapshot,
@@ -292,7 +314,7 @@ pub fn buildOversizedTradeBlockedChain(
     var events: [oversized_trade_blocked_event_count]audit.AuditEvent = undefined;
     var prev_hash: u64 = 0;
 
-    events[0] = audit.buildEvent(header(0, "tkings", thesis_input.account_id, capability_id, prev_hash), .{
+    events[0] = audit.buildEvent(header(0, "tkings", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .source_event = .{
             .source_system = parseFixedAsciiBytes(16, source_system),
             .event_type = parseFixedAsciiBytes(32, source_event_type),
@@ -301,7 +323,7 @@ pub fn buildOversizedTradeBlockedChain(
     });
     prev_hash = events[0].header.record_hash;
 
-    events[1] = audit.buildEvent(header(1, "tknorm", thesis_input.account_id, capability_id, prev_hash), .{
+    events[1] = audit.buildEvent(header(1, "tknorm", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .normalization = .{
             .source_event_hash = raw_hash,
             .normalized_hash = normalized_hash,
@@ -310,7 +332,25 @@ pub fn buildOversizedTradeBlockedChain(
     });
     prev_hash = events[1].header.record_hash;
 
-    events[2] = audit.buildEvent(header(2, "tkpoly", thesis_input.account_id, capability_id, prev_hash), .{
+    events[2] = audit.buildEvent(header(2, "tkdedu", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+        .deduplication = .{
+            .idempotency_key = raw_hash,
+            .is_duplicate = false,
+        },
+    });
+    prev_hash = events[2].header.record_hash;
+
+    events[3] = audit.buildEvent(header(3, "tkcase", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+        .case_creation = .{
+            .basket_id = proposed_basket.basket_id,
+            .instrument_count = proposed_basket.instrument_count,
+            .rejected_count = proposed_basket.rejected_count,
+            .total_allocated_cents = proposed_basket.total_allocated_cents,
+        },
+    });
+    prev_hash = events[3].header.record_hash;
+
+    events[4] = audit.buildEvent(header(4, "tkpoly", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .policy_decision = .{
             .outcome = .deny,
             .rule_id = 1101,
@@ -318,9 +358,9 @@ pub fn buildOversizedTradeBlockedChain(
             .source_event_hash = normalized_hash,
         },
     });
-    prev_hash = events[2].header.record_hash;
+    prev_hash = events[4].header.record_hash;
 
-    events[3] = audit.buildEvent(header(3, "tkmodl", thesis_input.account_id, capability_id, prev_hash), .{
+    events[5] = audit.buildEvent(header(5, "tkmodl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .model_call = .{
             .model_id = parseFixedAsciiBytes(32, model_backend_id),
             .prompt_hash = raw_hash,
@@ -329,9 +369,9 @@ pub fn buildOversizedTradeBlockedChain(
             .retry_count = 0,
         },
     });
-    prev_hash = events[3].header.record_hash;
+    prev_hash = events[5].header.record_hash;
 
-    events[4] = audit.buildEvent(header(4, "tkadpt", thesis_input.account_id, capability_id, prev_hash), .{
+    events[6] = audit.buildEvent(header(6, "tkadpt", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .financial_adapter_call = .{
             .adapter_id = parseFixedAsciiBytes(16, "portfolio"),
             .request_hash = hashBytes("portfolio.read"),
@@ -339,9 +379,9 @@ pub fn buildOversizedTradeBlockedChain(
             .fixture_id = 1,
         },
     });
-    prev_hash = events[4].header.record_hash;
+    prev_hash = events[6].header.record_hash;
 
-    events[5] = audit.buildEvent(header(5, "tkadpt", thesis_input.account_id, capability_id, prev_hash), .{
+    events[7] = audit.buildEvent(header(7, "tkadpt", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .financial_adapter_call = .{
             .adapter_id = parseFixedAsciiBytes(16, "quotes"),
             .request_hash = normalized_hash,
@@ -349,18 +389,18 @@ pub fn buildOversizedTradeBlockedChain(
             .fixture_id = 2,
         },
     });
-    prev_hash = events[5].header.record_hash;
+    prev_hash = events[7].header.record_hash;
 
-    events[6] = audit.buildEvent(header(6, "tkagnt", thesis_input.account_id, capability_id, prev_hash), .{
+    events[8] = audit.buildEvent(header(8, "tkagnt", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .proposal = .{
             .proposal_type = parseFixedAsciiBytes(32, proposal_type),
             .proposal_hash = proposal_hash,
             .approval_state = 0,
         },
     });
-    prev_hash = events[6].header.record_hash;
+    prev_hash = events[8].header.record_hash;
 
-    events[7] = audit.buildEvent(header(7, "tkpoly", thesis_input.account_id, capability_id, prev_hash), .{
+    events[9] = audit.buildEvent(header(9, "tkpoly", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .limit_check = .{
             .limit_type = .amount,
             .value = blocked_reason.requested_cents,
@@ -368,18 +408,18 @@ pub fn buildOversizedTradeBlockedChain(
             .outcome = .deny,
         },
     });
-    prev_hash = events[7].header.record_hash;
+    prev_hash = events[9].header.record_hash;
 
-    events[8] = audit.buildEvent(header(8, "tkpoly", thesis_input.account_id, capability_id, prev_hash), .{
+    events[10] = audit.buildEvent(header(10, "tkpoly", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .denial = .{
             .action_class = parseFixedAsciiBytes(32, "trading_order.place"),
             .reason_code = @intFromEnum(blocked_reason.code),
             .failed_scope_dim = parseFixedAsciiBytes(32, blocked_reason.failed_scope_dim.label()),
         },
     });
-    prev_hash = events[8].header.record_hash;
+    prev_hash = events[10].header.record_hash;
 
-    events[9] = audit.buildEvent(header(9, "tkrepl", thesis_input.account_id, capability_id, prev_hash), .{
+    events[11] = audit.buildEvent(header(11, "tkrepl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .replay_result = .{
             .capsule_id = hashBytes("replay_capsule_ai_infra_oversized_25000"),
             .divergences = replay_result.divergence_count,
@@ -391,6 +431,7 @@ pub fn buildOversizedTradeBlockedChain(
 }
 
 pub fn buildRestrictedInstrumentBlockedChain(
+    run_id: u64,
     thesis_input: *const thesis.ThesisInput,
     proposed_basket: *const basket.Basket,
     model_response: *const model.ModelResponse,
@@ -404,7 +445,7 @@ pub fn buildRestrictedInstrumentBlockedChain(
     var events: [restricted_instrument_blocked_event_count]audit.AuditEvent = undefined;
     var prev_hash: u64 = 0;
 
-    events[0] = audit.buildEvent(header(0, "tkings", thesis_input.account_id, capability_id, prev_hash), .{
+    events[0] = audit.buildEvent(header(0, "tkings", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .source_event = .{
             .source_system = parseFixedAsciiBytes(16, source_system),
             .event_type = parseFixedAsciiBytes(32, source_event_type),
@@ -413,7 +454,7 @@ pub fn buildRestrictedInstrumentBlockedChain(
     });
     prev_hash = events[0].header.record_hash;
 
-    events[1] = audit.buildEvent(header(1, "tknorm", thesis_input.account_id, capability_id, prev_hash), .{
+    events[1] = audit.buildEvent(header(1, "tknorm", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .normalization = .{
             .source_event_hash = raw_hash,
             .normalized_hash = normalized_hash,
@@ -422,7 +463,25 @@ pub fn buildRestrictedInstrumentBlockedChain(
     });
     prev_hash = events[1].header.record_hash;
 
-    events[2] = audit.buildEvent(header(2, "tkpoly", thesis_input.account_id, capability_id, prev_hash), .{
+    events[2] = audit.buildEvent(header(2, "tkdedu", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+        .deduplication = .{
+            .idempotency_key = raw_hash,
+            .is_duplicate = false,
+        },
+    });
+    prev_hash = events[2].header.record_hash;
+
+    events[3] = audit.buildEvent(header(3, "tkcase", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+        .case_creation = .{
+            .basket_id = proposed_basket.basket_id,
+            .instrument_count = proposed_basket.instrument_count,
+            .rejected_count = proposed_basket.rejected_count,
+            .total_allocated_cents = proposed_basket.total_allocated_cents,
+        },
+    });
+    prev_hash = events[3].header.record_hash;
+
+    events[4] = audit.buildEvent(header(4, "tkpoly", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .policy_decision = .{
             .outcome = .deny,
             .rule_id = 1101,
@@ -430,9 +489,9 @@ pub fn buildRestrictedInstrumentBlockedChain(
             .source_event_hash = normalized_hash,
         },
     });
-    prev_hash = events[2].header.record_hash;
+    prev_hash = events[4].header.record_hash;
 
-    events[3] = audit.buildEvent(header(3, "tkmodl", thesis_input.account_id, capability_id, prev_hash), .{
+    events[5] = audit.buildEvent(header(5, "tkmodl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .model_call = .{
             .model_id = parseFixedAsciiBytes(32, model_backend_id),
             .prompt_hash = raw_hash,
@@ -441,18 +500,18 @@ pub fn buildRestrictedInstrumentBlockedChain(
             .retry_count = 0,
         },
     });
-    prev_hash = events[3].header.record_hash;
+    prev_hash = events[5].header.record_hash;
 
-    events[4] = audit.buildEvent(header(4, "tkpoly", thesis_input.account_id, capability_id, prev_hash), .{
+    events[6] = audit.buildEvent(header(6, "tkpoly", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .denial = .{
             .action_class = parseFixedAsciiBytes(32, proposal_type),
             .reason_code = @intFromEnum(basket.RejectionReason.restricted_instrument),
             .failed_scope_dim = parseFixedAsciiBytes(32, "restricted_instrument"),
         },
     });
-    prev_hash = events[4].header.record_hash;
+    prev_hash = events[6].header.record_hash;
 
-    events[5] = audit.buildEvent(header(5, "tkrepl", thesis_input.account_id, capability_id, prev_hash), .{
+    events[7] = audit.buildEvent(header(7, "tkrepl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .replay_result = .{
             .capsule_id = hashBytes("replay_capsule_ai_infra_restricted_soxl"),
             .divergences = replay_result.divergence_count,

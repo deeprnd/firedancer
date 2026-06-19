@@ -19,6 +19,7 @@ tk_audit_record_hash( tk_audit_event_t const * event ) {
   fd_siphash13_t * sip = fd_siphash13_init( _sip, TK_AUDIT_HASH_K0, TK_AUDIT_HASH_K1 );
 
   TK_HASH( &event->header.schema_version,          sizeof(uint16_t) );
+  TK_HASH( &event->header.run_id,                  sizeof(uint64_t) );
   TK_HASH( &event->header.seq,                     sizeof(uint64_t) );
   TK_HASH( &event->header.source_offset,           sizeof(uint64_t) );
   TK_HASH(  event->header.tile_id,                 6UL              );
@@ -93,6 +94,16 @@ tk_audit_record_hash( tk_audit_event_t const * event ) {
       TK_HASH( &event->payload.replay_result.divergences,        sizeof(uint64_t) );
       TK_HASH( &event->payload.replay_result.first_divergent_seq,sizeof(uint64_t) );
       break;
+    case 12U:
+      TK_HASH( &event->payload.deduplication.idempotency_key, sizeof(uint64_t) );
+      TK_HASH( &event->payload.deduplication.is_duplicate,    sizeof(uint8_t)  );
+      break;
+    case 13U:
+      TK_HASH( &event->payload.case_creation.basket_id,             sizeof(uint64_t) );
+      TK_HASH( &event->payload.case_creation.instrument_count,      sizeof(uint8_t)  );
+      TK_HASH( &event->payload.case_creation.rejected_count,        sizeof(uint8_t)  );
+      TK_HASH( &event->payload.case_creation.total_allocated_cents, sizeof(int64_t)  );
+      break;
     default: break;
   }
 
@@ -102,6 +113,7 @@ tk_audit_record_hash( tk_audit_event_t const * event ) {
 #undef TK_HASH
 
 #define TK_AUDIT_FIELD_SCHEMA_VERSION           (1U)
+#define TK_AUDIT_FIELD_RUN_ID                   (2U)
 #define TK_AUDIT_FIELD_SEQ                      (3U)
 #define TK_AUDIT_FIELD_SOURCE_OFFSET            (4U)
 #define TK_AUDIT_FIELD_TILE_ID                  (5U)
@@ -111,7 +123,7 @@ tk_audit_record_hash( tk_audit_event_t const * event ) {
 #define TK_AUDIT_FIELD_TIMESTAMP_NS             (9U)
 #define TK_AUDIT_FIELD_PREV_HASH                (10U)
 #define TK_AUDIT_FIELD_RECORD_HASH              (11U)
-/* oneof payload: field = 12 + record_type (0..11) */
+/* oneof payload: field = 12 + record_type (0..13) */
 #define TK_AUDIT_FIELD_PAYLOAD_BASE             (12U)
 
 static size_t
@@ -454,6 +466,44 @@ tk_parse_payload( uint                record_type,
             break;
         }
         break;
+      case 12U:
+        switch( tlv->field_id ) {
+          case 1U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            payload->deduplication.idempotency_key = (uint64_t)tlv->varint;
+            break;
+          case 2U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            payload->deduplication.is_duplicate = (uint8_t)tlv->varint;
+            break;
+          default:
+            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            break;
+        }
+        break;
+      case 13U:
+        switch( tlv->field_id ) {
+          case 1U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            payload->case_creation.basket_id = (uint64_t)tlv->varint;
+            break;
+          case 2U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            payload->case_creation.instrument_count = (uint8_t)tlv->varint;
+            break;
+          case 3U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            payload->case_creation.rejected_count = (uint8_t)tlv->varint;
+            break;
+          case 4U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            payload->case_creation.total_allocated_cents = (int64_t)(long)tlv->varint;
+            break;
+          default:
+            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            break;
+        }
+        break;
       default:
         return TK_AUDIT_CODEC_INVALID_PROTOBUF;
     }
@@ -476,6 +526,7 @@ tk_audit_format_protobuf( void *                   out,
   size_t policy_len = tk_trimmed_len( event->header.policy_version, 32UL );
 
   if( !fd_pb_push_uint32( enc, TK_AUDIT_FIELD_SCHEMA_VERSION, (uint)event->header.schema_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_RUN_ID,         (ulong)event->header.run_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
   if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_SEQ,            (ulong)event->header.seq ) ) return TK_AUDIT_CODEC_NO_SPACE;
   if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_SOURCE_OFFSET,  (ulong)event->header.source_offset ) ) return TK_AUDIT_CODEC_NO_SPACE;
   if( !fd_pb_push_bytes(  enc, TK_AUDIT_FIELD_TILE_ID,        event->header.tile_id, tile_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
@@ -573,6 +624,16 @@ tk_audit_format_protobuf( void *                   out,
       if( !fd_pb_push_uint64( enc, 2U, (ulong)event->payload.replay_result.divergences ) ) return TK_AUDIT_CODEC_NO_SPACE;
       if( !fd_pb_push_uint64( enc, 3U, (ulong)event->payload.replay_result.first_divergent_seq ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
+    case 12U:
+      if( !fd_pb_push_uint64( enc, 1U, (ulong)event->payload.deduplication.idempotency_key ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_uint32( enc, 2U, (uint)event->payload.deduplication.is_duplicate ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      break;
+    case 13U:
+      if( !fd_pb_push_uint64( enc, 1U, (ulong)event->payload.case_creation.basket_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_uint32( enc, 2U, (uint)event->payload.case_creation.instrument_count ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_uint32( enc, 3U, (uint)event->payload.case_creation.rejected_count ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_int64(  enc, 4U, (long)event->payload.case_creation.total_allocated_cents ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      break;
     default:
       return TK_AUDIT_CODEC_INVALID_FIELD;
   }
@@ -610,6 +671,10 @@ tk_audit_parse_protobuf( void const *       in,
       case TK_AUDIT_FIELD_SCHEMA_VERSION:
         if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.schema_version = (uint16_t)tlv->varint;
+        break;
+      case TK_AUDIT_FIELD_RUN_ID:
+        if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        event->header.run_id = (uint64_t)tlv->varint;
         break;
       case TK_AUDIT_FIELD_SEQ:
         if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
@@ -658,6 +723,7 @@ tk_audit_parse_protobuf( void const *       in,
         break;
       case 12U: case 13U: case 14U: case 15U: case 16U: case 17U:
       case 18U: case 19U: case 20U: case 21U: case 22U: case 23U:
+      case 24U: case 25U:
         if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         if( fd_pb_inbuf_sz( inbuf )<tlv->len ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         {

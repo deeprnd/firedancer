@@ -60,8 +60,10 @@ test-unit-fd:
     make run-unit-test TEST_OPTS="--page-sz normal"
   fi
 
+# Tickoni unit lane: pure logic and fixture/mock-backed tests only.
+# No running servers belong here.
 test-unit-tk:
-  zig build test --summary all
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build test --summary all
 
 # Print computed hash and wire bytes for every audit fixture event.
 # Use the output to understand or snapshot the current encoding after intentional changes.
@@ -83,11 +85,19 @@ test-e2e-all:
 test-integration-fd:
   @true
 
+# Tickoni integration lane: transport and boundary wiring against local mocks.
 test-integration-tk:
-  zig build integration-test --summary all
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build integration-test --summary all
 
+# Tickoni system lane: opt-in real-LLM V1.1 demo proof.
 test-system-tk:
   bash contrib/test/run_integration_model_tests.sh
+
+test-system-fd:
+  @true
+
+test-system-all:
+  python3 contrib/readme/run-badged-command.py system bash -c "just test-system-tk && just test-system-fd"
 
 infra-run-llamacpp:
   #!/usr/bin/env bash
@@ -110,6 +120,7 @@ test-integration-all:
 test-all:
   @just test-unit-all
   @just test-integration-all
+  @just test-system-all
   @just test-e2e-all
 
 # ── Test: Coverage ─────────────────────────────────────────────────────────

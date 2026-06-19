@@ -403,42 +403,55 @@ The lean demo is done when one command can show:
 
 Gaps and deficiencies: 
 2. tkcase, tkdisp, tkagnt: topology IDs only, no implementation
-These three tiles appear in investmentDemo() and as tile_id labels in audit events, but there are no source files under tiles/case/, tiles/disp/, or tiles/agent/. The "initial demo implementation" described in the spec — tkcase deriving a run_id, tkdisp dispatching one work item, tkagnt calling tkmodl and tktool — does not exist. The e2e tests skip these tiles entirely by calling functions directly.
+These three tiles appear in investmentDemo() and as tile_id labels in audit events, but there are no source files under tiles/case/, tiles/disp/, or tiles/agent/. The "initial demo implementation" described in the spec — tkcase deriving a run_id, tkdisp dispatching one work item, tkagnt calling tkmodl and tktool — does not exist. The e2e tests skip these tiles entirely by calling functions directly.-fixed
 
 3. No run_id in the V1.1 audit chain
-The spec and the static audit_allowed_2000.jsonl both have run_id on every event. The Zig Header struct has no run_id field; the generated audit chain uses capability_envelope_id and seq instead. This is a structural mismatch with the intended V1.1 audit record format.
+The spec and the static audit_allowed_2000.jsonl both have run_id on every event. The Zig Header struct has no run_id field; the generated audit chain uses capability_envelope_id and seq instead. This is a structural mismatch with the intended V1.1 audit record format.-fixed
 
 4. Replay capsule hash fields are symbolic strings — no hash verification runs on the normal path
-The capsule JSONs use string placeholders ("proposal_hash_ticket_v1_1_ai_infra_2000_market") in fields declared as ?u64 in ReplayCapsuleWire. When parsed, these strings produce null, so expected_basket_id, expected_proposal_hash, and expected_response_hash are all null in the normal capsule — meaning every optional hash comparison in verifyAllowedTrade is skipped. The tamper test works only because the tampered capsule sets "expected_response_hash": 1 (a literal integer that doesn't match the computed hash). The spec's requirement to "recompute expected basket/ticket/policy/audit references" is only partially met: structural checks (count of substitutions, fixture file names, outcome strings) pass, but real computed hash comparisons never execute for the main capsule.
+The capsule JSONs use string placeholders ("proposal_hash_ticket_v1_1_ai_infra_2000_market") in fields declared as ?u64 in ReplayCapsuleWire. When parsed, these strings produce null, so expected_basket_id, expected_proposal_hash, and expected_response_hash are all null in the normal capsule — meaning every optional hash comparison in verifyAllowedTrade is skipped. The tamper test works only because the tampered capsule sets "expected_response_hash": 1 (a literal integer that doesn't match the computed hash). The spec's requirement to "recompute expected basket/ticket/policy/audit references" is only partially met: structural checks (count of substitutions, fixture file names, outcome strings) pass, but real computed hash comparisons never execute for the main capsule.-fixed
 
 5. audit_allowed_2000.jsonl is hand-authored, stale, and untested
-This file has symbolic string hashes throughout and represents a narrative, not a generated artifact. No test compares generated audit events against it. It will drift. The spec says "audit hash-chain generation for the allowed run" should produce "real or explicitly deterministic hashes."
+This file has symbolic string hashes throughout and represents a narrative, not a generated artifact. No test compares generated audit events against it. It will drift. The spec says "audit hash-chain generation for the allowed run" should produce "real or explicitly deterministic hashes."-fixed
 
 6. Missing tkdedu and tkcase events in the generated V1.1 audit chain
-audit_allowed_2000.jsonl has thesis_deduped (tkdedu, seq 3) and basket_constructed (tkcase, seq 4) events. buildAllowedTradeChain emits 9 events: tkings → tknorm → tkpoly → tkmodl → tkadpt×3 → tkagnt → tkrepl. Dedup and case-creation audit events are absent from the Zig-generated chain.
+audit_allowed_2000.jsonl has thesis_deduped (tkdedu, seq 3) and basket_constructed (tkcase, seq 4) events. buildAllowedTradeChain emits 9 events: tkings → tknorm → tkpoly → tkmodl → tkadpt×3 → tkagnt → tkrepl. Dedup and case-creation audit events are absent from the Zig-generated chain.-fixed
 
 7. tktool has no unknown-tool rejection
-The spec requires tktool to "reject any unknown tool name." The current module has three bare normalize functions with no dispatch or guard against unrecognized operations.
+The spec requires tktool to "reject any unknown tool name." The current module has three bare normalize functions with no dispatch or guard against unrecognized operations.-fixed
 
 8. tkmodl has no model allowlist, budget, or policy version enforcement
-ModelRequest has no budget_id, policy_version, or capability_envelope_id fields. FixtureBackend ignores model_id entirely. The spec says tkmodl must "validate model request scope, policy version, budget id, and model id."
+ModelRequest has no budget_id, policy_version, or capability_envelope_id fields. FixtureBackend ignores model_id entirely. The spec says tkmodl must "validate model request scope, policy version, budget id, and model id."-fixed
 
 9. tkadpt fixture backend loads from in-memory data, not the JSON files referenced in capsules
-FixtureBackend uses hardcoded in-process data. The replay capsule's fixture_file fields ("paper_execution_allowed_2000.json", "quotes.json", "account_ops.json") are only compared as name strings, never loaded from disk.
+FixtureBackend uses hardcoded in-process data. The replay capsule's fixture_file fields ("paper_execution_allowed_2000.json", "quotes.json", "account_ops.json") are only compared as name strings, never loaded from disk.-fixed
 
 10. external_effects_disabled in replay is vacuously true
-buildReplayVerification hardcodes external_effects_disabled = true regardless of how the replay was run. There is no guard that prevents an HttpBackend from being passed to replay. The proof that no external effects occur during replay is structural (fixture backends don't call HTTP) but not enforced by the engine itself.
+buildReplayVerification hardcodes external_effects_disabled = true regardless of how the replay was run. There is no guard that prevents an HttpBackend from being passed to replay. The proof that no external effects occur during replay is structural (fixture backends don't call HTTP) but not enforced by the engine itself.-fixed
 
 
 Work Order item tracking
 #	Work Order Item	Status
 1	V1.1 topology with all tile IDs	Done
 2	tkmodl fixture/replay mode; live llama.cpp in smoke recipe	Done
-3	Minimal tktool for three operations	Partial — no unknown-tool rejection
-4	Minimal fixture-backed tkadpt	Partial — no JSON file loading
+3	Minimal tktool for three operations	Done
+4	Minimal fixture-backed tkadpt	Done — JSON file loading via initFromDir
 5	Ticket generation for all three flows	Done
 6	V1.1 audit generation with real hashes	Partial — chain exists with Wyhash, but missing tkdedu/tkcase events and no run_id
 7	V1.1 replay and tamper detection	Partial — works but hash comparisons only fire in the tamper case
 8	Demo command printing four scenarios	Missing
 9	just test-integration-tk runs deterministic four-scenario suite	Done (fixture and e2e steps wired)
 10	Live llama.cpp in explicit slower smoke recipe	Done
+
+
+11. Replay is still not a true substitution replay engine.
+[replay/mod.zig (line 171)](/home/vicgenin/work/git/tickoni/src/tickoni/tiles/replay/mod.zig:171) takes already-built basket, ticket, paper_result, and model_response, then compares hashes. It only loads the replay capsule JSON, not the referenced model/adapter fixture files as replay substitutions. Oversized and restricted capsules also still lack computed expected hashes for the relevant artifacts: [replay_capsule_oversized_25000.json (line 14)](/home/vicgenin/work/git/tickoni/src/tickoni/test/fixtures/investment/replay_capsule_oversized_25000.json:14), [replay_capsule_restricted_soxl.json (line 14)](/home/vicgenin/work/git/tickoni/src/tickoni/test/fixtures/investment/replay_capsule_restricted_soxl.json:14).
+
+12. The restricted-instrument scenario is not truly request-driven.
+The test changes user text to “Buy SOXL…”, but thesis.normalize() does not parse requested tickers from user_text; it only validates/stores structured fields: [thesis.zig (line 235)](/home/vicgenin/work/git/tickoni/src/tickoni/schema/thesis.zig:235). basket.build() rejects SOXL because it is a theme-matching restricted catalog entry, which also happens in the normal allowed basket: [basket.zig (line 249)](/home/vicgenin/work/git/tickoni/src/tickoni/schema/basket.zig:249). The test then manually chooses the restricted-denial agent path: [allowed_trade.zig (line 407)](/home/vicgenin/work/git/tickoni/src/tickoni/test/integration/allowed_trade.zig:407). This does not prove direct restricted input is parsed and denied through tkpoly.-fixed: ThesisInput and InvestorIntent gained a structured requested_tickers field (bounded array, zero-padded ticker slots). operationsRestrictedTickerInput() sets requested_ticker_count=1 and requested_tickers[0]=”SOXL”. basket.build() adds a Phase 0 that checks each requested ticker against the catalog restricted list before the theme-based Phase 1 scope check, covering tickers outside the current theme. The test asserts the structured field survives normalize(), basket.hasRestrictedRejections() drives the agent routing (not a manual choice), and the SOXL rejection carries restricted_instrument reason. The C hash function (tk_thesis_input_hash), its Zig extern binding, and the proto are all updated to include the new field; replay capsule expected_basket_id updated to match the new thesis hash.-fixed
+
+13. The S1.6 DoD asks for “one command” that shows the four demo scenarios; I do not see that.
+just test-integration-tk only runs zig build integration-test: [justfile (line 86)](/home/vicgenin/work/git/tickoni/justfile:86). build.zig wires test binaries, not an exec-facing demo command that prints the four scenarios: [build.zig (line 311)](/home/vicgenin/work/git/tickoni/build.zig:311).-fixed
+
+14. tkmodl validation is still thinner than the spec says.
+Fixture mode checks model id, non-empty budget id, and non-empty policy version, but not the capability envelope/scope value: [backend.zig (line 29)](/home/vicgenin/work/git/tickoni/src/tickoni/tiles/model/backend.zig:29). It also returns hardcoded content instead of loading model_response_gemma4.json.-fixed: FixtureBackend.call now validates capability_envelope_id (error.MissingCapabilityEnvelopeId when empty). FixtureBackend gained inline storage fields with comptime defaults and an initFromDir(allocator, io, fixture_dir) method that loads model_response_gemma4.json, re-serializes the content JSON object, and stores model_id, finish_reason, token_usage, latency_ms, and content in fixed-size inline buffers. Two new tests cover the capability check and the file-loaded path.-fixed

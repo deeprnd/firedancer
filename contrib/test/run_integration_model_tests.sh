@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Ensure llama.cpp and model exist, start server, run model integration tests, stop server.
+# Ensure llama.cpp and model exist, start the local server, run the live
+# V1.1 system/demo proof, then stop the server.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -76,7 +77,8 @@ if (( !ready )); then
   exit 1
 fi
 echo "llama-server ready"
+echo "running live V1.1 system/demo proof"
 
-# Run the live tkmodl smoke tests in foreground so stdin is available for the
+# Run the live system test in foreground so stdin is available for the
 # zig build --listen=- test protocol. The EXIT trap kills the server.
-zig build integration-test-live-model --summary all
+ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build system-test --summary all

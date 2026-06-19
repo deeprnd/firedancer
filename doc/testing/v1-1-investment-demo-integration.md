@@ -150,10 +150,10 @@ output so the replay lane can validate the same run without invoking the
 model again.
 
 The real-LLM lane must check for the GGUF before starting the local model
-server:
+server. The opt-in command for that lane is:
 
 ```bash
-just test-integration-tk
+just test-system-tk
 ```
 
 That command checks for:
@@ -165,9 +165,12 @@ model_file = gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf
 
 If the file exists and is non-empty, it does nothing. If the file is missing,
 it downloads only `gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf` from
-`unsloth/gemma-4-E2B-it-qat-GGUF` using `hf download`. CI can use
-`just test-integration-tk` when it needs a no-network
-preflight that fails if the model is absent.
+`unsloth/gemma-4-E2B-it-qat-GGUF` using `hf download`, starts the local
+`llama.cpp` server, and runs the live `tkmodl` smoke tests.
+
+`just test-integration-tk` remains the offline deterministic V1.1 gate. It
+does not download a model, start a live server, or require local LLM
+availability.
 
 Simple integration tests in the normal gate:
 

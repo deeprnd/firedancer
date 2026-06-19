@@ -8,12 +8,21 @@
    Incrementing this value changes the hash key and invalidates existing hashes. */
 #define TK_THESIS_SCHEMA_VERSION ((uint16_t)1)
 
+/* Ticker stride for requested_tickers: same as catalog and basket stride. */
+#define TK_THESIS_MAX_TICKER_LEN ((ulong)8)
+
+/* Maximum explicitly requested tickers in one ThesisInput. */
+#define TK_THESIS_MAX_REQUESTED_TICKERS ((uint8_t)8)
+
 /* Compute a stable content hash over a ThesisInput.
    Covers schema_version, account_id, target_notional_cents, market_scope,
    asset_class_prefs, sector_theme, risk_preference, max_single_name_pct,
-   exclusions, user_text_len, and user_text[0..user_text_len].
+   exclusions, requested_ticker_count, requested_tickers[0..requested_ticker_count]
+   (each zero-padded to TK_THESIS_MAX_TICKER_LEN bytes), user_text_len, and
+   user_text[0..user_text_len].
    Hash key: "TKTHSS\0\0" LE (k0=0x0000535348544B54, k1=TK_THESIS_SCHEMA_VERSION).
-   user_text must point to at least user_text_len bytes. */
+   user_text must point to at least user_text_len bytes.
+   requested_tickers must point to requested_ticker_count * TK_THESIS_MAX_TICKER_LEN bytes. */
 uint64_t
 tk_thesis_input_hash( uint16_t              user_text_len,
                       unsigned char const * user_text,
@@ -24,7 +33,9 @@ tk_thesis_input_hash( uint16_t              user_text_len,
                       uint8_t               sector_theme,
                       uint8_t               risk_preference,
                       uint8_t               max_single_name_pct,
-                      uint8_t               exclusions );
+                      uint8_t               exclusions,
+                      uint8_t               requested_ticker_count,
+                      unsigned char const * requested_tickers );
 
 /* Schema version for the basket schema.
    Must match basket_schema_version in src/tickoni/schema/basket.zig.

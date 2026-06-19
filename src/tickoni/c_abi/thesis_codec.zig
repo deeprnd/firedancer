@@ -16,6 +16,8 @@ pub extern fn tk_thesis_input_hash(
     risk_preference: u8,
     max_single_name_pct: u8,
     exclusions: u8,
+    requested_ticker_count: u8,
+    requested_tickers: [*]const u8,
 ) u64;
 
 /// Compute a stable content hash over a constructed basket's composition.

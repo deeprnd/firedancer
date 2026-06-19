@@ -14,6 +14,7 @@ enum {
 
 typedef struct {
   uint16_t schema_version;
+  uint64_t run_id;
   uint64_t seq;
   uint64_t source_offset;
   unsigned char tile_id[ 6 ];
@@ -101,6 +102,18 @@ typedef struct {
   uint64_t first_divergent_seq;
 } tk_audit_replay_result_t;
 
+typedef struct {
+  uint64_t idempotency_key;
+  uint8_t  is_duplicate;
+} tk_audit_deduplication_t;
+
+typedef struct {
+  uint64_t basket_id;
+  uint8_t  instrument_count;
+  uint8_t  rejected_count;
+  int64_t  total_allocated_cents;
+} tk_audit_case_creation_t;
+
 typedef union {
   tk_audit_source_event_t source_event;
   tk_audit_normalization_t normalization;
@@ -114,6 +127,8 @@ typedef union {
   tk_audit_denial_t denial;
   tk_audit_telemetry_checkpoint_t telemetry_checkpoint;
   tk_audit_replay_result_t replay_result;
+  tk_audit_deduplication_t deduplication;
+  tk_audit_case_creation_t case_creation;
 } tk_audit_payload_t;
 
 typedef struct {

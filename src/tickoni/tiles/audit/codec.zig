@@ -86,6 +86,7 @@ fn toCodecEvent(event: schema.AuditEvent) audit_codec.Event {
     return .{
         .header = .{
             .schema_version = event.header.schema_version,
+            .run_id = event.header.run_id,
             .seq = event.header.seq,
             .source_offset = event.header.source_offset,
             .tile_id = event.header.tile_id,
@@ -108,6 +109,7 @@ fn fromCodecEvent(codec_event: audit_codec.Event) !schema.AuditEvent {
     return validateParsedEvent(.{
         .header = .{
             .schema_version = codec_event.header.schema_version,
+            .run_id = codec_event.header.run_id,
             .seq = codec_event.header.seq,
             .source_offset = codec_event.header.source_offset,
             .tile_id = codec_event.header.tile_id,
@@ -188,6 +190,16 @@ fn payloadToCodec(payload: schema.AuditEvent.Payload) audit_codec.Payload {
             .divergences = p.divergences,
             .first_divergent_seq = p.first_divergent_seq,
         } },
+        .deduplication => |p| .{ .deduplication = .{
+            .idempotency_key = p.idempotency_key,
+            .is_duplicate = @intFromBool(p.is_duplicate),
+        } },
+        .case_creation => |p| .{ .case_creation = .{
+            .basket_id = p.basket_id,
+            .instrument_count = p.instrument_count,
+            .rejected_count = p.rejected_count,
+            .total_allocated_cents = p.total_allocated_cents,
+        } },
     };
 }
 
@@ -256,6 +268,16 @@ fn payloadFromCodec(record_type: schema.RecordType, payload: audit_codec.Payload
             .capsule_id = payload.replay_result.capsule_id,
             .divergences = payload.replay_result.divergences,
             .first_divergent_seq = payload.replay_result.first_divergent_seq,
+        } },
+        .deduplication => .{ .deduplication = .{
+            .idempotency_key = payload.deduplication.idempotency_key,
+            .is_duplicate = payload.deduplication.is_duplicate != 0,
+        } },
+        .case_creation => .{ .case_creation = .{
+            .basket_id = payload.case_creation.basket_id,
+            .instrument_count = payload.case_creation.instrument_count,
+            .rejected_count = payload.case_creation.rejected_count,
+            .total_allocated_cents = payload.case_creation.total_allocated_cents,
         } },
     };
 }
