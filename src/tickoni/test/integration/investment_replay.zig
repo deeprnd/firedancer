@@ -1,7 +1,6 @@
 const std = @import("std");
 const adapter = @import("adapter");
 const audit = @import("audit_tile");
-const basket_mod = @import("basket");
 const investment_audit = @import("investment_audit");
 const model = @import("model");
 const replay = @import("replay");
@@ -10,13 +9,14 @@ const support = @import("investment_support");
 const tkagnt = @import("tkagnt");
 const tkcase = @import("tkcase");
 const tkdisp = @import("tkdisp");
+const tkpoly = @import("tkpoly");
 
 test "investment_replay_integration: succeeds with fixture substitutions and no live effects" {
     const allocator = std.testing.allocator;
     const input = support.operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
     try std.testing.expect(support.basketRejects(&basket, "SOXL"));
     try std.testing.expect(support.basketRejects(&basket, "BULZ"));
 
@@ -84,7 +84,7 @@ test "investment_replay_integration: allowed trade audit chain hashes are real a
     const input = support.operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
 
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
@@ -176,7 +176,7 @@ test "investment_replay_integration: tamper detection reports first divergent ha
     const input = support.operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
 
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);

@@ -3,6 +3,7 @@ const adapter = @import("adapter");
 const basket = @import("basket");
 const model = @import("model");
 const trade_ticket = @import("trade_ticket");
+const tkpoly = @import("tkpoly");
 
 const ReplayCapsuleWire = struct {
     ticket_id: []const u8,
@@ -580,13 +581,13 @@ fn buildAllowedReplayFixture(allocator: std.mem.Allocator, io: std.Io) !AllowedR
         &fixture_backend.account_snapshot,
         &proposed_basket,
     );
-    const ticket = try trade_ticket.buildMarketBuyTicket(
+    var ticket = try trade_ticket.buildMarketBuyTicket(
         &proposed_basket,
         &quote_snapshot,
         affordability,
-        250_000,
         "ticket_v1_1_ai_infra_2000_market",
     );
+    tkpoly.applyTradeGuardrails(&ticket, affordability, 250_000);
 
     return .{
         .proposed_basket = proposed_basket,

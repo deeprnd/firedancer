@@ -184,53 +184,29 @@ fn copyAscii(comptime N: usize, dst: *[N]u8, src: []const u8) !u8 {
     return @intCast(src.len);
 }
 
-fn deriveBlockedReason(
-    requested_notional_cents: i64,
-    affordability: portfolio.AffordabilityResult,
-    policy_max_notional_per_order_cents: i64,
-) ?BlockedReason {
-    if (requested_notional_cents > policy_max_notional_per_order_cents and
-        affordability.outcome == .allow)
-    {
-        return .{
-            .code = .per_order_notional_exceeded,
-            .failed_scope_dim = .per_order_notional,
-            .requested_cents = requested_notional_cents,
-            .limit_cents = policy_max_notional_per_order_cents,
-        };
+pub fn applyPolicyDecision(
+    ticket: *TradeTicket,
+    policy_outcome: PolicyOutcome,
+    blocked_reasons: []const BlockedReason,
+    effective_max_paper_trade_cents: i64,
+) void {
+    ticket.policy_outcome = policy_outcome;
+    ticket.blocked_reasons = std.mem.zeroes([max_blocked_reasons]BlockedReason);
+    const count = if (policy_outcome == .deny)
+        @min(blocked_reasons.len, max_blocked_reasons)
+    else
+        0;
+    for (blocked_reasons[0..count], 0..) |blocked_reason, i| {
+        ticket.blocked_reasons[i] = blocked_reason;
     }
-
-    return switch (affordability.outcome) {
-        .allow => null,
-        .deny_open_order_limit,
-        .deny_invalid_notional,
-        => null,
-        .deny_insufficient_buying_power => .{
-            .code = .buying_power_exceeded,
-            .failed_scope_dim = .buying_power,
-            .requested_cents = requested_notional_cents,
-            .limit_cents = affordability.max_affordable_cents,
-        },
-        .deny_day_limit_exceeded => .{
-            .code = .daily_notional_exceeded,
-            .failed_scope_dim = .day_notional,
-            .requested_cents = requested_notional_cents,
-            .limit_cents = affordability.remaining_daily_notional_cents,
-        },
-        .deny_month_limit_exceeded => .{
-            .code = .monthly_notional_exceeded,
-            .failed_scope_dim = .month_notional,
-            .requested_cents = requested_notional_cents,
-            .limit_cents = affordability.remaining_monthly_notional_cents,
-        },
-    };
+    ticket.blocked_reason_count = @intCast(count);
+    ticket.affordability_result.effective_max_paper_trade_cents = effective_max_paper_trade_cents;
 }
 
 pub fn buildMarketBuyTicket(
     proposed_basket: *const basket.Basket,
     quote_snapshot: *const QuoteSnapshot,
     affordability: portfolio.AffordabilityResult,
-    policy_max_notional_per_order_cents: i64,
     ticket_id: []const u8,
 ) BuildTicketError!TradeTicket {
     var ticket: TradeTicket = std.mem.zeroes(TradeTicket);
@@ -241,11 +217,6 @@ pub fn buildMarketBuyTicket(
     ticket.time_in_force = .day;
     ticket.target_notional_cents = proposed_basket.total_allocated_cents;
     ticket.line_item_count = proposed_basket.instrument_count;
-
-    const effective_max = @min(
-        affordability.max_affordable_cents,
-        policy_max_notional_per_order_cents,
-    );
     ticket.affordability_result = .{
         .outcome = affordability.outcome,
         .cash_available_cents = affordability.cash_available_cents,
@@ -253,19 +224,9 @@ pub fn buildMarketBuyTicket(
         .remaining_daily_notional_cents = affordability.remaining_daily_notional_cents,
         .remaining_monthly_notional_cents = affordability.remaining_monthly_notional_cents,
         .max_affordable_cents = affordability.max_affordable_cents,
-        .effective_max_paper_trade_cents = effective_max,
+        .effective_max_paper_trade_cents = affordability.max_affordable_cents,
     };
-    ticket.policy_outcome = if (ticket.target_notional_cents <= effective_max) .allow else .deny;
-    if (ticket.policy_outcome == .deny) {
-        if (deriveBlockedReason(
-            ticket.target_notional_cents,
-            affordability,
-            policy_max_notional_per_order_cents,
-        )) |reason| {
-            ticket.blocked_reasons[0] = reason;
-            ticket.blocked_reason_count = 1;
-        }
-    }
+    ticket.policy_outcome = .allow;
 
     var estimated_cost: i64 = 0;
     for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |instrument, i| {
@@ -318,14 +279,10 @@ test "buildMarketBuyTicket: oversized notional produces per-order block reason" 
         &proposed_basket,
         &quotes,
         affordability,
-        250_000,
         "ticket_v1_1_ai_infra_25000_blocked",
     );
 
-    try std.testing.expectEqual(PolicyOutcome.deny, ticket.policy_outcome);
-    try std.testing.expectEqual(@as(u8, 1), ticket.blocked_reason_count);
-    try std.testing.expectEqual(BlockedReasonCode.per_order_notional_exceeded, ticket.blocked_reasons[0].code);
-    try std.testing.expectEqual(FailedScopeDimension.per_order_notional, ticket.blocked_reasons[0].failed_scope_dim);
-    try std.testing.expectEqual(@as(i64, 2_500_000), ticket.blocked_reasons[0].requested_cents);
-    try std.testing.expectEqual(@as(i64, 250_000), ticket.blocked_reasons[0].limit_cents);
+    try std.testing.expectEqual(PolicyOutcome.allow, ticket.policy_outcome);
+    try std.testing.expectEqual(@as(u8, 0), ticket.blocked_reason_count);
+    try std.testing.expectEqual(affordability.max_affordable_cents, ticket.affordability_result.effective_max_paper_trade_cents);
 }

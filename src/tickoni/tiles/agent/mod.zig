@@ -4,6 +4,7 @@ const basket_mod = @import("basket");
 const disp = @import("disp");
 const model = @import("model");
 const portfolio = @import("portfolio");
+const tkpoly = @import("tkpoly");
 const tool = @import("tool");
 const trade_ticket = @import("trade_ticket");
 
@@ -142,13 +143,13 @@ pub fn runInvestmentAgent(
         else => return error.UnexpectedAdapterResponse,
     };
 
-    const ticket = try trade_ticket.buildMarketBuyTicket(
+    var ticket = try trade_ticket.buildMarketBuyTicket(
         proposed_basket,
         &quote_snapshot,
         affordability,
-        policy_max_notional_per_order_cents,
         ticket_id,
     );
+    tkpoly.applyTradeGuardrails(&ticket, affordability, policy_max_notional_per_order_cents);
 
     // tktool -> tkadpt: paper order (only when policy allows)
     var paper_result: ?trade_ticket.PaperExecutionResult = null;

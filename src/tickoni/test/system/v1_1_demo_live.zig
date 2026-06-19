@@ -5,6 +5,7 @@ const model = @import("model");
 const portfolio = @import("portfolio");
 const replay = @import("replay");
 const thesis = @import("thesis");
+const tkpoly = @import("tkpoly");
 const tool = @import("tool");
 const trade_ticket = @import("trade_ticket");
 const support = @import("investment_support");
@@ -163,7 +164,7 @@ fn runAllowedTradeScenario() !struct {
     const input = support.operationsThesisInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
     try std.testing.expect(support.basketRejects(&basket, "SOXL"));
     try std.testing.expect(support.basketRejects(&basket, "BULZ"));
 
@@ -179,13 +180,13 @@ fn runAllowedTradeScenario() !struct {
         .quote_snapshot => |snapshot| snapshot,
         else => return error.TestUnexpectedResult,
     };
-    const ticket = try trade_ticket.buildMarketBuyTicket(
+    var ticket = try trade_ticket.buildMarketBuyTicket(
         &basket,
         &quote_snapshot,
         affordability,
-        support.policy_max_notional_per_order_cents,
         support.expected_ticket_id,
     );
+    tkpoly.applyTradeGuardrails(&ticket, affordability, support.policy_max_notional_per_order_cents);
     try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, affordability.outcome);
     try std.testing.expectEqual(trade_ticket.PolicyOutcome.allow, ticket.policy_outcome);
 
@@ -212,7 +213,7 @@ fn runOversizedTradeScenario() !void {
     const input = support.operationsThesisInputWithTarget(support.oversized_target_notional_cents);
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
 
     var adapter_backend = adapter.Backend{ .fixture = .{} };
     const portfolio_result = try adapter_backend.call(tool.normalizePortfolioRead(input.account_id));
@@ -226,13 +227,13 @@ fn runOversizedTradeScenario() !void {
         .quote_snapshot => |snapshot| snapshot,
         else => return error.TestUnexpectedResult,
     };
-    const ticket = try trade_ticket.buildMarketBuyTicket(
+    var ticket = try trade_ticket.buildMarketBuyTicket(
         &basket,
         &quote_snapshot,
         affordability,
-        support.policy_max_notional_per_order_cents,
         support.expected_blocked_ticket_id,
     );
+    tkpoly.applyTradeGuardrails(&ticket, affordability, support.policy_max_notional_per_order_cents);
     try std.testing.expectEqual(trade_ticket.PolicyOutcome.deny, ticket.policy_outcome);
     try std.testing.expectEqual(@as(u8, 1), ticket.blocked_reason_count);
     try std.testing.expectEqual(
@@ -255,7 +256,7 @@ fn runRestrictedScenario() !void {
     const input = support.operationsRestrictedTickerInput();
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
-    const basket = try basket_mod.build(intent, thesis_id);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
     const rejected = support.findRejectedCandidate(&basket, support.restricted_ticker) orelse return error.TestUnexpectedResult;
 
     try std.testing.expect(basket.hasRestrictedRejections());

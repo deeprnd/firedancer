@@ -270,6 +270,17 @@ pub fn build(b: *std.Build) void {
             .{ .name = "thesis", .module = thesis_adapter_test_mod },
         },
     });
+    const tkpoly_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/policy/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_adapter_test_mod },
+            .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+            .{ .name = "thesis", .module = thesis_adapter_test_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_adapter_test_mod },
+        },
+    });
     const adapter_test_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/adapter/mod.zig"),
         .target = target,
@@ -353,6 +364,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "disp", .module = disp_unit_mod },
                 .{ .name = "model", .module = model_test_mod },
                 .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+                .{ .name = "tkpoly", .module = tkpoly_test_mod },
                 .{ .name = "tool", .module = tool_test_mod },
                 .{ .name = "trade_ticket", .module = trade_ticket_adapter_test_mod },
             },
@@ -370,6 +382,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "basket", .module = basket_adapter_test_mod },
                 .{ .name = "model", .module = model_test_mod },
                 .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+                .{ .name = "tkpoly", .module = tkpoly_test_mod },
                 .{ .name = "trade_ticket", .module = trade_ticket_adapter_test_mod },
             },
         }),
@@ -462,6 +475,17 @@ pub fn build(b: *std.Build) void {
             .{ .name = "thesis", .module = thesis_int_mod },
         },
     });
+    const tkpoly_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/policy/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "thesis", .module = thesis_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+        },
+    });
 
     const model_int_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
@@ -511,6 +535,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "disp", .module = disp_int_mod },
             .{ .name = "model", .module = model_int_mod },
             .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "tkpoly", .module = tkpoly_int_mod },
             .{ .name = "tool", .module = tool_int_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
         },
@@ -523,6 +548,8 @@ pub fn build(b: *std.Build) void {
             .{ .name = "adapter", .module = adapter_int_mod },
             .{ .name = "basket", .module = basket_int_mod },
             .{ .name = "model", .module = model_int_mod },
+            .{ .name = "portfolio", .module = portfolio_int_mod },
+            .{ .name = "tkpoly", .module = tkpoly_int_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
         },
     });
@@ -573,6 +600,7 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "portfolio", .module = portfolio_int_mod },
                     .{ .name = "replay", .module = replay_int_mod },
                     .{ .name = "thesis", .module = thesis_int_mod },
+                    .{ .name = "tkpoly", .module = tkpoly_int_mod },
                     .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
                     .{ .name = "tkcase", .module = case_int_mod },
                     .{ .name = "tkdisp", .module = disp_int_mod },
@@ -598,6 +626,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "portfolio", .module = portfolio_int_mod },
                 .{ .name = "replay", .module = replay_int_mod },
                 .{ .name = "thesis", .module = thesis_int_mod },
+                .{ .name = "tkpoly", .module = tkpoly_int_mod },
                 .{ .name = "tool", .module = tool_int_mod },
                 .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
             },
