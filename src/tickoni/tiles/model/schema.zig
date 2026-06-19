@@ -49,6 +49,33 @@ pub const TkModlRequest = struct {
     replay_substitution_id: u64 = 0,
 };
 
+pub const max_allowed_model_ids: usize = 16;
+
+pub const TkModlConfig = struct {
+    allowed_model_ids: [max_allowed_model_ids][]const u8 = undefined,
+    allowed_model_id_count: u8 = 0,
+    live_provider_enabled: bool = false,
+    hard_max_context_tokens: u32 = 0,
+    hard_max_output_tokens: u32 = 0,
+    hard_max_retry_count: u8 = 0,
+    hard_timeout_ms: u32 = 0,
+    per_run_token_budget: u32 = 0,
+    provider_endpoint: [256]u8 = [_]u8{0} ** 256,
+};
+
+pub const TkModlDecision = union(enum) {
+    allow_live,
+    allow_replay,
+    deny_missing_scope: []const u8,
+    deny_model_not_allowed,
+    deny_budget_exhausted,
+    deny_context_limit,
+    deny_output_limit,
+    deny_retry_limit,
+    deny_live_provider_disabled,
+    deny_replay_substitution_missing,
+};
+
 pub const TokenUsage = struct {
     prompt_tokens: u32,
     completion_tokens: u32,
