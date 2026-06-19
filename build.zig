@@ -484,6 +484,7 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/test/integration/investment_replay.zig",
         "src/tickoni/test/integration/investment_blocked_limits.zig",
         "src/tickoni/test/integration/investment_restricted_instrument.zig",
+        "src/tickoni/test/integration/mock_servers.zig",
     }) |path| {
         const integration_test = b.addTest(.{
             .root_module = b.createModule(.{
