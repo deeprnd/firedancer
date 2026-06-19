@@ -510,3 +510,144 @@ pub fn verifyRestrictedInstrumentBlock(
     const external_effects_disabled = model_backend.isEffectFree();
     return buildReplayVerification(divergences, external_effects_disabled);
 }
+
+const AllowedReplayFixture = struct {
+    proposed_basket: basket.Basket,
+    ticket: trade_ticket.TradeTicket,
+};
+
+fn loadExpectedAllowedBasketId(allocator: std.mem.Allocator, io: std.Io) !u64 {
+    var loaded = try loadReplayCapsule(
+        allocator,
+        io,
+        "src/tickoni/test/fixtures/investment/replay_capsule.json",
+    );
+    defer loaded.deinit(allocator);
+
+    return loaded.parsed.value.expected_basket_id orelse return error.MissingExpectedBasketId;
+}
+
+fn buildAllowedReplayFixture(allocator: std.mem.Allocator, io: std.Io) !AllowedReplayFixture {
+    const portfolio = @import("portfolio");
+    const expected_basket_id = try loadExpectedAllowedBasketId(allocator, io);
+
+    var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
+    proposed_basket.basket_id = expected_basket_id;
+    proposed_basket.account_id = 2001;
+    proposed_basket.target_notional_cents = 200_000;
+    proposed_basket.catalog_schema_version = 1;
+    proposed_basket.instrument_count = 7;
+    proposed_basket.total_allocated_cents = 200_000;
+
+    const line_specs = [_]struct {
+        ticker: []const u8,
+        asset_class: @FieldType(basket.BasketInstrument, "asset_class"),
+        allocation_cents: i64,
+        weight_bp: u32,
+    }{
+        .{ .ticker = "NVDA", .asset_class = .equity, .allocation_cents = 25_000, .weight_bp = 1_250 },
+        .{ .ticker = "AMD", .asset_class = .equity, .allocation_cents = 25_000, .weight_bp = 1_250 },
+        .{ .ticker = "AVGO", .asset_class = .equity, .allocation_cents = 25_000, .weight_bp = 1_250 },
+        .{ .ticker = "MSFT", .asset_class = .equity, .allocation_cents = 25_000, .weight_bp = 1_250 },
+        .{ .ticker = "AMZN", .asset_class = .equity, .allocation_cents = 25_000, .weight_bp = 1_250 },
+        .{ .ticker = "BOTZ", .asset_class = .etf, .allocation_cents = 37_500, .weight_bp = 1_875 },
+        .{ .ticker = "SOXX", .asset_class = .etf, .allocation_cents = 37_500, .weight_bp = 1_875 },
+    };
+    for (line_specs, 0..) |spec, i| {
+        proposed_basket.instruments[i].ticker_len = @intCast(spec.ticker.len);
+        @memcpy(proposed_basket.instruments[i].ticker[0..spec.ticker.len], spec.ticker);
+        proposed_basket.instruments[i].asset_class = spec.asset_class;
+        proposed_basket.instruments[i].allocation_cents = spec.allocation_cents;
+        proposed_basket.instruments[i].weight_bp = spec.weight_bp;
+    }
+
+    var quote_request = adapter.AdapterRequest{
+        .operation = .quote_snapshot,
+        .account_id = proposed_basket.account_id,
+        .ticker_count = proposed_basket.instrument_count,
+    };
+    for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |instrument, i| {
+        @memcpy(quote_request.tickers[i][0..instrument.ticker_len], instrument.tickerSlice());
+    }
+
+    const fixture_backend = adapter.FixtureBackend{};
+    const quote_result = try fixture_backend.call(quote_request);
+    const quote_snapshot = switch (quote_result) {
+        .quote_snapshot => |snapshot| snapshot,
+        else => unreachable,
+    };
+    const affordability = try portfolio.checkBasketAffordability(
+        &fixture_backend.account_snapshot,
+        &proposed_basket,
+    );
+    const ticket = try trade_ticket.buildMarketBuyTicket(
+        &proposed_basket,
+        &quote_snapshot,
+        affordability,
+        250_000,
+        "ticket_v1_1_ai_infra_2000_market",
+    );
+
+    return .{
+        .proposed_basket = proposed_basket,
+        .ticket = ticket,
+    };
+}
+
+test "verifyAllowedTradeWithCapsulePath marks live model backends as external effects" {
+    const fixture = try buildAllowedReplayFixture(std.testing.allocator, std.testing.io);
+    var model_backend = model.Backend{ .http = .{
+        .endpoint = "http://127.0.0.1:65535/v1",
+        .io = std.testing.io,
+    } };
+    var adapter_backend = adapter.Backend{ .fixture = .{} };
+
+    const replay_result = try verifyAllowedTrade(
+        std.testing.allocator,
+        std.testing.io,
+        &model_backend,
+        &adapter_backend,
+        &fixture.proposed_basket,
+        &fixture.ticket,
+    );
+    try std.testing.expect(!replay_result.external_effects_disabled);
+}
+
+test "verifyAllowedTradeWithCapsulePath detects tampered paper fill hashes" {
+    const fixture = try buildAllowedReplayFixture(std.testing.allocator, std.testing.io);
+    var model_backend = model.Backend{ .fixture = .{} };
+    var adapter_backend = adapter.Backend{ .fixture = .{} };
+
+    const replay_result = try verifyAllowedTradeWithCapsulePath(
+        std.testing.allocator,
+        std.testing.io,
+        "src/tickoni/test/fixtures/investment/replay_capsule_tampered_paper_fill.json",
+        &model_backend,
+        &adapter_backend,
+        &fixture.proposed_basket,
+        &fixture.ticket,
+    );
+    try std.testing.expect(replay_result.external_effects_disabled);
+    try std.testing.expect(!replay_result.replay_match);
+    try std.testing.expect(replay_result.divergence_count >= 1);
+    try std.testing.expect(replay_result.first_divergent_field.len > 0);
+}
+
+test "verifyRestrictedInstrumentBlock stays offline with fixture model backend" {
+    var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
+    proposed_basket.rejected_count = 1;
+    proposed_basket.rejected[0].ticker_len = 4;
+    @memcpy(proposed_basket.rejected[0].ticker[0..4], "SOXL");
+    proposed_basket.rejected[0].reason_code = .restricted_instrument;
+    var model_backend = model.Backend{ .fixture = .{} };
+
+    const replay_result = try verifyRestrictedInstrumentBlock(
+        std.testing.allocator,
+        std.testing.io,
+        &model_backend,
+        &proposed_basket,
+        "SOXL",
+    );
+    try std.testing.expect(replay_result.external_effects_disabled);
+    try std.testing.expect(replay_result.replay_match);
+}

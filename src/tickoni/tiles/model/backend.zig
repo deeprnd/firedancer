@@ -445,6 +445,39 @@ test "FixtureBackend rejects empty capability_envelope_id" {
     try std.testing.expectError(error.MissingCapabilityEnvelopeId, fixture.call(allocator, req));
 }
 
+test "HttpBackend rejects missing budget_id before transport" {
+    const allocator = std.testing.allocator;
+    const http = HttpBackend{
+        .endpoint = "http://127.0.0.1:65535/v1",
+        .io = std.testing.io,
+    };
+    const req = ModelRequest{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{},
+        .budget_id = "",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "capenv.trading_order.propose.demo",
+    };
+    try std.testing.expectError(error.MissingBudgetId, http.call(allocator, req));
+}
+
+test "HttpBackend rejects non-allowlisted model before transport" {
+    const allocator = std.testing.allocator;
+    const http = HttpBackend{
+        .endpoint = "http://127.0.0.1:65535/v1",
+        .io = std.testing.io,
+        .allowed_model_ids = &.{"fixture.ai_infra"},
+    };
+    const req = ModelRequest{
+        .model_id = "other-model",
+        .messages = &.{},
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "capenv.trading_order.propose.demo",
+    };
+    try std.testing.expectError(error.ModelNotAllowed, http.call(allocator, req));
+}
+
 test "FixtureBackend.initFromDir loads model_response_gemma4.json" {
     const allocator = std.testing.allocator;
     const fixture = try FixtureBackend.initFromDir(
@@ -497,4 +530,17 @@ test "ModelResponse token_usage fields accessible" {
     try std.testing.expectEqual(@as(u32, 0), resp.token_usage.prompt_tokens);
     try std.testing.expectEqual(@as(u32, 0), resp.token_usage.completion_tokens);
     try std.testing.expectEqual(@as(u32, 0), resp.token_usage.total_tokens);
+}
+
+test "Backend.isEffectFree tracks live network boundaries" {
+    const mock = Backend{ .mock = .{ .canned_content = "mock" } };
+    const fixture = Backend{ .fixture = .{} };
+    const http = Backend{ .http = .{
+        .endpoint = "http://127.0.0.1:65535/v1",
+        .io = std.testing.io,
+    } };
+
+    try std.testing.expect(mock.isEffectFree());
+    try std.testing.expect(fixture.isEffectFree());
+    try std.testing.expect(!http.isEffectFree());
 }

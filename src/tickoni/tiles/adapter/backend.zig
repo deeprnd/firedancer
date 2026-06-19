@@ -378,6 +378,43 @@ test "Backend union dispatches to fixture backend" {
     try std.testing.expectEqual(portfolio_fixtures.fixtures.cash_rich.account_id, snapshot.account_id);
 }
 
+test "FixtureBackend rejects unknown account" {
+    try std.testing.expectError(error.UnknownAccount, (FixtureBackend{}).call(.{
+        .operation = .portfolio_snapshot,
+        .account_id = 999_999,
+    }));
+}
+
+test "FixtureBackend rejects unsupported ticker" {
+    var req = schema.AdapterRequest{
+        .operation = .quote_snapshot,
+        .account_id = portfolio_fixtures.fixtures.cash_rich.account_id,
+        .ticker_count = 1,
+    };
+    req.tickers[0] = tickerBuf("NOPE");
+    try std.testing.expectError(error.UnsupportedTicker, (FixtureBackend{}).call(req));
+}
+
+test "FixtureBackend rejects missing ticket for paper order" {
+    try std.testing.expectError(error.MissingTicket, (FixtureBackend{}).call(.{
+        .operation = .paper_order,
+        .account_id = portfolio_fixtures.fixtures.cash_rich.account_id,
+        .ticket = null,
+    }));
+}
+
+test "FixtureBackend rejects policy blocked ticket for paper order" {
+    var ticket: trade_ticket.TradeTicket = std.mem.zeroes(trade_ticket.TradeTicket);
+    ticket.account_id = portfolio_fixtures.fixtures.cash_rich.account_id;
+    ticket.policy_outcome = .deny;
+
+    try std.testing.expectError(error.PolicyBlocked, (FixtureBackend{}).call(.{
+        .operation = .paper_order,
+        .account_id = ticket.account_id,
+        .ticket = &ticket,
+    }));
+}
+
 test "parseQuantityMicros parses fractional quantities" {
     try std.testing.expectEqual(@as(u64, 2_000_000), try parseQuantityMicros("2.000000"));
     try std.testing.expectEqual(@as(u64, 1_562_500), try parseQuantityMicros("1.562500"));
@@ -445,4 +482,12 @@ test "FixtureBackend.initFromDir data matches hardcoded defaults" {
         try std.testing.expectEqual(dq.ask_cents, fq.ask_cents);
         try std.testing.expectEqual(dq.bid_cents, fq.bid_cents);
     }
+}
+
+test "Backend.isEffectFree stays true for offline adapter backends" {
+    const mock = Backend{ .mock = .{} };
+    const fixture = Backend{ .fixture = .{} };
+
+    try std.testing.expect(mock.isEffectFree());
+    try std.testing.expect(fixture.isEffectFree());
 }

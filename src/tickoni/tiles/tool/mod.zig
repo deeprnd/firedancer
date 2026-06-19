@@ -62,6 +62,53 @@ test "normalizePortfolioRead sets account and operation" {
     try std.testing.expectEqual(portfolio_fixtures.fixtures.cash_rich.account_id, req.account_id);
 }
 
+test "normalizeQuoteRead copies basket tickers and account scope" {
+    var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
+    proposed_basket.account_id = portfolio_fixtures.fixtures.cash_rich.account_id;
+    proposed_basket.instrument_count = 2;
+    proposed_basket.instruments[0].ticker_len = 4;
+    @memcpy(proposed_basket.instruments[0].ticker[0..4], "NVDA");
+    proposed_basket.instruments[1].ticker_len = 4;
+    @memcpy(proposed_basket.instruments[1].ticker[0..4], "SOXX");
+
+    const req = normalizeQuoteRead(&proposed_basket);
+    try std.testing.expectEqual(adapter.AdapterOperation.quote_snapshot, req.operation);
+    try std.testing.expectEqual(proposed_basket.account_id, req.account_id);
+    try std.testing.expectEqual(@as(u8, 2), req.ticker_count);
+    try std.testing.expectEqualStrings("NVDA", std.mem.sliceTo(&req.tickers[0], 0));
+    try std.testing.expectEqualStrings("SOXX", std.mem.sliceTo(&req.tickers[1], 0));
+}
+
+test "normalizePaperOrder preserves account and ticket pointer" {
+    var ticket: trade_ticket.TradeTicket = std.mem.zeroes(trade_ticket.TradeTicket);
+    ticket.account_id = portfolio_fixtures.fixtures.cash_rich.account_id;
+    ticket.ticket_id_len = 9;
+    @memcpy(ticket.ticket_id[0..9], "ticket-01");
+
+    const req = normalizePaperOrder(&ticket);
+    try std.testing.expectEqual(adapter.AdapterOperation.paper_order, req.operation);
+    try std.testing.expectEqual(ticket.account_id, req.account_id);
+    try std.testing.expect(req.ticket == &ticket);
+}
+
+test "dispatch routes quote and paper-order tool names to adapter requests" {
+    var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
+    proposed_basket.account_id = portfolio_fixtures.fixtures.cash_rich.account_id;
+    proposed_basket.instrument_count = 1;
+    proposed_basket.instruments[0].ticker_len = 4;
+    @memcpy(proposed_basket.instruments[0].ticker[0..4], "NVDA");
+
+    var ticket: trade_ticket.TradeTicket = std.mem.zeroes(trade_ticket.TradeTicket);
+    ticket.account_id = proposed_basket.account_id;
+
+    const quote_req = dispatch(.{ .quote_read = &proposed_basket });
+    const paper_req = dispatch(.{ .paper_order = &ticket });
+
+    try std.testing.expectEqual(adapter.AdapterOperation.quote_snapshot, quote_req.operation);
+    try std.testing.expectEqual(adapter.AdapterOperation.paper_order, paper_req.operation);
+    try std.testing.expect(paper_req.ticket == &ticket);
+}
+
 test "ToolName.fromString accepts known tools" {
     try std.testing.expectEqual(ToolName.portfolio_read, try ToolName.fromString("portfolio_read"));
     try std.testing.expectEqual(ToolName.quote_read, try ToolName.fromString("quote_read"));

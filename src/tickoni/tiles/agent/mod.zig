@@ -122,3 +122,52 @@ pub fn runRestrictedInstrumentDenialAgent(
         .model_response = model_response,
     };
 }
+
+test "runInvestmentAgent blocks oversized trade and skips paper execution" {
+    var proposed_basket: basket_mod.Basket = std.mem.zeroes(basket_mod.Basket);
+    proposed_basket.account_id = 2001;
+    proposed_basket.target_notional_cents = 2_500_000;
+    proposed_basket.total_allocated_cents = 2_500_000;
+    proposed_basket.instrument_count = 1;
+    proposed_basket.instruments[0].ticker_len = 4;
+    @memcpy(proposed_basket.instruments[0].ticker[0..4], "NVDA");
+    proposed_basket.instruments[0].asset_class = .equity;
+    proposed_basket.instruments[0].allocation_cents = 2_500_000;
+    proposed_basket.instruments[0].weight_bp = 10_000;
+    const work_item = disp.dispatchInvestmentRun(77, proposed_basket.account_id, proposed_basket.target_notional_cents);
+
+    var model_backend = model.Backend{ .fixture = .{} };
+    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    const result = try runInvestmentAgent(
+        std.testing.allocator,
+        work_item,
+        &proposed_basket,
+        &model_backend,
+        &adapter_backend,
+        250_000,
+        "ticket_v1_1_ai_infra_25000_blocked",
+    );
+    defer result.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(work_item.run_id, result.run_id);
+    try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, result.affordability.outcome);
+    try std.testing.expectEqual(trade_ticket.PolicyOutcome.deny, result.ticket.policy_outcome);
+    try std.testing.expectEqual(@as(u8, 1), result.ticket.blocked_reason_count);
+    try std.testing.expectEqual(trade_ticket.BlockedReasonCode.per_order_notional_exceeded, result.ticket.blocked_reasons[0].code);
+    try std.testing.expect(result.paper_result == null);
+    try std.testing.expect(std.mem.indexOf(u8, result.model_response.content, "NVDA") != null);
+}
+
+test "runRestrictedInstrumentDenialAgent stays model-only for restricted ticker flows" {
+    var model_backend = model.Backend{ .fixture = .{} };
+    const work_item = disp.dispatchInvestmentRun(88, 2001, 200_000);
+    const result = try runRestrictedInstrumentDenialAgent(
+        std.testing.allocator,
+        work_item,
+        &model_backend,
+    );
+    defer result.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(work_item.run_id, result.run_id);
+    try std.testing.expect(std.mem.indexOf(u8, result.model_response.content, "recommended_tickers") != null);
+}

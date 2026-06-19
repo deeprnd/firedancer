@@ -60,6 +60,8 @@ test-unit-fd:
     make run-unit-test TEST_OPTS="--page-sz normal"
   fi
 
+# Tickoni unit lane: pure logic and fixture/mock-backed tests only.
+# No running servers belong here.
 test-unit-tk:
   zig build test --summary all
 
@@ -83,9 +85,11 @@ test-e2e-all:
 test-integration-fd:
   @true
 
+# Tickoni integration lane: transport and boundary wiring against local mocks.
 test-integration-tk:
   zig build integration-test --summary all
 
+# Tickoni system lane: opt-in live model/demo validation.
 test-system-tk:
   bash contrib/test/run_integration_model_tests.sh
 
