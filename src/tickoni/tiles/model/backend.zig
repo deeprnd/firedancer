@@ -485,6 +485,68 @@ test "FixtureBackend.initFromDir loads model_response_gemma4.json" {
     try std.testing.expect(std.mem.indexOf(u8, resp.content, "rationale") != null);
 }
 
+test "FixtureBackend response JSON matches expected tickers and excludes restricted products" {
+    const allocator = std.testing.allocator;
+    const fixture = FixtureBackend{};
+    const req = ModelRequest{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{},
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "capenv.trading_order.propose.demo",
+    };
+    const resp = try fixture.call(allocator, req);
+    defer resp.deinit(allocator);
+
+    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, resp.content, .{});
+    defer parsed.deinit();
+
+    const root = switch (parsed.value) {
+        .object => |o| o,
+        else => return error.TestUnexpectedResult,
+    };
+    const summary_v = root.get("thesis_summary") orelse return error.TestUnexpectedResult;
+    const summary = switch (summary_v) {
+        .string => |s| s,
+        else => return error.TestUnexpectedResult,
+    };
+    try std.testing.expect(summary.len > 0);
+
+    const tickers_v = root.get("recommended_tickers") orelse return error.TestUnexpectedResult;
+    const tickers = switch (tickers_v) {
+        .array => |a| a,
+        else => return error.TestUnexpectedResult,
+    };
+
+    const expected = [_][]const u8{ "NVDA", "AMD", "AVGO", "MSFT", "AMZN", "BOTZ", "SOXX" };
+    for (expected) |sym| {
+        var found = false;
+        for (tickers.items) |item| {
+            switch (item) {
+                .string => |s| {
+                    if (std.mem.eql(u8, s, sym)) found = true;
+                },
+                else => {},
+            }
+        }
+        try std.testing.expect(found);
+    }
+
+    const restricted = [_][]const u8{
+        "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",
+        "UVXY", "SVXY", "LABU", "LABD", "FAS", "FAZ",
+    };
+    for (tickers.items) |item| {
+        const ticker = switch (item) {
+            .string => |s| s,
+            else => return error.TestUnexpectedResult,
+        };
+        for (restricted) |denied| {
+            try std.testing.expect(!std.mem.eql(u8, ticker, denied));
+        }
+    }
+}
+
 test "MockBackend ignores request model_id and messages" {
     const allocator = std.testing.allocator;
     const mock = MockBackend{ .canned_content = "fixed" };

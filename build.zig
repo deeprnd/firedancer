@@ -584,19 +584,32 @@ pub fn build(b: *std.Build) void {
         integration_step.dependOn(&b.addRunArtifact(integration_test).step);
     }
 
-    // Transitional step kept for the opt-in live system/demo lane.
-    const live_model_step = b.step("integration-test-live-model", "Run opt-in live tkmodl llama.cpp smoke tests");
-    const model_http_test = b.addTest(.{
+    const system_step = b.step("system-test", "Run live V1.1 system/demo proofs");
+    const system_test = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test/integration/model_tile_http.zig"),
+            .root_source_file = b.path("src/tickoni/test/system/v1_1_demo_live.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{.{ .name = "model", .module = model_int_mod }},
+            .imports = &.{
+                .{ .name = "adapter", .module = adapter_int_mod },
+                .{ .name = "basket", .module = basket_int_mod },
+                .{ .name = "investment_support", .module = investment_support_int_mod },
+                .{ .name = "model", .module = model_int_mod },
+                .{ .name = "portfolio", .module = portfolio_int_mod },
+                .{ .name = "replay", .module = replay_int_mod },
+                .{ .name = "thesis", .module = thesis_int_mod },
+                .{ .name = "tool", .module = tool_int_mod },
+                .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+            },
         }),
     });
-    model_http_test.root_module.link_libc = true;
-    const model_http_run = b.addRunArtifact(model_http_test);
-    live_model_step.dependOn(&model_http_run.step);
+    linkTickoniCodec(b, system_test, fd_lib_dir);
+    system_test.root_module.link_libc = true;
+    system_step.dependOn(&b.addRunArtifact(system_test).step);
+
+    // Compatibility alias for the old live-model smoke command.
+    const live_model_step = b.step("integration-test-live-model", "Alias for the live V1.1 system/demo lane");
+    live_model_step.dependOn(system_step);
 
     // ---------------------------------------------------------------------------
     // Coverage step — install test binaries to zig-out/cov/ for kcov
