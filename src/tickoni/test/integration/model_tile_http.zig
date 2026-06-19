@@ -37,7 +37,7 @@ const mock_model_content =
     "\"recommended_tickers\":[\"NVDA\",\"AMD\",\"AVGO\",\"MSFT\",\"AMZN\",\"BOTZ\",\"SOXX\"]," ++
     "\"rationale\":{\"NVDA\":\"AI compute leader\",\"AMD\":\"AI accelerator challenger\",\"AVGO\":\"Networking and custom silicon\",\"MSFT\":\"Cloud AI platform\",\"AMZN\":\"Cloud infrastructure exposure\",\"BOTZ\":\"Diversified robotics and AI ETF\",\"SOXX\":\"Semiconductor ETF diversification\"}}";
 
-fn makeAiInfraRequest(model_id: []const u8) model.ModelRequest {
+fn makeAiInfraRequest(model_id: []const u8) model.ProviderRequest {
     return .{
         .model_id = model_id,
         .messages = &.{
@@ -50,8 +50,8 @@ fn makeAiInfraRequest(model_id: []const u8) model.ModelRequest {
             .max_output_tokens = 2048,
             .seed = 42,
         },
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
+        .budget_id = "budget.demo_paper",
+        .policy_version = "v1",
         .capability_envelope_id = "capenv.trading_order.propose.demo",
     };
 }
@@ -76,23 +76,19 @@ fn withMockBackend(
     const endpoint = try server.endpointAlloc(allocator);
     defer allocator.free(endpoint);
 
-    var backend = model.Backend{ .http = .{
-        .endpoint = endpoint,
-        .io = runtime.io(),
-        .allowed_model_ids = &.{mock_model_id},
-    } };
+    var backend = model.Backend{ .http = .{ .endpoint = endpoint, .io = runtime.io() } };
     try test_fn(allocator, &backend, &server);
 }
 
 test "model tile http: hello round-trip via mock server" {
     try withMockBackend(std.testing.allocator, struct {
         fn run(allocator: std.mem.Allocator, backend: *model.Backend, server: *openai_mock.Server) !void {
-            const req = model.ModelRequest{
+            const req = model.ProviderRequest{
                 .model_id = mock_model_id,
                 .messages = &.{.{ .role = "user", .content = "Reply with the single word: hello" }},
                 .sampling = .{ .temperature = 0, .max_output_tokens = 256, .seed = 1 },
-                .budget_id = "budget.demo_paper.v1_1",
-                .policy_version = "v1.1",
+                .budget_id = "budget.demo_paper",
+                .policy_version = "v1",
                 .capability_envelope_id = "capenv.trading_order.propose.demo",
             };
             const resp = try backend.call(allocator, req);
@@ -196,10 +192,6 @@ test "model tile http: wrong endpoint fails closed with HttpStatusError" {
     const wrong_endpoint = try std.fmt.allocPrint(allocator, "http://127.0.0.1:{d}", .{server.listener.socket.address.getPort()});
     defer allocator.free(wrong_endpoint);
 
-    var backend = model.Backend{ .http = .{
-        .endpoint = wrong_endpoint,
-        .io = runtime.io(),
-        .allowed_model_ids = &.{mock_model_id},
-    } };
+    var backend = model.Backend{ .http = .{ .endpoint = wrong_endpoint, .io = runtime.io() } };
     try std.testing.expectError(error.HttpStatusError, backend.call(allocator, makeAiInfraRequest(mock_model_id)));
 }

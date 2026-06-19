@@ -1,4 +1,4 @@
-/// Basket construction schema for V1.1.S3.
+/// Basket construction schema
 ///
 /// Basket: result of deterministic construction from InvestorIntent and the
 /// instrument catalog.  Instruments are scope-checked (US market, NYSE/NASDAQ
@@ -18,6 +18,8 @@ const std = @import("std");
 const thesis = @import("thesis.zig");
 const cat = @import("catalog.zig");
 const thesis_cabi = @import("thesis_cabi");
+
+pub const catalog = cat;
 
 pub const basket_schema_version: u16 = 1;
 
@@ -208,28 +210,13 @@ pub fn computeBasketHash(basket: *const Basket) u64 {
 // Build (T2, T3, T4, T5)
 // ---------------------------------------------------------------------------
 
-/// Construct a deterministic basket from InvestorIntent and the static catalog.
+/// Construct a deterministic basket from a pre-screened candidate list.
 ///
-/// basket_id: content hash of the source ThesisInput; callers use
-///   computeThesisInputHash() from thesis.zig.  Passed as a parameter so
-///   basket.zig does not need to import thesis_cabi.
-///
-/// Design note — scope enforcement and tkpoly:
-///   The checks below (market, venue, asset class, restricted-instrument
-///   denylist) implement the V1.1.S3 finance-native scope filter in this schema
-///   module as a provisional scaffold.  The contribution guide assigns
-///   capability-envelope authority to tkpoly; when basket construction is
-///   integrated into the runtime tile pipeline, these checks should be
-///   expressed as capability-envelope decisions through tkpoly rather than
-///   inline in the schema module.
-///
-/// Scope enforcement (T3):
-///   - US market only
-///   - NYSE and NASDAQ venues only
-///   - asset classes from intent.allowed_asset_classes (equity/ETF; options,
-///     futures, leveraged ETFs, inverse ETFs denied by thesis.normalize())
-///   - restricted-instrument denylist (InstrumentEntry.restricted == true)
-///   - sector/theme filter via filterByTheme(intent.theme)
+/// Governed runtime flows call tkpoly first, then pass the allowed
+/// candidates and rejected set here for deterministic allocation.  basket_id:
+/// content hash of the source ThesisInput; callers use
+/// computeThesisInputHash() from thesis.zig.  Passed as a parameter so
+/// basket.zig does not need to import thesis_cabi.
 ///
 /// Allocation (T4):
 ///   - Equal-weight baseline; ETF preference (1.5× equity base weight) when
@@ -243,57 +230,22 @@ pub fn computeBasketHash(basket: *const Basket) u64 {
 ///   - rationale string per included instrument (asset class, venue, weight,
 ///     dollars, ETF preference note).
 ///   - reason string per rejected instrument (restriction type or scope failure).
-pub fn build(intent: thesis.InvestorIntent, thesis_id: u64) BasketError!Basket {
-    var theme_buf: [cat.catalog.len]*const cat.InstrumentEntry = undefined;
-    const theme_n = cat.filterByTheme(intent.theme, &theme_buf);
-
-    var candidates: [max_basket_instruments]*const cat.InstrumentEntry = undefined;
-    var n: usize = 0;
-
+pub fn buildFromScreening(
+    intent: thesis.InvestorIntent,
+    thesis_id: u64,
+    screened_candidates: []const *const cat.InstrumentEntry,
+    rejected_candidates: []const RejectedCandidate,
+) BasketError!Basket {
     var basket: Basket = std.mem.zeroes(Basket);
     basket.thesis_id = thesis_id;
     basket.account_id = intent.account_id;
     basket.target_notional_cents = intent.target_amount_cents;
     basket.catalog_schema_version = cat.catalog_schema_version;
+    copyRejectedCandidates(&basket, rejected_candidates);
 
-    // Phase 0 – deny explicitly requested restricted tickers (T3 capability gate).
-    // Covers tickers the user named directly that are not in the current theme catalog,
-    // so the denial is provably request-driven independent of theme catalog iteration.
-    for (intent.requested_tickers[0..@as(usize, intent.requested_ticker_count)]) |slot| {
-        const ticker_str = std.mem.sliceTo(&slot, 0);
-        if (ticker_str.len == 0) continue;
-        if (isAlreadyRejected(&basket, ticker_str)) continue;
-        const entry = cat.lookupByTicker(ticker_str) orelse continue;
-        if (entry.restricted) {
-            addRejected(&basket, entry, .restricted_instrument, restrictionMsg(entry.restriction_reason));
-        }
-    }
-
-    // Phase 1 – scope-check each theme match (T3).
-    for (theme_buf[0..theme_n]) |e| {
-        if (e.restricted) {
-            if (!isAlreadyRejected(&basket, e.ticker[0..e.ticker_len]))
-                addRejected(&basket, e, .restricted_instrument, restrictionMsg(e.restriction_reason));
-            continue;
-        }
-        if (!intent.allowed_asset_classes.has(e.asset_class)) {
-            addRejected(&basket, e, .wrong_asset_class, "Asset class not eligible (equity/ETF only)");
-            continue;
-        }
-        if (e.market != intent.market) {
-            addRejected(&basket, e, .wrong_market, "Market not in US scope");
-            continue;
-        }
-        if (!venueAllowed(e.venue, intent.venues[0..@as(usize, intent.venue_count)])) {
-            addRejected(&basket, e, .wrong_venue, "Venue not NYSE or NASDAQ");
-            continue;
-        }
-        if (n < max_basket_instruments) {
-            candidates[n] = e;
-            n += 1;
-        }
-    }
-
+    var candidates: [max_basket_instruments]*const cat.InstrumentEntry = undefined;
+    const n = @min(screened_candidates.len, max_basket_instruments);
+    for (screened_candidates[0..n], 0..) |entry, i| candidates[i] = entry;
     if (n == 0) return BasketError.NoEligibleInstruments;
 
     // Phase 2 – compute initial weights (T4).
@@ -367,6 +319,59 @@ pub fn build(intent: thesis.InvestorIntent, thesis_id: u64) BasketError!Basket {
     basket.basket_id = computeBasketHash(&basket);
 
     return basket;
+}
+
+/// Convenience schema-level wrapper that performs local screening before
+/// deterministic allocation.  Governed runtime flows should call tkpoly and
+/// then buildFromScreening() instead of relying on this helper for policy.
+pub fn build(intent: thesis.InvestorIntent, thesis_id: u64) BasketError!Basket {
+    var theme_buf: [cat.catalog.len]*const cat.InstrumentEntry = undefined;
+    const theme_n = cat.filterByTheme(intent.theme, &theme_buf);
+
+    var candidates: [max_basket_instruments]*const cat.InstrumentEntry = undefined;
+    var n: usize = 0;
+    var screened: Basket = std.mem.zeroes(Basket);
+
+    for (intent.requested_tickers[0..@as(usize, intent.requested_ticker_count)]) |slot| {
+        const ticker_str = std.mem.sliceTo(&slot, 0);
+        if (ticker_str.len == 0) continue;
+        if (isAlreadyRejected(&screened, ticker_str)) continue;
+        const entry = cat.lookupByTicker(ticker_str) orelse continue;
+        if (entry.restricted) {
+            addRejected(&screened, entry, .restricted_instrument, restrictionMsg(entry.restriction_reason));
+        }
+    }
+
+    for (theme_buf[0..theme_n]) |e| {
+        if (e.restricted) {
+            if (!isAlreadyRejected(&screened, e.ticker[0..e.ticker_len]))
+                addRejected(&screened, e, .restricted_instrument, restrictionMsg(e.restriction_reason));
+            continue;
+        }
+        if (!intent.allowed_asset_classes.has(e.asset_class)) {
+            addRejected(&screened, e, .wrong_asset_class, "Asset class not eligible (equity/ETF only)");
+            continue;
+        }
+        if (e.market != intent.market) {
+            addRejected(&screened, e, .wrong_market, "Market not in US scope");
+            continue;
+        }
+        if (!venueAllowed(e.venue, intent.venues[0..@as(usize, intent.venue_count)])) {
+            addRejected(&screened, e, .wrong_venue, "Venue not NYSE or NASDAQ");
+            continue;
+        }
+        if (n < max_basket_instruments) {
+            candidates[n] = e;
+            n += 1;
+        }
+    }
+
+    return buildFromScreening(
+        intent,
+        thesis_id,
+        candidates[0..n],
+        screened.rejected[0..screened.rejected_count],
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -467,6 +472,17 @@ fn addRejected(
     @memcpy(rc.reason[0..len], reason_str[0..len]);
     rc.reason_len = @intCast(len);
     basket.rejected_count += 1;
+}
+
+fn copyRejectedCandidates(
+    basket: *Basket,
+    rejected_candidates: []const RejectedCandidate,
+) void {
+    const count = @min(rejected_candidates.len, max_rejected_instruments);
+    for (rejected_candidates[0..count], 0..) |rejected, i| {
+        basket.rejected[i] = rejected;
+    }
+    basket.rejected_count = @intCast(count);
 }
 
 fn restrictionMsg(reason: cat.RestrictionReason) []const u8 {

@@ -133,6 +133,12 @@ Everything else supports one of these money loops.
 
 ### V1.1: Investment Intent To Paper Trade
 
+Status: conditionally accepted as an internal deterministic demo baseline. It
+is suitable for engineering, product review, and fixture-backed demonstrations,
+but it is not feature-complete or externally release-ready. The remaining
+release work is carried explicitly by V1.11 rather than hidden in the V1.1
+status.
+
 User story:
 
 As an investor, I can type a plain-English market thesis and Tickoni turns it
@@ -216,6 +222,104 @@ Non-goals:
 - no margin trading
 - no options, futures, leveraged ETFs, inverse ETFs, or crypto
 - no autonomous rebalancing
+
+### V1.11: Investment Demo Release Closure
+
+Product intent:
+
+Turn the useful V1.1 engineering demo into a defensible investment-paper-trade
+release. Preserve the deterministic fixture flow, but close the gaps between
+direct function tests and the governed Tickoni product path.
+
+Starting point:
+
+- the offline USD 2,000 fixture demo builds a basket, ticket, paper fill, and
+  replay-match result,
+- USD 25,000 and restricted `SOXL` flows are covered by deterministic tests,
+- thesis, catalog, basket, portfolio, buy/sell, market/limit, model, adapter,
+  audit, and replay scaffolding exists,
+- unit and local-mock integration lanes are deterministic,
+- the optional local llama.cpp smoke path goes through `tkmodl`.
+
+Release findings carried from V1.1:
+
+1. Bind paper placement to a validated ticket, exact proposal hash, capability
+   envelope, policy decision, account, environment, and deterministic action
+   id. A caller-provided `policy_outcome = allow` must never be sufficient to
+   execute a paper fill.
+2. Run the investment demo through the governed V1.1 boundaries instead of a
+   parallel direct-call path: `tkcase`, `tkdisp`, `tkagnt`, `tkmodl`, `tktool`,
+   `tkadpt`, `tkaudt`, and `tkrepl` must all participate in the demonstrated
+   flow. Keep AI outside the deterministic financial-event critical path.
+3. Replace the narrow amount-and-`SOXL` CLI parser with bounded structured
+   intent extraction for account, target amount, market, venue, asset class,
+   theme or sector, risk preference, exclusions, requested tickers, and
+   concentration. Unsupported or ambiguous input must fail closed with a
+   user-readable reason.
+4. Complete the documented V1.1 trade checks: cash, buying power, per-order,
+   daily and monthly notional, market, venue, sector, side, order type,
+   restricted instrument, same-day round trip, minimum holding period, and
+   open-order limits. Every denial must carry an exact blocked reason and
+   failed scope dimension.
+5. Complete ticket and paper-result contracts. Tickets must carry basket and
+   validation identity plus status. Paper results must carry execution time,
+   exact fills, and resulting cash and holdings snapshots. Add the documented
+   save-as-proposal path.
+6. Make replay source-driven and fail-closed. Reconstruct the flow from the
+   captured thesis/run inputs, route model replay through `tkmodl` replay
+   substitution, route adapter replay through captured substitutions, reject
+   missing or mismatched hashes, and make live model or adapter effects
+   structurally impossible.
+7. Finish `tkmodl` governance: required request/run/actor/account/policy scope,
+   non-empty model and provider allowlists, provider endpoint mapping, hard
+   message/context/output/retry/timeout limits, per-request and cumulative
+   per-run budgets, capability allowlisting, stable denial reasons, and audit
+   records for allowed, replayed, and denied calls.
+8. Put audit, metrics, and diagnostics in the executable demo path. Emit
+   append-only hash-chained records and evidence references for source,
+   normalization, dedupe, case, policy, model, tool, adapter, proposal, paper
+   result, denial, and replay events. Export V1.11 queue, denial, budget,
+   adapter, replay, and crash health.
+9. Reconcile roadmap, WBS, integration-test specs, implementation audits, demo
+   commands, and release status so completed, partial, and deferred work have
+   one evidence-backed interpretation.
+
+Success demo:
+
+One offline command shows, in order:
+
+- a plain-English AI-infrastructure thesis normalized into bounded intent,
+- the explainable basket and rejected candidates,
+- affordability and the USD 2,000 allowed ticket and paper fill,
+- the USD 25,000 denial with exact limit and effective maximum,
+- the direct `SOXL` denial before quote or paper-fill work,
+- a direct-placement bypass denial,
+- audit, metrics, and diagnostic artifact locations,
+- replay success from captured substitutions,
+- deliberate tamper detection with the first divergent field and sequence.
+
+Release gate:
+
+- `just test-unit-tk` passes with no unexpected skips,
+- `just test-integration-tk` passes offline against local mocks,
+- one deterministic `just demo-tk` command prints all required scenarios and
+  produces the proof bundle,
+- the explicit live-local-model smoke lane remains opt-in and uses `tkmodl`,
+- no paper action can bypass validated ticket, policy, capability, and action
+  identity,
+- replay performs no live model, broker, market, trading, payment, or execution
+  effects,
+- all V1.11 release findings above have executable evidence or are explicitly
+  de-scoped by an approved roadmap change.
+
+Non-goals:
+
+- no live brokerage order placement,
+- no margin, options, futures, leveraged or inverse ETF execution,
+- no production market-data dependency,
+- no autonomous trading or portfolio rebalancing,
+- no broad UI, partner API, or sandbox connector expansion beyond what is
+  required to prove the governed paper-trade loop.
 
 ### V1.2: Pay And Move Money Guard
 
@@ -876,6 +980,10 @@ Additional gates by increment:
 - V1.1 closes when thesis-to-paper-trade output is reproducible from fixtures,
   rejected instruments explain their scope failure, and oversized orders
   produce durable trade-ticket evidence.
+- V1.11 closes when the V1.1 paper-trade flow is executable through governed
+  boundaries, paper placement cannot be forged or bypassed, one offline command
+  shows all allowed, blocked, restricted, bypass, replay, and tamper evidence,
+  and audit, metrics, diagnostics, and replay artifacts agree.
 - V1.2 closes when a safe payment or payout proposal and an unsafe blocked
   proposal both produce beneficiary, rail, amount, retry, approval, and replay
   evidence.

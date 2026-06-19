@@ -198,6 +198,10 @@ tk_audit_format_jsonl( char *                    out,
         if( !err ) err = tk_add_u64( root, "response_hash", event->payload.model_call.response_hash );
         if( !err ) err = tk_add_u32( root, "token_estimate", event->payload.model_call.token_estimate );
         if( !err ) err = tk_add_u32( root, "retry_count", event->payload.model_call.retry_count );
+        if( !err ) err = tk_add_string( root, "actor_role", event->payload.model_call.actor_role, 16UL );
+        if( !err ) err = tk_add_string( root, "workflow", event->payload.model_call.workflow, 16UL );
+        if( !err ) err = tk_add_u64( root, "policy_decision_id", event->payload.model_call.policy_decision_id );
+        if( !err ) err = tk_add_u64( root, "replay_substitution_id", event->payload.model_call.replay_substitution_id );
         break;
       case 4U:
         err = tk_add_string( root, "adapter_id", event->payload.financial_adapter_call.adapter_id, 16UL );

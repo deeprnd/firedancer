@@ -4,8 +4,17 @@ const basket_mod = @import("basket");
 const disp = @import("disp");
 const model = @import("model");
 const portfolio = @import("portfolio");
+const tkpoly = @import("tkpoly");
 const tool = @import("tool");
 const trade_ticket = @import("trade_ticket");
+
+const investment_model_id = "fixture.ai_infra";
+const investment_actor_role = "trading_ops_reviewer";
+const investment_workflow = "trading_control";
+const investment_capability = "trading_order.propose";
+const investment_capability_envelope_id = "capenv.trading_order.propose.demo";
+const investment_policy_version = "v1";
+const investment_budget_id = "budget.demo_paper";
 
 /// Result of a normal investment agent run (allowed or oversized-denied).
 /// Caller owns model_response; call deinit(allocator) when done.
@@ -34,6 +43,72 @@ pub const RestrictedBlockResult = struct {
     }
 };
 
+fn baseTkModlConfig(allowed_model_id: []const u8) model.TkModlConfig {
+    var config = model.TkModlConfig{
+        .live_provider_enabled = true,
+        .hard_max_context_tokens = 4096,
+        .hard_max_output_tokens = 1024,
+        .hard_max_retry_count = 1,
+        .hard_timeout_ms = 30_000,
+        .per_run_token_budget = 2048,
+    };
+    config.allowed_model_ids[0] = allowed_model_id;
+    config.allowed_model_id_count = 1;
+    return config;
+}
+
+fn investmentTkModlRequest(work_item: disp.WorkItem) model.TkModlRequest {
+    return .{
+        .request_id = work_item.run_id,
+        .run_id = work_item.run_id,
+        .actor_id = work_item.account_id,
+        .actor_role = investment_actor_role,
+        .workflow = investment_workflow,
+        .account_id = work_item.account_id,
+        .capability = investment_capability,
+        .capability_envelope_id = investment_capability_envelope_id,
+        .policy_version = investment_policy_version,
+        .policy_decision_id = 0,
+        .budget_id = investment_budget_id,
+        .model_id = investment_model_id,
+        .messages = &.{.{ .role = "user", .content = "ai infrastructure" }},
+        .sampling = .{
+            .temperature = 0,
+            .top_p = 1.0,
+            .max_output_tokens = 512,
+            .seed = 42,
+        },
+        .max_context_tokens = 2048,
+        .max_output_tokens = 512,
+        .retry_limit = 0,
+        .timeout_ms = 30_000,
+        .replay_mode = .live,
+    };
+}
+
+fn runInvestmentTkModl(
+    allocator: std.mem.Allocator,
+    work_item: disp.WorkItem,
+    model_backend: *model.Backend,
+) !model.ModelResponse {
+    var result = try model.runTkModlRequest(
+        allocator,
+        baseTkModlConfig(investment_model_id),
+        model_backend,
+        investmentTkModlRequest(work_item),
+    );
+    errdefer result.deinit(allocator);
+
+    switch (result.outcome) {
+        .allow_live, .allow_replay => {},
+        else => return error.TkModlDenied,
+    }
+
+    const response = result.response orelse return error.TkModlMissingResponse;
+    result.response = null;
+    return response;
+}
+
 /// Bounded deterministic agent for normal investment flows (allowed or oversized).
 /// Calls tkmodl (model_backend) then tktool/tkadpt (adapter_backend).
 /// Invokes paper order only when ticket.policy_outcome == .allow.
@@ -46,14 +121,7 @@ pub fn runInvestmentAgent(
     policy_max_notional_per_order_cents: i64,
     ticket_id: []const u8,
 ) !AgentResult {
-    // tkmodl: model recommendation — never call LLM directly
-    const model_response = try model_backend.call(allocator, .{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{.{ .role = "user", .content = "ai infrastructure" }},
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
-        .capability_envelope_id = "capenv.trading_order.propose.demo",
-    });
+    const model_response = try runInvestmentTkModl(allocator, work_item, model_backend);
     errdefer model_response.deinit(allocator);
 
     // tktool -> tkadpt: portfolio snapshot
@@ -75,13 +143,13 @@ pub fn runInvestmentAgent(
         else => return error.UnexpectedAdapterResponse,
     };
 
-    const ticket = try trade_ticket.buildMarketBuyTicket(
+    var ticket = try trade_ticket.buildMarketBuyTicket(
         proposed_basket,
         &quote_snapshot,
         affordability,
-        policy_max_notional_per_order_cents,
         ticket_id,
     );
+    tkpoly.applyTradeGuardrails(&ticket, affordability, policy_max_notional_per_order_cents);
 
     // tktool -> tkadpt: paper order (only when policy allows)
     var paper_result: ?trade_ticket.PaperExecutionResult = null;
@@ -110,13 +178,7 @@ pub fn runRestrictedInstrumentDenialAgent(
     work_item: disp.WorkItem,
     model_backend: *model.Backend,
 ) !RestrictedBlockResult {
-    const model_response = try model_backend.call(allocator, .{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{.{ .role = "user", .content = "ai infrastructure" }},
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
-        .capability_envelope_id = "capenv.trading_order.propose.demo",
-    });
+    const model_response = try runInvestmentTkModl(allocator, work_item, model_backend);
     return .{
         .run_id = work_item.run_id,
         .model_response = model_response,
@@ -171,7 +233,7 @@ test "runInvestmentAgent blocks oversized trade and skips paper execution" {
         &model_backend,
         &adapter_backend,
         250_000,
-        "ticket_v1_1_ai_infra_25000_blocked",
+        "ticket_ai_infra_25000_blocked",
     );
     defer result.deinit(std.testing.allocator);
 
@@ -208,7 +270,7 @@ test "runRestrictedInstrumentDenialAgent has no adapter boundary and calls tkmod
 
     try std.testing.expectEqual(work_item.run_id, result.run_id);
     try std.testing.expectEqual(@as(usize, 1), model_trace.call_count);
-    try std.testing.expectEqualStrings("budget.demo_paper.v1_1", model_trace.last_budget_id);
-    try std.testing.expectEqualStrings("v1.1", model_trace.last_policy_version);
+    try std.testing.expectEqualStrings("budget.demo_paper", model_trace.last_budget_id);
+    try std.testing.expectEqualStrings("v1", model_trace.last_policy_version);
     try std.testing.expectEqualStrings("capenv.trading_order.propose.demo", model_trace.last_capability_envelope_id);
 }

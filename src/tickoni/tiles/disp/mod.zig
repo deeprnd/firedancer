@@ -1,7 +1,7 @@
 const std = @import("std");
 
 /// One bounded investment work item dispatched to the agent worker.
-/// In the V1.1 implementation this is an in-process deterministic dispatch.
+/// In the implementation this is an in-process deterministic dispatch.
 pub const WorkItem = struct {
     run_id: u64,
     account_id: u32,

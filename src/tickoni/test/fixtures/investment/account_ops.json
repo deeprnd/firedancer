@@ -1,6 +1,6 @@
 {
   "fixture_id": "account_demo_ops",
-  "schema": "tickoni.v1_1.demo_account",
+  "schema": "tickoni.demo_account",
   "account": {
     "account_id": "brokerage.demo_ops",
     "numeric_account_id": 2001,

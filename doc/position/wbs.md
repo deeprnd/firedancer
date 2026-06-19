@@ -40,7 +40,8 @@ product.
 | Increment | Status | Product outcome |
 | --- | --- | --- |
 | V1.0 | Done | Technical runtime proof: deterministic events, policy decision, audit hash chain, replay, metrics, diagnostics |
-| V1.1 | Next | Investment Intent To Paper Trade: thesis becomes basket, ticket, affordability check, and paper trade |
+| V1.1 | Accepted baseline | Internal deterministic investment demo: thesis becomes basket, ticket, affordability check, and paper-trade scaffold |
+| V1.11 | Next | Investment Demo Release Closure: governed demo path, no-bypass paper placement, audit/metrics/diagnostics proof, and source-driven replay |
 | V1.2 | Planned | Pay And Move Money Guard: failed payment, payout, retry, or transfer becomes an allowed, blocked, or approval-required proposal |
 | V1.3 | Planned | Portfolio And Cash Impact Loop: user sees portfolio, cash, pending obligation, approval, and drift impact together |
 | V1.4 | Later | Social Thesis And Money Feed: user copies thesis or money templates into their own limits |
@@ -252,6 +253,134 @@ trading_order.recommend
 trading_order.propose
 trading_order.place        paper-only until later sandbox approval
 ```
+
+## V1.11: Investment Demo Release Closure
+
+### Product Outcome
+
+The internal V1.1 demo becomes an evidence-backed release candidate. The same
+investment flow must run through the governed Tickoni boundaries, deny paper
+placement bypasses, emit audit/metrics/diagnostic proof, and replay from
+captured inputs with external effects disabled.
+
+### V1.11.S1: Governed demo topology
+
+Tasks:
+
+- V1.11.S1.T1: Add an explicit V1.11 investment-demo topology instead of
+  overloading the Phase 0 payment pipeline.
+- V1.11.S1.T2: Include these tiles in the release-closure path: `tkings`,
+  `tknorm`, `tkdedu`, `tkcase`, `tkpoly`, `tkaudt`, `tkdisp`, `tkagnt`,
+  `tkmodl`, `tktool`, `tkadpt`, `tkrepl`, `tkmetr`, and `tkdiag`.
+- V1.11.S1.T3: Wire reliable links for `tkings_tknorm`, `tknorm_tkdedu`,
+  `tkdedu_tkcase`, `tkcase_tkpoly`, `tkcase_tkdisp`, `tkdisp_tkagnt`,
+  `tkagnt_tkmodl`, `tkagnt_tktool`, `tktool_tkadpt`, `tkpoly_tkaudt`,
+  `tkmodl_tkaudt`, `tktool_tkaudt`, `tkadpt_tkaudt`, `tkagnt_tkaudt`, and
+  `tkaudt_tkrepl`.
+- V1.11.S1.T4: Keep `paymentPipeline()` as the Phase 0 payment topology. Do
+  not silently insert agent, model, tool, or replay tiles into that path.
+
+Acceptance:
+
+- A topology test proves the V1.11 path is separate and explicit.
+- A topology test proves `tkmodl` is present in the V1.11 path.
+- The deterministic event path still begins
+  `tkings -> tknorm -> tkdedu -> tkcase -> tkpoly -> tkaudt`.
+
+### V1.11.S2: Tkmodl governed boundary
+
+Tasks:
+
+- V1.11.S2.T1: Keep provider-wire transport types private and distinct from the
+  governed `tkmodl` boundary contract.
+- V1.11.S2.T2: Add a validated `TkModlRequest` that carries request identity,
+  run or case scope, actor, role, workflow, account, capability, capability
+  envelope id, policy version, policy decision id, budget id, model id,
+  bounded messages, sampling, timeout, retry, and replay fields.
+- V1.11.S2.T3: Add `TkModlConfig` with provider enablement, model allowlist,
+  provider endpoint mapping, hard timeout, hard retry, hard context, hard
+  output, per-request budget, and per-run budget controls.
+- V1.11.S2.T4: Add a pure validator with stable decision codes for live allow,
+  replay allow, and fail-closed denials for missing scope, unknown model,
+  budget exhaustion, limit overflow, disabled live provider, and missing replay
+  substitution.
+- V1.11.S2.T5: Build provider requests only from validated `tkmodl` decisions
+  and emit audit fields for policy version, budget id, model id, request hash,
+  response hash or fixture reference, token usage, retry count, latency, and
+  replay substitution id.
+
+Acceptance:
+
+- No model call in the investment flow can bypass `tkmodl`.
+- Unknown model ids, disabled providers, and oversize requests fail closed.
+- Replay can substitute captured model output without invoking a live provider.
+
+### V1.11.S3: Ticket and paper execution hardening
+
+Tasks:
+
+- V1.11.S3.T1: Bind paper placement to a validated ticket, proposal hash,
+  capability envelope id, policy decision id, account id, environment, and
+  deterministic action id.
+- V1.11.S3.T2: Reject direct paper-placement attempts that bypass validated
+  ticket or proposal identity before any adapter call.
+- V1.11.S3.T3: Complete the ticket schema with basket id, validation identity,
+  and explicit status.
+- V1.11.S3.T4: Complete the paper execution result schema with paper order id,
+  ticket id, account id, fill timestamp, filled line items, fill prices, and
+  resulting cash and holdings snapshot.
+- V1.11.S3.T5: Add the documented save-as-proposal path so a reviewed proposal
+  can be persisted without placing even a paper order.
+
+Acceptance:
+
+- A caller-provided `policy_outcome = allow` is not sufficient to paper-place.
+- Allowed USD 2,000 tickets paper-fill only when their validated identity
+  matches exactly.
+- Blocked or malformed tickets cannot be paper-placed.
+
+### V1.11.S4: Source-driven replay and proof bundle
+
+Tasks:
+
+- V1.11.S4.T1: Reconstruct the investment flow from captured thesis or run
+  inputs instead of trusting prebuilt ticket or replay fixtures.
+- V1.11.S4.T2: Route model replay through `tkmodl` substitution and adapter
+  replay through captured substitutions, both keyed by captured hashes.
+- V1.11.S4.T3: Reject missing or mismatched substitutions fail closed and
+  report the first divergent record or field.
+- V1.11.S4.T4: Emit append-only audit, metrics, and diagnostics artifacts for
+  source, normalization, dedupe, case, policy, model, tool, adapter, proposal,
+  paper result, denial, replay, and tamper events.
+- V1.11.S4.T5: Make one deterministic `just demo-tk` command show the allowed
+  USD 2,000 path, the blocked USD 25,000 path, restricted-instrument denial,
+  direct-placement bypass denial, replay success, and deliberate tamper
+  detection.
+
+Acceptance:
+
+- Replay performs no live model, broker, market, trading, payment, or execution
+  effects.
+- Deliberate tamper produces a first-divergence report.
+- Demo artifacts expose audit, metrics, diagnostics, and replay locations.
+
+### V1.11.S5: Demo gate and documentation reconciliation
+
+Tasks:
+
+- V1.11.S5.T1: Make `just test-integration-tk` the offline deterministic
+  release gate for the V1.11 investment flow.
+- V1.11.S5.T2: Keep the live local-model smoke lane explicit and opt-in
+  through `tkmodl`.
+- V1.11.S5.T3: Reconcile roadmap, WBS, integration-test spec, demo command
+  output, and release status so completed, partial, and deferred work have one
+  evidence-backed interpretation.
+
+Acceptance:
+
+- `just test-unit-tk` passes with no unexpected skips.
+- `just test-integration-tk` passes offline against local mocks.
+- `just demo-tk` prints the release-closure scenarios and proof bundle.
 
 ## V1.2: Pay And Move Money Guard
 
