@@ -667,7 +667,12 @@ pub fn build(b: *std.Build) void {
         .name = "tickoni",
         .root_module = cli_main_mod,
     });
-    linkTickoniCodec(b, cli_exe, fd_lib_dir);
+    // C sources and library links come in via v1_demo_mod (shared with system test).
+    // Only set lib path + system libs at the exe level to avoid duplicate C object files.
+    cli_exe.root_module.addLibraryPath(b.path(fd_lib_dir));
+    cli_exe.root_module.linkSystemLibrary("fd_util", .{});
+    cli_exe.root_module.linkSystemLibrary("fd_ballet", .{});
+    cli_exe.root_module.linkSystemLibrary("stdc++", .{});
     b.installArtifact(cli_exe);
 
     const run_cli = b.addRunArtifact(cli_exe);

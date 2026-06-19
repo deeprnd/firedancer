@@ -54,17 +54,13 @@ pub fn main(init: std.process.Init) !void {
         .allocator = gpa,
         .terminating_positional = 0,
     }) catch |err| {
-        var stderr_buffer: [4096]u8 = undefined;
-        var stderr_writer = std.Io.File.stderr().writer(init.io, &stderr_buffer);
-        diag.report(&stderr_writer.interface, err) catch {};
+        try diag.reportToFile(init.io, std.Io.File.stderr(), err);
         return err;
     };
     defer res.deinit();
 
     if (res.args.help != 0 or res.positionals[0] == null) {
-        var stderr_buffer: [4096]u8 = undefined;
-        var stderr_writer = std.Io.File.stderr().writer(init.io, &stderr_buffer);
-        try clap.help(&stderr_writer.interface, clap.Help, &main_params, .{});
+        try clap.helpToFile(init.io, std.Io.File.stderr(), clap.Help, &main_params, .{});
         return;
     }
 
@@ -80,17 +76,13 @@ fn demoMain(gpa: std.mem.Allocator, io: std.Io, iter: *std.process.Args.Iterator
         .allocator = gpa,
         .terminating_positional = 0,
     }) catch |err| {
-        var stderr_buffer: [4096]u8 = undefined;
-        var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
-        diag.report(&stderr_writer.interface, err) catch {};
+        try diag.reportToFile(io, std.Io.File.stderr(), err);
         return err;
     };
     defer res.deinit();
 
     if (res.args.help != 0 or res.positionals[0] == null) {
-        var stderr_buffer: [4096]u8 = undefined;
-        var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
-        try clap.help(&stderr_writer.interface, clap.Help, &demo_params, .{});
+        try clap.helpToFile(io, std.Io.File.stderr(), clap.Help, &demo_params, .{});
         return;
     }
 
@@ -105,17 +97,13 @@ fn v1Main(gpa: std.mem.Allocator, io: std.Io, iter: *std.process.Args.Iterator) 
         .diagnostic = &diag,
         .allocator = gpa,
     }) catch |err| {
-        var stderr_buffer: [4096]u8 = undefined;
-        var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
-        diag.report(&stderr_writer.interface, err) catch {};
+        try diag.reportToFile(io, std.Io.File.stderr(), err);
         return err;
     };
     defer res.deinit();
 
     if (res.args.help != 0) {
-        var stderr_buffer: [4096]u8 = undefined;
-        var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
-        try clap.help(&stderr_writer.interface, clap.Help, &v1_params, .{});
+        try clap.helpToFile(io, std.Io.File.stderr(), clap.Help, &v1_params, .{});
         return;
     }
 
@@ -142,7 +130,8 @@ fn v1Main(gpa: std.mem.Allocator, io: std.Io, iter: *std.process.Args.Iterator) 
     var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     if (res.args.json != 0) {
         try demo.writeCliReportJson(gpa, &stdout_writer.interface, report);
-        return;
+    } else {
+        try demo.writeCliReportText(&stdout_writer.interface, report);
     }
-    try demo.writeCliReportText(&stdout_writer.interface, report);
+    try stdout_writer.flush();
 }

@@ -110,10 +110,10 @@ pub fn envOrDefault(
     name: []const u8,
     fallback: []const u8,
 ) ![]u8 {
-    return std.process.getEnvVarOwned(allocator, name) catch |err| switch (err) {
-        error.EnvironmentVariableNotFound => allocator.dupe(u8, fallback),
-        else => err,
-    };
+    const name_z = try allocator.dupeZ(u8, name);
+    defer allocator.free(name_z);
+    if (std.c.getenv(name_z)) |val| return allocator.dupe(u8, std.mem.span(val));
+    return allocator.dupe(u8, fallback);
 }
 
 fn makeLiveConfig(allowed_model_id: []const u8) model.TkModlConfig {
