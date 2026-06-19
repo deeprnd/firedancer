@@ -93,9 +93,11 @@ test-integration-tk:
 test-system-tk:
   bash contrib/test/run_integration_model_tests.sh
 
-# Backwards-compatible alias for the old live tkmodl smoke command name.
-test-smoke-tkmodl-live:
-  @just test-system-tk
+test-system-fd:
+  @true
+
+test-system-all:
+  python3 contrib/readme/run-badged-command.py system bash -c "just test-system-tk && just test-system-fd"
 
 infra-run-llamacpp:
   #!/usr/bin/env bash
@@ -118,6 +120,7 @@ test-integration-all:
 test-all:
   @just test-unit-all
   @just test-integration-all
+  @just test-system-all
   @just test-e2e-all
 
 # ── Test: Coverage ─────────────────────────────────────────────────────────

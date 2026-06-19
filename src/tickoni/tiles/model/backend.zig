@@ -214,8 +214,15 @@ pub const HttpBackend = struct {
             }
             if (!model_allowed) return error.ModelNotAllowed;
         }
-        const url = try std.fmt.allocPrint(allocator, "{s}/chat/completions", .{self.endpoint});
-        defer allocator.free(url);
+        // Arena for HTTP transport intermediates (url, body, client, response buffer,
+        // parsed wire types). Only the three returned strings use the caller's
+        // allocator so GPA never sees connection-pool state that std.http.Client
+        // leaves behind after deinit in Zig 0.16.
+        var http_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer http_arena.deinit();
+        const http_alloc = http_arena.allocator();
+
+        const url = try std.fmt.allocPrint(http_alloc, "{s}/chat/completions", .{self.endpoint});
 
         const wire_req = WireRequest{
             .model = req.model_id,
@@ -227,14 +234,12 @@ pub const HttpBackend = struct {
             .stream = false,
         };
 
-        const json_body = try std.json.Stringify.valueAlloc(allocator, wire_req, .{});
-        defer allocator.free(json_body);
+        const json_body = try std.json.Stringify.valueAlloc(http_alloc, wire_req, .{});
 
-        var client = std.http.Client{ .allocator = allocator, .io = self.io };
+        var client = std.http.Client{ .allocator = http_alloc, .io = self.io };
         defer client.deinit();
 
-        var resp_writer: std.Io.Writer.Allocating = .init(allocator);
-        defer resp_writer.deinit();
+        var resp_writer: std.Io.Writer.Allocating = .init(http_alloc);
 
         const fetch_result = client.fetch(.{
             .location = .{ .url = url },
@@ -251,10 +256,9 @@ pub const HttpBackend = struct {
 
         const resp_bytes = resp_writer.written();
 
-        var parsed = try std.json.parseFromSlice(WireResponse, allocator, resp_bytes, .{
+        const parsed = try std.json.parseFromSlice(WireResponse, http_alloc, resp_bytes, .{
             .ignore_unknown_fields = true,
         });
-        defer parsed.deinit();
 
         if (parsed.value.choices.len == 0) return error.EmptyChoices;
 
