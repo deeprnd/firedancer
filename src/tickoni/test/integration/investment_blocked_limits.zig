@@ -13,7 +13,6 @@ const tkcase = @import("tkcase");
 const tkdisp = @import("tkdisp");
 const tkpoly = @import("tkpoly");
 
-
 test "investment_blocked_limits_integration: oversized trade is blocked before paper execution" {
     const allocator = std.testing.allocator;
     const input = support.operationsThesisInputWithTarget(support.oversized_target_notional_cents);

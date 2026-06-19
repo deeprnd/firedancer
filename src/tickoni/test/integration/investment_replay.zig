@@ -11,7 +11,6 @@ const tkcase = @import("tkcase");
 const tkdisp = @import("tkdisp");
 const tkpoly = @import("tkpoly");
 
-
 test "investment_replay_integration: succeeds with fixture substitutions and no live effects" {
     const allocator = std.testing.allocator;
     const input = support.operationsThesisInput();
@@ -247,7 +246,8 @@ test "investment_replay_integration: audit jsonl hash chain is consistent" {
 
     const expected_tile_ids = [investment_audit.allowed_trade_event_count][]const u8{
         "tkings", "tknorm", "tkdedu", "tkcase", "tkpoly",
-        "tkmodl", "tkadpt", "tkadpt", "tkagnt", "tkadpt", "tkrepl",
+        "tkmodl", "tkadpt", "tkadpt", "tkagnt", "tkadpt",
+        "tkrepl",
     };
 
     var lines = std.mem.tokenizeScalar(u8, raw, '\n');
@@ -277,8 +277,13 @@ test "gen audit allowed trade jsonl" {
     var model_backend = model.Backend{ .fixture = .{} };
     var adapter_backend = adapter.Backend{ .fixture = .{} };
     const agent_result = try tkagnt.runInvestmentAgent(
-        allocator, work_item, &basket, &model_backend, &adapter_backend,
-        support.policy_max_notional_per_order_cents, support.expected_ticket_id,
+        allocator,
+        work_item,
+        &basket,
+        &model_backend,
+        &adapter_backend,
+        support.policy_max_notional_per_order_cents,
+        support.expected_ticket_id,
     );
     defer agent_result.deinit(allocator);
     const execution = agent_result.paper_result orelse return error.TestUnexpectedResult;
@@ -290,9 +295,17 @@ test "gen audit allowed trade jsonl" {
         .first_divergent_seq = 0,
     };
     const chain = investment_audit.buildAllowedTradeChain(
-        run_id, "ops_reviewer", "trading_control",
-        &input, &basket, &agent_result.quote_snapshot, agent_result.affordability,
-        &agent_result.model_response, &agent_result.ticket, &execution, &no_divergence,
+        run_id,
+        "ops_reviewer",
+        "trading_control",
+        &input,
+        &basket,
+        &agent_result.quote_snapshot,
+        agent_result.affordability,
+        &agent_result.model_response,
+        &agent_result.ticket,
+        &execution,
+        &no_divergence,
     );
 
     const path = "src/tickoni/test/fixtures/investment/audit_allowed_2000.jsonl";

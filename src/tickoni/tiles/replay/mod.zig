@@ -771,7 +771,6 @@ test "verifyAllowedTradeWithCapsulePath detects tampered paper fill hashes" {
     try std.testing.expect(replay_result.first_divergent_field.len > 0);
 }
 
-
 test "verifyRestrictedInstrumentBlock stays offline with fixture model backend" {
     var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
     proposed_basket.basket_id = 10627110967246007067; // matches replay_capsule_restricted_soxl.json
