@@ -50,7 +50,7 @@ fn envOrDefault(allocator: std.mem.Allocator, name: []const u8, fallback: []cons
     return allocator.dupe(u8, std.mem.span(raw));
 }
 
-fn makeLiveRequest(model_id: []const u8) model.ModelRequest {
+fn makeLiveRequest(model_id: []const u8) model.ProviderRequest {
     return .{
         .model_id = model_id,
         .messages = &.{

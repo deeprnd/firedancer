@@ -12,13 +12,41 @@ pub const Message = struct {
     content: []const u8,
 };
 
-pub const ModelRequest = struct {
+pub const ProviderRequest = struct {
     model_id: []const u8,
     messages: []const Message,
     sampling: SamplingParams = .{},
     budget_id: []const u8 = "",
     policy_version: []const u8 = "",
     capability_envelope_id: []const u8 = "",
+};
+
+pub const ReplayMode = enum(u8) {
+    live,
+    replay,
+};
+
+pub const TkModlRequest = struct {
+    request_id: u64 = 0,
+    run_id: u64 = 0,
+    actor_id: u64 = 0,
+    actor_role: []const u8 = "",
+    workflow: []const u8 = "",
+    account_id: u64 = 0,
+    capability: []const u8 = "",
+    capability_envelope_id: []const u8 = "",
+    policy_version: []const u8 = "",
+    policy_decision_id: u64 = 0,
+    budget_id: []const u8 = "",
+    model_id: []const u8,
+    messages: []const Message,
+    sampling: SamplingParams = .{},
+    max_context_tokens: u32 = 0,
+    max_output_tokens: u32 = 512,
+    retry_limit: u8 = 1,
+    timeout_ms: u32 = 0,
+    replay_mode: ReplayMode = .live,
+    replay_substitution_id: u64 = 0,
 };
 
 pub const TokenUsage = struct {
@@ -41,6 +69,17 @@ pub const ModelResponse = struct {
         allocator.free(self.finish_reason);
     }
 };
+
+test "TkModlRequest required fields compile and replay_mode defaults to live" {
+    const req = TkModlRequest{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{},
+    };
+    try std.testing.expectEqualStrings("fixture.ai_infra", req.model_id);
+    try std.testing.expectEqual(ReplayMode.live, req.replay_mode);
+    try std.testing.expectEqual(@as(u8, 1), req.retry_limit);
+    try std.testing.expectEqual(@as(u32, 512), req.max_output_tokens);
+}
 
 test "ModelResponse deinit frees all fields" {
     const allocator = std.testing.allocator;

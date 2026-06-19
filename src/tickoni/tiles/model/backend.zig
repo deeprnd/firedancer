@@ -1,7 +1,7 @@
 const std = @import("std");
 const schema = @import("schema.zig");
 
-pub const ModelRequest = schema.ModelRequest;
+pub const ProviderRequest = schema.ProviderRequest;
 pub const ModelResponse = schema.ModelResponse;
 
 // MockBackend returns a pre-set canned response. Used in unit tests.
@@ -19,7 +19,7 @@ pub const MockBackend = struct {
     canned_finish_reason: []const u8 = "stop",
     trace: ?*CallTrace = null,
 
-    pub fn call(self: MockBackend, allocator: std.mem.Allocator, req: ModelRequest) error{OutOfMemory}!ModelResponse {
+    pub fn call(self: MockBackend, allocator: std.mem.Allocator, req: ProviderRequest) error{OutOfMemory}!ModelResponse {
         if (self.trace) |trace| {
             trace.call_count += 1;
             trace.last_model_id = req.model_id;
@@ -112,7 +112,7 @@ pub const FixtureBackend = struct {
         return self;
     }
 
-    pub fn call(self: FixtureBackend, allocator: std.mem.Allocator, req: ModelRequest) !ModelResponse {
+    pub fn call(self: FixtureBackend, allocator: std.mem.Allocator, req: ProviderRequest) !ModelResponse {
         var model_allowed = false;
         for (fixture_allowed_model_ids) |id| {
             if (std.mem.eql(u8, req.model_id, id)) {
@@ -201,7 +201,7 @@ pub const HttpBackend = struct {
     io: std.Io,
     allowed_model_ids: []const []const u8 = &.{},
 
-    pub fn call(self: HttpBackend, allocator: std.mem.Allocator, req: ModelRequest) !ModelResponse {
+    pub fn call(self: HttpBackend, allocator: std.mem.Allocator, req: ProviderRequest) !ModelResponse {
         if (req.budget_id.len == 0) return error.MissingBudgetId;
         if (req.policy_version.len == 0) return error.MissingPolicyVersion;
         if (self.allowed_model_ids.len > 0) {
@@ -293,7 +293,7 @@ pub const Backend = union(enum) {
     fixture: FixtureBackend,
     http: HttpBackend,
 
-    pub fn call(self: *Backend, allocator: std.mem.Allocator, req: ModelRequest) anyerror!ModelResponse {
+    pub fn call(self: *Backend, allocator: std.mem.Allocator, req: ProviderRequest) anyerror!ModelResponse {
         return switch (self.*) {
             .mock => |m| m.call(allocator, req),
             .fixture => |f| f.call(allocator, req),
@@ -343,7 +343,7 @@ test "MockBackend returns canned response" {
         .canned_content = "test response",
         .canned_model_id = "mock-v1",
     };
-    const req = ModelRequest{ .model_id = "any", .messages = &.{} };
+    const req = ProviderRequest{ .model_id = "any", .messages = &.{} };
     const resp = try mock.call(allocator, req);
     defer resp.deinit(allocator);
 
@@ -357,7 +357,7 @@ test "MockBackend returns canned response" {
 test "MockBackend default model_id and finish_reason" {
     const allocator = std.testing.allocator;
     const mock = MockBackend{ .canned_content = "hello" };
-    const req = ModelRequest{ .model_id = "any", .messages = &.{} };
+    const req = ProviderRequest{ .model_id = "any", .messages = &.{} };
     const resp = try mock.call(allocator, req);
     defer resp.deinit(allocator);
 
@@ -368,7 +368,7 @@ test "MockBackend default model_id and finish_reason" {
 test "MockBackend is deterministic across calls" {
     const allocator = std.testing.allocator;
     const mock = MockBackend{ .canned_content = "deterministic output" };
-    const req = ModelRequest{ .model_id = "x", .messages = &.{} };
+    const req = ProviderRequest{ .model_id = "x", .messages = &.{} };
 
     const r1 = try mock.call(allocator, req);
     defer r1.deinit(allocator);
@@ -384,7 +384,7 @@ test "MockBackend is deterministic across calls" {
 test "Backend union dispatches to mock" {
     const allocator = std.testing.allocator;
     var backend = Backend{ .mock = .{ .canned_content = "from mock backend" } };
-    const req = ModelRequest{ .model_id = "any", .messages = &.{} };
+    const req = ProviderRequest{ .model_id = "any", .messages = &.{} };
 
     const resp = try backend.call(allocator, req);
     defer resp.deinit(allocator);
@@ -395,7 +395,7 @@ test "Backend union dispatches to mock" {
 test "FixtureBackend returns deterministic response" {
     const allocator = std.testing.allocator;
     const fixture = FixtureBackend{};
-    const req = ModelRequest{
+    const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
         .budget_id = "budget.demo_paper.v1_1",
@@ -418,7 +418,7 @@ test "FixtureBackend returns deterministic response" {
 test "FixtureBackend rejects unknown model_id" {
     const allocator = std.testing.allocator;
     const fixture = FixtureBackend{};
-    const req = ModelRequest{
+    const req = ProviderRequest{
         .model_id = "unknown-model",
         .messages = &.{},
         .budget_id = "budget.demo_paper.v1_1",
@@ -430,7 +430,7 @@ test "FixtureBackend rejects unknown model_id" {
 test "FixtureBackend rejects empty budget_id" {
     const allocator = std.testing.allocator;
     const fixture = FixtureBackend{};
-    const req = ModelRequest{
+    const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
         .budget_id = "",
@@ -442,7 +442,7 @@ test "FixtureBackend rejects empty budget_id" {
 test "FixtureBackend rejects empty policy_version" {
     const allocator = std.testing.allocator;
     const fixture = FixtureBackend{};
-    const req = ModelRequest{
+    const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
         .budget_id = "budget.demo_paper.v1_1",
@@ -454,7 +454,7 @@ test "FixtureBackend rejects empty policy_version" {
 test "FixtureBackend rejects empty capability_envelope_id" {
     const allocator = std.testing.allocator;
     const fixture = FixtureBackend{};
-    const req = ModelRequest{
+    const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
         .budget_id = "budget.demo_paper.v1_1",
@@ -471,7 +471,7 @@ test "FixtureBackend.initFromDir loads model_response_gemma4.json" {
         std.testing.io,
         "src/tickoni/test/fixtures/investment",
     );
-    const req = ModelRequest{
+    const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
         .budget_id = "budget.demo_paper.v1_1",
@@ -492,7 +492,7 @@ test "FixtureBackend.initFromDir loads model_response_gemma4.json" {
 test "FixtureBackend response JSON matches expected tickers and excludes restricted products" {
     const allocator = std.testing.allocator;
     const fixture = FixtureBackend{};
-    const req = ModelRequest{
+    const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
         .budget_id = "budget.demo_paper.v1_1",
@@ -557,7 +557,7 @@ test "MockBackend ignores request model_id and messages" {
     const messages = [_]schema.Message{
         .{ .role = "user", .content = "hello" },
     };
-    const req = ModelRequest{
+    const req = ProviderRequest{
         .model_id = "gpt-999",
         .messages = &messages,
         .sampling = .{ .temperature = 0.8, .max_output_tokens = 1024 },
@@ -575,7 +575,7 @@ test "MockBackend traces the model request scope fields" {
         .canned_content = "fixed",
         .trace = &trace,
     };
-    const req = ModelRequest{
+    const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
         .budget_id = "budget.demo_paper.v1_1",
@@ -595,7 +595,7 @@ test "MockBackend traces the model request scope fields" {
 test "ModelResponse token_usage fields accessible" {
     const allocator = std.testing.allocator;
     const mock = MockBackend{ .canned_content = "x" };
-    const req = ModelRequest{ .model_id = "any", .messages = &.{} };
+    const req = ProviderRequest{ .model_id = "any", .messages = &.{} };
     const resp = try mock.call(allocator, req);
     defer resp.deinit(allocator);
 

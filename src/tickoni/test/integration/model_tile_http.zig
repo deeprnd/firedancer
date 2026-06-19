@@ -37,7 +37,7 @@ const mock_model_content =
     "\"recommended_tickers\":[\"NVDA\",\"AMD\",\"AVGO\",\"MSFT\",\"AMZN\",\"BOTZ\",\"SOXX\"]," ++
     "\"rationale\":{\"NVDA\":\"AI compute leader\",\"AMD\":\"AI accelerator challenger\",\"AVGO\":\"Networking and custom silicon\",\"MSFT\":\"Cloud AI platform\",\"AMZN\":\"Cloud infrastructure exposure\",\"BOTZ\":\"Diversified robotics and AI ETF\",\"SOXX\":\"Semiconductor ETF diversification\"}}";
 
-fn makeAiInfraRequest(model_id: []const u8) model.ModelRequest {
+fn makeAiInfraRequest(model_id: []const u8) model.ProviderRequest {
     return .{
         .model_id = model_id,
         .messages = &.{
@@ -87,7 +87,7 @@ fn withMockBackend(
 test "model tile http: hello round-trip via mock server" {
     try withMockBackend(std.testing.allocator, struct {
         fn run(allocator: std.mem.Allocator, backend: *model.Backend, server: *openai_mock.Server) !void {
-            const req = model.ModelRequest{
+            const req = model.ProviderRequest{
                 .model_id = mock_model_id,
                 .messages = &.{.{ .role = "user", .content = "Reply with the single word: hello" }},
                 .sampling = .{ .temperature = 0, .max_output_tokens = 256, .seed = 1 },

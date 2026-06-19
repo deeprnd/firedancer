@@ -3,7 +3,9 @@ const schema = @import("schema.zig");
 
 pub const SamplingParams = schema.SamplingParams;
 pub const Message = schema.Message;
-pub const ModelRequest = schema.ModelRequest;
+pub const ProviderRequest = schema.ProviderRequest;
+pub const ReplayMode = schema.ReplayMode;
+pub const TkModlRequest = schema.TkModlRequest;
 pub const TokenUsage = schema.TokenUsage;
 pub const ModelResponse = schema.ModelResponse;
 
