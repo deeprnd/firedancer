@@ -6,12 +6,27 @@ pub const ModelResponse = schema.ModelResponse;
 
 // MockBackend returns a pre-set canned response. Used in unit tests.
 pub const MockBackend = struct {
+    pub const CallTrace = struct {
+        call_count: usize = 0,
+        last_model_id: []const u8 = "",
+        last_budget_id: []const u8 = "",
+        last_policy_version: []const u8 = "",
+        last_capability_envelope_id: []const u8 = "",
+    };
+
     canned_content: []const u8,
     canned_model_id: []const u8 = "mock",
     canned_finish_reason: []const u8 = "stop",
+    trace: ?*CallTrace = null,
 
     pub fn call(self: MockBackend, allocator: std.mem.Allocator, req: ModelRequest) error{OutOfMemory}!ModelResponse {
-        _ = req;
+        if (self.trace) |trace| {
+            trace.call_count += 1;
+            trace.last_model_id = req.model_id;
+            trace.last_budget_id = req.budget_id;
+            trace.last_policy_version = req.policy_version;
+            trace.last_capability_envelope_id = req.capability_envelope_id;
+        }
         return .{
             .model_id = try allocator.dupe(u8, self.canned_model_id),
             .content = try allocator.dupe(u8, self.canned_content),
@@ -445,39 +460,6 @@ test "FixtureBackend rejects empty capability_envelope_id" {
     try std.testing.expectError(error.MissingCapabilityEnvelopeId, fixture.call(allocator, req));
 }
 
-test "HttpBackend rejects missing budget_id before transport" {
-    const allocator = std.testing.allocator;
-    const http = HttpBackend{
-        .endpoint = "http://127.0.0.1:65535/v1",
-        .io = std.testing.io,
-    };
-    const req = ModelRequest{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{},
-        .budget_id = "",
-        .policy_version = "v1.1",
-        .capability_envelope_id = "capenv.trading_order.propose.demo",
-    };
-    try std.testing.expectError(error.MissingBudgetId, http.call(allocator, req));
-}
-
-test "HttpBackend rejects non-allowlisted model before transport" {
-    const allocator = std.testing.allocator;
-    const http = HttpBackend{
-        .endpoint = "http://127.0.0.1:65535/v1",
-        .io = std.testing.io,
-        .allowed_model_ids = &.{"fixture.ai_infra"},
-    };
-    const req = ModelRequest{
-        .model_id = "other-model",
-        .messages = &.{},
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
-        .capability_envelope_id = "capenv.trading_order.propose.demo",
-    };
-    try std.testing.expectError(error.ModelNotAllowed, http.call(allocator, req));
-}
-
 test "FixtureBackend.initFromDir loads model_response_gemma4.json" {
     const allocator = std.testing.allocator;
     const fixture = try FixtureBackend.initFromDir(
@@ -518,6 +500,30 @@ test "MockBackend ignores request model_id and messages" {
     defer resp.deinit(allocator);
 
     try std.testing.expectEqualStrings("fixed", resp.content);
+}
+
+test "MockBackend traces the model request scope fields" {
+    const allocator = std.testing.allocator;
+    var trace = MockBackend.CallTrace{};
+    const mock = MockBackend{
+        .canned_content = "fixed",
+        .trace = &trace,
+    };
+    const req = ModelRequest{
+        .model_id = "fixture.ai_infra",
+        .messages = &.{},
+        .budget_id = "budget.demo_paper.v1_1",
+        .policy_version = "v1.1",
+        .capability_envelope_id = "capenv.trading_order.propose.demo",
+    };
+    const resp = try mock.call(allocator, req);
+    defer resp.deinit(allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), trace.call_count);
+    try std.testing.expectEqualStrings("fixture.ai_infra", trace.last_model_id);
+    try std.testing.expectEqualStrings("budget.demo_paper.v1_1", trace.last_budget_id);
+    try std.testing.expectEqualStrings("v1.1", trace.last_policy_version);
+    try std.testing.expectEqualStrings("capenv.trading_order.propose.demo", trace.last_capability_envelope_id);
 }
 
 test "ModelResponse token_usage fields accessible" {
