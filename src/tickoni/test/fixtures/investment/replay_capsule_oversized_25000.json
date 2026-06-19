@@ -3,6 +3,8 @@
   "schema": "tickoni.replay_capsule",
   "capsule_id": "replay_capsule_ai_infra_oversized_25000",
   "run_id": "run_ai_infra_demo_oversized_25000",
+  "expected_basket_id": 17844936811726487061,
+  "expected_proposal_hash": 15423733414829260079,
   "policy_version": "v1",
   "catalog_schema_version": 1,
   "thesis_input_hash": "thesis_hash_oversized_25000",

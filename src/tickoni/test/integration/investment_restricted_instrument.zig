@@ -11,6 +11,7 @@ const tkcase = @import("tkcase");
 const tkdisp = @import("tkdisp");
 const tkpoly = @import("tkpoly");
 
+
 test "investment_restricted_instrument_integration: direct restricted ticker request is denied before adapter work" {
     const allocator = std.testing.allocator;
     const input = support.operationsRestrictedTickerInput();

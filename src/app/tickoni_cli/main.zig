@@ -36,6 +36,7 @@ const v1_params = clap.parseParamsComptime(
     \\    --endpoint <str>  OpenAI-compatible endpoint. Defaults to TK_LLM_ENDPOINT or local llama.cpp.
     \\    --model <str>     Allowed model id. Defaults to TK_LLM_MODEL_ID or the demo default.
     \\    --json            Emit machine-readable JSON.
+    \\    --fixture         Use deterministic fixture model response; no live LLM required.
     \\
 );
 
@@ -123,6 +124,7 @@ fn investmentMain(gpa: std.mem.Allocator, io: std.Io, iter: *std.process.Args.It
     var report = try demo.runCliDemo(gpa, io, .{
         .endpoint = endpoint,
         .model_id = model_id,
+        .use_fixture = res.args.fixture != 0,
     }, thesis_text);
     defer report.deinit(gpa);
 

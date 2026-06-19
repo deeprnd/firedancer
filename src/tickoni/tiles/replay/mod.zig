@@ -494,6 +494,17 @@ pub fn verifyOversizedTradeBlock(
         proposed_basket.thesis_id != capsule.model_substitutions[0].request_hash)
         divergences.note("model_request_hash", 3);
 
+    if (capsule.expected_basket_id) |expected| {
+        if (proposed_basket.basket_id != expected) divergences.note("basket_id", 1);
+    } else {
+        divergences.note("basket_id_missing", 1);
+    }
+    if (capsule.expected_proposal_hash) |expected| {
+        if (hashTicket(ticket) != expected) divergences.note("proposal_hash", 6);
+    } else {
+        divergences.note("proposal_hash_missing", 6);
+    }
+
     if (capsule.replay_assertions.max_affordable_cents) |expected| {
         if (ticket.affordability_result.max_affordable_cents != expected) divergences.note("max_affordable_cents", 4);
     }
@@ -600,6 +611,11 @@ pub fn verifyRestrictedInstrumentBlock(
         capsule.model_substitutions.len > 0 and
         proposed_basket.thesis_id != capsule.model_substitutions[0].request_hash)
         divergences.note("model_request_hash", 3);
+    if (capsule.expected_basket_id) |expected| {
+        if (proposed_basket.basket_id != expected) divergences.note("basket_id", 1);
+    } else {
+        divergences.note("basket_id_missing", 1);
+    }
     if (proposed_basket.rejected_count == 0) divergences.note("rejected_count", 2);
     if (!std.mem.eql(u8, requested_ticker, "SOXL")) divergences.note("requested_ticker", 2);
 
@@ -758,6 +774,7 @@ test "verifyAllowedTradeWithCapsulePath detects tampered paper fill hashes" {
 
 test "verifyRestrictedInstrumentBlock stays offline with fixture model backend" {
     var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
+    proposed_basket.basket_id = 10627110967246007067; // matches replay_capsule_restricted_soxl.json
     proposed_basket.rejected_count = 1;
     proposed_basket.rejected[0].ticker_len = 4;
     @memcpy(proposed_basket.rejected[0].ticker[0..4], "SOXL");

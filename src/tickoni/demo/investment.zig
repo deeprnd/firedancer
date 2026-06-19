@@ -48,6 +48,7 @@ pub const DemoScenario = enum {
 pub const LiveConfig = struct {
     endpoint: []const u8,
     model_id: []const u8,
+    use_fixture: bool = false,
 };
 
 pub const ParsedDemoRequest = struct {
@@ -267,6 +268,65 @@ pub fn runLiveModel(
     }
 
     const response = tkmodl_result.response orelse return error.MissingLiveResponse;
+    tkmodl_result.response = null;
+    defer response.deinit(allocator);
+
+    return assertLiveModelResponse(allocator, &response);
+}
+
+pub fn runFixtureModel(
+    allocator: std.mem.Allocator,
+    input: thesis.ThesisInput,
+) !LiveModelEvidence {
+    const user_prompt = try buildUserPrompt(allocator, input);
+    defer allocator.free(user_prompt);
+
+    const messages = [_]model.Message{
+        .{ .role = "system", .content = system_prompt },
+        .{ .role = "user", .content = user_prompt },
+    };
+    const request = model.TkModlRequest{
+        .request_id = 1,
+        .run_id = 1,
+        .actor_id = input.account_id,
+        .actor_role = live_actor_role,
+        .workflow = live_workflow,
+        .account_id = input.account_id,
+        .capability = live_capability,
+        .capability_envelope_id = live_capability_envelope_id,
+        .policy_version = live_policy_version,
+        .policy_decision_id = 0,
+        .budget_id = live_budget_id,
+        .model_id = default_model_id,
+        .messages = &messages,
+        .sampling = .{
+            .temperature = 0,
+            .top_p = 1.0,
+            .max_output_tokens = 4096,
+            .seed = 42,
+        },
+        .max_context_tokens = 8192,
+        .max_output_tokens = 4096,
+        .retry_limit = 0,
+        .timeout_ms = 30_000,
+        .replay_mode = .live,
+    };
+
+    var fixture_backend = model.Backend{ .fixture = .{} };
+    var tkmodl_result = try model.runTkModlRequest(
+        allocator,
+        makeLiveConfig(default_model_id),
+        &fixture_backend,
+        request,
+    );
+    defer tkmodl_result.deinit(allocator);
+
+    switch (tkmodl_result.outcome) {
+        .allow_live => {},
+        else => return error.TkModlFixtureDenied,
+    }
+
+    const response = tkmodl_result.response orelse return error.MissingFixtureResponse;
     tkmodl_result.response = null;
     defer response.deinit(allocator);
 
@@ -565,7 +625,10 @@ pub fn runCliDemo(
     user_text: []const u8,
 ) !CliReport {
     const parsed = try parseCliDemoRequest(user_text);
-    var live_evidence = try runLiveModel(allocator, io, live_config, parsed.input);
+    var live_evidence = if (live_config.use_fixture)
+        try runFixtureModel(allocator, parsed.input)
+    else
+        try runLiveModel(allocator, io, live_config, parsed.input);
     errdefer live_evidence.deinit(allocator);
 
     // Replay scenario functions use the canonical fixture inputs so their

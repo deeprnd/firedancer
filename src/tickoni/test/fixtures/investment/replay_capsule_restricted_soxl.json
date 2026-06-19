@@ -3,6 +3,7 @@
   "schema": "tickoni.replay_capsule",
   "capsule_id": "replay_capsule_ai_infra_restricted_soxl",
   "run_id": "run_ai_infra_demo_restricted_soxl",
+  "expected_basket_id": 10627110967246007067,
   "policy_version": "v1",
   "catalog_schema_version": 1,
   "thesis_input_hash": "thesis_hash_restricted_soxl",

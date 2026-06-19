@@ -228,3 +228,82 @@ test "investment_replay_integration: tamper detection reports first divergent ha
     try std.testing.expectEqual(@as(u64, 1), audit_chain.events[10].payload.replay_result.divergences);
     try std.testing.expectEqual(@as(u64, 7), audit_chain.events[10].payload.replay_result.first_divergent_seq);
 }
+
+test "investment_replay_integration: audit jsonl hash chain is consistent" {
+    const allocator = std.testing.allocator;
+    const input = support.operationsThesisInput();
+    const thesis_id = thesis.computeThesisInputHash(input);
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+
+    const raw = try std.Io.Dir.cwd().readFileAlloc(
+        std.testing.io,
+        "src/tickoni/test/fixtures/investment/audit_allowed_2000.jsonl",
+        allocator,
+        .limited(64 * 1024),
+    );
+    defer allocator.free(raw);
+
+    const AuditLine = struct { run_id: u64, tile_id: []const u8, prev_hash: u64, record_hash: u64 };
+
+    const expected_tile_ids = [investment_audit.allowed_trade_event_count][]const u8{
+        "tkings", "tknorm", "tkdedu", "tkcase", "tkpoly",
+        "tkmodl", "tkadpt", "tkadpt", "tkagnt", "tkadpt", "tkrepl",
+    };
+
+    var lines = std.mem.tokenizeScalar(u8, raw, '\n');
+    var idx: usize = 0;
+    var prev_record_hash: u64 = 0;
+    while (lines.next()) |line| {
+        const parsed = try std.json.parseFromSlice(AuditLine, allocator, line, .{ .ignore_unknown_fields = true });
+        defer parsed.deinit();
+        try std.testing.expectEqual(run_id, parsed.value.run_id);
+        try std.testing.expectEqual(prev_record_hash, parsed.value.prev_hash);
+        try std.testing.expectEqualStrings(expected_tile_ids[idx], parsed.value.tile_id);
+        prev_record_hash = parsed.value.record_hash;
+        idx += 1;
+    }
+    try std.testing.expectEqual(investment_audit.allowed_trade_event_count, idx);
+}
+
+test "gen audit allowed trade jsonl" {
+    if (std.c.getenv("TK_GEN_FIXTURES") == null) return error.SkipZigTest;
+    const allocator = std.testing.allocator;
+    const input = support.operationsThesisInput();
+    const thesis_id = thesis.computeThesisInputHash(input);
+    const intent = try thesis.normalize(input);
+    const basket = try tkpoly.buildBasket(intent, thesis_id);
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+    const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
+    var model_backend = model.Backend{ .fixture = .{} };
+    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    const agent_result = try tkagnt.runInvestmentAgent(
+        allocator, work_item, &basket, &model_backend, &adapter_backend,
+        support.policy_max_notional_per_order_cents, support.expected_ticket_id,
+    );
+    defer agent_result.deinit(allocator);
+    const execution = agent_result.paper_result orelse return error.TestUnexpectedResult;
+    const no_divergence = replay.ReplayVerification{
+        .external_effects_disabled = true,
+        .replay_match = true,
+        .divergence_count = 0,
+        .first_divergent_field = "",
+        .first_divergent_seq = 0,
+    };
+    const chain = investment_audit.buildAllowedTradeChain(
+        run_id, "ops_reviewer", "trading_control",
+        &input, &basket, &agent_result.quote_snapshot, agent_result.affordability,
+        &agent_result.model_response, &agent_result.ticket, &execution, &no_divergence,
+    );
+
+    const path = "src/tickoni/test/fixtures/investment/audit_allowed_2000.jsonl";
+    const f = std.c.fopen(path, "w") orelse return error.FileOpenFailed;
+    defer _ = std.c.fclose(f);
+
+    var line_buf: [4096]u8 = undefined;
+    for (chain.events) |event| {
+        var w = std.Io.Writer.fixed(&line_buf);
+        try audit.formatJsonLine(event, &w);
+        const written = w.buffered();
+        _ = std.c.fwrite(written.ptr, 1, written.len, f);
+    }
+}

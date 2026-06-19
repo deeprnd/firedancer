@@ -31,6 +31,7 @@ pub const checkSchemaVersion = codec.checkSchemaVersion;
 pub const parseRecordType = codec.parseRecordType;
 pub const peekBinaryLen = codec.peekBinaryLen;
 pub const formatBinary = codec.formatBinary;
+pub const formatJsonLine = codec.formatJsonLine;
 pub const parseBinary = codec.parseBinary;
 
 test {
