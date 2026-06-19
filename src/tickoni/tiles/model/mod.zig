@@ -17,6 +17,10 @@ pub const validateTkModlRequest = validator.validateTkModlRequest;
 pub const MockBackend = backend.MockBackend;
 pub const FixtureBackend = backend.FixtureBackend;
 pub const HttpBackend = backend.HttpBackend;
+pub const ReplayEntry = backend.ReplayEntry;
+pub const ReplayBackend = backend.ReplayBackend;
+pub const max_replay_entries = backend.max_replay_entries;
+pub const hashProviderRequest = backend.hashProviderRequest;
 pub const Backend = backend.Backend;
 
 test {
