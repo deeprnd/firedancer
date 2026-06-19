@@ -50,8 +50,8 @@ fn makeAiInfraRequest(model_id: []const u8) model.ProviderRequest {
             .max_output_tokens = 2048,
             .seed = 42,
         },
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
+        .budget_id = "budget.demo_paper",
+        .policy_version = "v1",
         .capability_envelope_id = "capenv.trading_order.propose.demo",
     };
 }
@@ -87,8 +87,8 @@ test "model tile http: hello round-trip via mock server" {
                 .model_id = mock_model_id,
                 .messages = &.{.{ .role = "user", .content = "Reply with the single word: hello" }},
                 .sampling = .{ .temperature = 0, .max_output_tokens = 256, .seed = 1 },
-                .budget_id = "budget.demo_paper.v1_1",
-                .policy_version = "v1.1",
+                .budget_id = "budget.demo_paper",
+                .policy_version = "v1",
                 .capability_envelope_id = "capenv.trading_order.propose.demo",
             };
             const resp = try backend.call(allocator, req);

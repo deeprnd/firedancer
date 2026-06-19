@@ -1,8 +1,8 @@
-/// Instrument catalog fixture and lookup functions for V1.1.S2.
+/// Instrument catalog fixture and lookup functions
 ///
 /// InstrumentEntry: static record per instrument (ticker, name, asset class,
 /// market, venue, sector, theme tags, risk tier, expense ratio, restriction).
-/// catalog: compile-time array of all V1.1 fixture instruments (24 entries).
+/// catalog: compile-time array of all fixture instruments (24 entries).
 /// Lookup functions: filterByTheme, filterBySector, filterByAssetClass,
 /// filterByVenue, lookupByTicker.
 ///
@@ -38,7 +38,7 @@ pub const max_name_len: usize = 48;
 /// Why an instrument is excluded from eligible baskets.
 ///
 /// Matches the asset-class deny policy in thesis.zig (denied_asset_classes)
-/// and the V1.1 restricted-instrument denylist.
+/// and the restricted-instrument denylist.
 pub const RestrictionReason = enum(u8) {
     none = 0,
     leveraged_etf = 1,
@@ -49,7 +49,7 @@ pub const RestrictionReason = enum(u8) {
     manual_denylist = 6,
 };
 
-/// Bit-set of all V1.1 sector/investment themes, backed by a single byte.
+/// Bit-set of all sector/investment themes, backed by a single byte.
 ///
 /// Layout invariant: @sizeOf(ThemeSet) == 1 (tested below).
 /// An instrument may belong to multiple themes (e.g. NVDA is both
@@ -77,7 +77,7 @@ pub const ThemeSet = packed struct(u8) {
     }
 };
 
-/// Single instrument record in the V1.1 catalog.
+/// Single instrument record in the catalog.
 ///
 /// expense_ratio_bps: annual fund expense ratio in basis points (100 bps = 1%).
 ///   Zero for individual equities, which have no fund expense ratio.
@@ -349,7 +349,7 @@ test "catalog: all entries are NYSE or NASDAQ" {
     }
 }
 
-// --- Acceptance criteria (V1.1.S2): AI infra scenario >= 4 eligible, >= 2 rejected ---
+// --- Acceptance criteria: AI infra scenario >= 4 eligible, >= 2 rejected ---
 
 test "filterByTheme: ai_infrastructure scenario yields >= 4 eligible and >= 2 restricted" {
     var out: [catalog.len]*const InstrumentEntry = undefined;

@@ -13,8 +13,8 @@ const investment_actor_role = "trading_ops_reviewer";
 const investment_workflow = "trading_control";
 const investment_capability = "trading_order.propose";
 const investment_capability_envelope_id = "capenv.trading_order.propose.demo";
-const investment_policy_version = "v1.1";
-const investment_budget_id = "budget.demo_paper.v1_1";
+const investment_policy_version = "v1";
+const investment_budget_id = "budget.demo_paper";
 
 /// Result of a normal investment agent run (allowed or oversized-denied).
 /// Caller owns model_response; call deinit(allocator) when done.
@@ -233,7 +233,7 @@ test "runInvestmentAgent blocks oversized trade and skips paper execution" {
         &model_backend,
         &adapter_backend,
         250_000,
-        "ticket_v1_1_ai_infra_25000_blocked",
+        "ticket_ai_infra_25000_blocked",
     );
     defer result.deinit(std.testing.allocator);
 
@@ -270,7 +270,7 @@ test "runRestrictedInstrumentDenialAgent has no adapter boundary and calls tkmod
 
     try std.testing.expectEqual(work_item.run_id, result.run_id);
     try std.testing.expectEqual(@as(usize, 1), model_trace.call_count);
-    try std.testing.expectEqualStrings("budget.demo_paper.v1_1", model_trace.last_budget_id);
-    try std.testing.expectEqualStrings("v1.1", model_trace.last_policy_version);
+    try std.testing.expectEqualStrings("budget.demo_paper", model_trace.last_budget_id);
+    try std.testing.expectEqualStrings("v1", model_trace.last_policy_version);
     try std.testing.expectEqualStrings("capenv.trading_order.propose.demo", model_trace.last_capability_envelope_id);
 }

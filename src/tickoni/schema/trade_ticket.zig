@@ -390,7 +390,7 @@ test "buildMarketBuyTicket: oversized notional produces per-order block reason" 
         &fixture.proposed_basket,
         &fixture.quotes,
         fixture.affordability,
-        "ticket_v1_1_ai_infra_25000_blocked",
+        "ticket_ai_infra_25000_blocked",
     );
 
     try std.testing.expectEqual(PolicyOutcome.allow, ticket.policy_outcome);
@@ -405,7 +405,7 @@ test "buildMarketSellTicket: creates sell preview using bid prices" {
         &fixture.proposed_basket,
         &fixture.quotes,
         fixture.affordability,
-        "ticket_v1_1_ai_infra_2000_market_sell",
+        "ticket_ai_infra_2000_market_sell",
     );
 
     try std.testing.expectEqual(Side.sell, ticket.side);
@@ -428,14 +428,14 @@ test "buildLimitBuyTicket: requires positive limit price" {
         &fixture.proposed_basket,
         &fixture.quotes,
         fixture.affordability,
-        "ticket_v1_1_ai_infra_2000_limit_buy",
+        "ticket_ai_infra_2000_limit_buy",
         null,
     ));
     try std.testing.expectError(error.InvalidLimitPrice, buildLimitBuyTicket(
         &fixture.proposed_basket,
         &fixture.quotes,
         fixture.affordability,
-        "ticket_v1_1_ai_infra_2000_limit_buy",
+        "ticket_ai_infra_2000_limit_buy",
         0,
     ));
 }
@@ -448,7 +448,7 @@ test "buildLimitBuyTicket: creates buy preview using limit price" {
         &fixture.proposed_basket,
         &fixture.quotes,
         fixture.affordability,
-        "ticket_v1_1_ai_infra_2000_limit_buy",
+        "ticket_ai_infra_2000_limit_buy",
         limit_price_cents,
     );
 
@@ -472,7 +472,7 @@ test "buildLimitSellTicket: creates sell preview using limit price" {
         &fixture.proposed_basket,
         &fixture.quotes,
         fixture.affordability,
-        "ticket_v1_1_ai_infra_2000_limit_sell",
+        "ticket_ai_infra_2000_limit_sell",
         limit_price_cents,
     );
 

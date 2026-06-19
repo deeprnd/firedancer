@@ -35,7 +35,7 @@ pub const RestrictedInstrumentBlockedAuditChain = struct {
     }
 };
 
-const policy_version = "tickoni.v1_1";
+const policy_version = "tickoni.v1";
 const source_system = "tkapi";
 const source_event_type = "investment_intent";
 const canonical_event_type = "investment.intent";

@@ -1,8 +1,8 @@
-/// Thesis input schema and investor intent normalization for V1.1.S1.
+/// Thesis input schema and investor intent normalization
 ///
 /// ThesisInput: raw investor request captured from the user or a test fixture.
 /// InvestorIntent: validated, structured form produced by normalize().
-/// fixtures: deterministic test inputs for the five canonical V1.1 themes.
+/// fixtures: deterministic test inputs for the five canonical themes.
 ///
 /// All validation in normalize() is fail-closed: missing or out-of-range
 /// fields return an explicit ThesisError instead of silently substituting
@@ -39,7 +39,7 @@ pub const max_target_notional_cents: i64 = 1_000_000_000_000;
 // Bounded domain types
 // ---------------------------------------------------------------------------
 
-/// Markets supported in V1.1.
+/// Markets supported in
 pub const Market = enum(u8) { us };
 
 /// Venues within the US market.
@@ -84,13 +84,13 @@ pub const AssetClassSet = packed struct(u8) {
         };
     }
 
-    /// Returns true when at least one V1.1-supported class (equity or etf) is set.
+    /// Returns true when at least one supported class (equity or etf) is set.
     pub fn hasSupportedClass(self: AssetClassSet) bool {
         return self.equity or self.etf;
     }
 };
 
-/// Sector and theme taxonomy for V1.1 investment theses.
+/// Sector and theme taxonomy for investment theses.
 pub const SectorTheme = enum(u8) {
     ai_infrastructure,
     semiconductors,
@@ -179,9 +179,9 @@ pub const InvestorIntent = struct {
 // Policy constants
 // ---------------------------------------------------------------------------
 
-/// Asset classes always denied in V1.1 regardless of user preference.
+/// Asset classes always denied in regardless of user preference.
 /// options, futures, leveraged ETFs, inverse ETFs, and crypto are outside the
-/// V1.1 mandate and denied by policy even if the user requests them.
+/// mandate and denied by policy even if the user requests them.
 pub const denied_asset_classes: AssetClassSet = .{
     .option = true,
     .future = true,
@@ -341,7 +341,7 @@ fn textBuf(comptime s: []const u8) [max_user_text_len]u8 {
     return buf;
 }
 
-/// Deterministic test fixtures for the five canonical V1.1.S1 investment themes.
+/// Deterministic test fixtures for the five canonical investment themes.
 pub const fixtures = struct {
     const ai_text =
         "I want to invest USD 2,000 in AI infrastructure, " ++

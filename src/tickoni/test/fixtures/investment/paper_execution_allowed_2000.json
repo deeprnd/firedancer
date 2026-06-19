@@ -1,8 +1,8 @@
 {
   "fixture_id": "paper_execution_allowed_2000",
-  "schema": "tickoni.v1_1.paper_execution_result",
-  "paper_order_id": "paper_order_v1_1_ai_infra_2000_0001",
-  "ticket_id": "ticket_v1_1_ai_infra_2000_market",
+  "schema": "tickoni.paper_execution_result",
+  "paper_order_id": "paper_order_ai_infra_2000_0001",
+  "ticket_id": "ticket_ai_infra_2000_market",
   "account_id": "brokerage.demo_ops",
   "status": "filled",
   "filled_at_ns": 1765792805000000000,

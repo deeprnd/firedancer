@@ -23,8 +23,8 @@ const live_actor_role = "trading_ops_reviewer";
 const live_workflow = "trading_control";
 const live_capability = "trading_order.propose";
 const live_capability_envelope_id = "capenv.trading_order.propose.demo";
-const live_policy_version = "v1.1";
-const live_budget_id = "budget.demo_paper.v1_1.live";
+const live_policy_version = "v1";
+const live_budget_id = "budget.demo_paper.live";
 
 const restricted_tickers = [_][]const u8{
     "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",

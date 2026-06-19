@@ -579,8 +579,8 @@ pub fn build(b: *std.Build) void {
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
         },
     });
-    const v1_demo_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/demo/v1_1.zig"),
+    const investment_demo_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/demo/investment.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -596,9 +596,9 @@ pub fn build(b: *std.Build) void {
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
         },
     });
-    const v1_demo_test = b.addTest(.{ .root_module = v1_demo_mod });
-    linkTickoniCodec(b, v1_demo_test, fd_lib_dir);
-    test_step.dependOn(&b.addRunArtifact(v1_demo_test).step);
+    const investment_demo_test = b.addTest(.{ .root_module = investment_demo_mod });
+    linkTickoniCodec(b, investment_demo_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(investment_demo_test).step);
     for ([_][]const u8{
         "src/tickoni/test/integration/investment_allowed_trade.zig",
         "src/tickoni/test/integration/investment_replay.zig",
@@ -639,11 +639,11 @@ pub fn build(b: *std.Build) void {
     const system_step = b.step("system-test", "Run live V1.1 system/demo proofs");
     const system_test = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test/system/v1_1_demo_live.zig"),
+            .root_source_file = b.path("src/tickoni/test/system/investment_demo_live.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "v1_demo", .module = v1_demo_mod },
+                .{ .name = "investment_demo", .module = investment_demo_mod },
             },
         }),
     });
@@ -660,14 +660,14 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "clap", .module = clap_mod },
-            .{ .name = "v1_demo", .module = v1_demo_mod },
+            .{ .name = "investment_demo", .module = investment_demo_mod },
         },
     });
     const cli_exe = b.addExecutable(.{
         .name = "tickoni",
         .root_module = cli_main_mod,
     });
-    // C sources and library links come in via v1_demo_mod (shared with system test).
+    // C sources and library links come in via investment_demo_mod (shared with system test).
     // Only set lib path + system libs at the exe level to avoid duplicate C object files.
     cli_exe.root_module.addLibraryPath(b.path(fd_lib_dir));
     cli_exe.root_module.linkSystemLibrary("fd_util", .{});

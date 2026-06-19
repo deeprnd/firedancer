@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ensure llama.cpp and model exist, start the local server, run the CLI V1.1
+# Ensure llama.cpp and model exist, start the local server, run the CLI investment
 # demo proofs, then stop the server.
 set -euo pipefail
 
@@ -83,7 +83,7 @@ run_and_assert() {
   local expected_failed_scope_dim="$6"
 
   local output
-  output="$(zig-out/bin/tickoni demo v1_1 --json --thesis "$thesis")"
+  output="$(zig-out/bin/tickoni demo investment --json --thesis "$thesis")"
   JSON_OUTPUT="$output" \
   EXPECTED_SCENARIO="$expected_scenario" \
   EXPECTED_POLICY="$expected_policy" \
@@ -126,7 +126,7 @@ run_and_assert \
   "I want to invest USD 2,000 in AI infrastructure through US-listed ETFs and large-cap equities." \
   "allowed" \
   "allow" \
-  "ticket_v1_1_ai_infra_2000_market" \
+  "ticket_ai_infra_2000_market" \
   "" \
   ""
 
@@ -135,7 +135,7 @@ run_and_assert \
   "I want to invest USD 25,000 in AI infrastructure through US-listed ETFs and large-cap equities." \
   "oversized_blocked" \
   "deny" \
-  "ticket_v1_1_ai_infra_25000_blocked" \
+  "ticket_ai_infra_25000_blocked" \
   "per_order_notional_exceeded" \
   "per_order_notional"
 

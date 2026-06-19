@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const policy_version = "tickoni.v1_1";
+const policy_version = "tickoni.v1";
 
 /// Derives a deterministic synthetic run id from the thesis input hash and
 /// policy version. Every audit event for this run carries this id.

@@ -453,8 +453,8 @@ test "FixtureBackend returns deterministic response" {
     const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
+        .budget_id = "budget.demo_paper",
+        .policy_version = "v1",
         .capability_envelope_id = "capenv.trading_order.propose.demo",
     };
 
@@ -480,8 +480,8 @@ test "FixtureBackend.initFromDir loads model_response_gemma4.json" {
     const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
+        .budget_id = "budget.demo_paper",
+        .policy_version = "v1",
         .capability_envelope_id = "capenv.trading_order.propose.demo",
     };
     const resp = try fixture.call(allocator, req);
@@ -501,8 +501,8 @@ test "FixtureBackend response JSON matches expected tickers and excludes restric
     const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
+        .budget_id = "budget.demo_paper",
+        .policy_version = "v1",
         .capability_envelope_id = "capenv.trading_order.propose.demo",
     };
     const resp = try fixture.call(allocator, req);
@@ -584,8 +584,8 @@ test "MockBackend traces the model request scope fields" {
     const req = ProviderRequest{
         .model_id = "fixture.ai_infra",
         .messages = &.{},
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
+        .budget_id = "budget.demo_paper",
+        .policy_version = "v1",
         .capability_envelope_id = "capenv.trading_order.propose.demo",
     };
     const resp = try mock.call(allocator, req);
@@ -593,8 +593,8 @@ test "MockBackend traces the model request scope fields" {
 
     try std.testing.expectEqual(@as(usize, 1), trace.call_count);
     try std.testing.expectEqualStrings("fixture.ai_infra", trace.last_model_id);
-    try std.testing.expectEqualStrings("budget.demo_paper.v1_1", trace.last_budget_id);
-    try std.testing.expectEqualStrings("v1.1", trace.last_policy_version);
+    try std.testing.expectEqualStrings("budget.demo_paper", trace.last_budget_id);
+    try std.testing.expectEqualStrings("v1", trace.last_policy_version);
     try std.testing.expectEqualStrings("capenv.trading_order.propose.demo", trace.last_capability_envelope_id);
 }
 

@@ -89,7 +89,7 @@ test-integration-fd:
 test-integration-tk:
   ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build integration-test --summary all
 
-# Tickoni system lane: opt-in real-LLM V1.1 demo proof.
+# Tickoni system lane: opt-in real-LLM investment demo proof.
 test-system-tk:
   bash contrib/test/run_integration_model_tests.sh
 

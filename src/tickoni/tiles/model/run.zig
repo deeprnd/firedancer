@@ -112,7 +112,7 @@ fn baseLiveReq() schema.TkModlRequest {
         .workflow = "trading_control",
         .capability = "trading_order.propose",
         .capability_envelope_id = "capenv.demo",
-        .policy_version = "v1.1",
+        .policy_version = "v1",
         .budget_id = "budget.demo",
         .max_output_tokens = 512,
         .max_context_tokens = 2048,

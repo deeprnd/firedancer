@@ -1,5 +1,5 @@
 const clap = @import("clap");
-const demo = @import("v1_demo");
+const demo = @import("investment_demo");
 const std = @import("std");
 
 const MainCommand = enum {
@@ -7,7 +7,7 @@ const MainCommand = enum {
 };
 
 const DemoCommand = enum {
-    v1_1,
+    investment,
 };
 
 const main_parsers = .{
@@ -87,11 +87,11 @@ fn demoMain(gpa: std.mem.Allocator, io: std.Io, iter: *std.process.Args.Iterator
     }
 
     switch (res.positionals[0].?) {
-        .v1_1 => try v1Main(gpa, io, iter),
+        .investment => try investmentMain(gpa, io, iter),
     }
 }
 
-fn v1Main(gpa: std.mem.Allocator, io: std.Io, iter: *std.process.Args.Iterator) !void {
+fn investmentMain(gpa: std.mem.Allocator, io: std.Io, iter: *std.process.Args.Iterator) !void {
     var diag = clap.Diagnostic{};
     var res = clap.parseEx(clap.Help, &v1_params, clap.parsers.default, iter, .{
         .diagnostic = &diag,

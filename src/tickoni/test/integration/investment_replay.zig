@@ -11,6 +11,7 @@ const tkcase = @import("tkcase");
 const tkdisp = @import("tkdisp");
 const tkpoly = @import("tkpoly");
 
+
 test "investment_replay_integration: succeeds with fixture substitutions and no live effects" {
     const allocator = std.testing.allocator;
     const input = support.operationsThesisInput();

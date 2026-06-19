@@ -1,7 +1,7 @@
-const demo = @import("v1_demo");
+const demo = @import("investment_demo");
 const std = @import("std");
 
-test "system demo live: real tkmodl plus V1.1 allowed blocked restricted replay proof" {
+test "system demo live: real tkmodl, allowed, blocked, restricted, replay proof" {
     const allocator = std.testing.allocator;
     const endpoint = try demo.envOrDefault(allocator, "TK_LLM_ENDPOINT", demo.default_endpoint);
     defer allocator.free(endpoint);

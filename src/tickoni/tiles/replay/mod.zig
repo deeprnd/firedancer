@@ -706,7 +706,7 @@ fn buildAllowedReplayFixture(allocator: std.mem.Allocator, io: std.Io) !AllowedR
         &proposed_basket,
         &quote_snapshot,
         affordability,
-        "ticket_v1_1_ai_infra_2000_market",
+        "ticket_ai_infra_2000_market",
     );
     tkpoly.applyTradeGuardrails(&ticket, affordability, 250_000);
 
@@ -754,6 +754,7 @@ test "verifyAllowedTradeWithCapsulePath detects tampered paper fill hashes" {
     try std.testing.expect(replay_result.divergence_count >= 1);
     try std.testing.expect(replay_result.first_divergent_field.len > 0);
 }
+
 
 test "verifyRestrictedInstrumentBlock stays offline with fixture model backend" {
     var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Ensure llama.cpp and model exist, start the local server, run the live
-# V1.1 system/demo proof, then stop the server.
+# investment system/demo proof, then stop the server.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -77,7 +77,7 @@ if (( !ready )); then
   exit 1
 fi
 echo "llama-server ready"
-echo "running live V1.1 system/demo proof"
+echo "running live investment system/demo proof"
 
 # Run the live system test in foreground so stdin is available for the
 # zig build --listen=- test protocol. The EXIT trap kills the server.

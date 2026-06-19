@@ -1,4 +1,4 @@
-/// Basket construction schema for V1.1.S3.
+/// Basket construction schema
 ///
 /// Basket: result of deterministic construction from InvestorIntent and the
 /// instrument catalog.  Instruments are scope-checked (US market, NYSE/NASDAQ
@@ -212,7 +212,7 @@ pub fn computeBasketHash(basket: *const Basket) u64 {
 
 /// Construct a deterministic basket from a pre-screened candidate list.
 ///
-/// Governed V1.1 runtime flows call tkpoly first, then pass the allowed
+/// Governed runtime flows call tkpoly first, then pass the allowed
 /// candidates and rejected set here for deterministic allocation.  basket_id:
 /// content hash of the source ThesisInput; callers use
 /// computeThesisInputHash() from thesis.zig.  Passed as a parameter so
