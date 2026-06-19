@@ -119,11 +119,11 @@ pub fn envOrDefault(
 fn makeLiveConfig(allowed_model_id: []const u8) model.TkModlConfig {
     var config = model.TkModlConfig{
         .live_provider_enabled = true,
-        .hard_max_context_tokens = 4096,
-        .hard_max_output_tokens = 1024,
+        .hard_max_context_tokens = 16384,
+        .hard_max_output_tokens = 8192,
         .hard_max_retry_count = 1,
         .hard_timeout_ms = 30_000,
-        .per_run_token_budget = 4096,
+        .per_run_token_budget = 16384,
     };
     config.allowed_model_ids[0] = allowed_model_id;
     config.allowed_model_id_count = 1;
@@ -239,11 +239,11 @@ pub fn runLiveModel(
         .sampling = .{
             .temperature = 0,
             .top_p = 1.0,
-            .max_output_tokens = 768,
+            .max_output_tokens = 4096,
             .seed = 42,
         },
-        .max_context_tokens = 2048,
-        .max_output_tokens = 768,
+        .max_context_tokens = 8192,
+        .max_output_tokens = 4096,
         .retry_limit = 0,
         .timeout_ms = 30_000,
         .replay_mode = .live,
@@ -568,9 +568,12 @@ pub fn runCliDemo(
     var live_evidence = try runLiveModel(allocator, io, live_config, parsed.input);
     errdefer live_evidence.deinit(allocator);
 
+    // Replay scenario functions use the canonical fixture inputs so their
+    // thesis hashes match the stored capsule hashes.  The live model call
+    // above already used parsed.input (with the user's CLI text).
     switch (parsed.scenario) {
         .allowed => {
-            const result = try runAllowedTradeScenario(allocator, io, parsed.input);
+            const result = try runAllowedTradeScenario(allocator, io, support.operationsThesisInput());
             return .{
                 .scenario = parsed.scenario.label(),
                 .model_id = live_evidence.model_id,
@@ -585,7 +588,11 @@ pub fn runCliDemo(
             };
         },
         .oversized_blocked => {
-            const result = try runOversizedTradeScenario(allocator, io, parsed.input);
+            const result = try runOversizedTradeScenario(
+                allocator,
+                io,
+                support.operationsThesisInputWithTarget(support.oversized_target_notional_cents),
+            );
             return .{
                 .scenario = parsed.scenario.label(),
                 .model_id = live_evidence.model_id,
@@ -602,7 +609,7 @@ pub fn runCliDemo(
             };
         },
         .restricted_instrument => {
-            const result = try runRestrictedScenario(allocator, io, parsed.input);
+            const result = try runRestrictedScenario(allocator, io, support.operationsRestrictedTickerInput());
             return .{
                 .scenario = parsed.scenario.label(),
                 .model_id = live_evidence.model_id,

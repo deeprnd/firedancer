@@ -647,7 +647,12 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    linkTickoniCodec(b, system_test, fd_lib_dir);
+    // C sources come in via investment_demo_mod (same pattern as cli_exe).
+    // Only set lib path + system libs here to avoid duplicate C object files.
+    system_test.root_module.addLibraryPath(b.path(fd_lib_dir));
+    system_test.root_module.linkSystemLibrary("fd_util", .{});
+    system_test.root_module.linkSystemLibrary("fd_ballet", .{});
+    system_test.root_module.linkSystemLibrary("stdc++", .{});
     system_step.dependOn(&b.addRunArtifact(system_test).step);
 
     // Compatibility alias for the old live-model smoke command.
