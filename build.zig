@@ -469,30 +469,47 @@ pub fn build(b: *std.Build) void {
             .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
         },
     });
-    const allowed_trade_e2e_test = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test/integration/allowed_trade.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "adapter", .module = adapter_int_mod },
-                .{ .name = "audit_tile", .module = audit_tile_mod },
-                .{ .name = "basket", .module = basket_int_mod },
-                .{ .name = "investment_audit", .module = investment_audit_int_mod },
-                .{ .name = "model", .module = model_int_mod },
-                .{ .name = "portfolio", .module = portfolio_int_mod },
-                .{ .name = "replay", .module = replay_int_mod },
-                .{ .name = "thesis", .module = thesis_int_mod },
-                .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
-                .{ .name = "tkcase", .module = case_int_mod },
-                .{ .name = "tkdisp", .module = disp_int_mod },
-                .{ .name = "tkagnt", .module = agent_int_mod },
-            },
-        }),
+    const investment_support_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test/integration/investment_support.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "thesis", .module = thesis_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+        },
     });
-    linkTickoniCodec(b, allowed_trade_e2e_test, fd_lib_dir);
-    const allowed_trade_e2e_run = b.addRunArtifact(allowed_trade_e2e_test);
-    integration_step.dependOn(&allowed_trade_e2e_run.step);
+    for ([_][]const u8{
+        "src/tickoni/test/integration/investment_allowed_trade.zig",
+        "src/tickoni/test/integration/investment_replay.zig",
+        "src/tickoni/test/integration/investment_blocked_limits.zig",
+        "src/tickoni/test/integration/investment_restricted_instrument.zig",
+    }) |path| {
+        const integration_test = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(path),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "adapter", .module = adapter_int_mod },
+                    .{ .name = "audit_tile", .module = audit_tile_mod },
+                    .{ .name = "basket", .module = basket_int_mod },
+                    .{ .name = "investment_audit", .module = investment_audit_int_mod },
+                    .{ .name = "investment_support", .module = investment_support_int_mod },
+                    .{ .name = "model", .module = model_int_mod },
+                    .{ .name = "portfolio", .module = portfolio_int_mod },
+                    .{ .name = "replay", .module = replay_int_mod },
+                    .{ .name = "thesis", .module = thesis_int_mod },
+                    .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+                    .{ .name = "tkcase", .module = case_int_mod },
+                    .{ .name = "tkdisp", .module = disp_int_mod },
+                    .{ .name = "tkagnt", .module = agent_int_mod },
+                },
+            }),
+        });
+        linkTickoniCodec(b, integration_test, fd_lib_dir);
+        integration_step.dependOn(&b.addRunArtifact(integration_test).step);
+    }
 
     // model tile integration tests: require a running llama.cpp server.
     // Run with: zig build integration-test-live-model
