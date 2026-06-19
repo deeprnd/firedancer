@@ -54,6 +54,8 @@ test "investment_replay_integration: succeeds with fixture substitutions and no 
 
     const audit_chain = investment_audit.buildAllowedTradeChain(
         run_id,
+        "ops_reviewer",
+        "trading_control",
         &input,
         &basket,
         &agent_result.quote_snapshot,
@@ -110,6 +112,8 @@ test "investment_replay_integration: allowed trade audit chain hashes are real a
     };
     const chain = investment_audit.buildAllowedTradeChain(
         run_id,
+        "ops_reviewer",
+        "trading_control",
         &input,
         &basket,
         &agent_result.quote_snapshot,
@@ -151,6 +155,8 @@ test "investment_replay_integration: allowed trade audit chain hashes are real a
     // The chain is deterministic: identical inputs must produce identical record_hash values.
     const chain2 = investment_audit.buildAllowedTradeChain(
         run_id,
+        "ops_reviewer",
+        "trading_control",
         &input,
         &basket,
         &agent_result.quote_snapshot,
@@ -207,6 +213,8 @@ test "investment_replay_integration: tamper detection reports first divergent ha
 
     const audit_chain = investment_audit.buildAllowedTradeChain(
         run_id,
+        "ops_reviewer",
+        "trading_control",
         &input,
         &basket,
         &agent_result.quote_snapshot,

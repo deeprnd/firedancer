@@ -82,6 +82,8 @@ test "investment_restricted_instrument_integration: restricted ticker replay and
 
     const audit_chain = investment_audit.buildRestrictedInstrumentBlockedChain(
         run_id,
+        "ops_reviewer",
+        "trading_control",
         &input,
         &basket,
         &block_result.model_response,

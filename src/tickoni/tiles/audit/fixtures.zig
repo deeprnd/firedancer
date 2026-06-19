@@ -77,6 +77,10 @@ pub fn makeFixtures() [12]schema.AuditEvent {
             .response_hash = 9101,
             .token_estimate = 512,
             .retry_count = 2,
+            .actor_role = [_]u8{0} ** 16,
+            .workflow = [_]u8{0} ** 16,
+            .policy_decision_id = 0,
+            .replay_substitution_id = 0,
         } }),
         codec.buildEvent(headers[4], .{ .financial_adapter_call = .{
             .adapter_id = parseFixedAsciiBytes(16, "broker") catch unreachable,

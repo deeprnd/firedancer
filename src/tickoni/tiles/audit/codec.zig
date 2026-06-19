@@ -227,6 +227,10 @@ fn payloadFromCodec(record_type: schema.RecordType, payload: audit_codec.Payload
             .response_hash = payload.model_call.response_hash,
             .token_estimate = payload.model_call.token_estimate,
             .retry_count = payload.model_call.retry_count,
+            .actor_role = [_]u8{0} ** 16,
+            .workflow = [_]u8{0} ** 16,
+            .policy_decision_id = 0,
+            .replay_substitution_id = 0,
         } },
         .financial_adapter_call => .{ .financial_adapter_call = .{
             .adapter_id = payload.financial_adapter_call.adapter_id,

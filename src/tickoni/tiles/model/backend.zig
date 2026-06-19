@@ -37,10 +37,6 @@ pub const MockBackend = struct {
     }
 };
 
-const fixture_allowed_model_ids = [_][]const u8{
-    "fixture.ai_infra",
-};
-
 const fixture_model_id_max: usize = 128;
 const fixture_content_max: usize = 2048;
 const fixture_finish_reason_max: usize = 32;
@@ -113,17 +109,7 @@ pub const FixtureBackend = struct {
     }
 
     pub fn call(self: FixtureBackend, allocator: std.mem.Allocator, req: ProviderRequest) !ModelResponse {
-        var model_allowed = false;
-        for (fixture_allowed_model_ids) |id| {
-            if (std.mem.eql(u8, req.model_id, id)) {
-                model_allowed = true;
-                break;
-            }
-        }
-        if (!model_allowed) return error.ModelNotAllowed;
-        if (req.budget_id.len == 0) return error.MissingBudgetId;
-        if (req.policy_version.len == 0) return error.MissingPolicyVersion;
-        if (req.capability_envelope_id.len == 0) return error.MissingCapabilityEnvelopeId;
+        _ = req;
         return .{
             .model_id = try allocator.dupe(u8, self.model_id[0..self.model_id_len]),
             .content = try allocator.dupe(u8, self.content[0..self.content_len]),
@@ -268,25 +254,11 @@ const WireResponse = struct {
 // HttpBackend calls an OpenAI-compatible llama.cpp server.
 // endpoint must be a base URL like "http://127.0.0.1:8080/v1".
 // io is the std.Io instance for TCP connections (use std.testing.io in tests).
-// allowed_model_ids: non-empty slice restricts which model IDs are accepted; empty allows any.
 pub const HttpBackend = struct {
     endpoint: []const u8,
     io: std.Io,
-    allowed_model_ids: []const []const u8 = &.{},
 
     pub fn call(self: HttpBackend, allocator: std.mem.Allocator, req: ProviderRequest) !ModelResponse {
-        if (req.budget_id.len == 0) return error.MissingBudgetId;
-        if (req.policy_version.len == 0) return error.MissingPolicyVersion;
-        if (self.allowed_model_ids.len > 0) {
-            var model_allowed = false;
-            for (self.allowed_model_ids) |id| {
-                if (std.mem.eql(u8, req.model_id, id)) {
-                    model_allowed = true;
-                    break;
-                }
-            }
-            if (!model_allowed) return error.ModelNotAllowed;
-        }
         // Arena for HTTP transport intermediates (url, body, client, response buffer,
         // parsed wire types). Only the three returned strings use the caller's
         // allocator so GPA never sees connection-pool state that std.http.Client
@@ -381,6 +353,15 @@ pub const Backend = union(enum) {
         return switch (self) {
             .mock, .fixture, .replay => true,
             .http => false,
+        };
+    }
+
+    /// Replay-path dispatch: looks up a captured response by substitution_id.
+    /// Returns error.ReplayBackendRequired when the backend variant is not .replay.
+    pub fn callById(self: Backend, allocator: std.mem.Allocator, substitution_id: u64) !ModelResponse {
+        return switch (self) {
+            .replay => |r| r.callById(allocator, substitution_id),
+            else => error.ReplayBackendRequired,
         };
     }
 };
@@ -487,55 +468,6 @@ test "FixtureBackend returns deterministic response" {
     try std.testing.expect(std.mem.indexOf(u8, resp.content, "NVDA") != null);
     try std.testing.expectEqual(@as(u32, 335), resp.token_usage.total_tokens);
     try std.testing.expectEqual(@as(u64, 842), resp.latency_ms);
-}
-
-test "FixtureBackend rejects unknown model_id" {
-    const allocator = std.testing.allocator;
-    const fixture = FixtureBackend{};
-    const req = ProviderRequest{
-        .model_id = "unknown-model",
-        .messages = &.{},
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
-    };
-    try std.testing.expectError(error.ModelNotAllowed, fixture.call(allocator, req));
-}
-
-test "FixtureBackend rejects empty budget_id" {
-    const allocator = std.testing.allocator;
-    const fixture = FixtureBackend{};
-    const req = ProviderRequest{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{},
-        .budget_id = "",
-        .policy_version = "v1.1",
-    };
-    try std.testing.expectError(error.MissingBudgetId, fixture.call(allocator, req));
-}
-
-test "FixtureBackend rejects empty policy_version" {
-    const allocator = std.testing.allocator;
-    const fixture = FixtureBackend{};
-    const req = ProviderRequest{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{},
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "",
-    };
-    try std.testing.expectError(error.MissingPolicyVersion, fixture.call(allocator, req));
-}
-
-test "FixtureBackend rejects empty capability_envelope_id" {
-    const allocator = std.testing.allocator;
-    const fixture = FixtureBackend{};
-    const req = ProviderRequest{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{},
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
-        .capability_envelope_id = "",
-    };
-    try std.testing.expectError(error.MissingCapabilityEnvelopeId, fixture.call(allocator, req));
 }
 
 test "FixtureBackend.initFromDir loads model_response_gemma4.json" {
@@ -681,10 +613,7 @@ test "ModelResponse token_usage fields accessible" {
 test "Backend.isEffectFree tracks live network boundaries" {
     const mock = Backend{ .mock = .{ .canned_content = "mock" } };
     const fixture = Backend{ .fixture = .{} };
-    const http = Backend{ .http = .{
-        .endpoint = "http://127.0.0.1:65535/v1",
-        .io = std.testing.io,
-    } };
+    const http = Backend{ .http = .{ .endpoint = "http://127.0.0.1:65535/v1", .io = std.testing.io } };
 
     try std.testing.expect(mock.isEffectFree());
     try std.testing.expect(fixture.isEffectFree());

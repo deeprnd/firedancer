@@ -91,6 +91,8 @@ test "investment_blocked_limits_integration: oversized trade replay and audit re
 
     const audit_chain = investment_audit.buildOversizedTradeBlockedChain(
         run_id,
+        "ops_reviewer",
+        "trading_control",
         &input,
         &basket,
         &agent_result.quote_snapshot,

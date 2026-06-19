@@ -166,6 +166,8 @@ fn header(
 
 pub fn buildAllowedTradeChain(
     run_id: u64,
+    actor_role: []const u8,
+    workflow: []const u8,
     thesis_input: *const thesis.ThesisInput,
     proposed_basket: *const basket.Basket,
     quote_snapshot: *const trade_ticket.QuoteSnapshot,
@@ -239,6 +241,10 @@ pub fn buildAllowedTradeChain(
             .response_hash = model_response_hash,
             .token_estimate = model_response.token_usage.total_tokens,
             .retry_count = 0,
+            .actor_role = parseFixedAsciiBytes(16, actor_role),
+            .workflow = parseFixedAsciiBytes(16, workflow),
+            .policy_decision_id = 0,
+            .replay_substitution_id = 0,
         },
     });
     prev_hash = events[5].header.record_hash;
@@ -295,6 +301,8 @@ pub fn buildAllowedTradeChain(
 
 pub fn buildOversizedTradeBlockedChain(
     run_id: u64,
+    actor_role: []const u8,
+    workflow: []const u8,
     thesis_input: *const thesis.ThesisInput,
     proposed_basket: *const basket.Basket,
     quote_snapshot: *const trade_ticket.QuoteSnapshot,
@@ -367,6 +375,10 @@ pub fn buildOversizedTradeBlockedChain(
             .response_hash = model_response_hash,
             .token_estimate = model_response.token_usage.total_tokens,
             .retry_count = 0,
+            .actor_role = parseFixedAsciiBytes(16, actor_role),
+            .workflow = parseFixedAsciiBytes(16, workflow),
+            .policy_decision_id = 0,
+            .replay_substitution_id = 0,
         },
     });
     prev_hash = events[5].header.record_hash;
@@ -432,6 +444,8 @@ pub fn buildOversizedTradeBlockedChain(
 
 pub fn buildRestrictedInstrumentBlockedChain(
     run_id: u64,
+    actor_role: []const u8,
+    workflow: []const u8,
     thesis_input: *const thesis.ThesisInput,
     proposed_basket: *const basket.Basket,
     model_response: *const model.ModelResponse,
@@ -498,6 +512,10 @@ pub fn buildRestrictedInstrumentBlockedChain(
             .response_hash = model_response_hash,
             .token_estimate = model_response.token_usage.total_tokens,
             .retry_count = 0,
+            .actor_role = parseFixedAsciiBytes(16, actor_role),
+            .workflow = parseFixedAsciiBytes(16, workflow),
+            .policy_decision_id = 0,
+            .replay_substitution_id = 0,
         },
     });
     prev_hash = events[5].header.record_hash;

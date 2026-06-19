@@ -64,6 +64,13 @@ pub const ModelCallPayload = struct {
     response_hash: u64,
     token_estimate: u32,
     retry_count: u8,
+    // Governed context fields added in v1.1 audit extension.
+    // These are carried in the Zig schema for orchestrator population;
+    // the C codec and protobuf encoding are updated separately.
+    actor_role: [16]u8,
+    workflow: [16]u8,
+    policy_decision_id: u64,
+    replay_substitution_id: u64,
 };
 
 pub const FinancialAdapterCallPayload = struct {

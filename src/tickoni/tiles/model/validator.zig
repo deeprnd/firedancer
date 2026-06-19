@@ -4,6 +4,7 @@ const schema = @import("schema.zig");
 pub const TkModlConfig = schema.TkModlConfig;
 pub const TkModlDecision = schema.TkModlDecision;
 pub const TkModlRequest = schema.TkModlRequest;
+pub const ProviderRequest = schema.ProviderRequest;
 
 pub fn validateTkModlRequest(config: TkModlConfig, req: TkModlRequest) TkModlDecision {
     // Required scope fields — checked before all else.
@@ -53,6 +54,21 @@ pub fn validateTkModlRequest(config: TkModlConfig, req: TkModlRequest) TkModlDec
         return .deny_replay_substitution_missing;
 
     return if (req.replay_mode == .replay) .allow_replay else .allow_live;
+}
+
+// Build the transport-layer ProviderRequest from a governed TkModlRequest.
+// Only valid when decision is .allow_live; returns error.NotAllowLive otherwise.
+// Slices in the returned ProviderRequest alias req — no allocation.
+pub fn buildProviderRequest(decision: TkModlDecision, req: TkModlRequest) error{NotAllowLive}!ProviderRequest {
+    if (decision != .allow_live) return error.NotAllowLive;
+    return .{
+        .model_id = req.model_id,
+        .messages = req.messages,
+        .sampling = req.sampling,
+        .budget_id = req.budget_id,
+        .policy_version = req.policy_version,
+        .capability_envelope_id = req.capability_envelope_id,
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -239,4 +255,34 @@ test "validateTkModlRequest deny_replay_substitution_missing: replay with zero s
     req.replay_substitution_id = 0;
     const d = validateTkModlRequest(baseConfig(), req);
     try std.testing.expectEqual(TkModlDecision.deny_replay_substitution_missing, d);
+}
+
+// ---------------------------------------------------------------------------
+// buildProviderRequest tests
+// ---------------------------------------------------------------------------
+
+test "buildProviderRequest: allow_live decision returns mapped ProviderRequest" {
+    const req = baseLiveReq();
+    const pr = try buildProviderRequest(.allow_live, req);
+    try std.testing.expectEqualStrings("test-model", pr.model_id);
+    try std.testing.expectEqualStrings("v1.1", pr.policy_version);
+    try std.testing.expectEqualStrings("budget.demo", pr.budget_id);
+    try std.testing.expectEqualStrings("capenv.demo", pr.capability_envelope_id);
+    try std.testing.expectEqual(@as(usize, 0), pr.messages.len);
+    try std.testing.expectEqual(@as(u32, 512), pr.sampling.max_output_tokens);
+}
+
+test "buildProviderRequest: allow_replay decision returns NotAllowLive" {
+    const req = baseLiveReq();
+    try std.testing.expectError(error.NotAllowLive, buildProviderRequest(.allow_replay, req));
+}
+
+test "buildProviderRequest: deny decision returns NotAllowLive" {
+    const req = baseLiveReq();
+    try std.testing.expectError(error.NotAllowLive, buildProviderRequest(.deny_model_not_allowed, req));
+}
+
+test "buildProviderRequest: deny_missing_scope returns NotAllowLive" {
+    const req = baseLiveReq();
+    try std.testing.expectError(error.NotAllowLive, buildProviderRequest(.{ .deny_missing_scope = "budget_id" }, req));
 }

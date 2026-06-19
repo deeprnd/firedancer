@@ -1,4 +1,5 @@
 const backend = @import("backend.zig");
+const run_mod = @import("run.zig");
 const schema = @import("schema.zig");
 const validator = @import("validator.zig");
 
@@ -13,6 +14,10 @@ pub const TokenUsage = schema.TokenUsage;
 pub const ModelResponse = schema.ModelResponse;
 
 pub const validateTkModlRequest = validator.validateTkModlRequest;
+pub const buildProviderRequest = validator.buildProviderRequest;
+
+pub const TkModlResult = run_mod.TkModlResult;
+pub const runTkModlRequest = run_mod.runTkModlRequest;
 
 pub const MockBackend = backend.MockBackend;
 pub const FixtureBackend = backend.FixtureBackend;
@@ -27,4 +32,5 @@ test {
     _ = @import("schema.zig");
     _ = @import("backend.zig");
     _ = @import("validator.zig");
+    _ = @import("run.zig");
 }
