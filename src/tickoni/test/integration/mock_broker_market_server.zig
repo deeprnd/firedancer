@@ -61,32 +61,38 @@ fn serveLoop(server: *Server) void {
 
         if (server.stop_flag.load(.seq_cst)) break;
 
-        const req = support.readRequest(server.io, stream.socket.handle) catch continue;
+        var read_buffer: [support.server_read_buffer_len]u8 = undefined;
+        var write_buffer: [support.server_write_buffer_len]u8 = undefined;
+        var reader = stream.reader(server.io, &read_buffer);
+        var writer = stream.writer(server.io, &write_buffer);
+        var http_server = std.http.Server.init(&reader.interface, &writer.interface);
+        var request = http_server.receiveHead() catch continue;
+        const req = support.captureRequest(&request) catch continue;
         server.mutex.lockUncancelable(server.io);
         server.last_request = req;
         server.request_count += 1;
         server.mutex.unlock(server.io);
 
         if (std.mem.eql(u8, req.methodSlice(), "GET") and std.mem.eql(u8, req.pathSlice(), "/health")) {
-            support.sendTextResponse(server.io, stream.socket.handle, "200 OK", server.config.health_body) catch {};
+            support.respondText(&request, .ok, server.config.health_body) catch {};
             continue;
         }
 
         if (std.mem.eql(u8, req.methodSlice(), "GET") and std.mem.eql(u8, req.pathSlice(), "/accounts/2001/portfolio")) {
-            support.sendJsonResponse(server.io, stream.socket.handle, "200 OK", server.config.portfolio_json) catch {};
+            support.respondJson(&request, .ok, server.config.portfolio_json) catch {};
             continue;
         }
 
         if (std.mem.eql(u8, req.methodSlice(), "POST") and std.mem.eql(u8, req.pathSlice(), "/quotes")) {
-            support.sendJsonResponse(server.io, stream.socket.handle, "200 OK", server.config.quotes_json) catch {};
+            support.respondJson(&request, .ok, server.config.quotes_json) catch {};
             continue;
         }
 
         if (std.mem.eql(u8, req.methodSlice(), "POST") and std.mem.eql(u8, req.pathSlice(), "/paper-orders")) {
-            support.sendJsonResponse(server.io, stream.socket.handle, "200 OK", server.config.paper_order_json) catch {};
+            support.respondJson(&request, .ok, server.config.paper_order_json) catch {};
             continue;
         }
 
-        support.sendTextResponse(server.io, stream.socket.handle, "404 Not Found", "not found") catch {};
+        support.respondText(&request, .not_found, "not found") catch {};
     }
 }

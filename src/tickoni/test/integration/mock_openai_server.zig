@@ -70,39 +70,49 @@ fn serveLoop(server: *Server) void {
 
         if (server.stop_flag.load(.seq_cst)) break;
 
-        const req = support.readRequest(server.io, stream.socket.handle) catch continue;
+        var read_buffer: [support.server_read_buffer_len]u8 = undefined;
+        var write_buffer: [support.server_write_buffer_len]u8 = undefined;
+        var reader = stream.reader(server.io, &read_buffer);
+        var writer = stream.writer(server.io, &write_buffer);
+        var http_server = std.http.Server.init(&reader.interface, &writer.interface);
+        var request = http_server.receiveHead() catch continue;
+        const req = support.captureRequest(&request) catch continue;
         server.mutex.lockUncancelable(server.io);
         server.last_request = req;
         server.request_count += 1;
         server.mutex.unlock(server.io);
 
         if (std.mem.eql(u8, req.methodSlice(), "GET") and std.mem.eql(u8, req.pathSlice(), "/health")) {
-            support.sendTextResponse(server.io, stream.socket.handle, "200 OK", server.config.health_body) catch {};
+            support.respondText(&request, .ok, server.config.health_body) catch {};
             continue;
         }
 
         if (std.mem.eql(u8, req.methodSlice(), "POST") and std.mem.eql(u8, req.pathSlice(), "/v1/chat/completions")) {
-            sendChatCompletion(server.io, stream.socket.handle, server.config) catch {};
+            sendChatCompletion(&request, server.config) catch {};
             continue;
         }
 
-        support.sendTextResponse(server.io, stream.socket.handle, "404 Not Found", "not found") catch {};
+        support.respondText(&request, .not_found, "not found") catch {};
     }
 }
 
-fn sendChatCompletion(io: std.Io, fd: std.posix.fd_t, config: Config) !void {
-    const body = try std.fmt.allocPrint(
-        std.heap.page_allocator,
-        "{{\"model\":\"{s}\",\"choices\":[{{\"message\":{{\"content\":{}}},\"finish_reason\":\"{s}\"}}],\"usage\":{{\"prompt_tokens\":{d},\"completion_tokens\":{d},\"total_tokens\":{d}}}}}",
-        .{
-            config.model_id,
-            std.json.fmt(config.content, .{}),
-            config.finish_reason,
-            config.prompt_tokens,
-            config.completion_tokens,
-            config.total_tokens,
+fn sendChatCompletion(request: *std.http.Server.Request, config: Config) !void {
+    const body = try std.json.Stringify.valueAlloc(std.heap.page_allocator, .{
+        .model = config.model_id,
+        .choices = &.{
+            .{
+                .message = .{
+                    .content = config.content,
+                },
+                .finish_reason = config.finish_reason,
+            },
         },
-    );
+        .usage = .{
+            .prompt_tokens = config.prompt_tokens,
+            .completion_tokens = config.completion_tokens,
+            .total_tokens = config.total_tokens,
+        },
+    }, .{});
     defer std.heap.page_allocator.free(body);
-    try support.sendJsonResponse(io, fd, "200 OK", body);
+    try support.respondJson(request, .ok, body);
 }

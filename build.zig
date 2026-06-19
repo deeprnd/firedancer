@@ -484,6 +484,7 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/test/integration/investment_replay.zig",
         "src/tickoni/test/integration/investment_blocked_limits.zig",
         "src/tickoni/test/integration/investment_restricted_instrument.zig",
+        "src/tickoni/test/integration/model_tile_http.zig",
         "src/tickoni/test/integration/mock_servers.zig",
     }) |path| {
         const integration_test = b.addTest(.{
@@ -512,8 +513,8 @@ pub fn build(b: *std.Build) void {
         integration_step.dependOn(&b.addRunArtifact(integration_test).step);
     }
 
-    // model tile integration tests: require a running llama.cpp server.
-    // Run with: zig build integration-test-live-model
+    // Transitional step kept for the existing system-test script; these tests
+    // are now deterministic and mock-backed even when invoked directly.
     const live_model_step = b.step("integration-test-live-model", "Run live tkmodl llama.cpp smoke tests");
     const model_http_test = b.addTest(.{
         .root_module = b.createModule(.{

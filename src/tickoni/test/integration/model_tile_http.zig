@@ -1,22 +1,14 @@
-// Integration tests for the tkmodl tile against a real llama.cpp server.
-//
-// These tests require a running llama.cpp OpenAI-compatible server.
-// Start one with: just infra-run-llamacpp-cpu
-//
-// If the server is not reachable, tests are skipped (not failed) so they
-// do not block unit-test CI lanes.
-//
-// The endpoint is read from TK_LLM_ENDPOINT (default http://127.0.0.1:8080/v1).
-// The model id is read from TK_LLM_MODEL_ID
-// (default unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL).
+// Integration tests for tkmodl HTTP transport against a local OpenAI-compatible
+// mock server. These are deterministic transport proofs and do not require
+// llama.cpp or any live model endpoint.
 
 const std = @import("std");
 const model = @import("model");
+const http_support = @import("mock_http_support.zig");
+const openai_mock = @import("mock_openai_server.zig");
 
-const default_endpoint = "http://127.0.0.1:8080/v1";
-const default_model_id = "unsloth/gemma-4-E2B-it-qat-GGUF:UD-Q4_K_XL";
+const mock_model_id = "mock-http-model";
 
-// System prompt from model_request.json.
 const system_prompt =
     "You are a structured financial research assistant. " ++
     "Your task is to analyze an investor thesis and recommend a basket of US-listed equities and ETFs. " ++
@@ -25,7 +17,6 @@ const system_prompt =
     "Only recommend instruments appropriate for the given sector theme. " ++
     "Do not recommend leveraged ETFs, inverse ETFs, options, futures, or crypto.";
 
-// User prompt from model_request.json.
 const user_prompt =
     "Thesis: I want to invest USD 2,000 in sector, but avoid single-name concentration " ++
     "and keep it to US-listed ETFs or large-cap equities.\n" ++
@@ -36,19 +27,15 @@ const user_prompt =
     "Risk preference: moderate\n" ++
     "Max single-name weight: 25%";
 
-fn getEndpoint() []const u8 {
-    if (std.c.getenv("TK_LLM_ENDPOINT")) |val| return std.mem.span(val);
-    return default_endpoint;
-}
+const restricted_tickers = [_][]const u8{
+    "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",
+    "UVXY", "SVXY", "LABU", "LABD", "FAS", "FAZ",
+};
 
-fn getModelId() []const u8 {
-    if (std.c.getenv("TK_LLM_MODEL_ID")) |val| return std.mem.span(val);
-    return default_model_id;
-}
-
-fn makeBackend() model.Backend {
-    return .{ .http = .{ .endpoint = getEndpoint(), .io = std.testing.io } };
-}
+const mock_model_content =
+    "{\"thesis_summary\":\"USD 2,000 into AI infrastructure via diversified US-listed large-cap equities and ETFs.\"," ++
+    "\"recommended_tickers\":[\"NVDA\",\"AMD\",\"AVGO\",\"MSFT\",\"AMZN\",\"BOTZ\",\"SOXX\"]," ++
+    "\"rationale\":{\"NVDA\":\"AI compute leader\",\"AMD\":\"AI accelerator challenger\",\"AVGO\":\"Networking and custom silicon\",\"MSFT\":\"Cloud AI platform\",\"AMZN\":\"Cloud infrastructure exposure\",\"BOTZ\":\"Diversified robotics and AI ETF\",\"SOXX\":\"Semiconductor ETF diversification\"}}";
 
 fn makeAiInfraRequest(model_id: []const u8) model.ModelRequest {
     return .{
@@ -69,138 +56,153 @@ fn makeAiInfraRequest(model_id: []const u8) model.ModelRequest {
     };
 }
 
-test "model tile http: hello round-trip" {
-    const allocator = std.testing.allocator;
-    var backend = makeBackend();
-    const req = model.ModelRequest{
-        .model_id = getModelId(),
-        .messages = &.{.{ .role = "user", .content = "Reply with the single word: hello" }},
-        .sampling = .{ .temperature = 0, .max_output_tokens = 256, .seed = 1 },
-        .budget_id = "budget.demo_paper.v1_1",
-        .policy_version = "v1.1",
-        .capability_envelope_id = "capenv.trading_order.propose.demo",
-    };
+fn withMockBackend(
+    allocator: std.mem.Allocator,
+    test_fn: fn (allocator: std.mem.Allocator, backend: *model.Backend, server: *openai_mock.Server) anyerror!void,
+) !void {
+    var runtime = http_support.TestRuntime.init();
+    defer runtime.deinit();
 
-    const resp = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => {
-            std.log.info("skipping: llama.cpp not reachable at {s} (run: just infra-run-llamacpp-cpu)", .{getEndpoint()});
-            return error.SkipZigTest;
-        },
-        else => return err,
-    };
-    defer resp.deinit(allocator);
+    var server = try openai_mock.Server.init(runtime.io(), .{
+        .model_id = mock_model_id,
+        .content = mock_model_content,
+        .prompt_tokens = 148,
+        .completion_tokens = 187,
+        .total_tokens = 335,
+    });
+    try server.start();
+    defer server.stop();
 
-    try std.testing.expect(resp.content.len > 0);
-    try std.testing.expect(resp.token_usage.total_tokens > 0);
+    const endpoint = try server.endpointAlloc(allocator);
+    defer allocator.free(endpoint);
+
+    var backend = model.Backend{ .http = .{
+        .endpoint = endpoint,
+        .io = runtime.io(),
+        .allowed_model_ids = &.{mock_model_id},
+    } };
+    try test_fn(allocator, &backend, &server);
 }
 
-test "model tile http: thesis returns non-empty content" {
-    const allocator = std.testing.allocator;
-    var backend = makeBackend();
-    const req = makeAiInfraRequest(getModelId());
+test "model tile http: hello round-trip via mock server" {
+    try withMockBackend(std.testing.allocator, struct {
+        fn run(allocator: std.mem.Allocator, backend: *model.Backend, server: *openai_mock.Server) !void {
+            const req = model.ModelRequest{
+                .model_id = mock_model_id,
+                .messages = &.{.{ .role = "user", .content = "Reply with the single word: hello" }},
+                .sampling = .{ .temperature = 0, .max_output_tokens = 256, .seed = 1 },
+                .budget_id = "budget.demo_paper.v1_1",
+                .policy_version = "v1.1",
+                .capability_envelope_id = "capenv.trading_order.propose.demo",
+            };
+            const resp = try backend.call(allocator, req);
+            defer resp.deinit(allocator);
 
-    const resp = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => {
-            std.log.info("skipping: llama.cpp not reachable at {s} (run: just infra-run-llamacpp-cpu)", .{getEndpoint()});
-            return error.SkipZigTest;
-        },
-        else => return err,
-    };
-    defer resp.deinit(allocator);
-
-    try std.testing.expect(resp.content.len > 0);
+            try std.testing.expect(resp.content.len > 0);
+            try std.testing.expect(resp.token_usage.total_tokens > 0);
+            try std.testing.expectEqual(@as(u32, 1), server.requestCount());
+        }
+    }.run);
 }
 
-test "model tile http: response has valid finish reason" {
-    const allocator = std.testing.allocator;
-    var backend = makeBackend();
-    const req = makeAiInfraRequest(getModelId());
+test "model tile http: thesis returns valid structured content from mock server" {
+    try withMockBackend(std.testing.allocator, struct {
+        fn run(allocator: std.mem.Allocator, backend: *model.Backend, server: *openai_mock.Server) !void {
+            const req = makeAiInfraRequest(mock_model_id);
+            const resp = try backend.call(allocator, req);
+            defer resp.deinit(allocator);
 
-    const resp = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => return error.SkipZigTest,
-        else => return err,
-    };
-    defer resp.deinit(allocator);
+            try std.testing.expectEqualStrings(mock_model_id, resp.model_id);
+            try std.testing.expectEqualStrings("stop", resp.finish_reason);
+            try std.testing.expectEqual(@as(u32, 148), resp.token_usage.prompt_tokens);
+            try std.testing.expectEqual(@as(u32, 187), resp.token_usage.completion_tokens);
+            try std.testing.expectEqual(@as(u32, 335), resp.token_usage.total_tokens);
 
-    // finish_reason is "stop" when model completed normally, "length" when truncated.
-    const ok = std.mem.eql(u8, resp.finish_reason, "stop") or
-        std.mem.eql(u8, resp.finish_reason, "length");
-    try std.testing.expect(ok);
+            const last = server.lastRequest() orelse return error.TestUnexpectedResult;
+            try std.testing.expectEqualStrings("POST", last.methodSlice());
+            try std.testing.expectEqualStrings("/v1/chat/completions", last.pathSlice());
+            try std.testing.expect(std.mem.indexOf(u8, last.bodySlice(), "\"model\":\"mock-http-model\"") != null);
+            try std.testing.expect(std.mem.indexOf(u8, last.bodySlice(), "\"stream\":false") != null);
+
+            var parsed = try std.json.parseFromSlice(std.json.Value, allocator, resp.content, .{});
+            defer parsed.deinit();
+            const root = switch (parsed.value) {
+                .object => |o| o,
+                else => return error.TestUnexpectedResult,
+            };
+            const summary_v = root.get("thesis_summary") orelse return error.TestUnexpectedResult;
+            const summary = switch (summary_v) {
+                .string => |s| s,
+                else => return error.TestUnexpectedResult,
+            };
+            try std.testing.expect(summary.len > 0);
+
+            const tickers_v = root.get("recommended_tickers") orelse return error.TestUnexpectedResult;
+            const tickers = switch (tickers_v) {
+                .array => |a| a,
+                else => return error.TestUnexpectedResult,
+            };
+            try std.testing.expect(tickers.items.len > 0);
+
+            const rationale_v = root.get("rationale") orelse return error.TestUnexpectedResult;
+            const rationale = switch (rationale_v) {
+                .object => |o| o,
+                else => return error.TestUnexpectedResult,
+            };
+            try std.testing.expect(rationale.count() > 0);
+
+            for (tickers.items) |item| {
+                const ticker = switch (item) {
+                    .string => |s| s,
+                    else => return error.TestUnexpectedResult,
+                };
+                try std.testing.expect(rationale.contains(ticker));
+                for (restricted_tickers) |r| {
+                    try std.testing.expect(!std.mem.eql(u8, ticker, r));
+                }
+            }
+        }
+    }.run);
 }
 
-test "model tile http: token usage is non-zero" {
-    const allocator = std.testing.allocator;
-    var backend = makeBackend();
-    const req = makeAiInfraRequest(getModelId());
+test "model tile http: two sequential calls both succeed against mock server" {
+    try withMockBackend(std.testing.allocator, struct {
+        fn run(allocator: std.mem.Allocator, backend: *model.Backend, server: *openai_mock.Server) !void {
+            const req = makeAiInfraRequest(mock_model_id);
+            const r1 = try backend.call(allocator, req);
+            defer r1.deinit(allocator);
+            const r2 = try backend.call(allocator, req);
+            defer r2.deinit(allocator);
 
-    const resp = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => return error.SkipZigTest,
-        else => return err,
-    };
-    defer resp.deinit(allocator);
-
-    try std.testing.expect(resp.token_usage.total_tokens > 0);
-    try std.testing.expect(resp.token_usage.prompt_tokens > 0);
+            try std.testing.expect(r1.content.len > 0);
+            try std.testing.expect(r2.content.len > 0);
+            try std.testing.expectEqual(@as(u32, 2), server.requestCount());
+        }
+    }.run);
 }
 
-test "model tile http: model_id is populated" {
+test "model tile http: wrong endpoint fails closed with HttpStatusError" {
     const allocator = std.testing.allocator;
-    var backend = makeBackend();
-    const req = makeAiInfraRequest(getModelId());
+    var runtime = http_support.TestRuntime.init();
+    defer runtime.deinit();
 
-    const resp = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => return error.SkipZigTest,
-        else => return err,
-    };
-    defer resp.deinit(allocator);
+    var server = try openai_mock.Server.init(runtime.io(), .{
+        .model_id = mock_model_id,
+        .content = mock_model_content,
+    });
+    try server.start();
+    defer server.stop();
 
-    try std.testing.expect(resp.model_id.len > 0);
+    const wrong_endpoint = try std.fmt.allocPrint(allocator, "http://127.0.0.1:{d}", .{server.listener.socket.address.getPort()});
+    defer allocator.free(wrong_endpoint);
+
+    var backend = model.Backend{ .http = .{
+        .endpoint = wrong_endpoint,
+        .io = runtime.io(),
+        .allowed_model_ids = &.{mock_model_id},
+    } };
+    try std.testing.expectError(error.HttpStatusError, backend.call(allocator, makeAiInfraRequest(mock_model_id)));
 }
-
-test "model tile http: deinit does not leak" {
-    const allocator = std.testing.allocator;
-    var backend = makeBackend();
-    const req = makeAiInfraRequest(getModelId());
-
-    const resp = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => return error.SkipZigTest,
-        else => return err,
-    };
-    resp.deinit(allocator);
-    // std.testing.allocator will report leaks at end of test
-}
-
-test "model tile http: two sequential calls both succeed" {
-    const allocator = std.testing.allocator;
-    var backend = makeBackend();
-    const req = makeAiInfraRequest(getModelId());
-
-    const r1 = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => return error.SkipZigTest,
-        else => return err,
-    };
-    defer r1.deinit(allocator);
-
-    const r2 = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => return error.SkipZigTest,
-        else => return err,
-    };
-    defer r2.deinit(allocator);
-
-    try std.testing.expect(r1.content.len > 0);
-    try std.testing.expect(r2.content.len > 0);
-}
-
-// Leveraged ETFs and inverse ETFs prohibited by the system prompt.
-const restricted_tickers = [_][]const u8{
-    "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",
-    "UVXY", "SVXY", "LABU", "LABD", "FAS",  "FAZ",
-};
-
-// ---------------------------------------------------------------------------
-// Fixture-based tests: deterministic substitution and captured-response replay.
-// These do not require a running llama.cpp server.
-// ---------------------------------------------------------------------------
 
 test "model tile fixture: replay substitution content is deterministic" {
     const allocator = std.testing.allocator;
@@ -255,7 +257,6 @@ test "model tile fixture: captured response JSON matches fixture tickers and usa
         else => return error.TestUnexpectedResult,
     };
 
-    // All tickers from the captured fixture must be present.
     const expected = [_][]const u8{ "NVDA", "AMD", "AVGO", "MSFT", "AMZN", "BOTZ", "SOXX" };
     for (expected) |sym| {
         var found = false;
@@ -270,7 +271,6 @@ test "model tile fixture: captured response JSON matches fixture tickers and usa
         try std.testing.expect(found);
     }
 
-    // Captured fixture must not contain restricted instruments.
     for (tickers.items) |item| {
         const ticker = switch (item) {
             .string => |s| s,
@@ -282,126 +282,5 @@ test "model tile fixture: captured response JSON matches fixture tickers and usa
                 return error.TestUnexpectedResult;
             }
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Live server tests: structured JSON, restricted ticker exclusion, rationale.
-// Skipped when llama.cpp is not reachable.
-// ---------------------------------------------------------------------------
-
-test "model tile http: response is valid JSON with required fields" {
-    const allocator = std.testing.allocator;
-    var backend = makeBackend();
-    const req = makeAiInfraRequest(getModelId());
-    const resp = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => return error.SkipZigTest,
-        else => return err,
-    };
-    defer resp.deinit(allocator);
-
-    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, resp.content, .{});
-    defer parsed.deinit();
-
-    const root = switch (parsed.value) {
-        .object => |o| o,
-        else => return error.TestUnexpectedResult,
-    };
-
-    const summary_v = root.get("thesis_summary") orelse return error.TestUnexpectedResult;
-    const summary = switch (summary_v) {
-        .string => |s| s,
-        else => return error.TestUnexpectedResult,
-    };
-    try std.testing.expect(summary.len > 0);
-
-    const tickers_v = root.get("recommended_tickers") orelse return error.TestUnexpectedResult;
-    const tickers = switch (tickers_v) {
-        .array => |a| a,
-        else => return error.TestUnexpectedResult,
-    };
-    try std.testing.expect(tickers.items.len > 0);
-
-    const rationale_v = root.get("rationale") orelse return error.TestUnexpectedResult;
-    const rationale = switch (rationale_v) {
-        .object => |o| o,
-        else => return error.TestUnexpectedResult,
-    };
-    try std.testing.expect(rationale.count() > 0);
-}
-
-test "model tile http: recommended tickers exclude restricted instruments" {
-    const allocator = std.testing.allocator;
-    var backend = makeBackend();
-    const req = makeAiInfraRequest(getModelId());
-    const resp = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => return error.SkipZigTest,
-        else => return err,
-    };
-    defer resp.deinit(allocator);
-
-    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, resp.content, .{});
-    defer parsed.deinit();
-
-    const root = switch (parsed.value) {
-        .object => |o| o,
-        else => return error.TestUnexpectedResult,
-    };
-    const tickers_v = root.get("recommended_tickers") orelse return error.TestUnexpectedResult;
-    const tickers = switch (tickers_v) {
-        .array => |a| a,
-        else => return error.TestUnexpectedResult,
-    };
-
-    for (tickers.items) |item| {
-        const ticker = switch (item) {
-            .string => |s| s,
-            else => return error.TestUnexpectedResult,
-        };
-        for (restricted_tickers) |r| {
-            if (std.mem.eql(u8, ticker, r)) {
-                std.log.err("restricted instrument in response: {s}", .{ticker});
-                return error.TestUnexpectedResult;
-            }
-        }
-    }
-}
-
-test "model tile http: rationale covers all recommended tickers" {
-    const allocator = std.testing.allocator;
-    var backend = makeBackend();
-    const req = makeAiInfraRequest(getModelId());
-    const resp = backend.call(allocator, req) catch |err| switch (err) {
-        error.ServerUnreachable => return error.SkipZigTest,
-        else => return err,
-    };
-    defer resp.deinit(allocator);
-
-    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, resp.content, .{});
-    defer parsed.deinit();
-
-    const root = switch (parsed.value) {
-        .object => |o| o,
-        else => return error.TestUnexpectedResult,
-    };
-
-    const tickers_v = root.get("recommended_tickers") orelse return error.TestUnexpectedResult;
-    const tickers = switch (tickers_v) {
-        .array => |a| a,
-        else => return error.TestUnexpectedResult,
-    };
-
-    const rationale_v = root.get("rationale") orelse return error.TestUnexpectedResult;
-    const rationale = switch (rationale_v) {
-        .object => |o| o,
-        else => return error.TestUnexpectedResult,
-    };
-
-    for (tickers.items) |item| {
-        const ticker = switch (item) {
-            .string => |s| s,
-            else => return error.TestUnexpectedResult,
-        };
-        try std.testing.expect(rationale.contains(ticker));
     }
 }
