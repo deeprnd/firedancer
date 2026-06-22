@@ -1,5 +1,17 @@
 set shell := ["bash", "-c"]
 
+# Prefer GNU Make 4.x (Homebrew installs it as `gmake` on macOS); fall back to `make`.
+# Firedancer's GNUmakefile uses `undefine`, which needs GNU Make >= 3.82.
+make := `command -v gmake || command -v make`
+
+# Firedancer/Tickoni build natively only on Linux. On macOS, build/test/run
+# recipes transparently re-run inside this Linux container (see the `dock` recipe).
+dev_image := "tickoni-dev:24.04"
+
+# Resolve a docker-compatible container CLI: prefer docker, then podman, then
+# nerdctl, then colima's bundled nerdctl. Empty if none is installed.
+container := `if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; elif command -v nerdctl >/dev/null 2>&1; then echo nerdctl; elif command -v colima >/dev/null 2>&1; then echo "colima nerdctl -p tickoni --"; else echo ""; fi`
+
 default:
   @just --list
 
@@ -22,7 +34,7 @@ build-tk:
   ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build
 
 build-fd:
-  make -j"$(nproc)" firedancer
+  {{make}} -j"$(nproc)" firedancer
 
 build-fd-gcc:
   make -j"$(nproc)" BUILDDIR=fd-gcc CC=gcc-12 MACHINE=linux_gcc_x86_64 firedancer
@@ -39,6 +51,50 @@ build-fd-dev:
 
 build-all:
   python3 contrib/readme/run-badged-command.py build bash -c "just build-fd && just build-tk"
+
+# ── macOS: run any recipe in the Linux dev container ─────────────────────────
+# Firedancer/Tickoni build natively only on Linux. The `dock` recipe mounts the
+# repo into an ubuntu:24.04 arm64 container (native on Apple Silicon), builds the
+# fd_util/fd_ballet libs first (mirroring .github/actions/build-fd-tk-libs), then
+# runs the requested recipe. On Linux it runs the recipe natively (no container).
+#
+# Run any recipe inside the Linux dev container, e.g. `just dock test-unit-tk`.
+dock +recipe:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [ "$(uname)" != "Darwin" ]; then exec just {{recipe}}; fi
+  if [ -z "{{container}}" ]; then
+    echo "No container runtime found (checked docker, podman, nerdctl, colima)." >&2
+    exit 1
+  fi
+  # colima's bundled nerdctl needs a VM with the containerd runtime; use a
+  # dedicated profile so an existing (docker-runtime) colima setup is untouched.
+  case "{{container}}" in
+    colima*) colima status -p tickoni >/dev/null 2>&1 || colima start -p tickoni --runtime containerd ;;
+  esac
+  just _dev-image
+  {{container}} run --rm \
+    -v "{{justfile_directory()}}":/work -w /work \
+    {{dev_image}} \
+    bash -lc 'make -j"$(nproc)" EXTRAS=tk-arm build/native/gcc/lib/libfd_util.a build/native/gcc/lib/libfd_ballet.a && just {{recipe}}'
+
+# Build the Linux dev image once (just + Zig 0.16.0 + build toolchain). Idempotent.
+[private]
+_dev-image:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if {{container}} image inspect {{dev_image}} >/dev/null 2>&1; then exit 0; fi
+  echo "Building {{dev_image}} (one-time, a few minutes)…" >&2
+  ctx="$(mktemp -d "$HOME/.tickoni-devimg.XXXXXX")"  # under $HOME so colima/nerdctl can see the build context
+  trap 'rm -rf "$ctx"' EXIT
+  printf '%s\n' \
+    'FROM ubuntu:24.04' \
+    'ENV DEBIAN_FRONTEND=noninteractive' \
+    'RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl ca-certificates xz-utils pkg-config perl && rm -rf /var/lib/apt/lists/*' \
+    'RUN curl -sSfL https://just.systems/install.sh | bash -s -- --to /usr/local/bin' \
+    'RUN curl -sSfL https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz | tar -xJ -C /opt && ln -s /opt/zig-aarch64-linux-0.16.0/zig /usr/local/bin/zig' \
+    > "$ctx/Dockerfile"
+  {{container}} build --platform linux/arm64 -t {{dev_image}} "$ctx"
 
 # ── Test ───────────────────────────────────────────────────────────────────
 
