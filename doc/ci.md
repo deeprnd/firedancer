@@ -147,7 +147,7 @@ Contains long-running tests that require additional infrastructure or model asse
 | Engine E2E Tests | `ubuntu-24.04`  | `just test-e2e-fd`   | 60 m    | **Disabled** (`if: false`) |
 | LLM System Tests | `ubuntu-latest` | see steps below      | 90 m    | Active                     |
 
-**Engine E2E Tests** — condition is hard-coded `if: false && …`, so it never runs. Remove `false &&` to re-enable.
+**Engine E2E Tests** — condition is hard-coded `if: false && …`, so it never runs. Remove `false &&` to re-enable. When enabled it configures pages via the Tickoni-owned `.github/actions/memory-management` action (not the upstream `.github/actions/hugepages` action). The `memory-management` action wraps the `just mem-*` recipes and degrades gracefully when a free GitHub-hosted runner cannot reserve all requested gigantic/huge pages, whereas upstream `hugepages` targets persistent self-hosted runners and fails the step on a short reservation. Keeping a separate action lets the shared `hugepages` file track Firedancer upstream without merge conflicts.
 
 **LLM System Tests** — runs the explicit live-model compatibility lane against a real local `llama.cpp` server. Steps in order:
 
