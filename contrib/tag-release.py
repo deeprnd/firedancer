@@ -116,6 +116,10 @@ def update_db(url: str, output_path: Path, processor: Callable[[Path, Path], Non
         compressor = zstandard.ZstdCompressor(level=FD_GUI_GEOIP_ZSTD_COMPRESSION_LEVEL)
         output_path.write_bytes(compressor.compress((tmpdir_path / "db.bin").read_bytes()))
 
+def main():
+    print("Updating dbip.bin (this will take ~2-5 minutes)")
+    dbip_url = "https://github.com/sapics/ip-location-db/releases/download/latest/dbip-city-ipv4.csv.gz"
+    update_db(dbip_url, Path('src/disco/gui/dbip.bin.zst'), convert_dbip)
 
 def read_tickoni_version() -> Tuple[int, int, int, List[str]]:
     lines = VERSION_MK_PATH.read_text(encoding="utf-8").splitlines()

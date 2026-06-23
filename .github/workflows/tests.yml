@@ -57,7 +57,7 @@ jobs:
             deps-extras: "+dev"
             targets: "all integration-test tickoni"
             compiler: clang
-            compiler-version: 15.0.6
+            compiler-version: 19.1.7
             run-unit-tests: true
           - test-case: native
             machine: native
@@ -83,7 +83,7 @@ jobs:
         run: |
           sudo killall firedancer-dev || true
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/deps
         with:
