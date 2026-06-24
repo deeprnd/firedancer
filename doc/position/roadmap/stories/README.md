@@ -5,26 +5,26 @@ Use this folder for per-increment planning, tracking, and reference.
 
 ## Increments
 
-| Increment | Description | Status |
-| --- | --- | --- |
-| [V1.0](v1.0.md) | Runtime Proof | Done |
-| [V1.1](v1.1.md) | Investment Intent To Paper Trade | Accepted baseline |
-| [V1.11](v1.11.md) | Investment Demo Release Closure | Next |
-| [V1.2](v1.2.md) | Pay And Move Money Guard | Planned |
-| [V1.3](v1.3.md) | Portfolio And Cash Impact Loop | Planned |
-| [V1.12](v1.12.md) | Runtime Hooks | Planned |
-| [V1.4](v1.4.md) | Social Thesis And Money Feed | Later |
-| [V1.5](v1.5.md) | Crypto And Stablecoin Guard | Later |
-| [V1.6](v1.6.md) | Guarded Broker, Payment, And Crypto Sandbox | Later |
-| [V1.7](v1.7.md) | Trust Layer | Later |
-| [V1.8](v1.8.md) | Capability Control Surface | Later |
-| [V1.9](v1.9.md) | Crypto Thesis To Guarded Spot Trade | Later |
-| [V1.13](v1.13.md) | Non-Investment Operations Workflows | Later |
-| [V1.14](v1.14.md) | Firedancer Process And Shared-Memory Topology | Planned |
-| [V1.15](v1.15.md) | Bounded Agent Run Governance | Planned |
-| [V1.16](v1.16.md) | Tool Broker And MCP-Compatible Dispatch | Planned |
-| [V1.17](v1.17.md) | Tkmodl Budget And Call-Limit Governance | Planned |
-| [V1.18](v1.18.md) | Replay Proof Bundle And Evidence Integrity | Planned |
+| Increment | Description |
+| --- | --- |
+|| [V1.0](v1.0.md) | Runtime Proof |
+|| [V1.1](v1.1.md) | Investment Intent To Paper Trade |
+|| [V1.11](v1.11.md) | Investment Demo Release Closure |
+|| [V1.2](v1.2.md) | Pay And Move Money Guard |
+|| [V1.3](v1.3.md) | Portfolio And Cash Impact Loop |
+|| [V1.12](v1.12.md) | Runtime Hooks |
+|| [V1.4](v1.4.md) | Social Thesis And Money Feed |
+|| [V1.5](v1.5.md) | Crypto And Stablecoin Guard |
+|| [V1.6](v1.6.md) | Guarded Broker, Payment, And Crypto Sandbox |
+|| [V1.7](v1.7.md) | Trust Layer |
+|| [V1.8](v1.8.md) | Capability Control Surface |
+|| [V1.9](v1.9.md) | Crypto Thesis To Guarded Spot Trade |
+|| [V1.13](v1.13.md) | Non-Investment Operations Workflows |
+|| [V1.14](v1.14.md) | Firedancer Process And Shared-Memory Topology |
+|| [V1.15](v1.15.md) | Bounded Agent Run Governance |
+|| [V1.16](v1.16.md) | Tool Broker And MCP-Compatible Dispatch |
+|| [V1.17](v1.17.md) | Tkmodl Budget And Call-Limit Governance |
+|| [V1.18](v1.18.md) | Replay Proof Bundle And Evidence Integrity |
 
 ## How Each File Is Organized
 
