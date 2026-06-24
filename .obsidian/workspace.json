@@ -4,17 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "b79773dfcd9fb10b",
+        "id": "ccc76d8ae89de84b",
         "type": "tabs",
         "children": [
           {
-            "id": "a66c78ec16d5aea6",
+            "id": "1c42677bac97387e",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "SECURITY.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "SECURITY"
             }
           }
         ]
@@ -150,12 +154,13 @@
             "state": {
               "type": "outline",
               "state": {
+                "file": "Untitled.canvas",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline"
+              "title": "Outline of Untitled"
             }
           }
         ]
@@ -178,17 +183,34 @@
   },
   "active": "618fe4fd98f427b2",
   "lastOpenFiles": [
+    "doc/position/templates/story_template.md.tmp.1558465.4ce7e0afaa98",
+    "doc/position/templates/story_template.md.tmp.1558465.97df89cf7412",
+    "doc/position/templates/story_template.md.tmp.1558465.7c0807d9ca77",
+    "doc/position/templates/story_template.md.tmp.1558465.8a671f6f358d",
+    "doc/position/roadmap/README.md.tmp.1558465.e6fae492ad14",
+    "doc/position/templates/story_template.md",
+    "doc/position/templates/story_template.md.tmp.1558465.36a364805edc",
+    "doc/position/roadmap/README.md.tmp.1558465.2107e5823c06",
+    "doc/position/templates/increment_evidence.md",
+    "doc/position/templates/increment_evidence.md.tmp.1558465.a9d0f7e6d1c9",
+    "doc/position/templates",
+    "doc/position/roadmap/README.md.tmp.1545723.3e3f59d76a13",
+    "doc/position/roadmap/v1.13.md",
+    "doc/position/roadmap/v1.13.md.tmp.1545723.fd77951b8219",
+    "SECURITY.md",
+    "opt/git/openssl/doc/life-cycles/README.md",
+    "Untitled 1.canvas",
+    "Untitled.canvas",
+    "opt/git/s2n/x86/INSTRUCTION.md",
+    "opt/git/openssl/CODE-OF-CONDUCT.md",
+    "opt/git/openssl/INSTALL.md",
+    "doc/position/roadmap/v1.12.md",
+    "doc/position/roadmap/v1.3.md",
+    "opt/git/zstd/README.md",
+    "README-Engine.md",
+    "opt/git/lz4/lib/dll/example/README.md",
+    "opt/git/openssl/dev/README.md",
     "doc/rant/omit-frame-pointer.md",
-    "doc/rant/integer-types.md",
-    "doc/rant",
-    "doc/testing/v1-1-investment-demo-integration.md.tmp.1520120.fa4d96638376",
-    "doc/position/README.md.tmp.1520120.fdfe5749cc23",
-    "doc/position/README.md.tmp.1520120.02c736bbb86f",
-    "doc/position/README.md.tmp.1520120.b6c90d6450e1",
-    "doc/position/tile-plan.md.tmp.1520120.45d5f89ebabb",
-    "doc/position/milestone.md.tmp.1520120.ad240473e5a4",
-    "doc/position/positioning.md.tmp.1520120.12852f36b142",
-    "doc/position/roadmap/README.md.tmp.1520120.e7c9673ebf55",
-    "doc/position/roadmap/README.md.tmp.1520120.6d6013969a87"
+    "doc/rant/integer-types.md"
   ]
 }

@@ -12,12 +12,14 @@ Use this folder for per-increment planning, tracking, and reference.
 | [V1.11](v1.11.md) | Investment Demo Release Closure | Next |
 | [V1.2](v1.2.md) | Pay And Move Money Guard | Planned |
 | [V1.3](v1.3.md) | Portfolio And Cash Impact Loop | Planned |
+| [V1.12](v1.12.md) | Runtime Hooks | Planned |
 | [V1.4](v1.4.md) | Social Thesis And Money Feed | Later |
 | [V1.5](v1.5.md) | Crypto And Stablecoin Guard | Later |
 | [V1.6](v1.6.md) | Guarded Broker, Payment, And Crypto Sandbox | Later |
 | [V1.7](v1.7.md) | Trust Layer | Later |
 | [V1.8](v1.8.md) | Capability Control Surface | Later |
 | [V1.9](v1.9.md) | Crypto Thesis To Guarded Spot Trade | Later |
+| [V1.13](v1.13.md) | Non-Investment Operations Workflows | Later |
 
 Platform backlog: [platform/p1-p8.md](platform/p1-p8.md).
 
@@ -74,7 +76,9 @@ Every increment must answer before closing:
 ## Increment Evidence Work Items
 
 Every increment should include these work items unless the increment explicitly
-does not touch that boundary:
+does not touch that boundary. For the full story template that combines these items
+with the P8 build, quality, security, and release requirements, see
+[`doc/position/templates/story_template.md`](../templates/story_template.md).
 
 - G.T1: Add a documented local demo command or script.
 - G.T2: Add deterministic fixtures for the product flow and each model, tool,
