@@ -24,6 +24,11 @@ Tickoni is an AI harness framework for agentic finance. It is built as
 financial AI-harness tiles on top of Firedancer infrastructure, not as a
 normal web backend with agents attached.
 
+- This repository is `deeprnd/tickoni`, not upstream Firedancer. Treat
+  Tickoni code and docs in this repo as the source of truth, and use
+  Firedancer only as reused infrastructure context unless a task explicitly
+  asks about upstream Firedancer.
+
 Core layers:
 1. Firedancer infrastructure provides the ultra-TPS systems substrate:
    `src/tango` queues, topology/workspace discipline, sandboxed tile
