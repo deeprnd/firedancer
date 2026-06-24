@@ -46,10 +46,10 @@ and acceptance criteria.
 
 ## Cross-References
 
-- Product bet, target user, and priority stack: [`positioning.md`](../positioning.md).
-- V1 completion criteria and non-goals: [`positioning.md`](../positioning.md).
-- V1 capability set, denied-by-default list, and capability depth by increment: [`capabilities.md`](../capabilities.md).
-- Product language conventions: [`doc/contribution/tickoni.md`](../../contribution/tickoni.md).
+- Product bet, target user, and priority stack: [`positioning.md`](../../positioning.md).
+- V1 completion criteria and non-goals: [`positioning.md`](../../positioning.md).
+- V1 capability set, denied-by-default list, and capability depth by increment: [`capabilities.md`](../../capabilities.md).
+- Product language conventions: [`doc/contribution/tickoni.md`](../../../contribution/tickoni.md).
 
 ## Increment Gate Checklist
 
@@ -78,4 +78,4 @@ Every increment must answer before closing:
 ## Increment Evidence Work Items
 
 Every increment should include the story template that combines quality, security, and release requirements, see
-[`doc/position/templates/story_template.md`](../templates/story_template.md).
+[`doc/position/templates/story_template.md`](../../templates/story_template.md).

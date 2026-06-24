@@ -344,11 +344,7 @@ The strongest differentiation:
 > Generic agent frameworks show what the agent did.
 > Tickoni proves whether the agent was allowed to do it, what evidence it used, what changed, and whether the decision can be replayed.
 
-See [Competitive Positioning](positioning.md) for comparisons with adjacent agent harnesses and developer tools.
-
-## License
-
-The repository is licensed under [Apache-2.0](../LICENSE).
+See [Competitive Positioning](position/positioning.md) for comparisons with adjacent agent harnesses and developer tools.
 
 ## Status
 
@@ -361,24 +357,3 @@ The intended v1 is a narrow, opinionated implementation focused on:
 - strict policy enforcement
 - forensic auditability
 - deterministic replay
-
-## Summary
-
-Tickoni exists because fintech AI needs a different substrate.
-
-Generic agent frameworks optimize for autonomy and convenience.
-
-Tickoni optimizes for:
-
-- throughput
-- control
-- auditability
-- replayability
-- policy enforcement
-- financial event integrity
-
-The infrastructure thesis:
-
-> Agentic finance will only be trusted when every action is controlled, every decision is replayable, and every outcome is auditable.
-
-Tickoni is the harness for AI-operated financial infrastructure.
