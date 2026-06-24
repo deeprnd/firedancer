@@ -8,8 +8,9 @@ enum RejectionReason {
   REJECTION_REASON_UNSPECIFIED         = 0;
   REJECTION_REASON_RESTRICTED_INSTRUMENT = 1;
   REJECTION_REASON_WRONG_ASSET_CLASS   = 2;
-  REJECTION_REASON_WRONG_MARKET        = 3;
-  REJECTION_REASON_WRONG_VENUE         = 4;
+  REJECTION_REASON_WRONG_INSTRUMENT_TYPE = 3;
+  REJECTION_REASON_WRONG_MARKET        = 4;
+  REJECTION_REASON_WRONG_VENUE         = 5;
 }
 
 enum BasketErrorCode {
@@ -22,9 +23,10 @@ enum BasketErrorCode {
 message BasketInstrument {
   bytes      ticker           = 1;
   AssetClass asset_class      = 2;
-  uint32     weight_bp        = 3;
-  int64      allocation_cents = 4;
-  bytes      rationale        = 5;
+  InstrumentType instrument_type = 3;
+  uint32     weight_bp        = 4;
+  int64      allocation_cents = 5;
+  bytes      rationale        = 6;
 }
 
 // One theme-matching instrument rejected from the basket.

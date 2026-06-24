@@ -6,7 +6,7 @@
   "expected_basket_id": 17844936811726487061,
   "expected_proposal_hash": 15423733414829260079,
   "policy_version": "v1",
-  "catalog_schema_version": 1,
+  "catalog_schema_version": 2,
   "thesis_input_hash": "thesis_hash_oversized_25000",
   "normalized_intent_hash": "intent_hash_oversized_25000",
   "basket_id": "basket_ai_infra_25000",
