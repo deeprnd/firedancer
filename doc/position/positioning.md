@@ -506,7 +506,25 @@ Tickoni’s core safety claim is that agents operate through policy-gated propos
 
 # V1 Product Scope
 
-See [roadmap](roadmap.md) for delivery timeline.
+## V1 Completion Criteria
+
+Consumer Finance V1 is complete when a user can:
+
+1. Type an investment thesis
+2. Receive an explainable basket of US-listed equities or ETFs
+3. Preview a buy ticket from that basket
+4. See buying power, estimated cost, remaining cash, and max affordable amount
+5. Place the trade in paper mode when it fits limits
+6. Inspect a failed or delayed payment/payout event
+7. Propose a retry, transfer, hold, route, or draft response only when
+   beneficiary, rail, currency, country, amount, retry, and approval checks pass
+8. Get a clear reason when a trade, payment, transfer, or wallet proposal is
+   blocked, resized, or approval-required
+9. See portfolio, cash, and pending-obligation impact before acting
+10. Monitor the thesis and money proposal after the action
+11. Export replayable proof for the material money decision
+12. Turn a crypto spot intent into a fee-aware paper or approved sandbox ticket
+    without granting wallet-transfer authority
 
 ## V1 Must Include
 
@@ -529,16 +547,30 @@ See [roadmap](roadmap.md) for delivery timeline.
 
 ## V1 Should Exclude
 
-1. Generic coding assistant
-2. Quant research
-3. Autonomous trading
-4. Open plugin marketplace
-5. Personal assistant workflows
-6. Email/calendar automation
-7. Arbitrary browser automation
-8. Unbounded swarms
-9. Self-modifying agents
-10. Direct money movement by agents
+- production live trading by default
+- margin trading
+- options, futures, leveraged ETFs, inverse ETFs, or complex derivatives
+- autonomous rebalancing
+- autonomous money movement
+- autonomous accounting ledger posting
+- autonomous account freezing
+- autonomous payout approval
+- autonomous compliance decisions
+- quant strategy generation
+- market-making
+- tax optimization
+- operations-heavy payment exception CaseOps workflows beyond the V1.2 payment guard
+- reconciliation CaseOps workflows
+- fraud/risk triage CaseOps workflows
+- compliance case-preparation CaseOps workflows
+- compliance-console-first UX
+- open plugin marketplace
+- generic browser automation
+- arbitrary custom workflows
+- full enterprise RBAC
+- unbounded agent swarms
+- agent-editable policy
+- self-modifying agents
 
 # Competitive Comparison Dimensions
 

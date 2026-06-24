@@ -24,8 +24,8 @@ execution.
 | Document | Owns | Does not own |
 | --- | --- | --- |
 | [`positioning.md`](positioning.md) | Market position, differentiation, buyer framing, non-positioning | Delivery sequencing or implementation tasks |
-| [`roadmap.md`](roadmap.md) | Consumer-finance version sequence, product narrative, prioritization, strategic tradeoffs | Detailed engineering task ownership |
-| [`wbs.md`](wbs.md) | Stories, tasks, acceptance criteria, increment evidence, backlog work | Market narrative or tile topology |
+| [`roadmap/`](roadmap/) | Consumer-finance increment sequence, story files, evidence gates, increment status | Market narrative or tile topology |
+| [`roadmap/`](roadmap/) | Stories, tasks, acceptance criteria, increment evidence, backlog work | Market narrative or tile topology |
 | [`capabilities.md`](capabilities.md) | Finance-native permission model, action classes, policy outcomes, scopes, destination allowlists, and capability roadmap | OS sandbox permissions or implementation-specific tile APIs |
 | [`tile-plan.md`](tile-plan.md) | Tile IDs, tile ownership, topology, validator-tile replacement decisions | Product backlog, roadmap sequencing, WBS tasks |
 
@@ -46,14 +46,14 @@ execution.
 ### Decision Rules
 
 1. If the question is "why are we building this?", update `positioning.md`.
-2. If the question is "when does this happen?", update `roadmap.md`.
-3. If the question is "what exact work remains?", update `wbs.md`.
+2. If the question is "when does this happen?", update the story file under `roadmap/`.
+3. If the question is "what exact work remains?", update the story file under `roadmap/`.
 4. If the question is "which tile owns this?", update `tile-plan.md`.
 5. If the question is "which financial action is allowed?", update
    `capabilities.md`.
-6. If the question is "which model path is allowed?", update `roadmap.md` and
-   `wbs.md` under model/tool governance unless a dedicated governance document
-   is restored.
+6. If the question is "which model path is allowed?", update `capabilities.md`
+   under model/tool governance unless a dedicated governance document is
+   restored.
 
 ### Senior Product Constraints
 
@@ -93,18 +93,3 @@ replayable financial proposals:
    policy version/hash, model/tool/adapter attribution, full action classes,
    policy outcomes, scope dimensions, evidence prerequisites, aggregate limits,
    and denied-by-default execution paths.
-
-The active roadmap sequence is:
-
-1. `V1.1` Investment Intent To Paper Trade
-2. `V1.2` Pay And Move Money Guard
-3. `V1.3` Portfolio And Cash Impact Loop
-4. `V1.4` Social Thesis And Money Feed
-5. `V1.5` Crypto And Stablecoin Guard
-6. `V1.6` Guarded Broker, Payment, And Crypto Sandbox
-7. `V1.7` Trust Layer
-8. `V1.8` Capability Control Surface
-
-V1 is intentionally not "real API first." It proves the consumer-money product
-flow with deterministic fixtures and governed boundaries before broad live
-connectors.

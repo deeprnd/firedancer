@@ -1194,3 +1194,43 @@ Before merging Tickoni runtime work, check:
 
 If the answer to any of these is "not yet", finish the design before adding
 more code.
+
+## Product Language
+
+Use consumer-money language in product-facing docs, APIs, and demos:
+
+- thesis
+- basket
+- trade ticket
+- buying power
+- cash available
+- recipient
+- beneficiary
+- IBAN
+- wallet
+- rail
+- currency
+- stablecoin
+- spot pair
+- quote freshness
+- estimated fee
+- price impact
+- pending obligation
+- trusted destination
+- blocked reason
+- approval-required
+- max affordable amount
+- max transferable amount
+- money-decision proof
+
+Keep internal runtime language inside implementation details:
+
+- `tkmodl`
+- `tktool`
+- `tkadpt`
+- `tkexec`
+- capability envelope
+- audit record
+- replay capsule
+- adapter manifest
+- signed action envelope
