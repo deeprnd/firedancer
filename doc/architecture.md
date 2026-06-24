@@ -1,5 +1,9 @@
 # Tickoni Architecture
 
+The infrastructure thesis:
+
+> Agentic finance will only be trusted when every action is controlled, every decision is replayable, and every outcome is auditable.
+
 Tickoni is a high-throughput AI harness for agentic finance. The architecture
 starts from financial event integrity, then adds controlled agents after the
 runtime can prove bounded processing, audit, replay, and isolation.

@@ -261,7 +261,7 @@ Tile-relevant facts:
 4. Phase 0 still maps tiles to in-process threads and heap-backed queues.
 5. The temporary `firedancer -> tickoni` compatibility behavior remains outside
    the product tile topology until the deprecation window in
-   [`roadmap.md`](roadmap.md) is complete.
+   [`roadmap/stories/v1.11.md`](roadmap/stories/v1.11.md) is complete.
 
 ### Phase 0 topology
 
@@ -348,7 +348,7 @@ tkexec
 ```
 
 The product work, acceptance criteria, and delivery sequencing for those phases
-live in [`wbs.md`](wbs.md) and [`phase-plan.md`](phase-plan.md). This document
+live in [`roadmap/`](roadmap/) and [`phase-plan.md`](phase-plan.md). This document
 only records tile identity, ownership, and topology.
 
 ## Tile Synchronization Debt

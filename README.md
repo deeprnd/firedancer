@@ -284,7 +284,7 @@ No black boxes.
 - [Telemetry](doc/telemetry.md)
 - [Security](doc/security.md)
 - [Audit and replay](doc/audit.md)
-- [Roadmap](doc/position/roadmap.md)
+- [Roadmap](doc/position/README.md)
 
 ## License
 
