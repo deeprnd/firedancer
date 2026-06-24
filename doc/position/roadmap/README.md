@@ -20,8 +20,11 @@ Use this folder for per-increment planning, tracking, and reference.
 | [V1.8](v1.8.md) | Capability Control Surface | Later |
 | [V1.9](v1.9.md) | Crypto Thesis To Guarded Spot Trade | Later |
 | [V1.13](v1.13.md) | Non-Investment Operations Workflows | Later |
-
-Platform backlog: [platform/p1-p8.md](platform/p1-p8.md).
+| [V1.14](v1.14.md) | Firedancer Process And Shared-Memory Topology | Planned |
+| [V1.15](v1.15.md) | Bounded Agent Run Governance | Planned |
+| [V1.16](v1.16.md) | Tool Broker And MCP-Compatible Dispatch | Planned |
+| [V1.17](v1.17.md) | Tkmodl Budget And Call-Limit Governance | Planned |
+| [V1.18](v1.18.md) | Replay Proof Bundle And Evidence Integrity | Planned |
 
 ## How Each File Is Organized
 
@@ -47,7 +50,6 @@ and acceptance criteria.
 - V1 completion criteria and non-goals: [`positioning.md`](../positioning.md).
 - V1 capability set, denied-by-default list, and capability depth by increment: [`capabilities.md`](../capabilities.md).
 - Product language conventions: [`doc/contribution/tickoni.md`](../../contribution/tickoni.md).
-- Platform backlog (P1–P8): [`platform/p1-p8.md`](platform/p1-p8.md).
 
 ## Increment Gate Checklist
 
@@ -75,20 +77,5 @@ Every increment must answer before closing:
 
 ## Increment Evidence Work Items
 
-Every increment should include these work items unless the increment explicitly
-does not touch that boundary. For the full story template that combines these items
-with the P8 build, quality, security, and release requirements, see
+Every increment should include the story template that combines quality, security, and release requirements, see
 [`doc/position/templates/story_template.md`](../templates/story_template.md).
-
-- G.T1: Add a documented local demo command or script.
-- G.T2: Add deterministic fixtures for the product flow and each model, tool,
-  adapter, market, portfolio, payment, transfer, and crypto boundary it uses.
-- G.T3: Emit audit output for the material user flow.
-- G.T4: Show policy, destination, venue, wallet, and limit decisions in audit
-  output where they apply.
-- G.T5: Export metrics or diagnostics for queue, policy, model, tool, adapter,
-  audit, replay, and crash state.
-- G.T6: Run replay without external model, broker, payment, trading, crypto, or
-  execution side effects.
-- G.T7: Include at least one blocked-flow or intentional divergence fixture.
-- G.T8: Maintain a product demo checklist tied to the increment's user story.
