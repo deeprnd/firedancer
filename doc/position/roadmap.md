@@ -117,10 +117,10 @@ prioritize it:
    count, payout state, and approval requirement before proposing a payment,
    payout, or transfer action.
 
-3. **Crypto And Stablecoin Safety**
-   The Binance/Coinbase lane. Check wallet, network, custody account, asset,
-   chain-risk tier, and travel-rule state before any withdrawal or transfer
-   proposal.
+3. **Trade Crypto And Move It Safely**
+   The Binance/Coinbase lane. Turn a crypto market view into a guarded spot
+   ticket, then keep exchange trading authority separate from wallet, network,
+   custody, chain-risk, and travel-rule controls for transfers.
 
 4. **Trust And Replay**
    The enterprise fintech lane. Every consequential recommendation, proposal,
@@ -283,6 +283,13 @@ Release findings carried from V1.1:
 9. Reconcile roadmap, WBS, integration-test specs, implementation audits, demo
    commands, and release status so completed, partial, and deferred work have
    one evidence-backed interpretation.
+10. Replace the in-process tile-thread spike with supervisor-managed tile
+    processes. Route inter-tile event transport through Firedancer Tango
+    `mcache`/`dcache` links backed by explicitly mapped shared-memory
+    workspaces, not direct cross-tile calls or heap-backed queues. Add validated
+    CPU-placement configuration that supports both exclusive tile affinity and
+    explicit shared-core assignments when multiple tiles are intentionally
+    placed on the same CPU core.
 
 Success demo:
 
@@ -309,6 +316,8 @@ Release gate:
   identity,
 - replay performs no live model, broker, market, trading, payment, or execution
   effects,
+- the V1.11 topology runs tiles as processes over Firedancer shared-memory
+  links, and tests cover both exclusive and explicit shared-core CPU placement,
 - all V1.11 release findings above have executable evidence or are explicitly
   de-scoped by an approved roadmap change.
 
@@ -661,6 +670,78 @@ This is where the full `capabilities.md` model becomes inspectable product
 surface. It is not a consumer hero screen; it is the partner control plane that
 explains and governs what financial consequences agents may participate in.
 
+### V1.9: Crypto Thesis To Guarded Spot Trade
+
+User story:
+
+As a crypto trader, I can describe a spot-market view, turn it into an
+explainable BTC, ETH, or approved stablecoin trade ticket, and paper-trade or
+submit it to an approved sandbox venue without giving an agent unrestricted
+exchange or wallet authority.
+
+Example:
+
+```text
+"Put USD 1,000 into BTC and ETH, keep 25% in USDC, use only approved spot
+markets, and do not place anything if the quote is stale or the fees are too
+high."
+```
+
+What the user can do:
+
+- enter a plain-English crypto allocation or single-pair trade intent
+- choose an approved exchange or custody trading account
+- inspect eligible spot assets, quote currencies, pairs, and venues
+- see current holdings, available quote balance, open orders, and resulting
+  asset concentration
+- receive a market or limit ticket with quantity, notional, fee estimate,
+  slippage or price-impact estimate, and quote timestamp
+- compare an approved venue route without granting cross-venue execution
+  authority
+- paper-place an allowed ticket or submit it to an already approved V1.6
+  sandbox adapter
+- see exact blocked or approval-required reasons before an order is submitted
+
+Guardrails:
+
+- spot only; margin, leverage, perpetuals, futures, options, lending, staking,
+  and DeFi execution remain out of scope
+- account, environment, venue, asset class, base asset, quote asset, pair,
+  side, order type, quantity, and notional scope
+- configured per-order, per-day, per-month, asset-exposure, concentration,
+  frequency, and open-order limits
+- quote freshness, minimum liquidity, fee ceiling, and price-deviation checks
+- deterministic decimal precision, minimum order size, and tick-size handling
+- restricted-asset, restricted-pair, venue-availability, and stablecoin-risk
+  evidence checks
+- exact proposal-hash, policy-version, approval, action-id, and adapter binding
+  before sandbox submission
+
+Authority boundary:
+
+Spot trading uses the existing `trading_order.recommend`,
+`trading_order.propose`, and paper/sandbox `trading_order.place` capabilities
+with crypto-asset trading scope. Moving an asset off venue remains a separate
+`crypto_transfer.propose` or approved `crypto_transfer.initiate` path under
+V1.5/V1.6. A trading approval never implies withdrawal authority.
+
+Success demo:
+
+An exec enters the example intent and gets a three-asset allocation, venue and
+pair selection, fee-aware tickets, a guarded paper fill, and updated holdings.
+The same demo blocks a stale quote, an unsupported pair, an over-concentrated
+order, and a direct sandbox-placement bypass, then replays without live market,
+exchange, model, or transfer effects.
+
+Still excludes:
+
+- production live trading by default
+- autonomous or continuous trading
+- margin, leverage, derivatives, shorting, market-making, and arbitrage
+- DeFi swaps, bridges, lending, staking, and yield strategies
+- autonomous withdrawals or transfers
+- treating a token ticker as sufficient asset or network identity
+
 ## Carried-Forward Platform Backlog
 
 The original roadmap and WBS contained important platform capabilities that are
@@ -1001,6 +1082,10 @@ Additional gates by increment:
 - V1.8 closes when partners can inspect the capability catalog by action class,
   policy outcome, scope dimension, evidence prerequisite, aggregate limit,
   approval path, and denied-by-default execution or override path.
+- V1.9 closes when a crypto spot intent produces deterministic fee-aware
+  tickets and guarded paper or approved sandbox results, blocked quote/pair/
+  concentration/bypass cases produce exact evidence, trading authority remains
+  separate from transfer authority, and replay performs no live effects.
 
 ## Capability Depth Backlog
 
@@ -1010,7 +1095,7 @@ The capability model should support the consumer-finance product in this order:
 | --- | --- | --- | --- | --- |
 | Investment | thesis to basket, ticket, affordability, paper trade | cash impact from payment obligations | portfolio/cash impact loop | broker sandbox/live read-back |
 | Payments | payment context visible only as cash fixture | retry, payout, transfer proposal with beneficiary and rail checks | pending obligation and approval state | payment/bank sandbox execution |
-| Crypto | excluded from first trade lane | excluded from first payment lane | stablecoin cash preview only | wallet, network, asset, custody, chain-risk guard |
+| Crypto | excluded from first trade lane | excluded from first payment lane | stablecoin cash preview only | wallet/network transfer guard plus V1.9 guarded spot trading |
 | Limits | market, venue, instrument denylist, notional, frequency | beneficiary, IBAN, rail, currency, amount, retry count | concentration, cash buffer, approval expiry | suitability, mandate, sanctions, travel-rule, restricted lists |
 | Model | explainable basket and ticket generation | payment/payout explanation and draft response | thesis and cash-impact explanation | creator/copier and partner explanations |
 | Tool/adapter | deterministic market/portfolio fixtures and paper trading adapter | payment and beneficiary fixtures | position/thesis/payment state adapters | broker, payment, bank, crypto sandbox adapters |
@@ -1034,6 +1119,8 @@ Consumer Finance V1 is complete when a user can:
 9. see portfolio, cash, and pending-obligation impact before acting
 10. monitor the thesis and money proposal after the action
 11. export replayable proof for the material money decision
+12. turn a crypto spot intent into a fee-aware paper or approved sandbox ticket
+    without granting wallet-transfer authority
 
 ## V1 Non-Goals
 

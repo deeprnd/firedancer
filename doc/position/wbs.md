@@ -49,6 +49,7 @@ product.
 | V1.6 | Later | Guarded Broker, Payment, And Crypto Sandbox: signed sandbox adapters and read-back for approved small actions |
 | V1.7 | Later | Trust Layer: signed audit, replay, attribution, and exportable money-decision records |
 | V1.8 | Later | Capability Control Surface: full finance-native action classes, outcomes, scopes, limits, evidence, and approval paths |
+| V1.9 | Later | Crypto Thesis To Guarded Spot Trade: crypto intent becomes a fee-aware ticket, guarded paper/sandbox order, updated portfolio, and replayable proof |
 
 ## Product Language Rules
 
@@ -66,6 +67,10 @@ Use consumer-money language in product-facing docs, APIs, and demos:
 - rail
 - currency
 - stablecoin
+- spot pair
+- quote freshness
+- estimated fee
+- price impact
 - pending obligation
 - trusted destination
 - blocked reason
@@ -381,6 +386,40 @@ Acceptance:
 - `just test-unit-tk` passes with no unexpected skips.
 - `just test-integration-tk` passes offline against local mocks.
 - `just demo-tk` prints the release-closure scenarios and proof bundle.
+
+### V1.11.S6: Firedancer process, shared-memory, and CPU topology
+
+Tasks:
+
+- V1.11.S6.T1: Replace the development-only in-process tile threads with one
+  supervisor-managed process per V1.11 tile while preserving the existing tile
+  ids, ownership boundaries, and crash-only lifecycle.
+- V1.11.S6.T2: Back inter-tile event links with Firedancer Tango
+  `mcache`/`dcache` primitives in explicitly defined shared-memory workspaces.
+  Remove heap-backed queues from the V1.11 executable path and prohibit direct
+  cross-tile function calls for event transport.
+- V1.11.S6.T3: Define each link's producer, consumer, workspace, mapping mode,
+  depth, MTU, reliability, overrun behavior, restart behavior, shutdown
+  behavior, and health metrics in the executable topology configuration.
+- V1.11.S6.T4: Add validated CPU-placement configuration for every tile. Allow
+  exclusive CPU affinity and explicit shared-core assignments; reject invalid
+  CPU ids and unintentional affinity collisions.
+- V1.11.S6.T5: Add integration coverage that proves process isolation,
+  shared-memory message flow, bounded backpressure, crash propagation, clean
+  shutdown, and deterministic output under both exclusive-core and
+  intentionally shared-core configurations.
+
+Acceptance:
+
+- Every V1.11 tile runs in a supervisor-managed process rather than an
+  in-process thread.
+- Correctness-bearing events cross tile boundaries only through configured
+  Firedancer shared-memory links; no direct calls or shared heap queues carry
+  inter-tile events.
+- CPU placement fails closed for malformed or unavailable CPU ids, and sharing
+  a core requires an explicit configuration declaration.
+- The V1.11 deterministic demo and replay results match under supported
+  exclusive-core and shared-core configurations.
 
 ## V1.2: Pay And Move Money Guard
 
@@ -783,6 +822,227 @@ Acceptance:
 - A partner can inspect the capability catalog by action class, policy outcome,
   scope dimension, evidence prerequisite, aggregate limit, approval path, and
   denied-by-default execution or override path.
+
+## V1.9: Crypto Thesis To Guarded Spot Trade
+
+### User Story
+
+As a crypto trader, I can describe a spot-market view, receive an explainable
+trade plan, and paper-trade or submit an allowed ticket to an approved sandbox
+venue without giving an agent unrestricted exchange or wallet authority.
+
+Example:
+
+```text
+Put USD 1,000 into BTC and ETH, keep 25% in USDC, use only approved spot
+markets, and do not place anything if the quote is stale or the fees are too
+high.
+```
+
+### Product Outcome
+
+The user gets:
+
+- structured crypto trading intent
+- eligible and rejected spot assets, pairs, and venues with reasons
+- current balances, holdings, open orders, and available quote currency
+- fee-aware market or limit tickets
+- quote-freshness, liquidity, price-deviation, and concentration decisions
+- paper execution or approved sandbox submission when allowed
+- resulting cash, stablecoin reserve, holdings, and exposure
+- replayable evidence for allowed, blocked, and bypass attempts
+
+Trading authority and transfer authority remain separate. An allowed exchange
+order never authorizes a wallet withdrawal, bridge, or custody transfer.
+
+### V1.9.S1: Crypto intent and spot instrument catalog
+
+Tasks:
+
+- V1.9.S1.T1: Define a bounded crypto trading intent schema with account,
+  target notional, base or requested assets, quote currency, allocation,
+  venue preference, side, order type, limit price where applicable, and user
+  exclusions.
+- V1.9.S1.T2: Normalize plain-English single-pair and multi-asset allocation
+  requests into that schema. Reject missing amount, ambiguous asset identity,
+  unsupported order type, and conflicting allocation instructions.
+- V1.9.S1.T3: Define deterministic spot instrument fixtures with canonical
+  asset id, display symbol, base asset, quote asset, pair id, asset class,
+  venue, supported order types, decimal precision, minimum order size, tick
+  size, status, and restricted flag.
+- V1.9.S1.T4: Keep asset identity distinct from network and token-contract
+  identity so a ticker collision cannot select an unintended asset.
+- V1.9.S1.T5: Include approved BTC, ETH, and stablecoin spot examples plus
+  unsupported pair, restricted asset, delisted pair, and symbol-collision
+  fixtures.
+
+Acceptance:
+
+- The example intent becomes deterministic account, asset, pair, allocation,
+  venue, and order constraints without requiring the user to know pair ids.
+- Ambiguous symbols and unsupported or inactive pairs fail closed before quote
+  or order construction.
+
+### V1.9.S2: Account, market, and portfolio snapshot
+
+Tasks:
+
+- V1.9.S2.T1: Define a crypto trading-account snapshot with account id,
+  environment, venue, available and reserved balances, holdings, open orders,
+  day/month notional used, and snapshot identity.
+- V1.9.S2.T2: Define a quote snapshot with pair, venue, bid, ask, reference
+  price, available depth, timestamp, sequence, fee tier, and evidence hash.
+- V1.9.S2.T3: Validate quote age, positive prices and sizes, monotonic snapshot
+  identity, pair/venue match, and configured decimal bounds before use.
+- V1.9.S2.T4: Compute available quote balance, current asset exposure,
+  post-trade exposure, stablecoin reserve, remaining limits, and maximum
+  affordable notional from validated snapshots.
+- V1.9.S2.T5: Route account and market reads through `tktool` and `tkadpt`;
+  agents and UI code receive no exchange credentials or direct venue access.
+
+Acceptance:
+
+- Ticket construction uses one identified account snapshot and one identified
+  quote snapshot per pair.
+- Stale, malformed, crossed, mismatched, or missing quotes fail closed with an
+  exact blocked reason and no order proposal.
+
+### V1.9.S3: Fee-aware spot plan and trade tickets
+
+Tasks:
+
+- V1.9.S3.T1: Build a deterministic single-pair or allocation plan from the
+  normalized intent, eligible instrument catalog, account snapshot, and quote
+  snapshots.
+- V1.9.S3.T2: Define crypto spot ticket lines with pair, venue, side, order
+  type, base quantity, quote notional, limit price where applicable, reference
+  price, estimated fee, estimated slippage or price impact, and quote id.
+- V1.9.S3.T3: Apply decimal precision, tick size, minimum order size, and
+  rounding rules deterministically; reject a line that becomes invalid after
+  rounding.
+- V1.9.S3.T4: Show the expected stablecoin/cash reserve and per-asset and total
+  portfolio exposure after the proposed fill.
+- V1.9.S3.T5: Compare only policy-approved venue quotes and present the chosen
+  route and rejected routes with evidence. A comparison does not grant
+  cross-venue placement authority.
+- V1.9.S3.T6: Hash-bind every ticket to intent, catalog, account snapshot,
+  quote snapshots, allocation plan, policy version, and capability envelope.
+
+Acceptance:
+
+- Ticket line notionals plus estimated fees fit the available quote balance
+  and requested allocation within deterministic rounding tolerance.
+- The displayed fee, price-impact estimate, quote age, and post-trade exposure
+  are reproducible from captured inputs.
+
+### V1.9.S4: Crypto spot capability and risk checks
+
+Tasks:
+
+- V1.9.S4.T1: Evaluate crypto spot orders through `tkpoly` using the existing
+  `trading_order.recommend`, `trading_order.propose`, and paper/sandbox
+  `trading_order.place` capabilities with crypto-asset trading scope.
+- V1.9.S4.T2: Check actor, role, workflow, account, environment, venue, base
+  asset, quote asset, pair, side, order type, quantity, notional, and policy
+  version on every ticket.
+- V1.9.S4.T3: Enforce configured per-order, per-day, per-month, asset-exposure,
+  concentration, frequency, and open-order limits.
+- V1.9.S4.T4: Enforce configured quote-freshness, minimum-liquidity, fee,
+  price-deviation, restricted-asset, restricted-pair, venue-availability, and
+  stablecoin-risk evidence requirements.
+- V1.9.S4.T5: Return explicit `allow`, `deny`, `require_approval`,
+  `require_more_evidence`, or `escalate` outcomes with the failed scope
+  dimension and user-readable reason.
+- V1.9.S4.T6: Prove that `trading_order.place` authority cannot satisfy
+  `crypto_transfer.initiate`, and that a transfer approval cannot place a
+  trade.
+
+Acceptance:
+
+- Unsupported pairs, stale quotes, excessive fees, insufficient balance,
+  over-limit orders, and over-concentration are rejected before adapter
+  placement.
+- Trading and transfer capabilities cannot substitute for each other.
+
+### V1.9.S5: Paper and approved sandbox order lifecycle
+
+Tasks:
+
+- V1.9.S5.T1: Keep paper mode as the default and require an explicitly enabled
+  V1.6 signed adapter manifest for sandbox submission.
+- V1.9.S5.T2: Bind placement to the exact validated ticket hash, policy
+  decision, capability envelope, account, venue, environment, approval where
+  required, deterministic action id, and idempotency key.
+- V1.9.S5.T3: Support bounded market and limit spot-order submission, status
+  read-back, partial-fill representation, cancellation proposal, and terminal
+  fill or rejection state in paper/sandbox mode.
+- V1.9.S5.T4: Reconcile read-back pair, side, quantity, price, fee, status,
+  venue order id, and action id against the submitted ticket.
+- V1.9.S5.T5: Update the captured portfolio view from accepted fill evidence;
+  never infer a fill from submission success alone.
+- V1.9.S5.T6: Reject duplicate action ids, expired or revoked approvals,
+  changed quotes, changed tickets, direct adapter calls, venue mismatches, and
+  kill-switch activation before submission.
+
+Acceptance:
+
+- An allowed ticket paper-fills, or reaches an approved sandbox adapter, only
+  when all bound identities match exactly.
+- Submission, partial fill, rejection, cancellation, and read-back mismatch are
+  distinguishable, audited states.
+- No order placement grants or triggers crypto withdrawal authority.
+
+### V1.9.S6: Crypto trading demo, audit, and replay
+
+Tasks:
+
+- V1.9.S6.T1: Add one deterministic local demo for the example BTC/ETH/USDC
+  intent using captured account, catalog, quote, model, tool, and adapter
+  fixtures.
+- V1.9.S6.T2: Show eligible assets and pairs, rejected alternatives, selected
+  venue routes, fees, quote ages, tickets, policy outcomes, fills, and updated
+  exposure.
+- V1.9.S6.T3: Include blocked stale-quote, unsupported-pair,
+  over-concentration, insufficient-balance, and direct-placement-bypass
+  scenarios.
+- V1.9.S6.T4: Emit append-only audit, metrics, diagnostics, and evidence for
+  intent, snapshots, model, tool, adapter, proposal, policy, approval, action,
+  fill, read-back, portfolio impact, denial, and replay events.
+- V1.9.S6.T5: Replay from captured source intent and substitutions with model,
+  market, exchange, adapter, and transfer effects structurally disabled.
+- V1.9.S6.T6: Report the first divergent intent, snapshot, quote, ticket,
+  policy, action, fill, or portfolio hash and include one deliberate tamper
+  case.
+
+Acceptance:
+
+- One demo produces a guarded paper fill and exact evidence for every blocked
+  scenario without live model, market, exchange, or transfer calls.
+- Replay reproduces the selected pairs, ticket values, policy outcomes, fill
+  results, fees, and final portfolio state, and detects the tampered fixture.
+
+Capability mapping:
+
+```text
+trading_portfolio.read
+market_event.read
+trading_order.recommend
+trading_order.propose
+trading_order.place        paper or approved sandbox only
+trading_order.cancel       paper or approved sandbox only
+
+crypto_transfer.propose   separate V1.5 authority
+crypto_transfer.initiate  denied unless separately approved through V1.6
+```
+
+Non-goals:
+
+- no production live trading by default
+- no autonomous or continuous trading
+- no margin, leverage, perpetuals, futures, options, or shorting
+- no market-making, arbitrage, or quant strategy generation
+- no DeFi swaps, bridges, lending, staking, or yield strategies
+- no autonomous withdrawals or transfers
 
 ## Cross-Increment Engineering Notes
 
