@@ -27,8 +27,8 @@ the harness boundary with deterministic local fixtures.
 
 - This closes the `V1.11 Investment Demo Release Closure` increment for the
   V1.1 investment story from
-  [roadmap.md](../position/roadmap.md) and
-  [wbs.md](../position/wbs.md).
+  [roadmap/v1.1.md](../position/roadmap/v1.1.md) and
+  [roadmap/v1.11.md](../position/roadmap/v1.11.md).
 - The test command should become a real Tickoni integration recipe behind the
   existing `just test-integration-tk` placeholder or a narrower command that it
   invokes.

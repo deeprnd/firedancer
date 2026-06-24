@@ -3,9 +3,9 @@
 ## Purpose
 
 This document groups the consumer-finance roadmap into three higher-level
-milestones. It does not replace or revise [`roadmap.md`](roadmap.md). The
-roadmap remains the source of truth for version order, product narrative,
-priority tradeoffs, and increment detail.
+milestones. It does not replace or revise the increment files under
+[`roadmap/`](roadmap/). Those files remain the source of truth for version
+order, product narrative, priority tradeoffs, and increment detail.
 
 Use this document when the question is:
 
@@ -20,8 +20,8 @@ carried-forward platform backlog item such as `P1`.
 
 | Milestone | Included roadmap epics | Product result |
 | --- | --- | --- |
-| M1: Safe Money Decisions | `V1.1`, `V1.2`, `V1.3`, supported by `P2`, `P3`, `P4`, `P8` | Consumer intent becomes safe investing, payment, cash, and portfolio decisions |
-| M2: Governed Expansion And Sandbox Action | `V1.4`, `V1.5`, `V1.6`, supported by `P5`, `P6`, `P8` | The product expands to social templates, crypto/stablecoin guardrails, and approved sandbox execution |
+| M1: Safe Money Decisions | `V1.1`, `V1.11`, `V1.2`, `V1.3`, supported by `P2`, `P3`, `P4`, `P8` | Consumer intent becomes safe investing, payment, cash, and portfolio decisions |
+| M2: Governed Expansion And Sandbox Action | `V1.4`, `V1.5`, `V1.6`, `V1.9`, supported by `P5`, `P6`, `P8` | The product expands to social templates, crypto/stablecoin guardrails, approved sandbox execution, and guarded spot trading |
 | M3: Partner Trust And Control Plane | `V1.7`, `V1.8`, supported by `P1`, `P2`, `P4`, `P5`, `P6`, `P7`, `P8` | Partners can inspect proof, replay decisions, and understand the finance-native control model |
 
 ## M1: Safe Money Decisions
@@ -46,6 +46,8 @@ obligations, approval state, and drift.
 Product increments:
 
 - `V1.1`: Investment Intent To Paper Trade
+- `V1.11`: Investment Demo Release Closure (governed boundaries, full audit,
+  replay, no-bypass enforcement)
 - `V1.2`: Pay And Move Money Guard
 - `V1.3`: Portfolio And Cash Impact Loop
 
@@ -103,6 +105,8 @@ Product increments:
 - `V1.4`: Social Thesis And Money Feed
 - `V1.5`: Crypto And Stablecoin Guard
 - `V1.6`: Guarded Broker, Payment, And Crypto Sandbox
+- `V1.9`: Crypto Thesis To Guarded Spot Trade (fee-aware tickets, quote
+  validation, trading authority distinct from transfer authority)
 
 Supporting platform epics:
 

@@ -598,6 +598,60 @@ Exit criteria:
 - read-back confirms downstream result or opens a reconciliation case
 - kill switch blocks all sensitive execution capabilities immediately
 
+## V1 Capability Set
+
+V1 consumer-finance features map to these finance-native capabilities:
+
+```text
+trading_portfolio.read
+market_event.read
+trading_order.recommend
+trading_order.propose
+trading_order.place        paper/sandbox only until later approval
+
+payment_attempt.read
+processor_record.read
+payment_failure.classify
+payment_retry.recommend
+payment_retry.propose
+customer_contact.draft
+
+bank_transfer.propose
+crypto_transfer.propose
+evidence_packet.prepare
+finance_queue.route
+```
+
+Denied by default in V1:
+
+```text
+option_order.place
+future_order.place
+leveraged_etf_order.place
+inverse_etf_order.place
+margin_order.place
+crypto_transfer.initiate
+bank_transfer.initiate
+ledger_adjustment.post
+payout.approve
+account.freeze
+risk_rule.override
+policy.modify
+```
+
+## V1 Capability Depth By Increment
+
+| Capability area | V1.1 | V1.2 | V1.3 | Later |
+| --- | --- | --- | --- | --- |
+| Investment | thesis to basket, ticket, affordability, paper trade | cash impact from payment obligations | portfolio/cash impact loop | broker sandbox/live read-back |
+| Payments | payment context visible only as cash fixture | retry, payout, transfer proposal with beneficiary and rail checks | pending obligation and approval state | payment/bank sandbox execution |
+| Crypto | excluded from first trade lane | excluded from first payment lane | stablecoin cash preview only | wallet/network transfer guard plus V1.9 guarded spot trading |
+| Limits | market, venue, instrument denylist, notional, frequency | beneficiary, IBAN, rail, currency, amount, retry count | concentration, cash buffer, approval expiry | suitability, mandate, sanctions, travel-rule, restricted lists |
+| Model | explainable basket and ticket generation | payment/payout explanation and draft response | thesis and cash-impact explanation | creator/copier and partner explanations |
+| Tool/adapter | deterministic market/portfolio fixtures and paper trading adapter | payment and beneficiary fixtures | position/thesis/payment state adapters | broker, payment, bank, crypto sandbox adapters |
+| Trust | trade-ticket proof | payment-proposal proof | money-decision history | audit/replay export and partner review |
+| Capability control | implicit action classes in flows | explicit payment and transfer outcomes | approval and expiry state | V1.8 action classes, full policy outcomes, scope viewer, aggregate limits, evidence prerequisites |
+
 ## Open Product Questions
 
 1. Should trading capabilities remain demo-only in V1, or should P4 include a
