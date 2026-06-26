@@ -184,4 +184,4 @@ To inspect or change this variable: **GitHub → Repository → Settings → Act
 
 These workflows are retained as-is to avoid unnecessary conflicts when merging from upstream Firedancer while Tickoni's own CI surface remains narrower. Do not remove or rewrite them as part of ordinary Tickoni changes unless the task is explicitly about that migration.
 
-Note: CodeQL `justfile` recipes are currently no-ops as documented in [Security](./security.md). Do not silently add new CodeQL pull request hooks.
+Note: CodeQL `justfile` recipes are currently no-ops as documented in [Security](../knowledge/security.md). Do not silently add new CodeQL pull request hooks.

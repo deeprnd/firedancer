@@ -216,8 +216,8 @@ Main test entrypoints:
 - `just tests-all`
 
 For the detailed test command matrix, see
-[Tickoni Testing](./testing-tickoni.md). The existing
-[Testing Tickoni](./testing.md) page remains the Firedancer-style testing guide
+[Tickoni Testing](../execution/testing-tickoni.md). The existing
+[Testing Tickoni](../testing.md) page remains the Firedancer-style testing guide
 and has not been merged with the justfile-oriented guide.
 
 ## Quality
@@ -256,7 +256,7 @@ Security entrypoints:
 - `just security-sanitize-check-all`
 - `just security-check-all`
 
-For scanner details and current no-op recipes, see [Security](./security.md).
+For scanner details and current no-op recipes, see [Security](../knowledge/security.md).
 
 ## Memory And Huge Pages
 
@@ -325,8 +325,8 @@ Generated outputs are checked into the repository.
 ## Related Docs
 
 - [Build](./build.md)
-- [Build System](./build-system.md)
-- [Architecture](./architecture.md)
+- [Build System](../build-system.md)
+- [Architecture](../knowledge/architecture.md)
 - [CI](./ci.md)
-- [Security](./security.md)
+- [Security](../knowledge/security.md)
 - [Observability](./observability.md)

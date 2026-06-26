@@ -2,10 +2,10 @@ Build System
 ============
 
 This page explains the philosophy and technical details of the
-build system and source code management in Firedancer.
+build system and source code management in Firedancer trading engine.
 
 For the Tickoni Zig supervisor build, see
-[Build](./build.md).
+[Build](./execution/build.md).
 
 Users are strongly encouraged to build Firedancer from source instead
 of downloading compiled binaries.  The build system therefore has a

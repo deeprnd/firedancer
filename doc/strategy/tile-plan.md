@@ -371,7 +371,7 @@ tkdiag
 ```
 
 Implemented in
-[`src/tickoni/tiles/payment_pipeline.zig`](../../src/tickoni/tiles/payment_pipeline.zig),
+[`src/tickoni/tiles/payment_pipeline/`](../../src/tickoni/tiles/payment_pipeline/),
 with supervisor wiring in
 [`src/app/tickoni/supervisor.zig`](../../src/app/tickoni/supervisor.zig) and the
 static topology in

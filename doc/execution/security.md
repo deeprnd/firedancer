@@ -184,6 +184,6 @@ denied:
 
 ## Related Docs
 
-- [Development](./development.md)
-- [Tickoni Testing](./testing-tickoni.md)
-- [Observability](./observability.md)
+- [Development](development.md)
+- [Tickoni Testing](testing-tickoni.md)
+- [Observability](observability.md)
