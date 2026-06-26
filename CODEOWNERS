@@ -1,6 +1,4 @@
-/CODEOWNERS @firedancer-admin
-
-/agave @0x0ece @anwayde @jherrera-jump @ptaffet-jump @mmcgee-jump @alpeng-jump
+/CODEOWNERS @deeprnd
 
 /config @ripatel-fd
 /src/ballet/txn/fd_txn_parse.c @ptaffet-jump
@@ -13,3 +11,4 @@
 /src/waltz/quic @nbridge-jump @ripatel-fd @akhinvasara-jumptrading
 /src/waltz/tls @ripatel-fd @mmcgee-jump
 /src/waltz/xdp @ripatel-fd @mmcgee-jump
+/src/tickoni @deeprnd

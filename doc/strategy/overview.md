@@ -344,7 +344,7 @@ The strongest differentiation:
 > Generic agent frameworks show what the agent did.
 > Tickoni proves whether the agent was allowed to do it, what evidence it used, what changed, and whether the decision can be replayed.
 
-See [Competitive Positioning](position/positioning.md) for comparisons with adjacent agent harnesses and developer tools.
+See [Competitive Positioning](positioning.md) for comparisons with adjacent agent harnesses and developer tools.
 
 ## Status
 
