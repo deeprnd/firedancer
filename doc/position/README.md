@@ -26,6 +26,7 @@ execution.
 | [`positioning.md`](positioning.md) | Market position, differentiation, buyer framing, non-positioning | Delivery sequencing or implementation tasks |
 | [`roadmap/`](roadmap/) | Consumer-finance increment sequence, story files, evidence gates, increment status | Market narrative or tile topology |
 | [`roadmap/`](roadmap/) | Stories, tasks, acceptance criteria, increment evidence, backlog work | Market narrative or tile topology |
+| [`templates/`](templates/) | GitHub issue templates for epics, stories, and tasks | Runtime or policy source of truth |
 | [`capabilities.md`](capabilities.md) | Finance-native permission model, action classes, policy outcomes, scopes, destination allowlists, and capability roadmap | OS sandbox permissions or implementation-specific tile APIs |
 | [`tile-plan.md`](tile-plan.md) | Tile IDs, tile ownership, topology, validator-tile replacement decisions | Product backlog, roadmap sequencing, WBS tasks |
 
