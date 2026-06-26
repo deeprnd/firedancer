@@ -53,7 +53,7 @@ Read before filling:
     attached systems.
   - doc/position/capabilities.md for finance-native capability scope and
     policy outcomes.
-  - doc/position/tile-plan.md when the epic may affect tile ownership,
+  - doc/knowledge/tile-topology.md when the epic may affect tile ownership,
     topology, links, or Firedancer reuse.
   - doc/security.md when the epic affects agent authority, tool access,
     secrets, replay divergence, or privileged action boundaries.

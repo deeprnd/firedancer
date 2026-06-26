@@ -204,6 +204,6 @@ Related docs
 
 - [Development](./development.md)
 - [Testing](./testing-tickoni.md)
-- [Security](../knowledge/security.md)
+- [Security](./security.md)
 - [Observability](./observability.md)
-- [Telemetry](../knowledge/telemetry.md)
+- [Telemetry](./telemetry.md)
