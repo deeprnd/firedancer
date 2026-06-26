@@ -10,7 +10,7 @@ operator-visible change. In GitHub, connect it as a sub-issue of one `epic`
 issue and connect domain `task` issues as sub-issues of this story.
 
 Copy this file into the GitHub issue body or into the relevant
-doc/position/roadmap/stories/VX.Y.md section, replace placeholders, and remove
+doc/strategy/roadmap/stories/VX.Y.md section, replace placeholders, and remove
 HTML comments before closing the issue.
 
 Story labels:
