@@ -3,7 +3,7 @@
 This document summarizes the justfile-oriented test layers for the current
 Tickoni repository.
 
-The existing [Testing Tickoni](./testing.md) page is the Firedancer-style test
+The [Testing Firedancer](../testing.md) page is the Firedancer-style test
 guide. This file is intentionally separate for now so the current `justfile`
 command matrix can be documented without merging those two views.
 
@@ -182,7 +182,7 @@ Practical rule of thumb:
 zig build test
 ```
 
-The current Zig test graph is defined in [build.zig](../build.zig). It includes
+The current Zig test graph is defined in [build.zig](../../build.zig). It includes
 standalone test roots for:
 
 - `src/tickoni/runtime/topology.zig`

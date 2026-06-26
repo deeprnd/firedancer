@@ -275,16 +275,15 @@ No black boxes.
 
 ## Documentation
 
-- [Overview](doc/overview.md)
-- [Architecture](doc/architecture.md)
-- [Development](doc/development.md)
-- [Build](doc/build.md)
-- [Testing](doc/testing-tickoni.md)
-- [Observability](doc/observability.md)
-- [Telemetry](doc/telemetry.md)
-- [Security](doc/security.md)
-- [Audit and replay](doc/audit.md)
-- [Roadmap](doc/position/README.md)
+- [Overview](doc/strategy/overview.md)
+- [Architecture](doc/knowledge/architecture.md)
+- [Development](doc/execution/development.md)
+- [Build](doc/execution/build.md)
+- [Testing](doc/execution/testing-tickoni.md)
+- [Observability](doc/execution/observability.md)
+- [Telemetry](doc/execution/telemetry.md)
+- [Security](doc/execution/security.md)
+- [Roadmap](doc/strategy/positioning.md)
 
 ## License
 

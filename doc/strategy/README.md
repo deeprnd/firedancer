@@ -26,8 +26,10 @@ execution.
 | [`positioning.md`](positioning.md) | Market position, differentiation, buyer framing, non-positioning | Delivery sequencing or implementation tasks |
 | [`roadmap/`](roadmap/) | Consumer-finance increment sequence, story files, evidence gates, increment status | Market narrative or tile topology |
 | [`roadmap/`](roadmap/) | Stories, tasks, acceptance criteria, increment evidence, backlog work | Market narrative or tile topology |
+| [`templates/`](templates/) | GitHub issue templates for epics, stories, and tasks | Runtime or policy source of truth |
 | [`capabilities.md`](capabilities.md) | Finance-native permission model, action classes, policy outcomes, scopes, destination allowlists, and capability roadmap | OS sandbox permissions or implementation-specific tile APIs |
-| [`tile-plan.md`](tile-plan.md) | Tile IDs, tile ownership, topology, validator-tile replacement decisions | Product backlog, roadmap sequencing, WBS tasks |
+| [`doc/knowledge/tile-topology.md`](../knowledge/tile-topology.md) | Tile IDs, tile ownership, topology, reuse boundary, validator-tile replacement decisions | Product backlog, roadmap sequencing, WBS tasks |
+| [`doc/execution/tile-delivery-status.md`](../execution/tile-delivery-status.md) | Current topology implementation facts, link table, readiness prerequisites, synchronization debt, completion gate | Architecture or tile ownership |
 
 ## Product Operating Model
 
@@ -48,7 +50,9 @@ execution.
 1. If the question is "why are we building this?", update `positioning.md`.
 2. If the question is "when does this happen?", update the story file under `roadmap/`.
 3. If the question is "what exact work remains?", update the story file under `roadmap/`.
-4. If the question is "which tile owns this?", update `tile-plan.md`.
+4. If the question is "which tile owns this?", update
+   `doc/knowledge/tile-topology.md`. If the question is "what is implemented or
+   still outstanding?", update `doc/execution/tile-delivery-status.md`.
 5. If the question is "which financial action is allowed?", update
    `capabilities.md`.
 6. If the question is "which model path is allowed?", update `capabilities.md`

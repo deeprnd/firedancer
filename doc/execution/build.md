@@ -5,7 +5,7 @@ This page describes the Tickoni-owned build entry points, with emphasis on the
 Zig build for Tickoni-owned components.
 
 For the Firedancer / C build, see
-[Build System](./build-system.md).
+[Build System](../build-system.md).
 
 The repository currently has two underlying build systems plus one repo-facing
 wrapper:
@@ -76,13 +76,13 @@ just build-all
 ```
 
 For the Firedancer-side Make targets and their build model, see
-[Build System](./build-system.md).
+[Build System](../build-system.md).
 
 Build process
 -------------
 
 The Zig side is much smaller than the Firedancer Make build described in
-[Build System](./build-system.md).
+[Build System](../build-system.md).
 
 The figure below describes the current Tickoni Zig build graph.
 
@@ -131,7 +131,7 @@ Standalone Zig test roots:
 Structure
 ---------
 
-The current build graph in [build.zig](../build.zig) has three main parts:
+The current build graph in [build.zig](../../build.zig) has three main parts:
 
 1. Shared modules:
    - `runtime` from `src/tickoni/runtime/runtime.zig`
@@ -159,9 +159,9 @@ It does not replace:
 - `just test-e2e-fd`
 
 Those repo-facing commands are covered by the Firedancer-side build described in
-[Build System](./build-system.md). The reason the Firedancer Make
+[Build System](../build-system.md). The reason the Firedancer Make
 `integration-test` target is surfaced as `just test-e2e-fd` is documented in
-[Testing](./testing.md).
+[Testing](../testing.md).
 
 Instead, it builds the Tickoni-owned supervisor layer around the
 Firedancer-derived substrate. The `just` wrapper keeps that split
@@ -197,7 +197,7 @@ Use the Firedancer-side build when you are working on:
 - `src/discof/`
 - the runtime C substrate
 
-That workflow is documented in [Build Engine](./build-system.md).
+That workflow is documented in [Build Engine](../build-system.md).
 
 Related docs
 ------------

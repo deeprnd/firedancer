@@ -30,4 +30,4 @@ carried-forward platform backlog item such as `P1`.
 - Product bet, target user, and priority stack: [`positioning.md`](../../positioning.md).
 - V1 completion criteria and non-goals: [`positioning.md`](../../positioning.md).
 - V1 capability set, denied-by-default list, and capability depth by increment: [`capabilities.md`](../../capabilities.md).
-- Product language conventions: [`doc/contribution/tickoni.md`](../../../contribution/tickoni.md).
+- Product language conventions: [`execution/contribution/tickoni.md`](../../../execution/contribution/tickoni.md).
