@@ -144,6 +144,6 @@ Generated outputs are checked into the repository.
 
 ## Related Docs
 
-- [Observability](./observability.md)
-- [Architecture](./architecture.md)
-- [Build System](./build-system.md)
+- [Observability](observability.md)
+- [Architecture](../knowledge/architecture.md)
+- [Build System](../build-system.md)

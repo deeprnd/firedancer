@@ -21,20 +21,20 @@ Use these templates:
 
 Use these project docs to fill and implement issues:
 
-- [`overview.md`](../../../overview.md) for product identity, supported
+- [`overview.md`](../../overview.md) for product identity, supported
   workflows, and non-goals.
-- [`architecture.md`](../../../architecture.md) for runtime layers, tile
+- [`architecture.md`](../../../knowledge/architecture.md) for runtime layers, tile
   ownership, audit, replay, and attached systems.
-- [`contribution/tickoni.md`](../../../contribution/tickoni.md) for Tickoni Zig
+- [`execution/contribution/tickoni.md`](../../../execution/contribution/tickoni.md) for Tickoni Zig
   runtime style and Firedancer substrate reuse.
-- [`build.md`](../../../build.md) and [`development.md`](../../../development.md)
+- [`build-system.md`](../../../build-system.md) and [`development.md`](../../../execution/development.md)
   for repo-facing build/run commands and justfile command policy.
-- [`testing-tickoni.md`](../../../testing-tickoni.md) and
-  [`ci.md`](../../../ci.md) for local verification and CI expectations.
-- [`security.md`](../../../security.md) for fail-closed and no-bypass
+- [`testing-tickoni.md`](../../../execution/testing-tickoni.md) and
+  [`ci.md`](../../../execution/ci.md) for local verification and CI expectations.
+- [`security.md`](../../../knowledge/security.md) for fail-closed and no-bypass
   requirements.
-- [`observability.md`](../../../observability.md) and
-  [`telemetry.md`](../../../telemetry.md) for metrics, diagnostics, and
+- [`observability.md`](../../../execution/observability.md) and
+  [`telemetry.md`](../../../knowledge/telemetry.md) for metrics, diagnostics, and
   operator-visible evidence.
 
 ## Increments
@@ -86,7 +86,7 @@ All issue types use the same status enum:
 - Product bet, target user, and priority stack: [`positioning.md`](../../positioning.md).
 - V1 completion criteria and non-goals: [`positioning.md`](../../positioning.md).
 - V1 capability set, denied-by-default list, and capability depth by increment: [`capabilities.md`](../../capabilities.md).
-- Product language conventions: [`doc/contribution/tickoni.md`](../../../contribution/tickoni.md).
+- Product language conventions: [`execution/contribution/tickoni.md`](../../../execution/contribution/tickoni.md).
 
 ## Increment Gate Checklist
 

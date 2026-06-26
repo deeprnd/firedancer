@@ -497,10 +497,10 @@ Agent and adapter isolation:
 
 ## Related Docs
 
-- [Development](./development.md)
-- [Build](./build.md)
-- [Testing](./testing-tickoni.md)
-- [Observability](./observability.md)
+- [Development](../execution/development.md)
+- [Build System](../build-system.md)
+- [Testing](../execution/testing-tickoni.md)
+- [Observability](../execution/observability.md)
 - [Telemetry](./telemetry.md)
 - [Security](./security.md)
-- [Contribution Guide](./contribution/tickoni.md)
+- [Contribution Guide](../execution/contribution/tickoni.md)

@@ -3,7 +3,7 @@
 This document summarizes the justfile-oriented test layers for the current
 Tickoni repository.
 
-The existing [Testing Tickoni](./testing.md) page is the Firedancer-style test
+The [Testing Firedancer](../testing.md) page is the Firedancer-style test
 guide. This file is intentionally separate for now so the current `justfile`
 command matrix can be documented without merging those two views.
 
@@ -182,7 +182,7 @@ Practical rule of thumb:
 zig build test
 ```
 
-The current Zig test graph is defined in [build.zig](../build.zig). It includes
+The current Zig test graph is defined in [build.zig](../../build.zig). It includes
 standalone test roots for:
 
 - `src/tickoni/runtime/topology.zig`
@@ -320,7 +320,7 @@ Preferred validation commands in order:
   Some current variants are no-op placeholders while local setup is blocked or
   not yet wired.
 - `just security-seccomp-check-all` runs the configured seccomp recipe variants.
-  Current placeholder components are documented in [Security](./security.md).
+  Current placeholder components are documented in [Security](../knowledge/security.md).
 - `just security-proof-check-all` runs proof-related checks for the lanes that
   currently expose them.
 - `just security-sanitize-check-all` runs sanitizer-oriented checks, including
@@ -361,5 +361,5 @@ call that out explicitly in the handoff.
 ## Related Docs
 
 - [Development](./development.md)
-- [Security](./security.md)
+- [Security](../knowledge/security.md)
 - [Observability](./observability.md)
