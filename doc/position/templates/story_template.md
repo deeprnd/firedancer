@@ -1,163 +1,278 @@
 <!--
-Increment story template.
+Tickoni story issue template.
 
-Copy this file to doc/position/roadmap/vX.Y.md, replace every VX.Y placeholder,
-and fill in each section. Delete HTML comments before committing.
+Use this template for a GitHub issue labeled `story`.
 
-Structure:
-  Roadmap section  — product framing, user story, demo, non-goals.
-  WBS section      — sub-stories with Tasks and Acceptance criteria.
+A story is a single implementable deliverable that can be independently
+verified. It should be small enough to complete without splitting across
+multiple unrelated outcomes, but large enough to produce a user-visible or
+operator-visible change. In GitHub, connect it as a sub-issue of one `epic`
+issue and connect domain `task` issues as sub-issues of this story.
 
-Sub-story labels: VX.Y.SN
-Task labels:      VX.Y.SN.TN   (e.g., V1.2.S3.T1)
+Copy this file into the GitHub issue body or into the relevant
+doc/position/roadmap/stories/VX.Y.md section, replace placeholders, and remove
+HTML comments before closing the issue.
 
-Every WBS must include an evidence and quality sub-story (the last one).
-Mark any item "N/A — reason" if the increment does not touch that boundary.
+Story labels:
+  Epic:  VX.Y
+  Story: VX.Y.SN
+  Task:  VX.Y.SN.TN
+
+Where:
+  X  = milestone number
+  Y  = epic number within that milestone
+  SN = story number within that epic
+  TN = task number within that story
+
+Example:
+  V1.6      = milestone 1, epic 6
+  V1.6.S2   = story 2 under epic V1.6
+  V1.6.S2.T3 = task 3 under story V1.6.S2
+
+Required for every story:
+  - Product outcome
+  - Actor/user story
+  - Acceptance criteria
+  - Evidence and quality gate tasks as child task issues after the story is
+    Ready
+
+GitHub label guidance for story creation:
+  - Required issue-kind label: `story`.
+  - Related issue-kind labels: parent issues use `epic`; child issues use
+    `task`.
+  - Add exactly one boundary/domain label for the story's primary ownership:
+    `agents`, `audit`, `crypto`, `investing`, `operations`, `payments`,
+    `platform`, `security`, `social`, `trust`, or `documentation`.
+  - If a story needs several boundary/domain labels, split it into smaller
+    stories under the same epic.
+  - Add `enhancement` for a new product/runtime capability when useful.
+  - Do not add resolution or triage labels during normal story creation, such
+    as `duplicate`, `invalid`, `question`, or `wontfix`.
+
+Conditional guidance:
+  - Include topology/link acceptance only when the story changes Tickoni tile
+    ownership, queues, workspaces, links, lifecycle, or Firedancer integration.
+  - Include capability/policy acceptance only when the story changes financial
+    authority, policy outcomes, approval rules, limits, or scope dimensions.
+  - Include audit/replay acceptance only when the story changes material events,
+    evidence, replay capsules, divergence checks, or append-only records.
+  - Include model/tool/adapter acceptance only when the story touches tkmodl,
+    tktool, tkadpt, model providers, local agent CLI routing, or financial
+    adapter calls.
+  - Include UI/API acceptance only when the story changes tkapi, CaseOps, HTTP,
+    WebSocket, ingestion, review, approval, or external contract behavior.
+  - Mark a conditional section `N/A - reason` when reviewers may otherwise
+    expect it.
+
+Read before filling:
+  - doc/position/templates/status_template.md for status definitions and the
+    rule that task sub-issues are created only after the story is Ready.
+  - doc/overview.md for product identity, supported workflows, and non-goals.
+  - doc/architecture.md for the runtime model, source-of-truth boundaries,
+    tile responsibilities, and replay/audit constraints.
+  - doc/contribution/tickoni.md for Zig runtime style, Firedancer substrate
+    reuse, C ABI boundaries, and separation rules.
+  - doc/build.md and doc/development.md for repo-facing build/run commands and
+    justfile command policy.
+  - doc/testing-tickoni.md and doc/ci.md for test layer selection and CI gates.
+  - doc/security.md for fail-closed behavior, no-bypass expectations, and
+    agent/tool capability boundaries.
+  - doc/observability.md and doc/telemetry.md for metrics, diagnostics, labels,
+    and operator-visible evidence.
 -->
 
-# VX.Y: [Title]
+# VX.Y.SN: [Story Title]
 
-**Status: [Planned | Next | Accepted baseline | Done] · Milestone: [M1 | M2 | M3]**
+**Status:** [Backlog] upon creation
+**Epic:** #[github-epic-issue]
+**Parent roadmap item:** [VX.Y: Epic title]
+**Labels:** `story`, [exactly one of: `agents` | `audit` | `crypto` | `documentation` | `investing` | `operations` | `payments` | `platform` | `security` | `social` | `trust`], [`enhancement` if applicable]
 
-**Epic:** #[github-epic-issue] · **Issue:** #[github-story-issue]
+<!-- One sentence: the independently verifiable deliverable. -->
 
-<!-- One paragraph: what this increment builds on and what it closes. -->
+## Product Outcome
 
----
-
-## Product Intent
-
-<!-- Context and starting point. What open findings or prior increment results
-     motivate this scope? What does this increment close or unblock? -->
+<!--
+Describe the outcome in user/operator language. Avoid implementation-only
+phrasing unless this is an infrastructure story. State what becomes possible or
+safer after this story is done.
+-->
 
 ## User Story
 
-<!-- "As a [actor], I can [action], so that [outcome]." One or two sentences. -->
+<!--
+Use standard product format:
+As a [actor], I want [capability], so that [benefit].
 
-## What The [User / Operator] Sees
+Tickoni actors are usually consumer-money user, CaseOps operator, reviewer,
+agent operator, developer/operator, compliance/risk reviewer, or runtime owner.
+-->
 
-<!-- Bullet list of visible outputs, screens, artifact locations, or UI states
-     the actor interacts with after this increment. -->
+As a [actor], I want [capability], so that [benefit].
 
-## Success Demo
+## Scope
 
-<!-- Exact sequence that one offline command must show to close this increment.
-     Each bullet is a verifiable scenario, not a description of the feature. -->
+<!--
+List the exact deliverable boundaries. Keep this story self-contained. Move
+unrelated work into separate stories under the same epic.
+-->
 
-- [ ] ...
+- In scope: ...
+- Out of scope: ...
 
-## Release Gate
+## Preconditions And Assumptions
 
-<!-- Conditions that must hold before this increment is marked done.
-     Reference just targets where possible. -->
-
-- `just test-unit-tk` passes with no unexpected skips
-- `just test-integration-tk` passes offline against local mocks
-- `just demo-tk` (or the increment-specific command) prints all required scenarios
-
-## Non-Goals
-
-<!-- What is explicitly out of scope for this increment. -->
-
----
-
-## WBS
-
-<!-- Sub-story naming: VX.Y.SN. Task naming: VX.Y.SN.TN.
-     Each sub-story has a Tasks list and an Acceptance list.
-     Add one sub-story per material boundary or concern. -->
-
-### VX.Y.S1: [Sub-story title]
-
-**Issue:** #[github-sub-story-issue]
-
-Tasks:
-
-- VX.Y.S1.T1: ...
-
-Acceptance:
+<!--
+State dependencies, fixture assumptions, known policy decisions, and existing
+runtime behavior this story relies on. If the story requires a policy,
+capability, storage, tile ownership, or API contract decision that is not
+already documented, stop and create/raise that decision before implementation.
+-->
 
 - ...
 
-<!-- Repeat for each domain sub-story. Common sub-stories:
-     - governed tile topology and link wiring
-     - capability envelope and policy boundary
-     - audit and hash-chain records
-     - replay and source-driven reconstruction
-     - agent run envelope and bounds
-     - model gateway governance (tkmodl)
-     - tool broker and adapter dispatch (tktool / tkadpt)
-     - metrics and diagnostics export
-     - demo gate and documentation reconciliation
--->
-
----
-
-### VX.Y.SN: Evidence and quality gate
-
-**Issue:** #[sub-story-issue]
-
-<!-- Required sub-story. Mark inapplicable items "N/A — reason". -->
-
-Tasks:
-
-<!-- Demo and gate -->
-- VX.Y.SN.T1: Add a documented local demo command or script that runs offline.
-- VX.Y.SN.T2: Maintain a product demo checklist tied to this increment's user story and V1 success metrics.
-- VX.Y.SN.T3: Add or update local increment gate commands in the justfile.
-- VX.Y.SN.T4: Update phase and increment status in the roadmap file; make non-goals visible in demo materials.
-
-<!-- Fixtures and test data -->
-- VX.Y.SN.T5: Add deterministic fixtures for the product flow and each model, tool, adapter, market, portfolio, payment, transfer, and crypto boundary this increment touches.
-- VX.Y.SN.T6: Add case or thesis fixture sets and replay capsule samples for the primary flow.
-- VX.Y.SN.T7: Add sample configs and sample outputs for any new configuration surface.
-
-<!-- Audit samples -->
-- VX.Y.SN.T8: Emit audit output for the material user flow; include policy, destination, venue, wallet, and limit decisions where they apply; produce audit JSONL samples with valid hash chains.
-- VX.Y.SN.T9: Produce approval and rejection audit samples where this increment introduces an approval path.
-
-<!-- Metrics and diagnostics -->
-- VX.Y.SN.T10: Export metrics and diagnostics for queue, policy, model, tool, adapter, audit, replay, and crash state; produce samples for any new surface.
-
-<!-- Replay -->
-- VX.Y.SN.T11: Run replay without external model, broker, payment, trading, crypto, or execution side effects; add replay match samples and divergence test output.
-
-<!-- Blocked flows -->
-- VX.Y.SN.T12: Include at least one blocked-flow or intentional divergence fixture.
-
-<!-- Tests and quality -->
-- VX.Y.SN.T13: Add focused tests for each schema, guardrail, adapter, and replay path the increment introduces or modifies.
-- VX.Y.SN.T14: Add forbidden-shell, forbidden-network, forbidden-direct-adapter, and forbidden-direct-execution tests for any new boundary.
-- VX.Y.SN.T15: Add malformed-envelope and malformed-hook fail-closed tests for any new hook or envelope type.
-- VX.Y.SN.T16: Add fail-closed validation tests for policy, model, adapter, destination allowlist, and amount/exposure/frequency/holding-period limit configuration.
-- VX.Y.SN.T17: Add provider configuration validation tests if the increment introduces or changes a provider configuration surface.
-- VX.Y.SN.T18: Add adapter manifest validation tests if the increment introduces or changes an adapter.
-- VX.Y.SN.T19: Add API integration tests for external ingestion and partner review endpoints if the increment introduces or changes those boundaries.
-
-Acceptance:
-
-- `just demo-tk` (or the increment-specific command) runs offline and prints all required scenarios.
-- Replay produces no live model, broker, payment, trading, crypto, or execution calls.
-- At least one blocked-flow or divergence fixture is present and fails as expected.
-- Audit, metrics, diagnostics, and replay artifacts are reachable from the demo output.
-- All gate commands pass: `just test-unit-tk` and `just test-integration-tk`.
-
-## Evidence Gate
+## Acceptance Criteria
 
 <!--
-Answer each question from the Increment Gate Checklist in roadmap/README.md
-before marking this increment done.
+Write testable acceptance criteria in Given/When/Then or concrete observable
+form. Each criterion should be independently verifiable by a task, test, demo,
+fixture, or artifact.
+
+Use the project docs to make acceptance concrete:
+  - Product behavior: doc/overview.md and doc/position/README.md.
+  - Runtime/tile behavior: doc/architecture.md and doc/contribution/tickoni.md.
+  - Build/run behavior: doc/build.md and doc/development.md.
+  - Tests and CI impact: doc/testing-tickoni.md and doc/ci.md.
+  - Security/fail-closed behavior: doc/security.md.
+  - Metrics/diagnostics evidence: doc/observability.md and doc/telemetry.md.
 -->
 
-- What can the user do now that they could not before this increment?
-- What changed from the previous increment?
-- What is the demo moment?
-- Which account, beneficiary, IBAN, wallet, rail, currency, market, venue, asset class, instrument, notional, amount, exposure, and frequency checks are enforced?
-- What happens when the user asks for too much money or an instrument is restricted?
-- Is execution paper-only, draft-only, sandbox, live, or disabled?
-- Which artifacts are needed for later partner trust?
-- Which demo command closes the increment?
-- Which fixture data covers each model, tool, adapter, and financial boundary?
-- Are policy and limit decisions visible in audit output?
-- Can replay run without side effects?
-- What intentional divergence or blocked-flow example proves failure behavior?
+- [ ] Given [context], when [action], then [observable result].
+- [ ] Given [invalid or blocked condition], when [action], then [fail-closed result].
+
+### Conditional Acceptance
+
+<!--
+Keep only the subsections that apply. Use `N/A - reason` for boundaries that
+are commonly relevant to this story's domain but intentionally untouched.
+-->
+
+**Financial capability and policy**
+
+<!-- Applies when changing tkpoly behavior, capability envelopes, limits,
+approval state, denied-by-default behavior, or financial scope. -->
+
+- [ ] [N/A - reason, or policy acceptance criterion]
+
+**Audit and replay**
+
+<!-- Applies when adding/changing material events, evidence, audit JSONL,
+hash-chain behavior, replay capsules, divergence checks, or replay substitution. -->
+
+- [ ] [N/A - reason, or audit/replay acceptance criterion]
+
+**Runtime topology and tile ownership**
+
+<!-- Applies when changing tile IDs, tile ownership, links, workspaces, queue
+depths, reliability, overrun behavior, restart behavior, shutdown behavior, or
+Firedancer infrastructure integration. -->
+
+- [ ] [N/A - reason, or topology acceptance criterion]
+
+**Model, tool, adapter, or execution boundary**
+
+<!-- Applies when changing tkmodl, tktool, tkadpt, tkexec, agent daemon behavior,
+provider config, adapter manifests, broker/payment/trading/crypto/risk/compliance
+API access, or replay substitution for external calls. -->
+
+- [ ] [N/A - reason, or boundary acceptance criterion]
+
+**CaseOps API or UI**
+
+<!-- Applies when changing tkapi, HTTP/WebSocket behavior, CaseOps screens,
+operator review, approval flows, external ingestion, or partner review APIs. -->
+
+- [ ] [N/A - reason, or API/UI acceptance criterion]
+
+## Child Task Issues
+
+<!--
+Create one GitHub sub-issue per task and label each `task` only after this
+story's Status is `Ready`.
+
+Before `Ready`, use this section to describe the likely task split in prose
+or leave placeholders. Do not create GitHub task sub-issues while the story is
+still being shaped; otherwise task work can start before the story boundary,
+acceptance criteria, and evidence gates are stable.
+
+Task split guidance:
+  - Split by domain/ownership, not by arbitrary activity.
+  - Prefer tasks such as runtime, policy, audit/replay, API/UI, fixtures,
+    tests, docs, and evidence gate.
+  - Once Ready, every story must include evidence and quality gate tasks,
+    even when the implementation is documentation-only.
+  - Evidence tasks should cover the applicable subset of demo command,
+    product checklist, fixtures, sample configs, audit JSONL, approval/rejection
+    samples, metrics, diagnostics, replay samples, blocked-flow fixtures, and
+    artifact links.
+  - Quality tasks should cover the applicable subset of focused tests,
+    fail-closed validation, forbidden direct access, malformed envelope/hook
+    handling, provider config validation, adapter manifest validation, API
+    integration tests, and roadmap/docs reconciliation.
+  - Implementation tasks should name the docs the implementer must follow. Use
+    doc/contribution/tickoni.md for Tickoni Zig/runtime style, doc/build.md and
+    doc/development.md for command surfaces, doc/testing-tickoni.md and
+    doc/ci.md for verification, doc/security.md for security-sensitive work,
+    and doc/observability.md or doc/telemetry.md for operator signals.
+  - Keep tasks implementable by one owner without requiring unrelated changes.
+  - Each task should point back to the acceptance criteria it helps close.
+-->
+
+- [ ] VX.Y.SN.T1: [Domain task title] - #[github-task-issue]
+- [ ] VX.Y.SN.T2: [Evidence gate task] - #[github-task-issue]
+- [ ] VX.Y.SN.T3: [Quality gate task] - #[github-task-issue]
+
+## Evidence Plan
+
+<!--
+State how this story will prove completion. Evidence is not limited to tasks;
+it may include tests, demo output, fixtures, audit samples, replay samples,
+screenshots, API examples, generated artifacts, or docs.
+-->
+
+- Demo or command: `[just target or exact command]`
+- Tests: `[focused test targets]`
+- Fixtures or samples: `[paths or planned artifacts]`
+- Audit/replay evidence: `[N/A - reason, or planned artifacts]`
+- Blocked-flow evidence: `[N/A - reason, or planned fixture/test]`
+
+## Quality Gate
+
+<!--
+Use the narrowest meaningful checks. Add broader gates when the story touches
+shared runtime behavior, security boundaries, or public contracts.
+
+Use doc/testing-tickoni.md for test selection. Use doc/ci.md to understand
+which GitHub Actions lanes are expected to cover the changed paths. Use
+doc/development.md for the rule that repo-facing commands belong in the
+justfile, not upstream Firedancer Makefiles.
+-->
+
+- [ ] Focused tests for changed behavior pass.
+- [ ] `just test-unit-tk` passes when Tickoni runtime code changes.
+- [ ] `just test-integration-tk` passes when cross-tile, API, replay, adapter,
+      or fixture behavior changes.
+- [ ] `just demo-tk` or the story-specific demo command prints the required
+      scenario when this story changes a demoable product flow.
+- [ ] Documentation and roadmap status are updated when user-visible scope,
+      non-goals, or evidence gates change.
+
+## Notes And Open Questions
+
+<!--
+List unresolved decisions. Do not hide ambiguity in implementation tasks. Raise
+architecture, policy, storage, execution authority, or API contract questions
+before implementation starts.
+-->
+
+- ...

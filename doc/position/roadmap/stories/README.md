@@ -1,7 +1,41 @@
-# Roadmap — Tickoni Consumer Finance V1
+# Roadmap - Tickoni Consumer Finance V1
 
-Each increment has one file that combines its roadmap description and WBS tasks.
-Use this folder for per-increment planning, tracking, and reference.
+Use this folder for per-increment planning, tracking, and reference. GitHub is
+the issue tracker: epics, stories, and tasks are all GitHub issues with
+different labels and sub-issue relationships.
+
+## Issue Hierarchy
+
+| Type | GitHub label | Purpose | Relationship |
+| --- | --- | --- | --- |
+| Epic | `epic` | Huge new feature or product increment. Groups related stories that deliver a complete capability across domains. | Has story sub-issues |
+| Story | `story` | Single implementable deliverable that can be independently verified. | Sub-issue of one epic, has task sub-issues |
+| Task | `task` | Domain-scoped implementation work for one story. | Sub-issue of one story |
+
+Use these templates:
+
+- [`epic_template.md`](../../templates/epic_template.md)
+- [`story_template.md`](../../templates/story_template.md)
+- [`task_template.md`](../../templates/task_template.md)
+- [`status_template.md`](../../templates/status_template.md)
+
+Use these project docs to fill and implement issues:
+
+- [`overview.md`](../../../overview.md) for product identity, supported
+  workflows, and non-goals.
+- [`architecture.md`](../../../architecture.md) for runtime layers, tile
+  ownership, audit, replay, and attached systems.
+- [`contribution/tickoni.md`](../../../contribution/tickoni.md) for Tickoni Zig
+  runtime style and Firedancer substrate reuse.
+- [`build.md`](../../../build.md) and [`development.md`](../../../development.md)
+  for repo-facing build/run commands and justfile command policy.
+- [`testing-tickoni.md`](../../../testing-tickoni.md) and
+  [`ci.md`](../../../ci.md) for local verification and CI expectations.
+- [`security.md`](../../../security.md) for fail-closed and no-bypass
+  requirements.
+- [`observability.md`](../../../observability.md) and
+  [`telemetry.md`](../../../telemetry.md) for metrics, diagnostics, and
+  operator-visible evidence.
 
 ## Increments
 
@@ -26,23 +60,26 @@ Use this folder for per-increment planning, tracking, and reference.
 || [V1.17](v1.17.md) | Tkmodl Budget And Call-Limit Governance |
 || [V1.18](v1.18.md) | Replay Proof Bundle And Evidence Integrity |
 
-## How Each File Is Organized
+## How Roadmap Files Are Organized
 
-Every story file has two sections:
+Roadmap files capture product sequencing and acceptance context. They may link
+to the GitHub epic/story/task issues that own active execution.
 
-**Roadmap section** — product intent, user story, what the user can do,
-what the user sees, capability depth, success demo, non-goals.
+**Roadmap section** - product intent, user story, what the user can do, what the
+user sees, capability depth, success demo, non-goals.
 
-**WBS section** — sub-stories (S1, S2, ...), each with numbered tasks
-and acceptance criteria.
+**Breakdown section** - story issues (S1, S2, ...), each with task sub-issues
+and acceptance criteria. Split by domain only where it helps deliver a
+self-contained, testable story.
 
 ## Status Legend
 
-- **Done** — completed, no further work.
-- **Accepted baseline** — engineering demo exists, not externally release-ready.
-- **Next** — the immediate focus.
-- **Planned** — scoped, not started.
-- **Later** — on the backlog, out of scope for near-term V1.
+For full epic, story, and task issue statuses, use
+[`status_template.md`](../../templates/status_template.md).
+
+All issue types use the same status enum:
+
+`Backlog | Refining | Ready | In Progress | Review | Verification | User Accepted | Done | Blocked`
 
 ## Cross-References
 
@@ -75,7 +112,9 @@ Every increment must answer before closing:
   side effects?
 - What intentional divergence or blocked-flow example proves failure behavior?
 
-## Increment Evidence Work Items
+## Evidence Work Items
 
-Every increment should include the story template that combines quality, security, and release requirements, see
-[`doc/position/templates/story_template.md`](../../templates/story_template.md).
+Every story should include child task issues for evidence and quality gates.
+Use conditional evidence: require topology, policy, tool-broker, adapter, audit,
+or replay proof only when the story touches that boundary. Mark an item
+`N/A - reason` when reviewers may otherwise expect it.
