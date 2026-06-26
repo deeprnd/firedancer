@@ -320,7 +320,7 @@ Preferred validation commands in order:
   Some current variants are no-op placeholders while local setup is blocked or
   not yet wired.
 - `just security-seccomp-check-all` runs the configured seccomp recipe variants.
-  Current placeholder components are documented in [Security](../knowledge/security.md).
+  Current placeholder components are documented in [Security](./security.md).
 - `just security-proof-check-all` runs proof-related checks for the lanes that
   currently expose them.
 - `just security-sanitize-check-all` runs sanitizer-oriented checks, including
@@ -361,5 +361,5 @@ call that out explicitly in the handoff.
 ## Related Docs
 
 - [Development](./development.md)
-- [Security](../knowledge/security.md)
+- [Security](./security.md)
 - [Observability](./observability.md)

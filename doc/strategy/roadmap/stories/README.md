@@ -31,10 +31,10 @@ Use these project docs to fill and implement issues:
   for repo-facing build/run commands and justfile command policy.
 - [`testing-tickoni.md`](../../../execution/testing-tickoni.md) and
   [`ci.md`](../../../execution/ci.md) for local verification and CI expectations.
-- [`security.md`](../../../knowledge/security.md) for fail-closed and no-bypass
+- [`security.md`](../../../execution/security.md) for fail-closed and no-bypass
   requirements.
 - [`observability.md`](../../../execution/observability.md) and
-  [`telemetry.md`](../../../knowledge/telemetry.md) for metrics, diagnostics, and
+- [`telemetry.md`](../../../execution/telemetry.md) for metrics, diagnostics, and
   operator-visible evidence.
 
 ## Increments

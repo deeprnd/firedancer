@@ -501,6 +501,6 @@ Agent and adapter isolation:
 - [Build System](../build-system.md)
 - [Testing](../execution/testing-tickoni.md)
 - [Observability](../execution/observability.md)
-- [Telemetry](./telemetry.md)
-- [Security](./security.md)
+- [Telemetry](../execution/telemetry.md)
+- [Security](../execution/security.md)
 - [Contribution Guide](../execution/contribution/tickoni.md)

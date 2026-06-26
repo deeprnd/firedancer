@@ -96,7 +96,7 @@ it blocked until the parent story or epic records the decision.
 
 Implementation reference by domain:
   - Runtime/tile/topology: doc/architecture.md, doc/contribution/tickoni.md,
-    doc/position/tile-plan.md.
+    doc/knowledge/tile-topology.md.
   - Build/run/tooling: doc/build.md and doc/development.md. Keep repo-facing
     commands in the justfile.
   - Tests/fixtures: doc/testing-tickoni.md. Use the narrowest relevant check

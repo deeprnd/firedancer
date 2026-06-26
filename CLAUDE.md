@@ -15,8 +15,9 @@ Use it to understand:
 Before making changes, read these in order:
 
 1. `README.md` — project overview
-2. `doc/architecture.md` — project architecture
-3. this file — constraints, invariants, and engineering rules
+2. `doc/knowledge/architecture.md` — project architecture
+3. `doc/execution/development.md` — dev environment, build, and workflow
+4. this file — constraints, invariants, and engineering rules
 
 ### Mental model
 
@@ -127,8 +128,9 @@ Information Technology ETF through `brokerage.demo_ops`.
 ### Supporting Documentation (Implementation & Operations)
 
 Development:
-- `doc/contribution/tickoni.md` — contribution styleguide
-- `doc/position/tile-plan.md` — Tickoni <-> Firedancer relation
+- `doc/execution/contribution/tickoni.md` — contribution styleguide
+- `doc/knowledge/tile-topology.md` — tile IDs, topology, reuse boundary, validator-tile decisions
+- `doc/execution/tile-delivery-status.md` — current topology implementation, link table, synchronization debt
 
 Runtime & Operations:
 - `justfile` — workspace scripts and validation gates
@@ -145,9 +147,9 @@ When documentation and code disagree, trust sources in this order:
    `src/disco/**`, `src/discof/**`, `src/waltz/http/**`, and selected
    `src/util/**`
 5. product-management and architecture sources under `doc/position/**` and
-   `doc/architecture.md`
+   `doc/knowledge/architecture.md`
 6. Tickoni contribution, development, testing, security, observability, and
-   workflow docs under `doc/**`
+   workflow docs under `doc/execution`
 7. tests wired through `zig build test`, `make ... test`, and `just test-*`
    recipes
 8. READMEs, diagrams, and generated book content

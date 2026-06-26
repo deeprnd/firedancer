@@ -134,6 +134,6 @@ Failure categories to preserve as the architecture hardens:
 
 ## Related Docs
 
-- [Telemetry](../knowledge/telemetry.md)
+- [Telemetry](./telemetry.md)
 - [Architecture](../knowledge/architecture.md)
 - [Tickoni Testing](../execution/testing-tickoni.md)

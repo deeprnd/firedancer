@@ -256,7 +256,7 @@ Security entrypoints:
 - `just security-sanitize-check-all`
 - `just security-check-all`
 
-For scanner details and current no-op recipes, see [Security](../knowledge/security.md).
+For scanner details and current no-op recipes, see [Security](./security.md).
 
 ## Memory And Huge Pages
 
@@ -284,18 +284,17 @@ Tickoni-owned areas:
 - `src/app/tickoni/`: supervisor CLI and startup
 - `src/tickoni/runtime/`: topology and tile runtime abstractions
 - `src/tickoni/tiles/`: Phase 0 payment pipeline tile logic
-- `src/tickoni/c_abi/`: narrow C ABI declarations for selected runtime
-  primitives
-- `doc/`: Tickoni architecture, build, security, testing, observability, and
-  product docs
+- `src/tickoni/c_abi/`: narrow C ABI declarations for selected runtime primitives
+- `doc/knowledge`: Tickoni architecture
+- `doc/execution`: Build, security, testing, and observability
+- `doc/strategy`: Product and roadmap docs
 
 Firedancer-derived areas:
 
 - `src/app/firedancer/`: full C runtime application
 - `src/disco/`: common Firedancer tiles and metrics
 - `src/discof/`: full Firedancer tiles
-- `src/tango/`, `src/util/`, `src/waltz/`, `src/flamenco/`, `src/funk/`:
-  supporting C runtime substrate
+- `src/tango/`, `src/util/`, `src/waltz/`, `src/flamenco/`, `src/funk/`: supporting C runtime substrate
 
 Avoid Frankendancer-specific paths such as `fdctl`, `fddev`, and `discoh`
 unless a task explicitly requires shared legacy behavior.
@@ -328,5 +327,5 @@ Generated outputs are checked into the repository.
 - [Build System](../build-system.md)
 - [Architecture](../knowledge/architecture.md)
 - [CI](./ci.md)
-- [Security](../knowledge/security.md)
+- [Security](./security.md)
 - [Observability](./observability.md)
