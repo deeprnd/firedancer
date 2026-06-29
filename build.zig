@@ -305,6 +305,21 @@ pub fn build(b: *std.Build) void {
     linkTickoniCodec(b, trade_ticket_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(trade_ticket_test).step);
 
+    // impact.zig: portfolio and cash impact model (V1.3.S1).
+    const impact_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/impact.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "basket", .module = basket_adapter_test_mod },
+                .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, impact_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(impact_test).step);
+
     const allowed_trade_fixture_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/test/fixtures/investment/allowed_trade.zig"),
@@ -834,6 +849,24 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, trade_ticket_cov_test, fd_lib_dir);
     cov_step.dependOn(&b.addInstallArtifact(trade_ticket_cov_test, .{
+        .dest_dir = .{ .override = .{ .custom = "cov" } },
+    }).step);
+
+    // impact coverage binary.
+    const impact_cov_test = b.addTest(.{
+        .name = "test-impact",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/impact.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "basket", .module = basket_int_mod },
+                .{ .name = "portfolio", .module = portfolio_int_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, impact_cov_test, fd_lib_dir);
+    cov_step.dependOn(&b.addInstallArtifact(impact_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
 
