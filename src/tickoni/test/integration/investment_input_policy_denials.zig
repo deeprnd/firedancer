@@ -12,8 +12,8 @@ test "investment_input_policy_denials_integration: malformed thesis input is rej
     try std.testing.expectError(thesis.ThesisError.MissingTargetAmount, thesis.normalize(missing_target));
 
     var unsupported_only = support.operationsThesisInput();
-    unsupported_only.asset_class_prefs = .{ .option = true };
-    try std.testing.expectError(thesis.ThesisError.NoEligibleAssetClass, thesis.normalize(unsupported_only));
+    unsupported_only.instrument_type_prefs = thesis.instrumentTypeList(.{.option});
+    try std.testing.expectError(thesis.ThesisError.NoEligibleInstrumentType, thesis.normalize(unsupported_only));
 }
 
 test "investment_input_policy_denials_integration: direct trading_order.place bypass is denied at tktool tkadpt boundary" {

@@ -4,12 +4,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=contrib/test/llama_cpp_env.sh
+source "${SCRIPT_DIR}/llama_cpp_env.sh"
 
-llama_dir="${TK_LLAMA_CPP_DIR:-$HOME/work/git/llama.cpp}"
-case "$llama_dir" in
-  "~")    llama_dir="$HOME" ;;
-  "~/"*)  llama_dir="$HOME/${llama_dir:2}" ;;
-esac
+llama_dir="$(tk_resolve_llama_cpp_dir)"
 
 backend=cpu
 if command -v nvidia-smi >/dev/null 2>&1; then

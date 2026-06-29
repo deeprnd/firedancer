@@ -16,11 +16,18 @@ tk_thesis_input_hash( uint16_t              user_text_len,
                       int64_t               target_notional_cents,
                       uint32_t              account_id,
                       uint8_t               market_scope,
-                      uint8_t               asset_class_prefs,
-                      uint8_t               sector_theme,
+                      uint8_t               asset_class_pref_count,
+                      uint8_t const *       asset_class_prefs,
+                      uint8_t               instrument_type_pref_count,
+                      uint8_t const *       instrument_type_prefs,
+                      uint8_t               theme_len,
+                      unsigned char const * theme,
                       uint8_t               risk_preference,
                       uint8_t               max_single_name_pct,
-                      uint8_t               exclusions,
+                      uint8_t               asset_class_exclusion_count,
+                      uint8_t const *       asset_class_exclusions,
+                      uint8_t               instrument_type_exclusion_count,
+                      uint8_t const *       instrument_type_exclusions,
                       uint8_t               requested_ticker_count,
                       unsigned char const * requested_tickers ) {
   fd_siphash13_t _sip[1];
@@ -32,11 +39,26 @@ tk_thesis_input_hash( uint16_t              user_text_len,
   TK_HASH( &account_id,            sizeof(uint32_t) );
   TK_HASH( &target_notional_cents, sizeof(int64_t)  );
   TK_HASH( &market_scope,          sizeof(uint8_t)  );
-  TK_HASH( &asset_class_prefs,     sizeof(uint8_t)  );
-  TK_HASH( &sector_theme,          sizeof(uint8_t)  );
+  TK_HASH( &asset_class_pref_count,sizeof(uint8_t)  );
+  for( uint8_t i = 0; i < asset_class_pref_count; i++ ) {
+    TK_HASH( asset_class_prefs + i, sizeof(uint8_t) );
+  }
+  TK_HASH( &instrument_type_pref_count, sizeof(uint8_t) );
+  for( uint8_t i = 0; i < instrument_type_pref_count; i++ ) {
+    TK_HASH( instrument_type_prefs + i, sizeof(uint8_t) );
+  }
+  TK_HASH( &theme_len,             sizeof(uint8_t)  );
+  TK_HASH( theme,                  (ulong)theme_len );
   TK_HASH( &risk_preference,       sizeof(uint8_t)  );
   TK_HASH( &max_single_name_pct,   sizeof(uint8_t)  );
-  TK_HASH( &exclusions,            sizeof(uint8_t)  );
+  TK_HASH( &asset_class_exclusion_count, sizeof(uint8_t) );
+  for( uint8_t i = 0; i < asset_class_exclusion_count; i++ ) {
+    TK_HASH( asset_class_exclusions + i, sizeof(uint8_t) );
+  }
+  TK_HASH( &instrument_type_exclusion_count, sizeof(uint8_t) );
+  for( uint8_t i = 0; i < instrument_type_exclusion_count; i++ ) {
+    TK_HASH( instrument_type_exclusions + i, sizeof(uint8_t) );
+  }
   /* Explicitly requested tickers: count followed by each ticker zero-padded to
      TK_THESIS_MAX_TICKER_LEN bytes.  Two inputs that differ only in which tickers
      were explicitly named produce different hashes. */

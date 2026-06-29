@@ -2,102 +2,57 @@ syntax = "proto3";
 
 package tickoni.schema.v1;
 
-// Shared domain enums used by thesis, catalog, and basket schemas.
-// Enum values are 1-based so that 0 is always UNSPECIFIED per proto3 convention.
-// Codec implementations must map Zig enum ordinals (0-based) to proto values
-// (1-based) on encode and reverse on decode.
-
-enum Market {
-  MARKET_UNSPECIFIED = 0;
-  MARKET_US          = 1;
-}
-
-enum Venue {
-  VENUE_UNSPECIFIED = 0;
-  VENUE_NYSE        = 1;
-  VENUE_NASDAQ      = 2;
-}
-
-enum AssetClass {
-  ASSET_CLASS_UNSPECIFIED   = 0;
-  ASSET_CLASS_EQUITY        = 1;
-  ASSET_CLASS_ETF           = 2;
-  ASSET_CLASS_OPTION        = 3;
-  ASSET_CLASS_FUTURE        = 4;
-  ASSET_CLASS_LEVERAGED_ETF = 5;
-  ASSET_CLASS_INVERSE_ETF   = 6;
-  ASSET_CLASS_CRYPTO        = 7;
-  ASSET_CLASS_BOND          = 8;
-}
-
-enum SectorTheme {
-  SECTOR_THEME_UNSPECIFIED      = 0;
-  SECTOR_THEME_AI_INFRASTRUCTURE = 1;
-  SECTOR_THEME_SEMICONDUCTORS   = 2;
-  SECTOR_THEME_CLOUD            = 3;
-  SECTOR_THEME_CYBER_SECURITY   = 4;
-  SECTOR_THEME_BROAD_MARKET     = 5;
-  SECTOR_THEME_DIVIDENDS        = 6;
-  SECTOR_THEME_CASH_LIKE        = 7;
-}
-
-enum RiskPreference {
-  RISK_PREFERENCE_UNSPECIFIED = 0;
-  RISK_PREFERENCE_LOW         = 1;
-  RISK_PREFERENCE_MODERATE    = 2;
-  RISK_PREFERENCE_HIGH        = 3;
-}
+import "classification.proto";
 
 enum ThesisErrorCode {
-  THESIS_ERROR_CODE_UNSPECIFIED          = 0;
-  THESIS_ERROR_CODE_EMPTY_USER_TEXT      = 1;
-  THESIS_ERROR_CODE_USER_TEXT_TOO_LONG   = 2;
-  THESIS_ERROR_CODE_MISSING_TARGET_AMOUNT = 3;
+  THESIS_ERROR_CODE_UNSPECIFIED            = 0;
+  THESIS_ERROR_CODE_EMPTY_USER_TEXT        = 1;
+  THESIS_ERROR_CODE_USER_TEXT_TOO_LONG     = 2;
+  THESIS_ERROR_CODE_MISSING_TARGET_AMOUNT  = 3;
   THESIS_ERROR_CODE_TARGET_AMOUNT_TOO_SMALL = 4;
   THESIS_ERROR_CODE_TARGET_AMOUNT_TOO_LARGE = 5;
   THESIS_ERROR_CODE_NO_ELIGIBLE_ASSET_CLASS = 6;
+  THESIS_ERROR_CODE_NO_ELIGIBLE_INSTRUMENT_TYPE = 7;
+  THESIS_ERROR_CODE_MALFORMED_CLASSIFICATION = 8;
 }
 
 // Raw investor thesis as received from the user or a demo fixture.
-// asset_class_prefs and exclusions are AssetClassSet bitmasks: each bit
-// corresponds to an AssetClass value (bit 0 = equity, bit 1 = etf, ...).
 message ThesisInput {
-  bytes          user_text              = 1;
-  int64          target_notional_cents  = 2;
-  uint32         account_id             = 3;
-  Market         market_scope           = 4;
-  uint32         asset_class_prefs      = 5;
-  SectorTheme    sector_theme           = 6;
-  RiskPreference risk_preference        = 7;
-  uint32         max_single_name_pct    = 8;
-  uint32         exclusions             = 9;
-  // Tickers the user explicitly named in their request (e.g. "Buy SOXL").
-  // Each entry is the ticker string; basket construction checks these against
-  // the catalog restricted list before theme-based scope checks.
-  repeated bytes requested_tickers      = 10;
+  bytes              user_text                    = 1;
+  int64              target_notional_cents        = 2;
+  uint32             account_id                   = 3;
+  Market             market_scope                 = 4;
+  AssetClassList     asset_class_prefs            = 5;
+  InstrumentTypeList instrument_type_prefs        = 6;
+  CanonicalId        theme                        = 7;
+  RiskPreference     risk_preference              = 8;
+  uint32             max_single_name_pct          = 9;
+  AssetClassList     asset_class_exclusions       = 10;
+  InstrumentTypeList instrument_type_exclusions   = 11;
+  repeated bytes     requested_tickers            = 12;
 }
 
 // Validated, structured intent produced by normalize().
-// allowed_asset_classes and excluded_asset_classes are AssetClassSet bitmasks.
 message InvestorIntent {
-  uint32         account_id             = 1;
-  SectorTheme    theme                  = 2;
-  int64          target_amount_cents    = 3;
-  uint32         allowed_asset_classes  = 4;
-  uint32         excluded_asset_classes = 5;
-  Market         market                 = 6;
-  repeated Venue venues                 = 7;
-  RiskPreference risk_preference        = 8;
-  uint32         max_single_name_pct    = 9;
-  // Forwarded from ThesisInput unchanged; basket construction checks these.
-  repeated bytes requested_tickers      = 10;
+  uint32             account_id                   = 1;
+  CanonicalId        theme                        = 2;
+  int64              target_amount_cents          = 3;
+  AssetClassList     allowed_asset_classes        = 4;
+  AssetClassList     excluded_asset_classes       = 5;
+  InstrumentTypeList allowed_instrument_types     = 6;
+  InstrumentTypeList excluded_instrument_types    = 7;
+  Market             market                       = 8;
+  repeated Venue     venues                       = 9;
+  RiskPreference     risk_preference              = 10;
+  uint32             max_single_name_pct          = 11;
+  repeated bytes     requested_tickers            = 12;
 }
 
 // Audit payload for a successful thesis normalization.
 message ThesisNormalizationPayload {
   uint64      thesis_input_hash   = 1;
   uint32      account_id          = 2;
-  SectorTheme sector_theme        = 3;
+  CanonicalId theme               = 3;
   int64       target_amount_cents = 4;
 }
 

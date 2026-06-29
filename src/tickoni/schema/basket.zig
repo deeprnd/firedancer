@@ -1,10 +1,10 @@
 /// Basket construction schema
 ///
 /// Basket: result of deterministic construction from InvestorIntent and the
-/// instrument catalog.  Instruments are scope-checked (US market, NYSE/NASDAQ
-/// venues, equity/ETF asset classes, theme tags, restricted-instrument
-/// denylist) and allocated using equal-weight with optional ETF preference and
-/// max-single-name concentration cap.
+/// instrument catalog.  Instruments are scope-checked against market, venue,
+/// asset class, instrument type, theme tags, and the restricted-instrument
+/// denylist, then allocated using equal-weight with optional ETF preference
+/// and max-single-name concentration cap.
 ///
 /// build(): same InvestorIntent and thesis_id always produce the same Basket.
 /// basket_id is a content hash of the constructed basket (computeBasketHash),
@@ -35,7 +35,7 @@ pub const max_basket_instruments: usize = 16;
 /// Maximum rejected candidates listed (bounded by catalog size).
 pub const max_rejected_instruments: usize = 24;
 /// Maximum bytes in a per-instrument rationale string.
-pub const max_rationale_len: usize = 80;
+pub const max_rationale_len: usize = 96;
 /// Maximum bytes in a per-rejected reason string.
 pub const max_reason_len: usize = 80;
 
@@ -60,16 +60,18 @@ pub const RejectionReason = enum(u8) {
     restricted_instrument = 0,
     /// Asset class not in intent.allowed_asset_classes.
     wrong_asset_class = 1,
+    /// Instrument type not in intent.allowed_instrument_types.
+    wrong_instrument_type = 2,
     /// Market != intent.market.
     /// Forward-looking: currently unreachable because Market only has .us and
     /// the catalog contains only .us entries.  Will become reachable when
     /// non-US markets are added to either type.
-    wrong_market = 2,
+    wrong_market = 3,
     /// Venue not in intent.venues.
     /// Forward-looking: currently unreachable because normalize() always sets
     /// venues = {nyse, nasdaq} and all catalog entries are NYSE or NASDAQ.
     /// Will become reachable when additional venues are introduced.
-    wrong_venue = 3,
+    wrong_venue = 4,
 };
 
 /// One instrument included in the basket with its allocation and rationale.
@@ -77,6 +79,7 @@ pub const BasketInstrument = struct {
     ticker: [cat.max_ticker_len]u8,
     ticker_len: u8,
     asset_class: cat.AssetClass,
+    instrument_type: cat.InstrumentType,
     /// Allocation weight in basis points; 10000 = 100.0%.
     weight_bp: u32,
     /// Allocated dollars in cents for this instrument.
@@ -219,16 +222,16 @@ pub fn computeBasketHash(basket: *const Basket) u64 {
 /// basket.zig does not need to import thesis_cabi.
 ///
 /// Allocation (T4):
-///   - Equal-weight baseline; ETF preference (1.5× equity base weight) when
-///     both equity and ETF are in intent.allowed_asset_classes.
+///   - Equal-weight baseline; ETF preference (1.5x stock base weight) when
+///     both stock and ETF are in intent.allowed_instrument_types.
 ///   - Max-single-name cap at intent.max_single_name_pct (3 redistribution
 ///     iterations; if all instruments hit the cap each is capped to cap_bp and
 ///     the loop stops; weight_sum reflects the capped total).
 ///   - Total rounded to target_notional_cents; remainder added to instrument 0.
 ///
 /// Explainability (T5):
-///   - rationale string per included instrument (asset class, venue, weight,
-///     dollars, ETF preference note).
+///   - rationale string per included instrument (instrument type, asset class,
+///     venue, weight, dollars, ETF preference note).
 ///   - reason string per rejected instrument (restriction type or scope failure).
 pub fn buildFromScreening(
     intent: thesis.InvestorIntent,
@@ -250,7 +253,8 @@ pub fn buildFromScreening(
 
     // Phase 2 – compute initial weights (T4).
     var weights: [max_basket_instruments]u32 = [_]u32{0} ** max_basket_instruments;
-    const etf_preferred = intent.allowed_asset_classes.etf and intent.allowed_asset_classes.equity;
+    const etf_preferred = intent.allowed_instrument_types.has(.etf) and
+        intent.allowed_instrument_types.has(.stock);
     initialWeights(candidates[0..n], etf_preferred, weights[0..n]);
 
     // Phase 3 – apply concentration cap (T4).
@@ -289,6 +293,7 @@ pub fn buildFromScreening(
         basket.instruments[i].ticker = candidates[i].ticker;
         basket.instruments[i].ticker_len = candidates[i].ticker_len;
         basket.instruments[i].asset_class = candidates[i].asset_class;
+        basket.instruments[i].instrument_type = candidates[i].instrument_type;
         basket.instruments[i].allocation_cents = alloc;
         total_alloc += alloc;
     }
@@ -349,7 +354,11 @@ pub fn build(intent: thesis.InvestorIntent, thesis_id: u64) BasketError!Basket {
             continue;
         }
         if (!intent.allowed_asset_classes.has(e.asset_class)) {
-            addRejected(&screened, e, .wrong_asset_class, "Asset class not eligible (equity/ETF only)");
+            addRejected(&screened, e, .wrong_asset_class, "Asset class not eligible");
+            continue;
+        }
+        if (!intent.allowed_instrument_types.has(e.instrument_type)) {
+            addRejected(&screened, e, .wrong_instrument_type, "Instrument type not eligible (stock/ETF only)");
             continue;
         }
         if (e.market != intent.market) {
@@ -383,8 +392,8 @@ fn venueAllowed(venue: cat.Venue, allowed: []const thesis.Venue) bool {
     return false;
 }
 
-/// Assign initial weights using ETF preference (1.5× equity) when both classes
-/// are allowed; otherwise equal weight.
+/// Assign initial weights using ETF preference (1.5x stock) when both stock
+/// and ETF instrument types are allowed; otherwise equal weight.
 fn initialWeights(
     candidates: []*const cat.InstrumentEntry,
     etf_preferred: bool,
@@ -394,16 +403,16 @@ fn initialWeights(
     if (n == 0) return;
 
     if (etf_preferred) {
-        // Count each class; assign 3 units to ETFs, 2 units to equities.
+        // Count each product type; assign 3 units to ETFs, 2 units to stocks.
         var n_etf: u32 = 0;
-        var n_eq: u32 = 0;
+        var n_stock: u32 = 0;
         for (candidates) |e| {
-            if (e.asset_class == .etf) n_etf += 1 else n_eq += 1;
+            if (e.instrument_type == .etf) n_etf += 1 else n_stock += 1;
         }
-        const total_units: u32 = n_etf * 3 + n_eq * 2;
+        const total_units: u32 = n_etf * 3 + n_stock * 2;
         if (total_units > 0) {
             for (candidates, 0..) |e, i| {
-                const units: u32 = if (e.asset_class == .etf) 3 else 2;
+                const units: u32 = if (e.instrument_type == .etf) 3 else 2;
                 out[i] = units * bp_denom / total_units;
             }
             return;
@@ -498,7 +507,7 @@ fn restrictionMsg(reason: cat.RestrictionReason) []const u8 {
 }
 
 /// Write a rationale string into out.rationale/rationale_len.
-/// Format: "Eligible {equity|ETF} on {NYSE|NASDAQ}; {pct}% = ${dollars}[, ETF preferred]"
+/// Format: "Eligible {stock|ETF}/{asset_class} on {NYSE|NASDAQ}; {pct}% = ${dollars}[, ETF preferred]"
 ///
 /// fd_cstr_printf (src/util/cstr) wraps snprintf and is available at runtime, but
 /// Zig's typed std.fmt.bufPrint is used here: it keeps typed fixed-point formatting
@@ -510,27 +519,28 @@ fn writeRationale(
     etf_preferred: bool,
 ) void {
     const venue_str: []const u8 = if (e.venue == .nyse) "NYSE" else "NASDAQ";
-    const class_str: []const u8 = if (e.asset_class == .etf) "ETF" else "equity";
+    const type_str: []const u8 = e.instrument_type.label();
+    const class_str: []const u8 = e.asset_class.label();
     const pct_whole = out.weight_bp / pct_to_bp;
     const pct_frac = out.weight_bp % pct_to_bp;
     const dollars = @divFloor(out.allocation_cents, cents_per_dollar);
     const cents_part: i64 = @rem(out.allocation_cents, cents_per_dollar);
 
-    // max_rationale_len (80) is always sufficient for the formatted string given
+    // max_rationale_len is always sufficient for the formatted string given
     // bounded venue/class names, weight_bp <= bp_denom, and allocation bounded
     // by max_target_notional_cents.  bufPrint errors are unreachable.
     var buf: [max_rationale_len]u8 = undefined;
-    const written: []const u8 = if (etf_preferred and e.asset_class == .etf)
+    const written: []const u8 = if (etf_preferred and e.instrument_type == .etf)
         std.fmt.bufPrint(
             &buf,
-            "Eligible {s} on {s}; {d}.{d:0>2}% = ${d}.{d:0>2}, ETF preferred",
-            .{ class_str, venue_str, pct_whole, pct_frac, dollars, cents_part },
+            "Eligible {s}/{s} on {s}; {d}.{d:0>2}% = ${d}.{d:0>2}, ETF preferred",
+            .{ type_str, class_str, venue_str, pct_whole, pct_frac, dollars, cents_part },
         ) catch unreachable
     else
         std.fmt.bufPrint(
             &buf,
-            "Eligible {s} on {s}; {d}.{d:0>2}% = ${d}.{d:0>2}",
-            .{ class_str, venue_str, pct_whole, pct_frac, dollars, cents_part },
+            "Eligible {s}/{s} on {s}; {d}.{d:0>2}% = ${d}.{d:0>2}",
+            .{ type_str, class_str, venue_str, pct_whole, pct_frac, dollars, cents_part },
         ) catch unreachable;
 
     out.rationale = std.mem.zeroes([max_rationale_len]u8);
@@ -638,8 +648,8 @@ test "build: cap is enforced when all instruments exceed it (binding cap)" {
     var input = thesis.fixtures.ai_infrastructure;
     input.max_single_name_pct = 10;
     // Equity-only so equal weighting applies (no ETF preference skew).
-    input.asset_class_prefs = .{ .equity = true };
-    input.exclusions = .{ .option = true, .future = true, .leveraged_etf = true, .inverse_etf = true, .crypto = true };
+    input.asset_class_prefs = thesis.assetClassList(.{.equity});
+    input.instrument_type_prefs = thesis.instrumentTypeList(.{.stock});
     const intent = try thesis.normalize(input);
     const basket = try build(intent, thesis.computeThesisInputHash(input));
 
@@ -667,7 +677,7 @@ test "build: ETF instruments receive higher allocation than equities when etf_pr
     var etf_count: usize = 0;
     var eq_count: usize = 0;
     for (basket.instruments[0..basket.instrument_count]) |inst| {
-        if (inst.asset_class == .etf) {
+        if (inst.instrument_type == .etf) {
             etf_alloc += inst.allocation_cents;
             etf_count += 1;
         } else {
@@ -792,7 +802,7 @@ test "build: broad_market ETF-only intent produces valid basket" {
     try std.testing.expectEqual(intent.target_amount_cents, basket.total_allocated_cents);
     // Broad market has only ETFs; no ETF preference applies (no equity class).
     for (basket.instruments[0..basket.instrument_count]) |inst| {
-        try std.testing.expectEqual(cat.AssetClass.etf, inst.asset_class);
+        try std.testing.expectEqual(cat.InstrumentType.etf, inst.instrument_type);
     }
 }
 
@@ -813,12 +823,36 @@ test "build: cyber_security intent includes HACK and CIBR ETFs" {
 test "build: equity-only intent excludes ETFs" {
     // Override to equity-only asset class preference; no ETF preference applied.
     var input = thesis.fixtures.ai_infrastructure;
-    input.asset_class_prefs = .{ .equity = true };
-    input.exclusions = .{ .option = true, .future = true, .leveraged_etf = true, .inverse_etf = true, .crypto = true };
+    input.asset_class_prefs = thesis.assetClassList(.{.equity});
+    input.instrument_type_prefs = thesis.instrumentTypeList(.{.stock});
     const intent = try thesis.normalize(input);
     const basket = try build(intent, 0);
     for (basket.instruments[0..basket.instrument_count]) |inst| {
         try std.testing.expectEqual(cat.AssetClass.equity, inst.asset_class);
+    }
+}
+
+test "build: stock-only intent rejects ETF candidates with wrong_instrument_type" {
+    var input = thesis.fixtures.ai_infrastructure;
+    input.asset_class_prefs = thesis.assetClassList(.{.equity});
+    input.instrument_type_prefs = thesis.instrumentTypeList(.{.stock});
+    const intent = try thesis.normalize(input);
+    const built = try build(intent, 0);
+
+    var found_wrong_type = false;
+    for (built.rejected[0..built.rejected_count]) |rejected| {
+        if (std.mem.eql(u8, rejected.tickerSlice(), "BOTZ") or
+            std.mem.eql(u8, rejected.tickerSlice(), "SOXX"))
+        {
+            try std.testing.expectEqual(RejectionReason.wrong_instrument_type, rejected.reason_code);
+            found_wrong_type = true;
+        }
+    }
+    try std.testing.expect(found_wrong_type);
+
+    for (built.instruments[0..built.instrument_count]) |inst| {
+        try std.testing.expectEqual(cat.InstrumentType.stock, inst.instrument_type);
+        try std.testing.expect(std.mem.startsWith(u8, inst.rationaleSlice(), "Eligible stock/equity"));
     }
 }
 
@@ -827,17 +861,18 @@ test "build: NoEligibleInstruments when all theme matches are restricted" {
     // We test this by using ai_infrastructure with equity-and-etf excluded,
     // which leaves no eligible class.
     var input = thesis.fixtures.ai_infrastructure;
-    input.asset_class_prefs = .{ .equity = true, .etf = true };
-    // Exclude all supported classes so normalize() returns NoEligibleAssetClass.
-    input.exclusions = .{ .equity = true, .etf = true, .option = true, .future = true, .leveraged_etf = true, .inverse_etf = true, .crypto = true };
-    try std.testing.expectError(thesis.ThesisError.NoEligibleAssetClass, thesis.normalize(input));
+    input.asset_class_prefs = thesis.assetClassList(.{.equity});
+    input.instrument_type_prefs = thesis.instrumentTypeList(.{ .stock, .etf });
+    // Exclude all supported types so normalize() returns NoEligibleInstrumentType.
+    input.instrument_type_exclusions = thesis.instrumentTypeList(.{ .stock, .etf });
+    try std.testing.expectError(thesis.ThesisError.NoEligibleInstrumentType, thesis.normalize(input));
     // Basket build would return NoEligibleInstruments for an intent whose theme
     // has no matching eligible catalog entries.  We verify the error path by
     // building with cash_like intent restricted to equities only (no equity in
     // the cash_like catalog subset).
     var cash_input = thesis.fixtures.cash_preservation;
-    cash_input.asset_class_prefs = .{ .equity = true };
-    cash_input.exclusions = .{ .option = true, .future = true, .leveraged_etf = true, .inverse_etf = true, .crypto = true };
+    cash_input.asset_class_prefs = thesis.assetClassList(.{.equity});
+    cash_input.instrument_type_prefs = thesis.instrumentTypeList(.{.stock});
     const cash_intent = try thesis.normalize(cash_input);
     try std.testing.expectError(BasketError.NoEligibleInstruments, build(cash_intent, 0));
 }

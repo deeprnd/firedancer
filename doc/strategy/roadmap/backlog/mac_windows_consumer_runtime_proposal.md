@@ -71,6 +71,8 @@ Expected behavior:
 
 Tickoni should be packaged as a consumer demo product, not only as a source checkout. The initial package does not need to enable live financial side effects, but it must make version, provenance, and platform support obvious.
 
+Consumer packages must include only the Firedancer tiles and source files that Tickoni actually reuses — queues, topology, workspaces, sandboxing, metrics, diagnostics, and `fd_http_server`. Solana validator tiles, RPC schemas, and unrelated Firedancer code must be excluded from distributed artifacts to keep the package surface accurate, auditable, and free of unrelated runtime assumptions.
+
 Expected package behavior:
 
 * `tickoni --version` prints the Tickoni version, build id, git revision, target OS/architecture, runtime tier, and whether the full Firedancer tile runtime is available.
@@ -135,6 +137,8 @@ Then:   Tickoni shows the supported platform tier, builds a policy-checked propo
 * Decide whether first support should be native portable mode, Linux container, WSL2, VM packaging, or a combination.
 * Keep Linux as the full high-throughput Firedancer runtime unless a separate architecture decision approves a native port.
 * Make platform mode visible in operator and audit surfaces where it affects trust.
+* Define which Firedancer tiles and source files are included in consumer packages; exclude Solana-specific tiles, RPC schemas, and any Firedancer code that Tickoni does not reuse.
+* Ensure the engine code coverage badge measures only the Firedancer code actually reused by Tickoni; it must not reflect coverage of the full Firedancer project, including Solana and unrelated source.
 
 ### Out Of Scope
 

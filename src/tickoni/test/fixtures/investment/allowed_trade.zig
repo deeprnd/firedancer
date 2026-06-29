@@ -73,15 +73,14 @@ test "allowed_trade: thesis normalization succeeds for ops account" {
     const input = operationsThesisInput();
     const intent = try thesis.normalize(input);
     try std.testing.expectEqual(operations_account_id, intent.account_id);
-    try std.testing.expectEqual(thesis.SectorTheme.ai_infrastructure, intent.theme);
+    try std.testing.expectEqualStrings("ai_infrastructure", intent.theme.slice());
     try std.testing.expectEqual(target_notional_cents, intent.target_amount_cents);
-    try std.testing.expect(intent.allowed_asset_classes.equity);
-    try std.testing.expect(intent.allowed_asset_classes.etf);
-    try std.testing.expect(!intent.allowed_asset_classes.option);
-    try std.testing.expect(!intent.allowed_asset_classes.future);
-    try std.testing.expect(!intent.allowed_asset_classes.leveraged_etf);
-    try std.testing.expect(!intent.allowed_asset_classes.inverse_etf);
-    try std.testing.expect(!intent.allowed_asset_classes.crypto);
+    try std.testing.expect(intent.allowed_asset_classes.has(.equity));
+    try std.testing.expect(intent.allowed_instrument_types.has(.stock));
+    try std.testing.expect(intent.allowed_instrument_types.has(.etf));
+    try std.testing.expect(!intent.allowed_asset_classes.has(.crypto));
+    try std.testing.expect(!intent.allowed_instrument_types.has(.option));
+    try std.testing.expect(!intent.allowed_instrument_types.has(.future));
     try std.testing.expectEqual(thesis.Market.us, intent.market);
     try std.testing.expectEqual(@as(u8, 2), intent.venue_count);
     try std.testing.expectEqual(thesis.RiskPreference.moderate, intent.risk_preference);
@@ -198,7 +197,7 @@ test "allowed_trade: ETF lines receive higher allocation than equity lines" {
     var total_eq: i64 = 0;
     var n_eq: usize = 0;
     for (b.instruments[0..b.instrument_count]) |inst| {
-        if (inst.asset_class == .etf) {
+        if (inst.instrument_type == .etf) {
             total_etf += inst.allocation_cents;
             n_etf += 1;
         } else {
@@ -227,7 +226,7 @@ test "allowed_trade: catalog schema version stamped on basket" {
     const input = operationsThesisInput();
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, 0);
-    try std.testing.expectEqual(@as(u16, 1), b.catalog_schema_version);
+    try std.testing.expectEqual(@as(u16, 2), b.catalog_schema_version);
 }
 
 // ---------------------------------------------------------------------------

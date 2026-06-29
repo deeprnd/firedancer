@@ -2,33 +2,30 @@ syntax = "proto3";
 
 package tickoni.schema.v1;
 
-import "thesis.proto";
+import "classification.proto";
 
 enum RestrictionReason {
-  RESTRICTION_REASON_UNSPECIFIED    = 0;
-  RESTRICTION_REASON_LEVERAGED_ETF  = 1;
-  RESTRICTION_REASON_INVERSE_ETF    = 2;
+  RESTRICTION_REASON_UNSPECIFIED      = 0;
+  RESTRICTION_REASON_LEVERAGED_ETF    = 1;
+  RESTRICTION_REASON_INVERSE_ETF      = 2;
   RESTRICTION_REASON_OPTIONS_CONTRACT = 3;
   RESTRICTION_REASON_FUTURES_CONTRACT = 4;
-  RESTRICTION_REASON_NON_US_VENUE   = 5;
-  RESTRICTION_REASON_MANUAL_DENYLIST = 6;
+  RESTRICTION_REASON_NON_US_VENUE     = 5;
+  RESTRICTION_REASON_MANUAL_DENYLIST  = 6;
 }
 
-// Single instrument record in the V1.1 catalog.
-// themes is a ThemeSet bitmask: each bit corresponds to a SectorTheme value
-// (bit 0 = ai_infrastructure, bit 1 = semiconductors, ...).
-// expense_ratio_bps is the annual fund expense ratio in basis points; zero
-// for individual equities.
 message InstrumentEntry {
-  bytes             ticker              = 1;
-  bytes             name                = 2;
-  AssetClass        asset_class         = 3;
-  Market            market              = 4;
-  Venue             venue               = 5;
-  SectorTheme       sector              = 6;
-  uint32            themes              = 7;
-  RiskPreference    risk_tier           = 8;
-  uint32            expense_ratio_bps   = 9;
-  bool              restricted          = 10;
-  RestrictionReason restriction_reason  = 11;
+  bytes                 ticker             = 1;
+  bytes                 name               = 2;
+  AssetClass            asset_class        = 3;
+  InstrumentType        instrument_type    = 4;
+  Market                market             = 5;
+  Venue                 venue              = 6;
+  ClassificationRefList sectors            = 7;
+  ClassificationRefList industries         = 8;
+  ThemeIdList           themes             = 9;
+  RiskPreference        risk_tier          = 10;
+  uint32                expense_ratio_bps  = 11;
+  bool                  restricted         = 12;
+  RestrictionReason     restriction_reason = 13;
 }

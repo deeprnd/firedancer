@@ -3,10 +3,10 @@
   "schema": "tickoni.replay_capsule",
   "capsule_id": "replay_capsule_ai_infra_oversized_25000",
   "run_id": "run_ai_infra_demo_oversized_25000",
-  "expected_basket_id": 17844936811726487061,
+  "expected_basket_id": 4678331139064168901,
   "expected_proposal_hash": 15423733414829260079,
   "policy_version": "v1",
-  "catalog_schema_version": 1,
+  "catalog_schema_version": 2,
   "thesis_input_hash": "thesis_hash_oversized_25000",
   "normalized_intent_hash": "intent_hash_oversized_25000",
   "basket_id": "basket_ai_infra_25000",
@@ -15,7 +15,7 @@
   "audit_chain_hash": "audit_chain_hash_oversized_25000",
   "model_substitutions": [
     {
-      "request_hash": 12817999446150238994,
+      "request_hash": 13631910410847332646,
       "response_hash": 12340958204495727724,
       "fixture_file": "model_response_gemma4.json"
     }
@@ -24,7 +24,7 @@
     {
       "adapter_id": "paper_broker_demo",
       "operation": "quote_snapshot",
-      "request_hash": 17844936811726487061,
+      "request_hash": 4678331139064168901,
       "response_hash": 3837264155678659392,
       "fixture_file": "quotes.json"
     },
