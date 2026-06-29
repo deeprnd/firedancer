@@ -59,7 +59,7 @@ test "denied_trade: malformed thesis without target amount fails closed" {
 
 test "denied_trade: malformed thesis with unsupported-only asset classes fails closed" {
     var input = operationsThesisInputWithTarget(200_000);
-    input.instrument_type_prefs = thesis.instrumentTypeList(.{ .option });
+    input.instrument_type_prefs = thesis.instrumentTypeList(.{.option});
     try std.testing.expectError(thesis.ThesisError.NoEligibleInstrumentType, thesis.normalize(input));
 }
 

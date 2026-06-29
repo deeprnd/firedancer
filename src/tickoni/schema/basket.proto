@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package tickoni.schema.v1;
 
-import "thesis.proto";
+import "classification.proto";
 
 enum RejectionReason {
   REJECTION_REASON_UNSPECIFIED         = 0;

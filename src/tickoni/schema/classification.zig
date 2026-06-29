@@ -4,6 +4,7 @@
 /// classification primitives that are shared across thesis intent, catalog
 /// facts, basket construction, and policy screening.
 const std = @import("std");
+const classification_proto = @embedFile("classification.proto");
 
 comptime {
     @setEvalBranchQuota(50_000);
@@ -392,6 +393,125 @@ fn canonicalInputSlice(comptime value: anytype) []const u8 {
     };
 }
 
+const ProtoEnumEntry = struct {
+    name: []const u8,
+    value: u32,
+};
+
+const ProtoField = struct {
+    type_name: []const u8,
+    field_name: []const u8,
+    field_number: u32,
+};
+
+fn expectProtoEnumMatchesZigEnum(
+    comptime ZigEnum: type,
+    comptime proto_enum_name: []const u8,
+    comptime proto_prefix: []const u8,
+) !void {
+    const proto_entries = try parseProtoEnum(proto_enum_name);
+    const zig_fields = std.meta.fields(ZigEnum);
+
+    try std.testing.expectEqual(zig_fields.len + 1, proto_entries.len);
+    try std.testing.expectEqualStrings(
+        std.fmt.comptimePrint("{s}UNSPECIFIED", .{proto_prefix}),
+        proto_entries[0].name,
+    );
+    try std.testing.expectEqual(@as(u32, 0), proto_entries[0].value);
+
+    inline for (zig_fields, 0..) |field, i| {
+        const expected_name = comptime std.fmt.comptimePrint(
+            "{s}{s}",
+            .{ proto_prefix, upperSnake(field.name) },
+        );
+        try std.testing.expectEqualStrings(expected_name, proto_entries[i + 1].name);
+        try std.testing.expectEqual(@as(u32, i + 1), proto_entries[i + 1].value);
+    }
+}
+
+fn expectProtoMessageFields(
+    comptime proto_message_name: []const u8,
+    comptime expected_fields: []const ProtoField,
+) !void {
+    const fields = try parseProtoMessage(proto_message_name);
+    try std.testing.expectEqual(expected_fields.len, fields.len);
+    for (expected_fields, fields) |expected, actual| {
+        try std.testing.expectEqualStrings(expected.type_name, actual.type_name);
+        try std.testing.expectEqualStrings(expected.field_name, actual.field_name);
+        try std.testing.expectEqual(expected.field_number, actual.field_number);
+    }
+}
+
+fn parseProtoEnum(comptime enum_name: []const u8) ![]const ProtoEnumEntry {
+    const block = try findProtoBlock("enum", enum_name);
+    return try parseProtoEnumBlock(block);
+}
+
+fn parseProtoMessage(comptime message_name: []const u8) ![]const ProtoField {
+    const block = try findProtoBlock("message", message_name);
+    return try parseProtoMessageBlock(block);
+}
+
+fn findProtoBlock(comptime kind: []const u8, comptime block_name: []const u8) ![]const u8 {
+    const needle = comptime std.fmt.comptimePrint("{s} {s} {{", .{ kind, block_name });
+    const start = std.mem.indexOf(u8, classification_proto, needle) orelse return error.MissingProtoBlock;
+    const body_start = start + needle.len;
+    const end_rel = std.mem.indexOf(u8, classification_proto[body_start..], "\n}") orelse
+        return error.MalformedProtoBlock;
+    return classification_proto[body_start .. body_start + end_rel];
+}
+
+fn parseProtoEnumBlock(block: []const u8) ![]const ProtoEnumEntry {
+    var entries: [32]ProtoEnumEntry = undefined;
+    var count: usize = 0;
+    var lines = std.mem.tokenizeScalar(u8, block, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " \t\r");
+        if (line.len == 0) continue;
+        if (count >= entries.len) return error.TooManyProtoEntries;
+
+        const eq_idx = std.mem.indexOfScalar(u8, line, '=') orelse return error.MalformedProtoEnumEntry;
+        const semi_idx = std.mem.indexOfScalar(u8, line, ';') orelse return error.MalformedProtoEnumEntry;
+        entries[count] = .{
+            .name = std.mem.trim(u8, line[0..eq_idx], " \t"),
+            .value = try std.fmt.parseInt(u32, std.mem.trim(u8, line[eq_idx + 1 .. semi_idx], " \t"), 10),
+        };
+        count += 1;
+    }
+    return entries[0..count];
+}
+
+fn parseProtoMessageBlock(block: []const u8) ![]const ProtoField {
+    var fields: [16]ProtoField = undefined;
+    var count: usize = 0;
+    var lines = std.mem.tokenizeScalar(u8, block, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " \t\r");
+        if (line.len == 0) continue;
+        if (count >= fields.len) return error.TooManyProtoEntries;
+
+        const eq_idx = std.mem.indexOfScalar(u8, line, '=') orelse return error.MalformedProtoField;
+        const semi_idx = std.mem.indexOfScalar(u8, line, ';') orelse return error.MalformedProtoField;
+        const left = std.mem.trim(u8, line[0..eq_idx], " \t");
+        const last_space = std.mem.lastIndexOfScalar(u8, left, ' ') orelse return error.MalformedProtoField;
+        fields[count] = .{
+            .type_name = std.mem.trim(u8, left[0..last_space], " \t"),
+            .field_name = std.mem.trim(u8, left[last_space + 1 ..], " \t"),
+            .field_number = try std.fmt.parseInt(u32, std.mem.trim(u8, line[eq_idx + 1 .. semi_idx], " \t"), 10),
+        };
+        count += 1;
+    }
+    return fields[0..count];
+}
+
+fn upperSnake(comptime value: []const u8) [value.len]u8 {
+    var out: [value.len]u8 = undefined;
+    inline for (value, 0..) |byte, i| {
+        out[i] = if (byte >= 'a' and byte <= 'z') byte - ('a' - 'A') else byte;
+    }
+    return out;
+}
+
 test "canonicalId validates lowercase underscore encoding" {
     const ok = try CanonicalId.init("ai_infrastructure");
     try std.testing.expectEqualStrings("ai_infrastructure", ok.slice());
@@ -423,4 +543,35 @@ test "themeIdList rejects duplicate canonical ids" {
         ThemeIdListError.DuplicateValue,
         list.append(CanonicalId.init("ai_infrastructure") catch unreachable),
     );
+}
+
+test "classification proto enum contract stays aligned with zig definitions" {
+    try expectProtoEnumMatchesZigEnum(Market, "Market", "MARKET_");
+    try expectProtoEnumMatchesZigEnum(Venue, "Venue", "VENUE_");
+    try expectProtoEnumMatchesZigEnum(AssetClass, "AssetClass", "ASSET_CLASS_");
+    try expectProtoEnumMatchesZigEnum(InstrumentType, "InstrumentType", "INSTRUMENT_TYPE_");
+    try expectProtoEnumMatchesZigEnum(RiskPreference, "RiskPreference", "RISK_PREFERENCE_");
+}
+
+test "classification proto message contract stays aligned with zig definitions" {
+    try expectProtoMessageFields("CanonicalId", &.{
+        .{ .type_name = "string", .field_name = "value", .field_number = 1 },
+    });
+    try expectProtoMessageFields("ClassificationRef", &.{
+        .{ .type_name = "CanonicalId", .field_name = "taxonomy_id", .field_number = 1 },
+        .{ .type_name = "uint32", .field_name = "taxonomy_version", .field_number = 2 },
+        .{ .type_name = "CanonicalId", .field_name = "code", .field_number = 3 },
+    });
+    try expectProtoMessageFields("AssetClassList", &.{
+        .{ .type_name = "repeated AssetClass", .field_name = "values", .field_number = 1 },
+    });
+    try expectProtoMessageFields("InstrumentTypeList", &.{
+        .{ .type_name = "repeated InstrumentType", .field_name = "values", .field_number = 1 },
+    });
+    try expectProtoMessageFields("ThemeIdList", &.{
+        .{ .type_name = "repeated CanonicalId", .field_name = "values", .field_number = 1 },
+    });
+    try expectProtoMessageFields("ClassificationRefList", &.{
+        .{ .type_name = "repeated ClassificationRef", .field_name = "values", .field_number = 1 },
+    });
 }

@@ -1,0 +1,287 @@
+# V1.3: Portfolio And Cash Impact Loop
+
+**Status: Planned · Milestone: M1**
+
+Connects investing, cash, and pending payment obligations so the user sees the
+consequence before the action. V1.1 checked investing, V1.2 checked payments,
+V1.3 shows how they interact together.
+
+---
+
+## Product Intent
+
+V1.2 checked whether a payment or transfer proposal is safe. V1.3 shows how
+investment and payment proposals interact with cash, portfolio exposure, buying
+power, and approval state.
+
+## User Story
+
+As a money user, I can see how an investment or payment proposal changes my
+portfolio, cash, exposure, and obligations before and after I act.
+
+Example:
+
+```text
+If I buy this AI infrastructure basket and retry the supplier payout, what
+changes in my cash and portfolio?
+```
+
+Tickoni answers:
+
+```text
+Technology exposure increases from 22% to 31%.
+Single-name concentration remains below 8%.
+ETF exposure increases from 36% to 43%.
+Cash drops from USD 5,240.18 to USD 2,002.76 after trade and payout proposal.
+Your AI infrastructure thesis is now represented by four positions.
+The supplier payout remains approval-required and unexecuted.
+```
+
+## What The User Can Do
+
+- compare portfolio before and after a proposed trade
+- compare cash before and after a proposed payment, payout, or transfer
+- see sector, asset class, ticker, cash, rail, and destination impact
+- save the thesis as a monitored investment idea
+- save a money-movement proposal as a pending obligation
+- receive thesis drift alerts (allocation breach, sector exposure, market
+  event, buying power change)
+- receive cash/payment alerts (cash buffer breach, retry window expired,
+  beneficiary limit changed, approval expired/revoked)
+- generate a rebalance suggestion in paper/proposal mode
+
+## What The User Sees
+
+- before/after portfolio view
+- before/after cash and pending-obligation view
+- thesis card
+- payment or transfer proposal card
+- position weights
+- exposure heatmap
+- cash and buying power
+- thesis health status
+- approval state
+- rebalance suggestion
+
+## Capability Depth
+
+- `trading_portfolio.read`
+- `market_event.read`
+- `trading_order.recommend`
+- `trading_order.propose`
+- `payment_attempt.read`
+- `payment_retry.propose`
+- `bank_transfer.propose`
+- thesis state tied to positions
+- pending payment or transfer proposal state tied to cash
+- exposure and concentration limits
+- cash-buffer and beneficiary/day/month limit checks
+
+## Non-Goals
+
+- no autonomous rebalancing
+- no autonomous payment execution
+- no live market-data dependency
+
+---
+
+## WBS
+
+### V1.3.S1: Portfolio and cash impact model
+
+**Description:** Define impact fields for cash, buying power, exposure, and pending obligations before and after actions, compute realized and pending impact separately, add display-ready explanations, test material changes.
+
+Tasks:
+
+- V1.3.S1.T1: Define impact fields for cash before/after, buying power
+  before/after, pending obligations, asset class exposure, sector exposure,
+  ticker concentration, thesis exposure, rail exposure, destination exposure,
+  and estimated order or transfer cost.
+- V1.3.S1.T2: Compute impact before paper execution or payment proposal.
+- V1.3.S1.T3: Compute realized paper-trade impact and pending payment impact
+  separately.
+- V1.3.S1.T4: Add display-ready explanations for material changes.
+- V1.3.S1.T5: Add tests for increased technology exposure, cash decrease,
+  pending obligation increase, approval expiry, and cash-buffer threshold.
+
+Acceptance:
+
+- Before acting, the user can see what changes in cash, portfolio, and pending
+  obligations.
+
+### V1.3.S2: Thesis and money proposal cards
+
+**Description:** Define thesis card and money proposal card schemas, save cards after paper execution and proposal generation, link positions and pending obligations back to rationale and evidence.
+
+Tasks:
+
+- V1.3.S2.T1: Define thesis card schema with thesis id, user text, basket id,
+  linked positions, target exposure, current exposure, status, created time,
+  and last checked time.
+- V1.3.S2.T2: Define money proposal card schema with proposal id, source event,
+  beneficiary, rail, currency, amount, approval state, expiry, evidence hash,
+  and status.
+- V1.3.S2.T3: Save a thesis card after paper execution.
+- V1.3.S2.T4: Save a payment or transfer proposal card after proposal
+  generation.
+- V1.3.S2.T5: Link positions and pending obligations back to their rationale
+  and evidence.
+
+Acceptance:
+
+- The AI infrastructure thesis and supplier payout proposal both remain visible
+  after the demo action.
+
+### V1.3.S3: Drift, approval, and rebalance signals
+
+**Description:** Define thesis drift and payment drift conditions, add deterministic market and cash fixtures to trigger drift, generate rebalance suggestions and payment-proposal updates without autonomous execution.
+
+Tasks:
+
+- V1.3.S3.T1: Define thesis drift conditions: allocation breach, sector
+  exposure breach, concentration breach, instrument no longer eligible, and
+  buying-power change.
+- V1.3.S3.T2: Define payment drift conditions: retry window expired,
+  beneficiary limit changed, evidence expired, approval expired, approval
+  revoked, or cash buffer breached.
+- V1.3.S3.T3: Add deterministic market, cash, and approval-state fixtures that
+  trigger drift.
+- V1.3.S3.T4: Generate a rebalance suggestion without autonomous execution.
+- V1.3.S3.T5: Generate a payment-proposal update without autonomous execution.
+
+Acceptance:
+
+- The user can preview a rebalance ticket or updated payment proposal.
+- No rebalance, retry, or transfer executes without explicit user action and
+  policy path.
+
+### V1.3.S4: Portfolio and cash demo
+
+**Description:** Extend V1.1 and V1.2 demos to show before/after portfolio and cash states, save thesis and proposal cards, apply deterministic drift fixtures and show alerts and rebalance suggestions.
+
+Tasks:
+
+- V1.3.S4.T1: Extend the V1.1 demo to show before/after portfolio state.
+- V1.3.S4.T2: Extend the V1.2 demo to show before/after cash and pending
+  obligation state.
+- V1.3.S4.T3: Save the AI infrastructure thesis card and supplier payout
+  proposal card.
+- V1.3.S4.T4: Apply deterministic market movement and approval-expiry fixtures.
+- V1.3.S4.T5: Show thesis drift, cash-buffer alert, approval expiry, and
+  rebalance suggestion.
+
+Acceptance:
+
+- An exec can see investment and payment decisions in one cash/portfolio view.
+
+### V1.3.S5: General instrument classification contract
+
+Tasks:
+
+- V1.3.S5.T1: Define one shared Zig and protobuf source of truth for instrument
+  classification instead of keeping catalog vocabulary inside the thesis schema.
+- V1.3.S5.T2: Separate strongly typed economic asset class from strongly typed
+  instrument type. Cover at least equity, fixed income, commodity, FX, crypto,
+  and cash exposures, and stock, ETF, bond, option, future, fund, and token
+  products.
+- V1.3.S5.T3: Replace the packed per-asset-class boolean representation with a
+  bounded collection of `AssetClass` values so adding an enum value does not
+  require a new collection field.
+- V1.3.S5.T4: Model sector and industry as separate bounded classification lists.
+  Each classification reference carries a canonical taxonomy id, taxonomy version,
+  and code so audit and replay do not reinterpret labels.
+- V1.3.S5.T5: Replace the packed per-theme boolean representation with a bounded
+  list of canonical theme identifiers. Presence in the list means membership; do
+  not store an `enabled` boolean in catalog facts.
+- V1.3.S5.T6: Validate classification bounds, canonical identifier encoding,
+  uniqueness, list counts, and taxonomy/version presence. Malformed or ambiguous
+  classification data fails closed.
+- V1.3.S5.T7: Migrate the V1.1 instrument fixtures to the shared contract and
+  preserve their current eligibility and restriction outcomes.
+- V1.3.S5.T8: Add catalog lookup by asset class, instrument type, sector,
+  industry, theme, venue, and ticker without hardcoded switches over catalog
+  values.
+- V1.3.S5.T9: Version the catalog contract and fixture content so classification
+  or taxonomy drift is visible to audit and replay.
+
+Acceptance:
+
+- A stock, ETF, bond, option, future, fund, or token can be represented without
+  conflating product type with economic exposure.
+- Sector, industry, and theme are distinct dimensions and may contain multiple
+  bounded values where applicable.
+- Adding `chemicals`, `gold`, `solana`, or `memecoins` requires catalog or
+  taxonomy data only, not a new Zig struct field or protobuf field.
+- Existing V1.1 catalog fixtures produce the same allow, deny, and restriction
+  outcomes after migration.
+
+### V1.3.S6: Classification-aware intent and policy screening
+
+Tasks:
+
+- V1.3.S6.T1: Replace the single fixed `sector_theme` thesis selector with
+  structured, bounded filters for asset classes, instrument types, sectors,
+  industries, themes, and explicitly requested instruments.
+- V1.3.S6.T2: Keep allowed and excluded intent values separate from immutable
+  catalog classifications; a negative policy constraint must not mutate or
+  masquerade as catalog metadata.
+- V1.3.S6.T3: Normalize filter ordering and reject empty, duplicate, overlong,
+  malformed, unknown-taxonomy, or internally inconsistent filters before they
+  influence basket or policy state.
+- V1.3.S6.T4: Update catalog lookup, basket screening, and `tkpoly` checks to
+  match each classification dimension explicitly and return the exact failed
+  scope dimension.
+- V1.3.S6.T5: Preserve the V1.1 policy envelope: US market, NYSE/NASDAQ,
+  equity and ETF products, current restricted-instrument rules, and
+  proposal/paper execution boundaries remain unchanged.
+- V1.3.S6.T6: Add deterministic fixtures proving that chemical, gold, Solana,
+  and memecoin classifications can be expressed without being automatically
+  permitted.
+- V1.3.S6.T7: Add focused tests for sector/industry distinction, multiple-theme
+  matching, asset-class versus instrument-type matching, exclusions, unknown
+  classifications, and fail-closed bounds.
+
+Acceptance:
+
+- A classification can be represented and matched without granting trading
+  authority for it.
+- Policy denies unsupported asset classes, instrument types, markets, venues,
+  sectors, industries, themes, and instruments before model, adapter, or paper
+  execution.
+- Every denial identifies the failed classification or scope dimension.
+
+### V1.3.S7: Classification audit, schema, and replay migration
+
+Tasks:
+
+- V1.3.S7.T1: Update thesis, catalog, basket, ticket, and audit protobuf
+  contracts without reusing retired field numbers; bump schema versions for
+  changed canonical layouts.
+- V1.3.S7.T2: Update the thesis C ABI and deterministic content hash to cover
+  normalized asset-class, instrument-type, sector, industry, and theme filters
+  in a documented canonical order.
+- V1.3.S7.T3: Carry the applicable catalog version, taxonomy id and version,
+  classification values, and failed scope dimension into policy and audit
+  evidence.
+- V1.3.S7.T4: Propagate asset class and instrument type through basket and trade
+  ticket records so downstream portfolio exposure does not infer them from a
+  ticker or theme.
+- V1.3.S7.T5: Update replay capsules and substitutions to reject unsupported
+  schema versions and detect taxonomy, classification, catalog, policy, or
+  normalized-order drift without external calls.
+- V1.3.S7.T6: Add schema, hash-golden, catalog, basket, policy, audit, replay,
+  protobuf-lint, and V1.1 regression coverage for the migration.
+
+Acceptance:
+
+- Equivalent normalized classification inputs produce identical hashes and policy
+  decisions regardless of source ordering.
+- Changed taxonomy versions, classifications, catalog versions, or policy scope
+  produce explicit replay divergence or schema-version rejection.
+- Replay never calls a model, financial adapter, broker, payment API, ledger, or
+  privileged executor while resolving classification evidence.
+
+## Evidence Gate
+
+- Before/after portfolio, cash, pending-obligation, thesis drift, and
+  payment-approval state are replayable from captured inputs.
