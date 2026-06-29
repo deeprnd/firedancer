@@ -648,11 +648,15 @@ const AllowedReplayFixture = struct {
     ticket: trade_ticket.TradeTicket,
 };
 
-fn loadExpectedAllowedBasketId(allocator: std.mem.Allocator, io: std.Io) !u64 {
+fn loadExpectedBasketId(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    capsule_path: []const u8,
+) !u64 {
     var loaded = try loadReplayCapsule(
         allocator,
         io,
-        "src/tickoni/test/fixtures/investment/replay_capsule.json",
+        capsule_path,
     );
     defer loaded.deinit(allocator);
 
@@ -660,7 +664,11 @@ fn loadExpectedAllowedBasketId(allocator: std.mem.Allocator, io: std.Io) !u64 {
 }
 
 fn buildAllowedReplayFixture(allocator: std.mem.Allocator, io: std.Io) !AllowedReplayFixture {
-    const expected_basket_id = try loadExpectedAllowedBasketId(allocator, io);
+    const expected_basket_id = try loadExpectedBasketId(
+        allocator,
+        io,
+        "src/tickoni/test/fixtures/investment/replay_capsule.json",
+    );
     var loaded = try loadReplayCapsule(
         allocator,
         io,
@@ -775,7 +783,11 @@ test "verifyAllowedTradeWithCapsulePath detects tampered paper fill hashes" {
 
 test "verifyRestrictedInstrumentBlock stays offline with fixture model backend" {
     var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
-    proposed_basket.basket_id = 10627110967246007067; // matches replay_capsule_restricted_soxl.json
+    proposed_basket.basket_id = try loadExpectedBasketId(
+        std.testing.allocator,
+        std.testing.io,
+        "src/tickoni/test/fixtures/investment/replay_capsule_restricted_soxl.json",
+    );
     proposed_basket.rejected_count = 1;
     proposed_basket.rejected[0].ticker_len = 4;
     @memcpy(proposed_basket.rejected[0].ticker[0..4], "SOXL");
