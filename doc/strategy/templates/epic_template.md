@@ -9,7 +9,7 @@ issues as sub-issues of this epic. Do not put implementation task checklists
 directly in the epic unless they are epic-level coordination work.
 
 Copy this file into the GitHub issue body or use it to create/update a
-doc/position/roadmap/stories/VX.Y.md roadmap file. Replace placeholders and
+doc/strategy/roadmap/stories/VX.Y.md roadmap file. Replace placeholders and
 remove HTML comments before closing the issue.
 
 Epic labels:
