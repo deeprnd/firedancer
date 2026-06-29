@@ -231,16 +231,16 @@ pub fn computePreTradeImpact(
     const total_after = total_before + proposed_basket.total_allocated_cents;
 
     // Asset class exposures.
-    fillAssetClassExposures(&impact, account, total_before, proposed_basket, total_after);
+    fillAssetClassExposures(&impact, account, total_before, proposed_basket, total_after, null);
 
     // Instrument type exposures.
-    fillInstrumentTypeExposures(&impact, account, total_before, proposed_basket, total_after);
+    fillInstrumentTypeExposures(&impact, account, total_before, proposed_basket, total_after, null);
 
     // Sector exposures.
-    fillSectorExposures(&impact, account, total_before, proposed_basket, total_after);
+    fillSectorExposures(&impact, account, total_before, proposed_basket, total_after, null);
 
     // Ticker concentrations for basket instruments.
-    fillTickerConcentrations(&impact, account, total_before, proposed_basket, total_after);
+    fillTickerConcentrations(&impact, account, total_before, proposed_basket, total_after, null);
 
     // Thesis exposure: basket fraction of total invested portfolio.
     impact.thesis_before_bp = toBp(proposed_basket.total_allocated_cents, total_before);
@@ -284,10 +284,10 @@ pub fn computeRealizedTradeImpact(
 
     // Use basket instruments as the realized additions (proportionally scaled
     // if filled_notional differs from basket.total_allocated_cents).
-    fillAssetClassExposures(&impact, account_before, total_before, proposed_basket, total_after);
-    fillInstrumentTypeExposures(&impact, account_before, total_before, proposed_basket, total_after);
-    fillSectorExposures(&impact, account_before, total_before, proposed_basket, total_after);
-    fillTickerConcentrations(&impact, account_before, total_before, proposed_basket, total_after);
+    fillAssetClassExposures(&impact, account_before, total_before, proposed_basket, total_after, filled_notional_cents);
+    fillInstrumentTypeExposures(&impact, account_before, total_before, proposed_basket, total_after, filled_notional_cents);
+    fillSectorExposures(&impact, account_before, total_before, proposed_basket, total_after, filled_notional_cents);
+    fillTickerConcentrations(&impact, account_before, total_before, proposed_basket, total_after, filled_notional_cents);
 
     impact.thesis_before_bp = toBp(filled_notional_cents, total_before);
     impact.thesis_after_bp = toBp(filled_notional_cents, total_after);
@@ -426,7 +426,7 @@ pub fn generateExplanations(
     }
 
     // Cash change.
-    if (impact.estimated_trade_cost_cents != 0 or impact.estimated_payment_cost_cents != 0) {
+    if (impact.cash_before_cents != impact.cash_after_cents) {
         const before_d = @divTrunc(impact.cash_before_cents, 100);
         const before_c: u64 = @intCast(@abs(@rem(impact.cash_before_cents, 100)));
         const after_d = @divTrunc(impact.cash_after_cents, 100);
@@ -498,6 +498,42 @@ fn addExplanation(impact: *PortfolioImpact, text: []const u8) void {
     impact.explanation_count += 1;
 }
 
+fn scaledBasketInstrumentAllocationCents(
+    proposed_basket: *const basket_mod.Basket,
+    instrument_index: usize,
+    effective_total_cents: i64,
+) i64 {
+    const effective_total = @max(@as(i64, 0), effective_total_cents);
+    const basket_total = @max(@as(i64, 0), proposed_basket.total_allocated_cents);
+    if (effective_total == 0 or basket_total == 0 or instrument_index >= proposed_basket.instrument_count) return 0;
+
+    var assigned_so_far: i64 = 0;
+    for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |*instr, idx| {
+        const scaled_alloc = if (idx + 1 == proposed_basket.instrument_count)
+            effective_total - assigned_so_far
+        else blk: {
+            const raw_alloc = @max(@as(i64, 0), instr.allocation_cents);
+            const numerator: i128 = @as(i128, raw_alloc) * @as(i128, effective_total);
+            break :blk @as(i64, @intCast(@divTrunc(numerator, @as(i128, basket_total))));
+        };
+        const clamped_alloc = @max(@as(i64, 0), scaled_alloc);
+        if (idx == instrument_index) return clamped_alloc;
+        assigned_so_far += clamped_alloc;
+    }
+    return 0;
+}
+
+fn effectiveBasketInstrumentAllocationCents(
+    proposed_basket: *const basket_mod.Basket,
+    instrument_index: usize,
+    effective_total_cents: ?i64,
+) i64 {
+    if (effective_total_cents) |effective_total| {
+        return scaledBasketInstrumentAllocationCents(proposed_basket, instrument_index, effective_total);
+    }
+    return @max(@as(i64, 0), proposed_basket.instruments[instrument_index].allocation_cents);
+}
+
 fn assetClassValueInHoldings(
     account: *const portfolio.BrokerageAccount,
     asset_class: cat.AssetClass,
@@ -515,11 +551,12 @@ fn assetClassValueInHoldings(
 fn assetClassValueInBasket(
     proposed_basket: *const basket_mod.Basket,
     asset_class: cat.AssetClass,
+    effective_total_cents: ?i64,
 ) i64 {
     var total: i64 = 0;
-    for (proposed_basket.instruments[0..proposed_basket.instrument_count]) |*instr| {
+    for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |*instr, idx| {
         if (instr.asset_class == asset_class) {
-            total += @max(@as(i64, 0), instr.allocation_cents);
+            total += effectiveBasketInstrumentAllocationCents(proposed_basket, idx, effective_total_cents);
         }
     }
     return total;
@@ -542,11 +579,12 @@ fn instrumentTypeValueInHoldings(
 fn instrumentTypeValueInBasket(
     proposed_basket: *const basket_mod.Basket,
     instrument_type: cat.InstrumentType,
+    effective_total_cents: ?i64,
 ) i64 {
     var total: i64 = 0;
-    for (proposed_basket.instruments[0..proposed_basket.instrument_count]) |*instr| {
+    for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |*instr, idx| {
         if (instr.instrument_type == instrument_type) {
-            total += @max(@as(i64, 0), instr.allocation_cents);
+            total += effectiveBasketInstrumentAllocationCents(proposed_basket, idx, effective_total_cents);
         }
     }
     return total;
@@ -558,11 +596,12 @@ fn fillAssetClassExposures(
     total_before: i64,
     proposed_basket: *const basket_mod.Basket,
     total_after: i64,
+    effective_total_cents: ?i64,
 ) void {
     const classes = [_]cat.AssetClass{ .equity, .fixed_income, .commodity, .fx, .crypto, .cash };
     for (classes) |ac| {
         const before_val = assetClassValueInHoldings(account, ac);
-        const basket_val = assetClassValueInBasket(proposed_basket, ac);
+        const basket_val = assetClassValueInBasket(proposed_basket, ac, effective_total_cents);
         const after_val = before_val + basket_val;
         // Skip if neither before nor after has any exposure.
         if (before_val == 0 and after_val == 0) continue;
@@ -582,11 +621,12 @@ fn fillInstrumentTypeExposures(
     total_before: i64,
     proposed_basket: *const basket_mod.Basket,
     total_after: i64,
+    effective_total_cents: ?i64,
 ) void {
     const types = [_]cat.InstrumentType{ .stock, .etf, .bond, .option, .future, .fund, .token };
     for (types) |it| {
         const before_val = instrumentTypeValueInHoldings(account, it);
-        const basket_val = instrumentTypeValueInBasket(proposed_basket, it);
+        const basket_val = instrumentTypeValueInBasket(proposed_basket, it, effective_total_cents);
         const after_val = before_val + basket_val;
         if (before_val == 0 and after_val == 0) continue;
         if (impact.instrument_type_exposure_count >= max_instrument_type_exposure_entries) break;
@@ -619,6 +659,7 @@ fn fillSectorExposures(
     total_before: i64,
     proposed_basket: *const basket_mod.Basket,
     total_after: i64,
+    effective_total_cents: ?i64,
 ) void {
     // Collect per-sector values from existing holdings.
     for (account.holdings[0..account.holding_count]) |*h| {
@@ -633,9 +674,9 @@ fn fillSectorExposures(
     }
 
     // Collect per-sector values from basket instruments.
-    for (proposed_basket.instruments[0..proposed_basket.instrument_count]) |*instr| {
+    for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |*instr, idx| {
         const entry = cat.lookupByTicker(instr.tickerSlice()) orelse continue;
-        const alloc = @max(@as(i64, 0), instr.allocation_cents);
+        const alloc = effectiveBasketInstrumentAllocationCents(proposed_basket, idx, effective_total_cents);
         if (alloc == 0) continue;
         for (entry.sectors.values[0..entry.sectors.count]) |*ref| {
             const code = ref.code.slice();
@@ -660,9 +701,9 @@ fn fillSectorExposures(
             }
         }
         var basket_after_cents: i64 = 0;
-        for (proposed_basket.instruments[0..proposed_basket.instrument_count]) |*instr| {
+        for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |*instr, idx| {
             const entry = cat.lookupByTicker(instr.tickerSlice()) orelse continue;
-            const alloc = @max(@as(i64, 0), instr.allocation_cents);
+            const alloc = effectiveBasketInstrumentAllocationCents(proposed_basket, idx, effective_total_cents);
             for (entry.sectors.values[0..entry.sectors.count]) |*ref| {
                 if (std.mem.eql(u8, ref.code.slice(), se.codeSlice())) {
                     basket_after_cents += alloc;
@@ -694,8 +735,9 @@ fn fillTickerConcentrations(
     total_before: i64,
     proposed_basket: *const basket_mod.Basket,
     total_after: i64,
+    effective_total_cents: ?i64,
 ) void {
-    for (proposed_basket.instruments[0..proposed_basket.instrument_count]) |*instr| {
+    for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |*instr, idx| {
         const ticker = instr.tickerSlice();
         const tc = findOrAddTicker(impact, ticker) orelse continue;
 
@@ -707,7 +749,10 @@ fn fillTickerConcentrations(
         tc.before_bp = toBp(existing_mv, total_before);
 
         // After: existing holding + basket allocation.
-        tc.after_bp = toBp(existing_mv + instr.allocation_cents, total_after);
+        tc.after_bp = toBp(
+            existing_mv + effectiveBasketInstrumentAllocationCents(proposed_basket, idx, effective_total_cents),
+            total_after,
+        );
     }
 }
 
@@ -1449,6 +1494,39 @@ test "computeRealizedTradeImpact: partial fill reduces cash by filled notional n
     try testing.expectEqual(@as(i64, 150_000), impact.estimated_trade_cost_cents);
 }
 
+test "computeRealizedTradeImpact: partial fill scales instrument exposure to filled notional" {
+    const account = makeMinimalAccount(5_000_000);
+    var basket = std.mem.zeroes(basket_mod.Basket);
+    basket.account_id = account.account_id;
+    basket.total_allocated_cents = 200_000;
+    basket.instrument_count = 2;
+    @memcpy(basket.instruments[0].ticker[0..4], "NVDA");
+    basket.instruments[0].ticker_len = 4;
+    basket.instruments[0].allocation_cents = 150_000;
+    basket.instruments[0].asset_class = .equity;
+    basket.instruments[0].instrument_type = .stock;
+    basket.instruments[0].weight_bp = 7_500;
+    @memcpy(basket.instruments[1].ticker[0..4], "SOXX");
+    basket.instruments[1].ticker_len = 4;
+    basket.instruments[1].allocation_cents = 50_000;
+    basket.instruments[1].asset_class = .equity;
+    basket.instruments[1].instrument_type = .etf;
+    basket.instruments[1].weight_bp = 2_500;
+
+    const filled: i64 = 100_000;
+    const impact = computeRealizedTradeImpact(&account, &basket, filled, &[_]PendingObligation{}, 0, 0);
+
+    var stock_after_bp: u32 = 0;
+    var etf_after_bp: u32 = 0;
+    for (impact.instrument_type_exposures[0..impact.instrument_type_exposure_count]) |*ite| {
+        if (ite.instrument_type == .stock) stock_after_bp = ite.after_bp;
+        if (ite.instrument_type == .etf) etf_after_bp = ite.after_bp;
+    }
+
+    try testing.expectEqual(@as(u32, 7_500), stock_after_bp);
+    try testing.expectEqual(@as(u32, 2_500), etf_after_bp);
+}
+
 // ---------------------------------------------------------------------------
 // generateExplanations: all narrative paths
 // ---------------------------------------------------------------------------
@@ -1555,4 +1633,22 @@ test "generateExplanations: ETF instrument type explanation produced for materia
         if (std.mem.indexOf(u8, e.textSlice(), "ETF") != null) found = true;
     }
     try testing.expect(found);
+}
+
+test "generateExplanations: pending payment impact does not claim cash drops when cash is unchanged" {
+    const account = makeMinimalAccount(5_000_000);
+    const new_ob = PendingObligation{
+        .proposal_id = 2_100,
+        .rail = .ach,
+        .destination_id = 5,
+        .amount_cents = 124_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    var impact = computePendingPaymentImpact(&account, new_ob, &[_]PendingObligation{}, 0, 0);
+    generateExplanations(&impact, 0);
+
+    for (impact.explanations[0..impact.explanation_count]) |*e| {
+        try testing.expect(std.mem.indexOf(u8, e.textSlice(), "Cash drops") == null);
+    }
 }
