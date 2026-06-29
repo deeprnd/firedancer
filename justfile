@@ -167,7 +167,8 @@ test-system-all:
 infra-run-llamacpp:
   #!/usr/bin/env bash
   set -euo pipefail
-  llama_dir="${TK_LLAMA_CPP_DIR:-$HOME/work/git/llama.cpp}"
+  source contrib/test/llama_cpp_env.sh
+  llama_dir="$(tk_resolve_llama_cpp_dir)"
   backend=cpu
   if command -v nvidia-smi >/dev/null 2>&1; then
     gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"

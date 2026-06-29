@@ -3,7 +3,7 @@
   "schema": "tickoni.replay_capsule",
   "capsule_id": "replay_capsule_ai_infra_restricted_soxl",
   "run_id": "run_ai_infra_demo_restricted_soxl",
-  "expected_basket_id": 10627110967246007067,
+  "expected_basket_id": 11341774755630813062,
   "policy_version": "v1",
   "catalog_schema_version": 2,
   "thesis_input_hash": "thesis_hash_restricted_soxl",
@@ -14,7 +14,7 @@
   "audit_chain_hash": "audit_chain_hash_restricted_soxl",
   "model_substitutions": [
     {
-      "request_hash": 10637886937405873159,
+      "request_hash": 10345386982848503179,
       "response_hash": 12340958204495727724,
       "fixture_file": "model_response_gemma4.json"
     }

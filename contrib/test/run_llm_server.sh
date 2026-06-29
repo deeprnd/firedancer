@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=contrib/test/llama_cpp_env.sh
+source "${SCRIPT_DIR}/llama_cpp_env.sh"
+
 usage() {
   cat <<'USAGE'
 Usage: contrib/test/run_llm_server.sh <cpu|gpu>
@@ -13,7 +17,8 @@ Environment overrides:
   TK_HF_MODEL_FILE    GGUF filename inside TK_HF_MODEL_DIR
 
 Defaults:
-  TK_LLAMA_CPP_DIR=$HOME/work/git/llama.cpp
+  TK_LLAMA_CPP_DIR unset: auto-detects `~/work/models/llama.cpp`
+  first, then `~/work/git/llama.cpp`
   TK_HF_MODEL_DIR=$HOME/work/models/gemma/gemma-4-E2B-it-qat-GGUF
   TK_HF_MODEL_FILE=gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf
 USAGE
@@ -25,14 +30,10 @@ if [[ $# -ne 1 || ( "$1" != "cpu" && "$1" != "gpu" ) ]]; then
 fi
 backend="$1"
 
-llama_dir="${TK_LLAMA_CPP_DIR:-$HOME/work/git/llama.cpp}"
+llama_dir="$(tk_resolve_llama_cpp_dir)"
 model_dir="${TK_HF_MODEL_DIR:-$HOME/work/models/gemma/gemma-4-E2B-it-qat-GGUF}"
 model_file="${TK_HF_MODEL_FILE:-gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf}"
 
-case "$llama_dir" in
-  "~")    llama_dir="$HOME" ;;
-  "~/"*)  llama_dir="$HOME/${llama_dir:2}" ;;
-esac
 case "$model_dir" in
   "~")    model_dir="$HOME" ;;
   "~/"*)  model_dir="$HOME/${model_dir:2}" ;;

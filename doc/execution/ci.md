@@ -152,7 +152,7 @@ Contains long-running tests that require additional infrastructure or model asse
 **LLM System Tests** — runs the explicit live-model compatibility lane against a real local `llama.cpp` server. Steps in order:
 
 1. Install `cmake`, `libopenblas-dev`, `libopenblas64-dev` via apt.
-2. `just infra-ensure-llamacpp` — clones `https://github.com/ggml-org/llama.cpp` into `~/work/git/llama.cpp` (if absent), builds for CPU with OpenBLAS via cmake, and copies `llama-*` binaries to the clone root.
+2. `just infra-ensure-llamacpp` — resolves `llama.cpp` from `TK_LLAMA_CPP_DIR` when set, otherwise auto-detects `~/work/models/llama.cpp` first and then `~/work/git/llama.cpp`; if neither exists it clones `https://github.com/ggml-org/llama.cpp` into `~/work/models/llama.cpp`, builds for CPU with OpenBLAS via cmake, and copies `llama-*` binaries to the clone root.
 3. `just infra-ensure-model` — downloads the GGUF model via the `hf` CLI (Hugging Face Hub) if not already present.
 4. `just test-system-tk` — ensures llama.cpp and model are present, starts the server, runs `zig build integration-test-live-model`, and stops the server.
 
