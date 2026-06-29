@@ -4,18 +4,18 @@
   "capsule_id": "replay_capsule_ai_infra",
   "run_id": "run_ai_infra_demo_0001",
   "policy_version": "v1",
-  "catalog_schema_version": 1,
+  "catalog_schema_version": 2,
   "thesis_input_hash": "thesis_hash_allowed_2000",
   "normalized_intent_hash": "intent_hash_allowed_2000",
   "basket_id": "basket_ai_infra_2000",
   "ticket_id": "ticket_ai_infra_2000_market",
   "proposal_hash": "proposal_hash_ticket_ai_infra_2000_market",
   "audit_chain_hash": "audit_chain_hash_allowed_2000",
-  "expected_basket_id": 11652673630910894805,
+  "expected_basket_id": 6651037992630488700,
   "expected_proposal_hash": 9109813778527198207,
   "model_substitutions": [
     {
-      "request_hash": 5782848427954506623,
+      "request_hash": 15637975690355711557,
       "response_hash": 12340958204495727724,
       "fixture_file": "model_response_gemma4.json"
     }
@@ -24,7 +24,7 @@
     {
       "adapter_id": "paper_broker_demo",
       "operation": "quote_snapshot",
-      "request_hash": 11652673630910894805,
+      "request_hash": 6651037992630488700,
       "response_hash": 3837264155678659392,
       "fixture_file": "quotes.json"
     },

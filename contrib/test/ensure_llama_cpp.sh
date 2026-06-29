@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=contrib/test/llama_cpp_env.sh
+source "${SCRIPT_DIR}/llama_cpp_env.sh"
+
 usage() {
   cat <<'USAGE'
 Usage: contrib/test/ensure_llama_cpp.sh [--gpu] [--check-only]
@@ -16,7 +20,9 @@ Environment overrides:
   TK_LLAMA_CPP_DIR    local directory for the llama.cpp checkout
 
 Defaults:
-  TK_LLAMA_CPP_DIR=$HOME/work/git/llama.cpp
+  TK_LLAMA_CPP_DIR unset: auto-detects `~/work/models/llama.cpp`
+  first, then `~/work/git/llama.cpp`; fresh clones default to
+  `~/work/models/llama.cpp`
 USAGE
 }
 
@@ -31,12 +37,7 @@ for arg in "$@"; do
   esac
 done
 
-llama_dir="${TK_LLAMA_CPP_DIR:-$HOME/work/git/llama.cpp}"
-
-case "$llama_dir" in
-  "~")      llama_dir="$HOME" ;;
-  "~/"*)    llama_dir="$HOME/${llama_dir:2}" ;;
-esac
+llama_dir="$(tk_resolve_llama_cpp_dir)"
 
 server_bin="${llama_dir}/llama-server"
 

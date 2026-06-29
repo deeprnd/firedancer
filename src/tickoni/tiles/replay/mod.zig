@@ -648,11 +648,15 @@ const AllowedReplayFixture = struct {
     ticket: trade_ticket.TradeTicket,
 };
 
-fn loadExpectedAllowedBasketId(allocator: std.mem.Allocator, io: std.Io) !u64 {
+fn loadExpectedBasketId(
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    capsule_path: []const u8,
+) !u64 {
     var loaded = try loadReplayCapsule(
         allocator,
         io,
-        "src/tickoni/test/fixtures/investment/replay_capsule.json",
+        capsule_path,
     );
     defer loaded.deinit(allocator);
 
@@ -660,7 +664,11 @@ fn loadExpectedAllowedBasketId(allocator: std.mem.Allocator, io: std.Io) !u64 {
 }
 
 fn buildAllowedReplayFixture(allocator: std.mem.Allocator, io: std.Io) !AllowedReplayFixture {
-    const expected_basket_id = try loadExpectedAllowedBasketId(allocator, io);
+    const expected_basket_id = try loadExpectedBasketId(
+        allocator,
+        io,
+        "src/tickoni/test/fixtures/investment/replay_capsule.json",
+    );
     var loaded = try loadReplayCapsule(
         allocator,
         io,
@@ -673,28 +681,30 @@ fn buildAllowedReplayFixture(allocator: std.mem.Allocator, io: std.Io) !AllowedR
     proposed_basket.thesis_id = loaded.parsed.value.model_substitutions[0].request_hash;
     proposed_basket.account_id = 2001;
     proposed_basket.target_notional_cents = 200_000;
-    proposed_basket.catalog_schema_version = 1;
+    proposed_basket.catalog_schema_version = 2;
     proposed_basket.instrument_count = 7;
     proposed_basket.total_allocated_cents = 200_000;
 
     const line_specs = [_]struct {
         ticker: []const u8,
         asset_class: @FieldType(basket.BasketInstrument, "asset_class"),
+        instrument_type: @FieldType(basket.BasketInstrument, "instrument_type"),
         allocation_cents: i64,
         weight_bp: u32,
     }{
-        .{ .ticker = "NVDA", .asset_class = .equity, .allocation_cents = 25_000, .weight_bp = 1_250 },
-        .{ .ticker = "AMD", .asset_class = .equity, .allocation_cents = 25_000, .weight_bp = 1_250 },
-        .{ .ticker = "AVGO", .asset_class = .equity, .allocation_cents = 25_000, .weight_bp = 1_250 },
-        .{ .ticker = "MSFT", .asset_class = .equity, .allocation_cents = 25_000, .weight_bp = 1_250 },
-        .{ .ticker = "AMZN", .asset_class = .equity, .allocation_cents = 25_000, .weight_bp = 1_250 },
-        .{ .ticker = "BOTZ", .asset_class = .etf, .allocation_cents = 37_500, .weight_bp = 1_875 },
-        .{ .ticker = "SOXX", .asset_class = .etf, .allocation_cents = 37_500, .weight_bp = 1_875 },
+        .{ .ticker = "NVDA", .asset_class = .equity, .instrument_type = .stock, .allocation_cents = 25_000, .weight_bp = 1_250 },
+        .{ .ticker = "AMD", .asset_class = .equity, .instrument_type = .stock, .allocation_cents = 25_000, .weight_bp = 1_250 },
+        .{ .ticker = "AVGO", .asset_class = .equity, .instrument_type = .stock, .allocation_cents = 25_000, .weight_bp = 1_250 },
+        .{ .ticker = "MSFT", .asset_class = .equity, .instrument_type = .stock, .allocation_cents = 25_000, .weight_bp = 1_250 },
+        .{ .ticker = "AMZN", .asset_class = .equity, .instrument_type = .stock, .allocation_cents = 25_000, .weight_bp = 1_250 },
+        .{ .ticker = "BOTZ", .asset_class = .equity, .instrument_type = .etf, .allocation_cents = 37_500, .weight_bp = 1_875 },
+        .{ .ticker = "SOXX", .asset_class = .equity, .instrument_type = .etf, .allocation_cents = 37_500, .weight_bp = 1_875 },
     };
     for (line_specs, 0..) |spec, i| {
         proposed_basket.instruments[i].ticker_len = @intCast(spec.ticker.len);
         @memcpy(proposed_basket.instruments[i].ticker[0..spec.ticker.len], spec.ticker);
         proposed_basket.instruments[i].asset_class = spec.asset_class;
+        proposed_basket.instruments[i].instrument_type = spec.instrument_type;
         proposed_basket.instruments[i].allocation_cents = spec.allocation_cents;
         proposed_basket.instruments[i].weight_bp = spec.weight_bp;
     }
@@ -773,7 +783,11 @@ test "verifyAllowedTradeWithCapsulePath detects tampered paper fill hashes" {
 
 test "verifyRestrictedInstrumentBlock stays offline with fixture model backend" {
     var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
-    proposed_basket.basket_id = 10627110967246007067; // matches replay_capsule_restricted_soxl.json
+    proposed_basket.basket_id = try loadExpectedBasketId(
+        std.testing.allocator,
+        std.testing.io,
+        "src/tickoni/test/fixtures/investment/replay_capsule_restricted_soxl.json",
+    );
     proposed_basket.rejected_count = 1;
     proposed_basket.rejected[0].ticker_len = 4;
     @memcpy(proposed_basket.rejected[0].ticker[0..4], "SOXL");

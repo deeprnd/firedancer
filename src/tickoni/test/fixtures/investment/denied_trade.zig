@@ -1,5 +1,4 @@
 const std = @import("std");
-const basket_mod = @import("basket");
 const thesis = @import("thesis");
 
 const operations_account_id: u32 = 2001;
@@ -60,8 +59,8 @@ test "denied_trade: malformed thesis without target amount fails closed" {
 
 test "denied_trade: malformed thesis with unsupported-only asset classes fails closed" {
     var input = operationsThesisInputWithTarget(200_000);
-    input.asset_class_prefs = .{ .option = true };
-    try std.testing.expectError(thesis.ThesisError.NoEligibleAssetClass, thesis.normalize(input));
+    input.instrument_type_prefs = thesis.instrumentTypeList(.{.option});
+    try std.testing.expectError(thesis.ThesisError.NoEligibleInstrumentType, thesis.normalize(input));
 }
 
 test "denied_trade: restricted ticket fixture stays explicit and not placeable" {

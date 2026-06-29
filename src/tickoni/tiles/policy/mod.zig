@@ -61,7 +61,11 @@ pub fn screenBasketIntent(intent: thesis.InvestorIntent) BasketScreening {
             continue;
         }
         if (!intent.allowed_asset_classes.has(entry.asset_class)) {
-            addRejected(&screening, entry, .wrong_asset_class, "Asset class not eligible (equity/ETF only)");
+            addRejected(&screening, entry, .wrong_asset_class, "Asset class not eligible");
+            continue;
+        }
+        if (!intent.allowed_instrument_types.has(entry.instrument_type)) {
+            addRejected(&screening, entry, .wrong_instrument_type, "Instrument type not eligible (stock/ETF only)");
             continue;
         }
         if (entry.market != intent.market) {
@@ -226,6 +230,30 @@ test "screenBasketIntent rejects restricted products and keeps eligible AI infra
     }
     try std.testing.expect(found_soxl);
     try std.testing.expect(found_bulz);
+}
+
+test "screenBasketIntent rejects ETFs when intent allows only stocks" {
+    var input = thesis.fixtures.ai_infrastructure;
+    input.asset_class_prefs = thesis.assetClassList(.{.equity});
+    input.instrument_type_prefs = thesis.instrumentTypeList(.{.stock});
+    const intent = try thesis.normalize(input);
+    const screening = screenBasketIntent(intent);
+
+    try std.testing.expect(screening.candidate_count > 0);
+    for (screening.candidateSlice()) |entry| {
+        try std.testing.expectEqual(catalog.InstrumentType.stock, entry.instrument_type);
+    }
+
+    var found_wrong_type = false;
+    for (screening.rejectedSlice()) |rejected| {
+        if (std.mem.eql(u8, rejected.tickerSlice(), "BOTZ") or
+            std.mem.eql(u8, rejected.tickerSlice(), "SOXX"))
+        {
+            try std.testing.expectEqual(basket.RejectionReason.wrong_instrument_type, rejected.reason_code);
+            found_wrong_type = true;
+        }
+    }
+    try std.testing.expect(found_wrong_type);
 }
 
 test "evaluateTradeGuardrails returns per-order denial for oversized allowed account" {

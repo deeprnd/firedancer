@@ -4,7 +4,7 @@
   <tr>
     <td>
       <!-- badge:build:start -->
-<img alt="Build" src="https://img.shields.io/badge/build-failing-red?style=flat-square" />
+<img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
 <!-- badge:build:end -->
     </td>
     <td>
@@ -48,7 +48,7 @@
     </td>
     <td>
       <!-- badge:cov-tk:start -->
-<img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-92.4%25-brightgreen?style=flat-square" />
+<img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-93.8%25-brightgreen?style=flat-square" />
 <!-- badge:cov-tk:end -->
     </td>
     <td></td>
