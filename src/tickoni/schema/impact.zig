@@ -1158,3 +1158,401 @@ test "computePreTradeImpact: thesis_position_count matches basket instrument cou
     const impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{}, 0, 0);
     try testing.expectEqual(@as(u8, 2), impact.thesis_position_count);
 }
+
+// ---------------------------------------------------------------------------
+// PendingObligation.isExpired edge cases
+// ---------------------------------------------------------------------------
+
+test "PendingObligation.isExpired: never expires when expires_at_ns is 0" {
+    const ob = PendingObligation{
+        .proposal_id = 1,
+        .rail = .ach,
+        .destination_id = 1,
+        .amount_cents = 1_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    try testing.expect(!ob.isExpired(std.math.maxInt(u64)));
+}
+
+test "PendingObligation.isExpired: not expired when now equals or is below expires_at_ns" {
+    const ob = PendingObligation{
+        .proposal_id = 2,
+        .rail = .wire,
+        .destination_id = 1,
+        .amount_cents = 1_000,
+        .approval_state = .pending,
+        .expires_at_ns = 1_000_000_000,
+    };
+    try testing.expect(!ob.isExpired(1_000_000_000)); // exactly at expiry: not expired
+    try testing.expect(!ob.isExpired(999_999_999)); // before expiry: not expired
+    try testing.expect(ob.isExpired(1_000_000_001)); // one ns past: expired
+}
+
+// ---------------------------------------------------------------------------
+// computePreTradeImpact: buying power, obligation totals, and approval state
+// ---------------------------------------------------------------------------
+
+test "computePreTradeImpact: buying_power_after decremented by basket cost" {
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{}, 0, 0);
+    try testing.expectEqual(@as(i64, 5_000_000), impact.buying_power_before_cents);
+    try testing.expectEqual(@as(i64, 4_800_000), impact.buying_power_after_cents);
+}
+
+test "computePreTradeImpact: pending_obligations_before_cents sums existing obligations" {
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const obligations = [_]PendingObligation{
+        .{ .proposal_id = 10, .rail = .ach, .destination_id = 1, .amount_cents = 100_000, .approval_state = .pending, .expires_at_ns = 0 },
+        .{ .proposal_id = 11, .rail = .wire, .destination_id = 2, .amount_cents = 50_000, .approval_state = .approved, .expires_at_ns = 0 },
+    };
+    const impact = computePreTradeImpact(&account, &basket, &obligations, 0, 0);
+    try testing.expectEqual(@as(i64, 150_000), impact.pending_obligations_before_cents);
+    try testing.expectEqual(@as(i64, 150_000), impact.pending_obligations_after_cents);
+}
+
+test "computePreTradeImpact: any_approval_required false when obligations are approved or rejected" {
+    const account = makeMinimalAccount(3_000_000);
+    const basket = makeBasketWith(account.account_id, 100_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const obligations = [_]PendingObligation{
+        .{ .proposal_id = 20, .rail = .ach, .destination_id = 1, .amount_cents = 50_000, .approval_state = .approved, .expires_at_ns = 0 },
+        .{ .proposal_id = 21, .rail = .wire, .destination_id = 2, .amount_cents = 50_000, .approval_state = .rejected, .expires_at_ns = 0 },
+    };
+    const impact = computePreTradeImpact(&account, &basket, &obligations, 0, 0);
+    try testing.expect(!impact.any_approval_required);
+}
+
+test "computePreTradeImpact: any_obligation_expired and any_approval_required false when no obligations" {
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{}, 0, 0);
+    try testing.expect(!impact.any_obligation_expired);
+    try testing.expect(!impact.any_approval_required);
+}
+
+test "computePreTradeImpact: estimated_trade_cost_cents equals basket allocated; payment cost is zero" {
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{}, 0, 0);
+    try testing.expectEqual(@as(i64, 200_000), impact.estimated_trade_cost_cents);
+    try testing.expectEqual(@as(i64, 0), impact.estimated_payment_cost_cents);
+}
+
+test "computePreTradeImpact: empty basket produces no ticker concentrations and zero thesis_position_count" {
+    const account = makeMinimalAccount(5_000_000);
+    var empty_basket = std.mem.zeroes(basket_mod.Basket);
+    empty_basket.account_id = account.account_id;
+    const impact = computePreTradeImpact(&account, &empty_basket, &[_]PendingObligation{}, 0, 0);
+    try testing.expectEqual(@as(u8, 0), impact.ticker_concentration_count);
+    try testing.expectEqual(@as(u8, 0), impact.thesis_position_count);
+}
+
+// ---------------------------------------------------------------------------
+// computePreTradeImpact: account with existing holdings (technology_heavy fixture)
+// ---------------------------------------------------------------------------
+
+test "computePreTradeImpact: ticker concentration before_bp nonzero for existing holding" {
+    // technology_heavy holds NVDA at 1,495,000 cents; buying more raises concentration.
+    const account = portfolio.fixtures.technology_heavy;
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{}, 0, 0);
+
+    var nvda_before_bp: u32 = 0;
+    var nvda_after_bp: u32 = 0;
+    for (impact.ticker_concentrations[0..impact.ticker_concentration_count]) |*tc| {
+        if (std.mem.eql(u8, tc.tickerSlice(), "NVDA")) {
+            nvda_before_bp = tc.before_bp;
+            nvda_after_bp = tc.after_bp;
+        }
+    }
+    try testing.expect(nvda_before_bp > 0); // NVDA already held
+    try testing.expect(nvda_after_bp > nvda_before_bp); // concentration grows after basket adds more
+}
+
+test "computePreTradeImpact: technology_heavy has nonzero equity exposure before trade" {
+    const account = portfolio.fixtures.technology_heavy;
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{}, 0, 0);
+
+    var equity_before: u32 = 0;
+    for (impact.asset_class_exposures[0..impact.asset_class_exposure_count]) |*ace| {
+        if (ace.asset_class == .equity) equity_before = ace.before_bp;
+    }
+    try testing.expect(equity_before > 0); // existing equity holdings
+}
+
+// ---------------------------------------------------------------------------
+// computePendingPaymentImpact: cash not drained, buffer breach, obligation sums
+// ---------------------------------------------------------------------------
+
+test "computePendingPaymentImpact: cash and buying power are not drained by pending obligation" {
+    const account = makeMinimalAccount(3_000_000);
+    const new_ob = PendingObligation{
+        .proposal_id = 501,
+        .rail = .ach,
+        .destination_id = 10,
+        .amount_cents = 500_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    const impact = computePendingPaymentImpact(&account, new_ob, &[_]PendingObligation{}, 0, 0);
+    try testing.expectEqual(impact.cash_before_cents, impact.cash_after_cents);
+    try testing.expectEqual(impact.buying_power_before_cents, impact.buying_power_after_cents);
+}
+
+test "computePendingPaymentImpact: cash_buffer_breached_after when pending obligations exceed buffer headroom" {
+    // cash = USD 10,000; buffer = USD 5,000; headroom = USD 5,000.
+    // pending = USD 9,500 > headroom → breach.
+    const account = makeMinimalAccount(1_000_000);
+    const new_ob = PendingObligation{
+        .proposal_id = 600,
+        .rail = .ach,
+        .destination_id = 10,
+        .amount_cents = 950_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    const cash_buffer: i64 = 500_000;
+    const impact = computePendingPaymentImpact(&account, new_ob, &[_]PendingObligation{}, cash_buffer, 0);
+    try testing.expect(impact.cash_buffer_breached_after);
+}
+
+test "computePendingPaymentImpact: pending_obligations_before_cents sums existing; after adds new" {
+    const account = makeMinimalAccount(5_000_000);
+    const existing = [_]PendingObligation{
+        .{ .proposal_id = 700, .rail = .ach, .destination_id = 1, .amount_cents = 50_000, .approval_state = .approved, .expires_at_ns = 0 },
+        .{ .proposal_id = 701, .rail = .wire, .destination_id = 2, .amount_cents = 75_000, .approval_state = .pending, .expires_at_ns = 0 },
+    };
+    const new_ob = PendingObligation{
+        .proposal_id = 702,
+        .rail = .card,
+        .destination_id = 3,
+        .amount_cents = 25_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    const impact = computePendingPaymentImpact(&account, new_ob, &existing, 0, 0);
+    try testing.expectEqual(@as(i64, 125_000), impact.pending_obligations_before_cents);
+    try testing.expectEqual(@as(i64, 150_000), impact.pending_obligations_after_cents);
+}
+
+test "computePendingPaymentImpact: estimated_payment_cost_cents equals new obligation amount" {
+    const account = makeMinimalAccount(5_000_000);
+    const new_ob = PendingObligation{
+        .proposal_id = 800,
+        .rail = .ach,
+        .destination_id = 5,
+        .amount_cents = 124_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    const impact = computePendingPaymentImpact(&account, new_ob, &[_]PendingObligation{}, 0, 0);
+    try testing.expectEqual(@as(i64, 124_000), impact.estimated_payment_cost_cents);
+    try testing.expectEqual(@as(i64, 0), impact.estimated_trade_cost_cents);
+}
+
+// ---------------------------------------------------------------------------
+// Rail and destination exposure accumulation
+// ---------------------------------------------------------------------------
+
+test "rail exposure: two obligations on the same rail accumulate" {
+    const account = makeMinimalAccount(5_000_000);
+    const existing_ob = PendingObligation{
+        .proposal_id = 900,
+        .rail = .ach,
+        .destination_id = 10,
+        .amount_cents = 100_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    const new_ob = PendingObligation{
+        .proposal_id = 901,
+        .rail = .ach,
+        .destination_id = 20,
+        .amount_cents = 200_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    const impact = computePendingPaymentImpact(&account, new_ob, &[_]PendingObligation{existing_ob}, 0, 0);
+
+    var ach_cents: i64 = 0;
+    for (impact.rail_exposures[0..impact.rail_exposure_count]) |*re| {
+        if (re.rail == .ach) ach_cents = re.pending_cents;
+    }
+    try testing.expectEqual(@as(i64, 300_000), ach_cents);
+}
+
+test "destination exposure: two obligations to same destination accumulate" {
+    const account = makeMinimalAccount(5_000_000);
+    const existing_ob = PendingObligation{
+        .proposal_id = 1_000,
+        .rail = .ach,
+        .destination_id = 42,
+        .amount_cents = 100_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    const new_ob = PendingObligation{
+        .proposal_id = 1_001,
+        .rail = .wire,
+        .destination_id = 42,
+        .amount_cents = 75_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    const impact = computePendingPaymentImpact(&account, new_ob, &[_]PendingObligation{existing_ob}, 0, 0);
+
+    var dest_cents: i64 = 0;
+    for (impact.destination_exposures[0..impact.destination_exposure_count]) |*de| {
+        if (de.destination_id == 42) dest_cents = de.pending_cents;
+    }
+    try testing.expectEqual(@as(i64, 175_000), dest_cents);
+}
+
+test "destination exposure: destination_id zero is not tracked" {
+    const account = makeMinimalAccount(5_000_000);
+    const new_ob = PendingObligation{
+        .proposal_id = 1_100,
+        .rail = .ach,
+        .destination_id = 0,
+        .amount_cents = 100_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    const impact = computePendingPaymentImpact(&account, new_ob, &[_]PendingObligation{}, 0, 0);
+    try testing.expectEqual(@as(u8, 0), impact.destination_exposure_count);
+    try testing.expectEqual(@as(u8, 1), impact.rail_exposure_count); // rail is still tracked
+}
+
+// ---------------------------------------------------------------------------
+// computeRealizedTradeImpact: thesis bp and partial fills
+// ---------------------------------------------------------------------------
+
+test "computeRealizedTradeImpact: thesis_after_bp is 10000 when filled notional equals all holdings" {
+    // No existing holdings; filled notional becomes 100% of the portfolio.
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const filled: i64 = 200_000;
+    const impact = computeRealizedTradeImpact(&account, &basket, filled, &[_]PendingObligation{}, 0, 0);
+    try testing.expectEqual(@as(u32, 0), impact.thesis_before_bp); // no holdings before
+    try testing.expectEqual(@as(u32, 10_000), impact.thesis_after_bp); // 100% of portfolio
+}
+
+test "computeRealizedTradeImpact: partial fill reduces cash by filled notional not basket target" {
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const filled: i64 = 150_000; // partial fill
+    const impact = computeRealizedTradeImpact(&account, &basket, filled, &[_]PendingObligation{}, 0, 0);
+    try testing.expectEqual(@as(i64, 5_000_000 - 150_000), impact.cash_after_cents);
+    try testing.expectEqual(@as(i64, 150_000), impact.estimated_trade_cost_cents);
+}
+
+// ---------------------------------------------------------------------------
+// generateExplanations: all narrative paths
+// ---------------------------------------------------------------------------
+
+test "generateExplanations: approval-required explanation produced" {
+    const account = makeMinimalAccount(3_000_000);
+    const basket = makeBasketWith(account.account_id, 50_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const ob = PendingObligation{
+        .proposal_id = 2_000,
+        .rail = .ach,
+        .destination_id = 1,
+        .amount_cents = 50_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    var impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{ob}, 0, 0);
+    generateExplanations(&impact, 0);
+
+    var found = false;
+    for (impact.explanations[0..impact.explanation_count]) |*e| {
+        if (std.mem.indexOf(u8, e.textSlice(), "approval-required") != null) found = true;
+    }
+    try testing.expect(found);
+}
+
+test "generateExplanations: expired obligation explanation produced" {
+    const account = makeMinimalAccount(3_000_000);
+    const basket = makeBasketWith(account.account_id, 50_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const ob = PendingObligation{
+        .proposal_id = 2_001,
+        .rail = .wire,
+        .destination_id = 5,
+        .amount_cents = 50_000,
+        .approval_state = .pending,
+        .expires_at_ns = 1,
+    };
+    var impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{ob}, 0, 1_000_000);
+    generateExplanations(&impact, 0);
+
+    var found = false;
+    for (impact.explanations[0..impact.explanation_count]) |*e| {
+        if (std.mem.indexOf(u8, e.textSlice(), "expired") != null) found = true;
+    }
+    try testing.expect(found);
+}
+
+test "generateExplanations: thesis position count explanation produced" {
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    var impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{}, 0, 0);
+    generateExplanations(&impact, 0);
+
+    var found = false;
+    for (impact.explanations[0..impact.explanation_count]) |*e| {
+        if (std.mem.indexOf(u8, e.textSlice(), "position(s)") != null) found = true;
+    }
+    try testing.expect(found);
+}
+
+test "generateExplanations: single-name concentration exceeds cap produces warning" {
+    // Basket: 100_000 NVDA + 100_000 SOXX, total_after = 200_000.
+    // NVDA concentration = 50% = 5000 bp; policy cap = 3000 bp → exceeded.
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    var impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{}, 0, 0);
+    generateExplanations(&impact, 3_000);
+
+    var found = false;
+    for (impact.explanations[0..impact.explanation_count]) |*e| {
+        if (std.mem.indexOf(u8, e.textSlice(), "exceeds policy cap") != null) found = true;
+    }
+    try testing.expect(found);
+}
+
+test "generateExplanations: single-name within cap produces reassurance" {
+    // NVDA concentration = 50% = 5000 bp; policy cap = 9000 bp (90%) → within.
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    var impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{}, 0, 0);
+    generateExplanations(&impact, 9_000);
+
+    var found = false;
+    for (impact.explanations[0..impact.explanation_count]) |*e| {
+        if (std.mem.indexOf(u8, e.textSlice(), "remains below") != null) found = true;
+    }
+    try testing.expect(found);
+}
+
+test "generateExplanations: zero impact produces no explanations" {
+    var impact = std.mem.zeroes(PortfolioImpact);
+    generateExplanations(&impact, 0);
+    try testing.expectEqual(@as(u8, 0), impact.explanation_count);
+}
+
+test "generateExplanations: ETF instrument type explanation produced for material change" {
+    // Basket is all ETFs from zero ETF holdings → ETF exposure change is material (>500 bp).
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "SOXX", .equity, .etf, "BOTZ", .equity, .etf);
+    var impact = computePreTradeImpact(&account, &basket, &[_]PendingObligation{}, 0, 0);
+    generateExplanations(&impact, 0);
+
+    var found = false;
+    for (impact.explanations[0..impact.explanation_count]) |*e| {
+        if (std.mem.indexOf(u8, e.textSlice(), "ETF") != null) found = true;
+    }
+    try testing.expect(found);
+}
