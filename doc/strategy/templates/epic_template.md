@@ -46,19 +46,19 @@ Epic quality standard:
     evidence boundaries only where they apply.
 
 Read before filling:
-  - doc/position/templates/status_template.md for epic, story, and task status
+  - doc/strategy/templates/status_template.md for epic, story, and task status
     definitions.
-  - doc/overview.md for product identity and what Tickoni is not.
-  - doc/architecture.md for runtime layers, tile ownership, event flow, and
-    attached systems.
-  - doc/position/capabilities.md for finance-native capability scope and
+  - doc/strategy/README.md for product identity and what Tickoni is not.
+  - doc/knowledge/architecture.md for runtime layers, tile ownership, event
+    flow, and attached systems.
+  - doc/strategy/capabilities.md for finance-native capability scope and
     policy outcomes.
   - doc/knowledge/tile-topology.md when the epic may affect tile ownership,
     topology, links, or Firedancer reuse.
-  - doc/security.md when the epic affects agent authority, tool access,
+  - doc/execution/security.md when the epic affects agent authority, tool access,
     secrets, replay divergence, or privileged action boundaries.
-  - doc/observability.md and doc/telemetry.md when the epic adds or changes
-    runtime/operator signals.
+  - doc/execution/observability.md and doc/execution/telemetry.md when the epic
+    adds or changes runtime/operator signals.
 -->
 
 # VX.Y: [Epic Title]
@@ -150,7 +150,7 @@ doc/observability.md and doc/telemetry.md for metrics/diagnostics expectations.
 
 <!--
 Create one GitHub sub-issue per story and label each `story`.
-Use doc/position/templates/story_template.md for each child story issue.
+Use doc/strategy/templates/story_template.md for each child story issue.
 
 Story split guidance:
   - Each story must be independently implementable and independently verified.
@@ -160,8 +160,10 @@ Story split guidance:
   - Include one story or child tasks that close evidence, demo, docs, and
     quality gates for the epic.
   - Point each story to the project docs that are relevant to its implementer:
-    doc/build.md, doc/development.md, doc/testing-tickoni.md, doc/ci.md,
-    doc/security.md, doc/observability.md, and doc/telemetry.md.
+    doc/execution/build.md, doc/execution/development.md,
+    doc/execution/testing-tickoni.md, doc/execution/ci.md,
+    doc/execution/security.md, doc/execution/observability.md, and
+    doc/execution/telemetry.md.
 -->
 
 - [ ] VX.Y.S1: [Self-contained story title] - #[github-story-issue]
@@ -189,7 +191,7 @@ child story acceptance criteria and evidence gates.
 <!--
 Answer only the questions that apply. Use `N/A - reason` instead of forcing
 every epic through topology or tool-broker evidence.
-Use doc/position/positioning.md to tie the answer back to Tickoni's unique
+Use doc/strategy/positioning.md to tie the answer back to Tickoni's unique
 value proposition: high-throughput agentic finance, consequence isolation,
 bounded spend, hard policy gates, and forensic replay.
 -->
@@ -199,7 +201,7 @@ bounded spend, hard policy gates, and forensic replay.
 - What is this epic's wow-effect: the visible moment in this epic's demo or
   workflow that makes Tickoni feel unlike a generic agent harness?
 - How does this epic progress Tickoni's unique value proposition from
-  doc/position/positioning.md: speed, isolation/control, spend governance,
+  doc/strategy/positioning.md: speed, isolation/control, spend governance,
   policy-gated action, and forensic replay?
 - Which demo command or CaseOps flow closes the epic?
 - Which account, beneficiary, IBAN, wallet, rail, currency, market, venue,

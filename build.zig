@@ -347,6 +347,41 @@ pub fn build(b: *std.Build) void {
     linkTickoniCodec(b, cards_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(cards_test).step);
 
+    // drift.zig: drift conditions, assessment, and suggestion generation (V1.3.S3).
+    // Fresh impact and cards module instances are required so that linkTickoniCodec
+    // does not add C source objects to drift_test more than once.
+    const impact_for_drift_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/impact.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_adapter_test_mod },
+            .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+        },
+    });
+    const cards_for_drift_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/cards.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_adapter_test_mod },
+            .{ .name = "impact", .module = impact_for_drift_mod },
+        },
+    });
+    const drift_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/drift.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "basket", .module = basket_adapter_test_mod },
+                .{ .name = "cards", .module = cards_for_drift_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, drift_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(drift_test).step);
+
     const allowed_trade_fixture_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/test/fixtures/investment/allowed_trade.zig"),

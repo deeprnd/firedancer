@@ -34,17 +34,18 @@ Task quality standard:
   - Does not introduce unrelated scope or hidden policy decisions.
 
 Read before implementing:
-  - doc/position/templates/status_template.md for task lifecycle status.
-  - doc/architecture.md for runtime/source-of-truth boundaries.
-  - doc/contribution/tickoni.md for Tickoni Zig runtime style, Firedancer reuse,
-    C ABI rules, and separation constraints.
-  - doc/build.md and doc/development.md for build/run commands and justfile
-    command policy.
-  - doc/testing-tickoni.md and doc/ci.md for local and CI verification choices.
-  - doc/security.md for fail-closed validation, no-bypass behavior, and
-    capability boundaries.
-  - doc/observability.md and doc/telemetry.md when changing metrics,
-    diagnostics, labels, alerts, or operator-visible runtime state.
+  - doc/strategy/templates/status_template.md for task lifecycle status.
+  - doc/knowledge/architecture.md for runtime/source-of-truth boundaries.
+  - doc/execution/contribution/tickoni.md for Tickoni Zig runtime style,
+    Firedancer reuse, C ABI rules, and separation constraints.
+  - doc/execution/build.md and doc/execution/development.md for build/run
+    commands and justfile command policy.
+  - doc/execution/testing-tickoni.md and doc/execution/ci.md for local and CI
+    verification choices.
+  - doc/execution/security.md for fail-closed validation, no-bypass behavior,
+    and capability boundaries.
+  - doc/execution/observability.md and doc/execution/telemetry.md when changing
+    metrics, diagnostics, labels, alerts, or operator-visible runtime state.
 -->
 
 # VX.Y.SN.TN: [Task Title]

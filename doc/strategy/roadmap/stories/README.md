@@ -21,7 +21,7 @@ Use these templates:
 
 Use these project docs to fill and implement issues:
 
-- [`overview.md`](../../overview.md) for product identity, supported
+- [`README.md`](../../README.md) for product identity, supported
   workflows, and non-goals.
 - [`architecture.md`](../../../knowledge/architecture.md) for runtime layers, tile
   ownership, audit, replay, and attached systems.
