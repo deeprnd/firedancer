@@ -1,6 +1,8 @@
 const std = @import("std");
 const adapter = @import("adapter");
 const basket_mod = @import("basket");
+pub const cards = @import("cards");
+const impact = @import("impact");
 const model = @import("model");
 const portfolio = @import("portfolio");
 const replay = @import("replay");
@@ -25,6 +27,14 @@ const live_capability = "trading_order.propose";
 const live_capability_envelope_id = "capenv.trading_order.propose.demo";
 const live_policy_version = "v1";
 const live_budget_id = "budget.demo_paper.live";
+const decision_cards_now_ns: u64 = 1_765_792_800_000_000_000;
+const supplier_payout_proposal_id: u64 = 1_240_001;
+const supplier_payout_amount_cents: i64 = 124_000;
+const supplier_payout_beneficiary = "supplier_acme_us";
+const supplier_payout_source_event = "payment_failed";
+const supplier_payout_currency = "USD";
+const supplier_payout_expires_at_ns: u64 = 1_765_879_200_000_000_000;
+const demo_cash_buffer_threshold_cents: i64 = 500_000;
 
 const restricted_tickers = [_][]const u8{
     "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",
@@ -71,6 +81,7 @@ pub const LiveModelEvidence = struct {
 pub const AllowedTradeScenarioResult = struct {
     basket: basket_mod.Basket,
     ticket: trade_ticket.TradeTicket,
+    decision_cards: cards.DecisionCardsContract,
     replay_result: replay.ReplayVerification,
 };
 
@@ -392,9 +403,17 @@ pub fn runAllowedTradeScenario(
     if (!replay_result.external_effects_disabled) return error.ReplayExternalEffectsEnabled;
     if (!replay_result.replay_match) return error.ReplayMismatch;
 
+    const decision_cards = try buildAllowedTradeDecisionCards(
+        input,
+        &account,
+        &basket,
+        &execution,
+    );
+
     return .{
         .basket = basket,
         .ticket = ticket,
+        .decision_cards = decision_cards,
         .replay_result = replay_result,
     };
 }
@@ -764,6 +783,9 @@ pub fn runSystemSuite(
             if (allowed.replay_result.external_effects_disabled) "true" else "false",
         },
     );
+    const decision_cards_json = try cards.allocDecisionCardsJson(allocator, &allowed.decision_cards);
+    defer allocator.free(decision_cards_json);
+    std.debug.print("=== Decision Cards ===\n{s}\n", .{decision_cards_json});
 
     const blocked = try runOversizedTradeScenario(
         allocator,
@@ -823,4 +845,75 @@ test "parseCliDemoRequest: unsupported amount fails closed" {
         error.UnsupportedDemoAmount,
         parseCliDemoRequest("I want to invest USD 5,000 in AI infrastructure."),
     );
+}
+
+test "runAllowedTradeScenario persists and exposes thesis and money proposal cards" {
+    const result = try runAllowedTradeScenario(std.testing.allocator, std.testing.io, support.operationsThesisInput());
+
+    try std.testing.expectEqual(result.basket.basket_id, result.decision_cards.thesis_card.basket_id);
+    try std.testing.expectEqual(
+        thesis.computeThesisInputHash(support.operationsThesisInput()),
+        result.decision_cards.thesis_card.thesis_id,
+    );
+    try std.testing.expectEqualStrings(supplier_payout_beneficiary, result.decision_cards.money_proposal_card.beneficiarySlice());
+    try std.testing.expectEqualStrings(supplier_payout_source_event, result.decision_cards.money_proposal_card.sourceEventSlice());
+    try std.testing.expectEqualStrings(supplier_payout_currency, result.decision_cards.money_proposal_card.currencySlice());
+
+    const json = try cards.allocDecisionCardsJson(std.testing.allocator, &result.decision_cards);
+    defer std.testing.allocator.free(json);
+    try std.testing.expect(std.mem.indexOf(u8, json, "\"thesis_card\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, json, "\"money_proposal_card\"") != null);
+}
+
+fn buildAllowedTradeDecisionCards(
+    input: thesis.ThesisInput,
+    account_before: *const portfolio.BrokerageAccount,
+    basket: *const basket_mod.Basket,
+    execution: *const trade_ticket.PaperExecutionResult,
+) !cards.DecisionCardsContract {
+    const target_impact = impact.computePreTradeImpact(
+        account_before,
+        basket,
+        &[_]impact.PendingObligation{},
+        demo_cash_buffer_threshold_cents,
+        decision_cards_now_ns,
+    );
+    const realized_impact = impact.computeRealizedTradeImpact(
+        account_before,
+        basket,
+        execution.total_filled_cents,
+        &[_]impact.PendingObligation{},
+        demo_cash_buffer_threshold_cents,
+        decision_cards_now_ns,
+    );
+
+    var store = cards.DecisionCardsStore{};
+    store.saveThesisCard(try cards.buildThesisCard(
+        thesis.computeThesisInputHash(input),
+        input.text(),
+        basket,
+        target_impact.thesis_after_bp,
+        realized_impact.thesis_after_bp,
+        replay.hashBytes("evidence.ai_infrastructure.positions.v1"),
+        decision_cards_now_ns,
+    ));
+
+    const payout_obligation = impact.PendingObligation{
+        .proposal_id = supplier_payout_proposal_id,
+        .rail = .ach,
+        .destination_id = 9001,
+        .amount_cents = supplier_payout_amount_cents,
+        .approval_state = .pending,
+        .expires_at_ns = supplier_payout_expires_at_ns,
+    };
+    store.saveMoneyProposalCard(try cards.buildMoneyProposalCard(
+        &payout_obligation,
+        supplier_payout_source_event,
+        supplier_payout_beneficiary,
+        supplier_payout_currency,
+        replay.hashBytes("evidence.payment_retry.supplier_acme_us.v1"),
+        decision_cards_now_ns,
+    ));
+
+    return store.snapshot();
 }

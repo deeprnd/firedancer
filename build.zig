@@ -519,6 +519,24 @@ pub fn build(b: *std.Build) void {
             .{ .name = "thesis", .module = thesis_int_mod },
         },
     });
+    const impact_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/impact.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "portfolio", .module = portfolio_int_mod },
+        },
+    });
+    const cards_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/cards.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "impact", .module = impact_int_mod },
+        },
+    });
     const tkpoly_int_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/policy/mod.zig"),
         .target = target,
@@ -628,6 +646,8 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "adapter", .module = adapter_int_mod },
             .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "cards", .module = cards_int_mod },
+            .{ .name = "impact", .module = impact_int_mod },
             .{ .name = "investment_support", .module = investment_support_int_mod },
             .{ .name = "model", .module = model_int_mod },
             .{ .name = "portfolio", .module = portfolio_int_mod },
@@ -677,6 +697,23 @@ pub fn build(b: *std.Build) void {
         linkTickoniCodec(b, integration_test, fd_lib_dir);
         integration_step.dependOn(&b.addRunArtifact(integration_test).step);
     }
+
+    const decision_cards_integration_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/integration/investment_decision_cards.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "investment_demo", .module = investment_demo_mod },
+                .{ .name = "investment_support", .module = investment_support_int_mod },
+            },
+        }),
+    });
+    decision_cards_integration_test.root_module.addLibraryPath(b.path(fd_lib_dir));
+    decision_cards_integration_test.root_module.linkSystemLibrary("fd_util", .{});
+    decision_cards_integration_test.root_module.linkSystemLibrary("fd_ballet", .{});
+    decision_cards_integration_test.root_module.linkSystemLibrary("stdc++", .{});
+    integration_step.dependOn(&b.addRunArtifact(decision_cards_integration_test).step);
 
     const system_step = b.step("system-test", "Run live V1.1 system/demo proofs");
     const system_test = b.addTest(.{

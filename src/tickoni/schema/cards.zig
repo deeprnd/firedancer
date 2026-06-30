@@ -1,19 +1,8 @@
 /// V1.3.S2 Thesis and Money Proposal Cards
 ///
-/// ThesisCard (T1): persisted after paper execution. Carries thesis id, user text,
-/// basket id, linked positions (each with ticker, rationale, and allocation_cents),
-/// target and current exposure in basis points, health status, and timestamps.
-///
-/// MoneyProposalCard (T2): persisted after proposal generation. Carries proposal id,
-/// source event, beneficiary, rail, currency, amount, approval state, expiry,
-/// content-addressed evidence hash, and status.
-///
-/// buildThesisCard() (T3): constructs a ThesisCard from basket and computed impact
-/// after a paper execution. Linked positions carry the basket rationale strings (T5).
-///
-/// buildMoneyProposalCard() (T4): constructs a MoneyProposalCard from a pending
-/// obligation plus source and evidence metadata. The evidence_hash field links the
-/// card back to the content-addressed evidence record (T5).
+/// This module defines bounded card schemas, fail-closed builders, a small
+/// deterministic store used by the current demo/runtime path, and a JSON
+/// export contract that a UI can render directly.
 const std = @import("std");
 const basket_mod = @import("basket");
 const impact_mod = @import("impact");
@@ -38,6 +27,42 @@ pub const max_source_event_len: usize = 64;
 pub const max_beneficiary_len: usize = 128;
 /// Currency code slot: three-letter ISO code zero-padded to 4 bytes.
 pub const currency_len: usize = 4;
+pub const bp_denom: u32 = 10_000;
+
+pub const BuildThesisCardError = error{
+    ZeroThesisId,
+    ZeroBasketId,
+    BasketThesisIdMismatch,
+    EmptyUserText,
+    UserTextTooLong,
+    EmptyLinkedPositions,
+    TooManyLinkedPositions,
+    InvalidTargetExposure,
+    InvalidCurrentExposure,
+    MissingEvidenceHash,
+    InvalidTimestamp,
+    InvalidUserText,
+};
+
+pub const BuildMoneyProposalCardError = error{
+    ZeroProposalId,
+    EmptySourceEvent,
+    SourceEventTooLong,
+    EmptyBeneficiary,
+    BeneficiaryTooLong,
+    InvalidSourceEvent,
+    InvalidBeneficiary,
+    InvalidCurrencyCode,
+    NonPositiveAmount,
+    MissingEvidenceHash,
+    InvalidTimestamp,
+    ExpiredProposal,
+};
+
+pub const DecisionCardsStoreError = error{
+    MissingThesisCard,
+    MissingMoneyProposalCard,
+};
 
 // ---------------------------------------------------------------------------
 // ThesisCard (T1)
@@ -51,15 +76,25 @@ pub const ThesisCardStatus = enum(u8) {
     drifted,
     /// Thesis was manually closed or superseded.
     closed,
+
+    pub fn label(self: ThesisCardStatus) []const u8 {
+        return switch (self) {
+            .active => "active",
+            .drifted => "drifted",
+            .closed => "closed",
+        };
+    }
 };
 
-/// One position linked to a thesis card, carrying the basket rationale (T5).
+/// One position linked to a thesis card, carrying rationale and evidence (T5).
 pub const LinkedPosition = struct {
     ticker: [basket_mod.catalog.max_ticker_len]u8,
     ticker_len: u8,
     /// Rationale text copied from the basket instrument at card creation (T5).
     rationale: [basket_mod.max_rationale_len]u8,
     rationale_len: u8,
+    /// Content-addressed hash of the evidence packet backing the rationale.
+    evidence_hash: u64,
     allocation_cents: i64,
 
     pub fn tickerSlice(self: *const LinkedPosition) []const u8 {
@@ -79,13 +114,12 @@ pub const ThesisCard = struct {
     user_text_len: u16,
     /// Content hash of the basket produced from the thesis.
     basket_id: u64,
-    /// Positions included in the basket, with rationale and allocation (T5).
+    /// Positions included in the basket, with rationale and evidence (T5).
     linked_positions: [max_linked_positions]LinkedPosition,
     linked_position_count: u8,
-    /// Intended exposure: basket fraction of total invested portfolio after
-    /// paper execution, in basis points (10000 = 100%).
+    /// Intended exposure in basis points from the proposed basket.
     target_exposure_bp: u32,
-    /// Exposure at last check (equals target_exposure_bp at card creation).
+    /// Realized/current exposure in basis points at card creation.
     current_exposure_bp: u32,
     status: ThesisCardStatus,
     /// Nanosecond epoch timestamp of card creation.
@@ -114,13 +148,23 @@ pub const MoneyProposalStatus = enum(u8) {
     expired,
     /// Proposal was executed (future tkexec path).
     executed,
+
+    pub fn label(self: MoneyProposalStatus) []const u8 {
+        return switch (self) {
+            .pending => "pending",
+            .approved => "approved",
+            .rejected => "rejected",
+            .expired => "expired",
+            .executed => "executed",
+        };
+    }
 };
 
 /// Persisted record for a payment or transfer proposal (T2).
 pub const MoneyProposalCard = struct {
     /// Stable proposal identifier matching the source PendingObligation.
     proposal_id: u64,
-    /// Financial event that triggered this proposal (e.g. "payment.failed").
+    /// Financial event that triggered this proposal (e.g. "payment_failed").
     source_event: [max_source_event_len]u8,
     source_event_len: u8,
     /// Human-readable beneficiary label or opaque identifier.
@@ -131,9 +175,9 @@ pub const MoneyProposalCard = struct {
     currency: [currency_len]u8,
     amount_cents: i64,
     approval_state: ApprovalState,
-    /// Nanosecond epoch expiry; 0 means no expiry.
+    /// Nanosecond epoch expiry; nonzero in the current demo flow.
     expires_at_ns: u64,
-    /// Content-addressed hash of the evidence record that justified this
+    /// Content-addressed hash of the evidence packet that justified this
     /// proposal. Links the card back to auditable rationale (T5).
     evidence_hash: u64,
     status: MoneyProposalStatus,
@@ -155,79 +199,180 @@ pub const MoneyProposalCard = struct {
 };
 
 // ---------------------------------------------------------------------------
+// Store and JSON contract
+// ---------------------------------------------------------------------------
+
+pub const DecisionCardsContract = struct {
+    schema_version: u16 = cards_schema_version,
+    thesis_card: ThesisCard,
+    money_proposal_card: MoneyProposalCard,
+};
+
+/// Minimal deterministic saved-card store for the current demo/runtime path.
+pub const DecisionCardsStore = struct {
+    thesis_card: ?ThesisCard = null,
+    money_proposal_card: ?MoneyProposalCard = null,
+
+    pub fn saveThesisCard(self: *DecisionCardsStore, card: ThesisCard) void {
+        self.thesis_card = card;
+    }
+
+    pub fn saveMoneyProposalCard(self: *DecisionCardsStore, card: MoneyProposalCard) void {
+        self.money_proposal_card = card;
+    }
+
+    pub fn snapshot(self: *const DecisionCardsStore) DecisionCardsStoreError!DecisionCardsContract {
+        const thesis_card = self.thesis_card orelse return error.MissingThesisCard;
+        const money_proposal_card = self.money_proposal_card orelse return error.MissingMoneyProposalCard;
+        return .{
+            .thesis_card = thesis_card,
+            .money_proposal_card = money_proposal_card,
+        };
+    }
+};
+
+pub fn allocDecisionCardsJson(
+    allocator: std.mem.Allocator,
+    contract: *const DecisionCardsContract,
+) ![]u8 {
+    const LinkedPositionView = struct {
+        ticker: []const u8,
+        rationale: []const u8,
+        evidence_hash: u64,
+        allocation_cents: i64,
+    };
+    const ThesisCardView = struct {
+        thesis_id: u64,
+        user_text: []const u8,
+        basket_id: u64,
+        linked_positions: []const LinkedPositionView,
+        target_exposure_bp: u32,
+        current_exposure_bp: u32,
+        status: []const u8,
+        created_at_ns: u64,
+        last_checked_at_ns: u64,
+    };
+    const MoneyProposalCardView = struct {
+        proposal_id: u64,
+        source_event: []const u8,
+        beneficiary: []const u8,
+        rail: []const u8,
+        currency: []const u8,
+        amount_cents: i64,
+        approval_state: []const u8,
+        expires_at_ns: u64,
+        evidence_hash: u64,
+        status: []const u8,
+        created_at_ns: u64,
+    };
+
+    var linked_position_views: [max_linked_positions]LinkedPositionView = undefined;
+    for (contract.thesis_card.linked_positions[0..contract.thesis_card.linked_position_count], 0..) |*position, i| {
+        linked_position_views[i] = .{
+            .ticker = position.tickerSlice(),
+            .rationale = position.rationaleSlice(),
+            .evidence_hash = position.evidence_hash,
+            .allocation_cents = position.allocation_cents,
+        };
+    }
+
+    return std.json.Stringify.valueAlloc(allocator, .{
+        .schema_version = contract.schema_version,
+        .thesis_card = ThesisCardView{
+            .thesis_id = contract.thesis_card.thesis_id,
+            .user_text = contract.thesis_card.userTextSlice(),
+            .basket_id = contract.thesis_card.basket_id,
+            .linked_positions = linked_position_views[0..contract.thesis_card.linked_position_count],
+            .target_exposure_bp = contract.thesis_card.target_exposure_bp,
+            .current_exposure_bp = contract.thesis_card.current_exposure_bp,
+            .status = contract.thesis_card.status.label(),
+            .created_at_ns = contract.thesis_card.created_at_ns,
+            .last_checked_at_ns = contract.thesis_card.last_checked_at_ns,
+        },
+        .money_proposal_card = MoneyProposalCardView{
+            .proposal_id = contract.money_proposal_card.proposal_id,
+            .source_event = contract.money_proposal_card.sourceEventSlice(),
+            .beneficiary = contract.money_proposal_card.beneficiarySlice(),
+            .rail = railLabel(contract.money_proposal_card.rail),
+            .currency = contract.money_proposal_card.currencySlice(),
+            .amount_cents = contract.money_proposal_card.amount_cents,
+            .approval_state = approvalStateLabel(contract.money_proposal_card.approval_state),
+            .expires_at_ns = contract.money_proposal_card.expires_at_ns,
+            .evidence_hash = contract.money_proposal_card.evidence_hash,
+            .status = contract.money_proposal_card.status.label(),
+            .created_at_ns = contract.money_proposal_card.created_at_ns,
+        },
+    }, .{});
+}
+
+pub fn writeDecisionCardsJson(
+    allocator: std.mem.Allocator,
+    writer: anytype,
+    contract: *const DecisionCardsContract,
+) !void {
+    const json = try allocDecisionCardsJson(allocator, contract);
+    defer allocator.free(json);
+    try writer.writeAll(json);
+    try writer.writeAll("\n");
+}
+
+// ---------------------------------------------------------------------------
 // Build functions (T3, T4)
 // ---------------------------------------------------------------------------
 
 /// Construct a ThesisCard after paper execution (T3).
-///
-/// `thesis_id`  — computeThesisInputHash() result for the source ThesisInput.
-/// `user_text`  — the raw investor text from ThesisInput; truncated to
-///                max_user_text_len if necessary.
-/// `basket`     — the deterministic basket produced from the thesis.
-/// `impact`     — the PortfolioImpact computed after paper execution.
-///                impact.thesis_after_bp is used as both target and current
-///                exposure at card creation (they diverge only in S3 drift).
-/// `now_ns`     — nanosecond epoch timestamp for created_at_ns and
-///                last_checked_at_ns.
-///
-/// Linked positions are populated from basket.instruments, carrying the per-
-/// instrument rationale strings so the card can be rendered without the basket
-/// being present (T5).
 pub fn buildThesisCard(
     thesis_id: u64,
     user_text: []const u8,
     basket: *const basket_mod.Basket,
-    impact: *const impact_mod.PortfolioImpact,
+    target_exposure_bp: u32,
+    current_exposure_bp: u32,
+    linked_position_evidence_hash: u64,
     now_ns: u64,
-) ThesisCard {
+) BuildThesisCardError!ThesisCard {
+    try validateThesisCardInputs(
+        thesis_id,
+        user_text,
+        basket,
+        target_exposure_bp,
+        current_exposure_bp,
+        linked_position_evidence_hash,
+        now_ns,
+    );
+
     var card = std.mem.zeroes(ThesisCard);
     card.thesis_id = thesis_id;
     card.basket_id = basket.basket_id;
-    card.target_exposure_bp = impact.thesis_after_bp;
-    card.current_exposure_bp = impact.thesis_after_bp;
+    card.target_exposure_bp = target_exposure_bp;
+    card.current_exposure_bp = current_exposure_bp;
     card.status = .active;
     card.created_at_ns = now_ns;
     card.last_checked_at_ns = now_ns;
 
-    // Copy user text, clamped to capacity.
-    const text_len = @min(user_text.len, max_user_text_len);
-    @memcpy(card.user_text[0..text_len], user_text[0..text_len]);
-    card.user_text_len = @intCast(text_len);
+    @memcpy(card.user_text[0..user_text.len], user_text);
+    card.user_text_len = @intCast(user_text.len);
 
-    // Link positions: copy ticker, rationale, and allocation from each basket
-    // instrument so the card carries its own evidence references (T5).
-    const pos_count = @min(basket.instrument_count, max_linked_positions);
-    for (basket.instruments[0..pos_count], 0..) |*instr, i| {
+    for (basket.instruments[0..basket.instrument_count], 0..) |*instr, i| {
         var pos = std.mem.zeroes(LinkedPosition);
 
-        const tk_len = @min(@as(usize, instr.ticker_len), basket_mod.catalog.max_ticker_len);
-        @memcpy(pos.ticker[0..tk_len], instr.ticker[0..tk_len]);
-        pos.ticker_len = @intCast(tk_len);
+        const ticker_len = @as(usize, instr.ticker_len);
+        @memcpy(pos.ticker[0..ticker_len], instr.ticker[0..ticker_len]);
+        pos.ticker_len = instr.ticker_len;
 
-        const rat_len = @min(@as(usize, instr.rationale_len), basket_mod.max_rationale_len);
-        @memcpy(pos.rationale[0..rat_len], instr.rationale[0..rat_len]);
-        pos.rationale_len = @intCast(rat_len);
+        const rationale_len = @as(usize, instr.rationale_len);
+        @memcpy(pos.rationale[0..rationale_len], instr.rationale[0..rationale_len]);
+        pos.rationale_len = instr.rationale_len;
 
+        pos.evidence_hash = linked_position_evidence_hash;
         pos.allocation_cents = instr.allocation_cents;
         card.linked_positions[i] = pos;
     }
-    card.linked_position_count = @intCast(pos_count);
+    card.linked_position_count = basket.instrument_count;
 
     return card;
 }
 
 /// Construct a MoneyProposalCard after proposal generation (T4).
-///
-/// `obligation`     — the PendingObligation created by the proposal path.
-/// `source_event`   — the financial event type that triggered the proposal
-///                    (e.g. "payment.failed", "transfer.requested").
-/// `beneficiary`    — display label or destination identifier for the
-///                    beneficiary; truncated to max_beneficiary_len.
-/// `currency`       — ISO 4217 code (e.g. "USD"); must be 1–3 bytes.
-/// `evidence_hash`  — content-addressed hash of the evidence record that
-///                    justified this proposal. Links the card back to auditable
-///                    rationale (T5). Pass 0 when evidence is not yet hashed.
-/// `now_ns`         — nanosecond epoch timestamp for created_at_ns.
 pub fn buildMoneyProposalCard(
     obligation: *const impact_mod.PendingObligation,
     source_event: []const u8,
@@ -235,7 +380,16 @@ pub fn buildMoneyProposalCard(
     currency: []const u8,
     evidence_hash: u64,
     now_ns: u64,
-) MoneyProposalCard {
+) BuildMoneyProposalCardError!MoneyProposalCard {
+    try validateMoneyProposalCardInputs(
+        obligation,
+        source_event,
+        beneficiary,
+        currency,
+        evidence_hash,
+        now_ns,
+    );
+
     var card = std.mem.zeroes(MoneyProposalCard);
     card.proposal_id = obligation.proposal_id;
     card.rail = obligation.rail;
@@ -245,7 +399,6 @@ pub fn buildMoneyProposalCard(
     card.evidence_hash = evidence_hash;
     card.created_at_ns = now_ns;
 
-    // Derive card status from approval state.
     card.status = switch (obligation.approval_state) {
         .pending => .pending,
         .approved => .approved,
@@ -253,27 +406,116 @@ pub fn buildMoneyProposalCard(
         .expired => .expired,
     };
 
-    const ev_len = @min(source_event.len, max_source_event_len);
-    @memcpy(card.source_event[0..ev_len], source_event[0..ev_len]);
-    card.source_event_len = @intCast(ev_len);
+    @memcpy(card.source_event[0..source_event.len], source_event);
+    card.source_event_len = @intCast(source_event.len);
 
-    const ben_len = @min(beneficiary.len, max_beneficiary_len);
-    @memcpy(card.beneficiary[0..ben_len], beneficiary[0..ben_len]);
-    card.beneficiary_len = @intCast(ben_len);
+    @memcpy(card.beneficiary[0..beneficiary.len], beneficiary);
+    card.beneficiary_len = @intCast(beneficiary.len);
 
-    // Copy ISO currency code into the fixed-width slot.
-    const cur_len = @min(currency.len, currency_len);
-    @memcpy(card.currency[0..cur_len], currency[0..cur_len]);
-
+    @memcpy(card.currency[0..currency.len], currency);
     return card;
 }
 
 // ---------------------------------------------------------------------------
-// Tests (T3, T4, T5)
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+fn validateThesisCardInputs(
+    thesis_id: u64,
+    user_text: []const u8,
+    basket: *const basket_mod.Basket,
+    target_exposure_bp: u32,
+    current_exposure_bp: u32,
+    linked_position_evidence_hash: u64,
+    now_ns: u64,
+) BuildThesisCardError!void {
+    if (thesis_id == 0) return error.ZeroThesisId;
+    if (basket.basket_id == 0) return error.ZeroBasketId;
+    if (basket.thesis_id == 0 or basket.thesis_id != thesis_id) return error.BasketThesisIdMismatch;
+    if (user_text.len == 0) return error.EmptyUserText;
+    if (user_text.len > max_user_text_len) return error.UserTextTooLong;
+    if (!isSafeText(user_text)) return error.InvalidUserText;
+    if (basket.instrument_count == 0) return error.EmptyLinkedPositions;
+    if (basket.instrument_count > max_linked_positions) return error.TooManyLinkedPositions;
+    if (target_exposure_bp > bp_denom) return error.InvalidTargetExposure;
+    if (current_exposure_bp > bp_denom) return error.InvalidCurrentExposure;
+    if (linked_position_evidence_hash == 0) return error.MissingEvidenceHash;
+    if (now_ns == 0) return error.InvalidTimestamp;
+}
+
+fn validateMoneyProposalCardInputs(
+    obligation: *const impact_mod.PendingObligation,
+    source_event: []const u8,
+    beneficiary: []const u8,
+    currency: []const u8,
+    evidence_hash: u64,
+    now_ns: u64,
+) BuildMoneyProposalCardError!void {
+    if (obligation.proposal_id == 0) return error.ZeroProposalId;
+    if (source_event.len == 0) return error.EmptySourceEvent;
+    if (source_event.len > max_source_event_len) return error.SourceEventTooLong;
+    if (!isSafeIdentifier(source_event)) return error.InvalidSourceEvent;
+    if (beneficiary.len == 0) return error.EmptyBeneficiary;
+    if (beneficiary.len > max_beneficiary_len) return error.BeneficiaryTooLong;
+    if (!isSafeText(beneficiary)) return error.InvalidBeneficiary;
+    if (!isIsoCurrencyCode(currency)) return error.InvalidCurrencyCode;
+    if (obligation.amount_cents <= 0) return error.NonPositiveAmount;
+    if (evidence_hash == 0) return error.MissingEvidenceHash;
+    if (now_ns == 0) return error.InvalidTimestamp;
+    if (obligation.expires_at_ns != 0 and obligation.expires_at_ns <= now_ns) return error.ExpiredProposal;
+}
+
+fn isSafeText(value: []const u8) bool {
+    for (value) |byte| {
+        if (byte < 0x20 or byte == 0x7f) return false;
+    }
+    return true;
+}
+
+fn isSafeIdentifier(value: []const u8) bool {
+    for (value) |byte| {
+        const ok =
+            std.ascii.isAlphanumeric(byte) or
+            byte == '_' or
+            byte == '.' or
+            byte == '-' or
+            byte == ':';
+        if (!ok) return false;
+    }
+    return true;
+}
+
+fn isIsoCurrencyCode(value: []const u8) bool {
+    if (value.len != 3) return false;
+    for (value) |byte| {
+        if (byte < 'A' or byte > 'Z') return false;
+    }
+    return true;
+}
+
+fn railLabel(rail: PaymentRail) []const u8 {
+    return switch (rail) {
+        .ach => "ach",
+        .wire => "wire",
+        .card => "card",
+        .internal => "internal",
+    };
+}
+
+fn approvalStateLabel(state: ApprovalState) []const u8 {
+    return switch (state) {
+        .pending => "pending",
+        .approved => "approved",
+        .rejected => "rejected",
+        .expired => "expired",
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
 // ---------------------------------------------------------------------------
 
 const testing = std.testing;
-const cat = basket_mod.catalog;
 
 fn makeMinimalBasket(basket_id: u64, thesis_id: u64) basket_mod.Basket {
     var b = std.mem.zeroes(basket_mod.Basket);
@@ -293,22 +535,14 @@ fn addInstrument(
 ) void {
     const i = b.instrument_count;
     @memcpy(b.instruments[i].ticker[0..ticker.len], ticker);
-    b.instruments[i].ticker_len = ticker.len;
+    b.instruments[i].ticker_len = @intCast(ticker.len);
     @memcpy(b.instruments[i].rationale[0..rationale.len], rationale);
-    b.instruments[i].rationale_len = rationale.len;
+    b.instruments[i].rationale_len = @intCast(rationale.len);
     b.instruments[i].allocation_cents = allocation_cents;
     b.instruments[i].asset_class = .equity;
     b.instruments[i].instrument_type = .etf;
     b.instruments[i].weight_bp = 5000;
     b.instrument_count += 1;
-}
-
-fn makeMinimalImpact(thesis_after_bp: u32) impact_mod.PortfolioImpact {
-    var imp = std.mem.zeroes(impact_mod.PortfolioImpact);
-    imp.thesis_after_bp = thesis_after_bp;
-    imp.thesis_before_bp = 0;
-    imp.thesis_position_count = 2;
-    return imp;
 }
 
 fn makeObligation(
@@ -328,186 +562,266 @@ fn makeObligation(
     };
 }
 
-// ---- ThesisCard (T3) -------------------------------------------------------
+fn hashBytes(bytes: []const u8) u64 {
+    return std.hash.Wyhash.hash(0, bytes);
+}
 
-test "buildThesisCard: thesis_id and basket_id are preserved" {
+test "buildThesisCard preserves ids and exposure fields" {
     var basket = makeMinimalBasket(0xABC, 0xDEF);
     addInstrument(&basket, "SOXX", "AI semiconductor ETF", 100_000);
     addInstrument(&basket, "NVDA", "GPU leader for AI workloads", 100_000);
 
-    const impact = makeMinimalImpact(2_200);
-    const card = buildThesisCard(0xDEF, "Buy AI infra", &basket, &impact, 1_000_000);
+    const evidence_hash = hashBytes("evidence.ai.thesis");
+    const card = try buildThesisCard(
+        0xDEF,
+        "Buy AI infra",
+        &basket,
+        3_100,
+        2_200,
+        evidence_hash,
+        1_000_000,
+    );
 
     try testing.expectEqual(@as(u64, 0xDEF), card.thesis_id);
     try testing.expectEqual(@as(u64, 0xABC), card.basket_id);
-}
-
-test "buildThesisCard: target and current exposure equal thesis_after_bp at creation" {
-    var basket = makeMinimalBasket(1, 2);
-    addInstrument(&basket, "SOXX", "semiconductor etf", 200_000);
-
-    const impact = makeMinimalImpact(3_100);
-    const card = buildThesisCard(2, "test", &basket, &impact, 0);
-
     try testing.expectEqual(@as(u32, 3_100), card.target_exposure_bp);
-    try testing.expectEqual(@as(u32, 3_100), card.current_exposure_bp);
+    try testing.expectEqual(@as(u32, 2_200), card.current_exposure_bp);
 }
 
-test "buildThesisCard: status is active at creation" {
-    var basket = makeMinimalBasket(1, 2);
-    addInstrument(&basket, "SOXX", "reason", 100_000);
-
-    const impact = makeMinimalImpact(1_000);
-    const card = buildThesisCard(2, "test", &basket, &impact, 0);
-
-    try testing.expectEqual(ThesisCardStatus.active, card.status);
-}
-
-test "buildThesisCard: timestamps set to now_ns" {
-    var basket = makeMinimalBasket(1, 2);
-    addInstrument(&basket, "SOXX", "reason", 100_000);
-
-    const now: u64 = 9_999_888_777;
-    const impact = makeMinimalImpact(1_000);
-    const card = buildThesisCard(2, "test", &basket, &impact, now);
-
-    try testing.expectEqual(now, card.created_at_ns);
-    try testing.expectEqual(now, card.last_checked_at_ns);
-}
-
-test "buildThesisCard: user text stored and retrievable" {
-    var basket = makeMinimalBasket(1, 2);
-    addInstrument(&basket, "SOXX", "reason", 100_000);
-
-    const user_text = "I want to invest USD 2,000 in AI infrastructure.";
-    const impact = makeMinimalImpact(2_200);
-    const card = buildThesisCard(2, user_text, &basket, &impact, 0);
-
-    try testing.expectEqualStrings(user_text, card.userTextSlice());
-}
-
-// T5: linked positions carry ticker and rationale from the basket.
-test "buildThesisCard: linked positions carry ticker and rationale from basket (T5)" {
+test "buildThesisCard links ticker rationale and evidence" {
     var basket = makeMinimalBasket(10, 20);
     addInstrument(&basket, "SOXX", "AI semiconductor ETF for broad exposure", 100_000);
     addInstrument(&basket, "NVDA", "GPU leader enabling AI model training", 100_000);
 
-    const impact = makeMinimalImpact(2_200);
-    const card = buildThesisCard(20, "AI infra thesis", &basket, &impact, 0);
+    const evidence_hash = hashBytes("evidence.ai.positions");
+    const card = try buildThesisCard(
+        20,
+        "AI infra thesis",
+        &basket,
+        2_200,
+        2_100,
+        evidence_hash,
+        9_999_888_777,
+    );
 
     try testing.expectEqual(@as(u8, 2), card.linked_position_count);
-
     try testing.expectEqualStrings("SOXX", card.linked_positions[0].tickerSlice());
     try testing.expectEqualStrings("AI semiconductor ETF for broad exposure", card.linked_positions[0].rationaleSlice());
-    try testing.expectEqual(@as(i64, 100_000), card.linked_positions[0].allocation_cents);
-
+    try testing.expectEqual(evidence_hash, card.linked_positions[0].evidence_hash);
     try testing.expectEqualStrings("NVDA", card.linked_positions[1].tickerSlice());
-    try testing.expectEqualStrings("GPU leader enabling AI model training", card.linked_positions[1].rationaleSlice());
-    try testing.expectEqual(@as(i64, 100_000), card.linked_positions[1].allocation_cents);
+    try testing.expectEqual(evidence_hash, card.linked_positions[1].evidence_hash);
 }
 
-test "buildThesisCard: empty basket produces zero linked_position_count" {
-    const basket = makeMinimalBasket(5, 6);
-    const impact = makeMinimalImpact(0);
-    const card = buildThesisCard(6, "test", &basket, &impact, 0);
-
-    try testing.expectEqual(@as(u8, 0), card.linked_position_count);
-}
-
-test "buildThesisCard: user text truncated at max_user_text_len" {
+test "buildThesisCard rejects invalid inputs instead of truncating" {
     var basket = makeMinimalBasket(1, 2);
-    addInstrument(&basket, "SOXX", "r", 100_000);
+    addInstrument(&basket, "SOXX", "reason", 100_000);
 
-    // Build a text longer than max_user_text_len.
-    var long_text: [max_user_text_len + 10]u8 = undefined;
+    try testing.expectError(
+        error.EmptyUserText,
+        buildThesisCard(2, "", &basket, 1_000, 1_000, hashBytes("evidence"), 1),
+    );
+
+    var long_text: [max_user_text_len + 1]u8 = undefined;
     @memset(&long_text, 'x');
+    try testing.expectError(
+        error.UserTextTooLong,
+        buildThesisCard(2, &long_text, &basket, 1_000, 1_000, hashBytes("evidence"), 1),
+    );
 
-    const impact = makeMinimalImpact(0);
-    const card = buildThesisCard(2, &long_text, &basket, &impact, 0);
-
-    try testing.expectEqual(@as(u16, max_user_text_len), card.user_text_len);
+    try testing.expectError(
+        error.BasketThesisIdMismatch,
+        buildThesisCard(3, "test", &basket, 1_000, 1_000, hashBytes("evidence"), 1),
+    );
+    try testing.expectError(
+        error.MissingEvidenceHash,
+        buildThesisCard(2, "test", &basket, 1_000, 1_000, 0, 1),
+    );
+    try testing.expectError(
+        error.InvalidTimestamp,
+        buildThesisCard(2, "test", &basket, 1_000, 1_000, hashBytes("evidence"), 0),
+    );
 }
 
-// ---- MoneyProposalCard (T4) ------------------------------------------------
-
-test "buildMoneyProposalCard: proposal_id, rail, amount, approval_state preserved" {
-    const ob = makeObligation(101, .ach, 124_000, .pending, 0);
-    const card = buildMoneyProposalCard(&ob, "payment.failed", "Supplier A", "USD", 0xCAFE, 5_000);
+test "buildMoneyProposalCard preserves proposal fields" {
+    const expiry: u64 = 9_999_000_000;
+    const now: u64 = 5_000_000_000;
+    const ob = makeObligation(101, .ach, 124_000, .pending, expiry);
+    const card = try buildMoneyProposalCard(
+        &ob,
+        "payment_failed",
+        "supplier_acme_us",
+        "USD",
+        hashBytes("evidence.payment"),
+        now,
+    );
 
     try testing.expectEqual(@as(u64, 101), card.proposal_id);
     try testing.expectEqual(PaymentRail.ach, card.rail);
     try testing.expectEqual(@as(i64, 124_000), card.amount_cents);
-    try testing.expectEqual(ApprovalState.pending, card.approval_state);
-}
-
-test "buildMoneyProposalCard: source_event and beneficiary stored correctly" {
-    const ob = makeObligation(202, .wire, 50_000, .approved, 0);
-    const card = buildMoneyProposalCard(&ob, "transfer.requested", "Payroll account", "USD", 0, 0);
-
-    try testing.expectEqualStrings("transfer.requested", card.sourceEventSlice());
-    try testing.expectEqualStrings("Payroll account", card.beneficiarySlice());
-}
-
-test "buildMoneyProposalCard: currency stored and trimmed" {
-    const ob = makeObligation(303, .ach, 10_000, .pending, 0);
-    const card = buildMoneyProposalCard(&ob, "payment.retry", "Partner B", "USD", 0, 0);
-
+    try testing.expectEqualStrings("payment_failed", card.sourceEventSlice());
+    try testing.expectEqualStrings("supplier_acme_us", card.beneficiarySlice());
     try testing.expectEqualStrings("USD", card.currencySlice());
+    try testing.expectEqual(MoneyProposalStatus.pending, card.status);
 }
 
-// T5: evidence_hash links the card back to auditable evidence.
-test "buildMoneyProposalCard: evidence_hash links card to evidence record (T5)" {
-    const ob = makeObligation(404, .ach, 124_000, .pending, 0);
-    const evidence_hash: u64 = 0xDEAD_BEEF_CAFE_1234;
-    const card = buildMoneyProposalCard(&ob, "payment.failed", "Supplier payout", "USD", evidence_hash, 0);
-
-    try testing.expectEqual(evidence_hash, card.evidence_hash);
-}
-
-test "buildMoneyProposalCard: status derived from approval_state at creation" {
-    const pending_ob = makeObligation(1, .ach, 1_000, .pending, 0);
-    const pending_card = buildMoneyProposalCard(&pending_ob, "ev", "b", "USD", 0, 0);
-    try testing.expectEqual(MoneyProposalStatus.pending, pending_card.status);
-
-    const approved_ob = makeObligation(2, .ach, 1_000, .approved, 0);
-    const approved_card = buildMoneyProposalCard(&approved_ob, "ev", "b", "USD", 0, 0);
-    try testing.expectEqual(MoneyProposalStatus.approved, approved_card.status);
-
-    const rejected_ob = makeObligation(3, .ach, 1_000, .rejected, 0);
-    const rejected_card = buildMoneyProposalCard(&rejected_ob, "ev", "b", "USD", 0, 0);
-    try testing.expectEqual(MoneyProposalStatus.rejected, rejected_card.status);
-
-    const expired_ob = makeObligation(4, .ach, 1_000, .expired, 0);
-    const expired_card = buildMoneyProposalCard(&expired_ob, "ev", "b", "USD", 0, 0);
-    try testing.expectEqual(MoneyProposalStatus.expired, expired_card.status);
-}
-
-test "buildMoneyProposalCard: expires_at_ns and created_at_ns preserved" {
-    const expiry: u64 = 9_999_000_000;
+test "buildMoneyProposalCard rejects malformed financial inputs" {
     const now: u64 = 5_000_000_000;
-    const ob = makeObligation(505, .wire, 75_000, .pending, expiry);
-    const card = buildMoneyProposalCard(&ob, "payment.failed", "Vendor C", "USD", 0, now);
+    const expiry: u64 = now + 1_000;
 
-    try testing.expectEqual(expiry, card.expires_at_ns);
-    try testing.expectEqual(now, card.created_at_ns);
+    try testing.expectError(
+        error.ZeroProposalId,
+        buildMoneyProposalCard(
+            &makeObligation(0, .ach, 124_000, .pending, expiry),
+            "payment_failed",
+            "supplier_acme_us",
+            "USD",
+            hashBytes("evidence"),
+            now,
+        ),
+    );
+    try testing.expectError(
+        error.NonPositiveAmount,
+        buildMoneyProposalCard(
+            &makeObligation(1, .ach, 0, .pending, expiry),
+            "payment_failed",
+            "supplier_acme_us",
+            "USD",
+            hashBytes("evidence"),
+            now,
+        ),
+    );
+    try testing.expectError(
+        error.InvalidCurrencyCode,
+        buildMoneyProposalCard(
+            &makeObligation(1, .ach, 124_000, .pending, expiry),
+            "payment_failed",
+            "supplier_acme_us",
+            "US",
+            hashBytes("evidence"),
+            now,
+        ),
+    );
+    try testing.expectError(
+        error.MissingEvidenceHash,
+        buildMoneyProposalCard(
+            &makeObligation(1, .ach, 124_000, .pending, expiry),
+            "payment_failed",
+            "supplier_acme_us",
+            "USD",
+            0,
+            now,
+        ),
+    );
+    try testing.expectError(
+        error.ExpiredProposal,
+        buildMoneyProposalCard(
+            &makeObligation(1, .ach, 124_000, .pending, now),
+            "payment_failed",
+            "supplier_acme_us",
+            "USD",
+            hashBytes("evidence"),
+            now,
+        ),
+    );
 }
 
-test "buildMoneyProposalCard: zero evidence_hash is valid" {
-    const ob = makeObligation(606, .internal, 10_000, .pending, 0);
-    const card = buildMoneyProposalCard(&ob, "ledger.transfer", "Internal ops", "USD", 0, 0);
+test "decision cards store snapshots only after both cards are saved" {
+    var store = DecisionCardsStore{};
+    try testing.expectError(error.MissingThesisCard, store.snapshot());
 
-    try testing.expectEqual(@as(u64, 0), card.evidence_hash);
+    var basket = makeMinimalBasket(1, 2);
+    addInstrument(&basket, "SOXX", "reason", 100_000);
+    store.saveThesisCard(try buildThesisCard(
+        2,
+        "test",
+        &basket,
+        1_000,
+        900,
+        hashBytes("evidence.ai"),
+        1,
+    ));
+    try testing.expectError(error.MissingMoneyProposalCard, store.snapshot());
+
+    store.saveMoneyProposalCard(try buildMoneyProposalCard(
+        &makeObligation(1, .ach, 124_000, .pending, 2),
+        "payment_failed",
+        "supplier_acme_us",
+        "USD",
+        hashBytes("evidence.money"),
+        1,
+    ));
+    const snapshot = try store.snapshot();
+    try testing.expectEqual(@as(u16, cards_schema_version), snapshot.schema_version);
 }
 
-test "buildMoneyProposalCard: beneficiary truncated at max_beneficiary_len" {
-    const ob = makeObligation(707, .ach, 1_000, .pending, 0);
-    var long_ben: [max_beneficiary_len + 5]u8 = undefined;
-    @memset(&long_ben, 'B');
+test "allocDecisionCardsJson exposes a UI-renderable contract" {
+    var store = DecisionCardsStore{};
+    var basket = makeMinimalBasket(0xAA, 0xBB);
+    addInstrument(&basket, "SOXX", "ETF rationale", 200_000);
 
-    const card = buildMoneyProposalCard(&ob, "ev", &long_ben, "USD", 0, 0);
-    try testing.expectEqual(@as(u8, max_beneficiary_len), card.beneficiary_len);
-}
+    store.saveThesisCard(try buildThesisCard(
+        0xBB,
+        "Buy AI infra",
+        &basket,
+        1_500,
+        1_250,
+        hashBytes("evidence.positions"),
+        10,
+    ));
+    store.saveMoneyProposalCard(try buildMoneyProposalCard(
+        &makeObligation(404, .ach, 124_000, .pending, 100),
+        "payment_failed",
+        "supplier_acme_us",
+        "USD",
+        hashBytes("evidence.money"),
+        10,
+    ));
 
-test "cards_schema_version is 1" {
-    try testing.expectEqual(@as(u16, 1), cards_schema_version);
+    const snapshot = try store.snapshot();
+    const json = try allocDecisionCardsJson(testing.allocator, &snapshot);
+    defer testing.allocator.free(json);
+
+    const ContractWire = struct {
+        schema_version: u16,
+        thesis_card: struct {
+            thesis_id: u64,
+            user_text: []const u8,
+            basket_id: u64,
+            linked_positions: []const struct {
+                ticker: []const u8,
+                rationale: []const u8,
+                evidence_hash: u64,
+                allocation_cents: i64,
+            },
+            target_exposure_bp: u32,
+            current_exposure_bp: u32,
+            status: []const u8,
+            created_at_ns: u64,
+            last_checked_at_ns: u64,
+        },
+        money_proposal_card: struct {
+            proposal_id: u64,
+            source_event: []const u8,
+            beneficiary: []const u8,
+            rail: []const u8,
+            currency: []const u8,
+            amount_cents: i64,
+            approval_state: []const u8,
+            expires_at_ns: u64,
+            evidence_hash: u64,
+            status: []const u8,
+            created_at_ns: u64,
+        },
+    };
+
+    const parsed = try std.json.parseFromSlice(ContractWire, testing.allocator, json, .{});
+    defer parsed.deinit();
+
+    try testing.expectEqual(@as(u16, cards_schema_version), parsed.value.schema_version);
+    try testing.expectEqualStrings("Buy AI infra", parsed.value.thesis_card.user_text);
+    try testing.expectEqual(@as(usize, 1), parsed.value.thesis_card.linked_positions.len);
+    try testing.expectEqualStrings("SOXX", parsed.value.thesis_card.linked_positions[0].ticker);
+    try testing.expectEqualStrings("supplier_acme_us", parsed.value.money_proposal_card.beneficiary);
+    try testing.expectEqualStrings("ach", parsed.value.money_proposal_card.rail);
+    try testing.expectEqualStrings("pending", parsed.value.money_proposal_card.approval_state);
 }
