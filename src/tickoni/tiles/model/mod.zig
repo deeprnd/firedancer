@@ -1,6 +1,6 @@
 const backend = @import("backend.zig");
 const run_mod = @import("run.zig");
-const schema = @import("schema.zig");
+const schema = @import("messages.zig");
 const validator = @import("validator.zig");
 
 pub const SamplingParams = schema.SamplingParams;
@@ -29,7 +29,7 @@ pub const hashProviderRequest = backend.hashProviderRequest;
 pub const Backend = backend.Backend;
 
 test {
-    _ = @import("schema.zig");
+    _ = @import("messages.zig");
     _ = @import("backend.zig");
     _ = @import("validator.zig");
     _ = @import("run.zig");
