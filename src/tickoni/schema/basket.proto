@@ -11,6 +11,9 @@ enum RejectionReason {
   REJECTION_REASON_WRONG_INSTRUMENT_TYPE = 3;
   REJECTION_REASON_WRONG_MARKET        = 4;
   REJECTION_REASON_WRONG_VENUE         = 5;
+  REJECTION_REASON_WRONG_SECTOR        = 6;
+  REJECTION_REASON_WRONG_INDUSTRY      = 7;
+  REJECTION_REASON_WRONG_THEME         = 8;
 }
 
 enum BasketErrorCode {
@@ -29,7 +32,7 @@ message BasketInstrument {
   bytes      rationale        = 6;
 }
 
-// One theme-matching instrument rejected from the basket.
+// One screened instrument rejected from the basket.
 message RejectedCandidate {
   bytes           ticker      = 1;
   RejectionReason reason_code = 2;
@@ -67,4 +70,5 @@ message BasketDenialPayload {
   uint32          account_id            = 2;
   int64           target_notional_cents = 3;
   BasketErrorCode error_code            = 4;
+  RejectionReason failed_scope_dim      = 5;
 }

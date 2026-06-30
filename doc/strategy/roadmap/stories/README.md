@@ -59,6 +59,8 @@ Use these project docs to fill and implement issues:
 || [V1.16](v1.16.md) | Tool Broker And MCP-Compatible Dispatch |
 || [V1.17](v1.17.md) | Tkmodl Budget And Call-Limit Governance |
 || [V1.18](v1.18.md) | Replay Proof Bundle And Evidence Integrity |
+|| [V1.19](v1.19.md) | Tickoni Terminal CaseOps UI |
+|| [V1.20](v1.20.md) | Guarded Crypto Transfers |
 
 ## How Roadmap Files Are Organized
 

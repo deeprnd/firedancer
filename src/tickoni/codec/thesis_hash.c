@@ -20,14 +20,18 @@ tk_thesis_input_hash( uint16_t              user_text_len,
                       uint8_t const *       asset_class_prefs,
                       uint8_t               instrument_type_pref_count,
                       uint8_t const *       instrument_type_prefs,
-                      uint8_t               theme_len,
-                      unsigned char const * theme,
+                      uint8_t               theme_count,
+                      unsigned char const * themes_flat,
                       uint8_t               risk_preference,
                       uint8_t               max_single_name_pct,
                       uint8_t               asset_class_exclusion_count,
                       uint8_t const *       asset_class_exclusions,
                       uint8_t               instrument_type_exclusion_count,
                       uint8_t const *       instrument_type_exclusions,
+                      uint8_t               sector_filter_count,
+                      unsigned char const * sector_filter_flat,
+                      uint8_t               industry_filter_count,
+                      unsigned char const * industry_filter_flat,
                       uint8_t               requested_ticker_count,
                       unsigned char const * requested_tickers ) {
   fd_siphash13_t _sip[1];
@@ -47,8 +51,14 @@ tk_thesis_input_hash( uint16_t              user_text_len,
   for( uint8_t i = 0; i < instrument_type_pref_count; i++ ) {
     TK_HASH( instrument_type_prefs + i, sizeof(uint8_t) );
   }
-  TK_HASH( &theme_len,             sizeof(uint8_t)  );
-  TK_HASH( theme,                  (ulong)theme_len );
+  /* Multi-theme filter: count followed by each theme zero-padded to
+     TK_THESIS_MAX_CANONICAL_ID_LEN bytes.  Caller must sort themes into
+     canonical order before calling so equivalent sets hash identically. */
+  TK_HASH( &theme_count, sizeof(uint8_t) );
+  ulong theme_stride = TK_THESIS_MAX_CANONICAL_ID_LEN;
+  for( uint8_t i = 0; i < theme_count; i++ ) {
+    TK_HASH( themes_flat + (ulong)i * theme_stride, theme_stride );
+  }
   TK_HASH( &risk_preference,       sizeof(uint8_t)  );
   TK_HASH( &max_single_name_pct,   sizeof(uint8_t)  );
   TK_HASH( &asset_class_exclusion_count, sizeof(uint8_t) );
@@ -59,13 +69,25 @@ tk_thesis_input_hash( uint16_t              user_text_len,
   for( uint8_t i = 0; i < instrument_type_exclusion_count; i++ ) {
     TK_HASH( instrument_type_exclusions + i, sizeof(uint8_t) );
   }
+  /* Sector and industry classification filters: count followed by packed
+     ClassificationRef entries (TK_THESIS_CLASSIFICATION_REF_STRIDE bytes each).
+     Caller must sort into canonical order so equivalent sets hash identically. */
+  TK_HASH( &sector_filter_count, sizeof(uint8_t) );
+  ulong ref_stride = TK_THESIS_CLASSIFICATION_REF_STRIDE;
+  for( uint8_t i = 0; i < sector_filter_count; i++ ) {
+    TK_HASH( sector_filter_flat + (ulong)i * ref_stride, ref_stride );
+  }
+  TK_HASH( &industry_filter_count, sizeof(uint8_t) );
+  for( uint8_t i = 0; i < industry_filter_count; i++ ) {
+    TK_HASH( industry_filter_flat + (ulong)i * ref_stride, ref_stride );
+  }
   /* Explicitly requested tickers: count followed by each ticker zero-padded to
      TK_THESIS_MAX_TICKER_LEN bytes.  Two inputs that differ only in which tickers
      were explicitly named produce different hashes. */
   TK_HASH( &requested_ticker_count, sizeof(uint8_t) );
-  ulong stride = TK_THESIS_MAX_TICKER_LEN;
+  ulong ticker_stride = TK_THESIS_MAX_TICKER_LEN;
   for( uint8_t i = 0; i < requested_ticker_count; i++ ) {
-    TK_HASH( requested_tickers + (ulong)i * stride, stride );
+    TK_HASH( requested_tickers + (ulong)i * ticker_stride, ticker_stride );
   }
   /* user_text follows so two different phrasings of the same thesis are
      distinguishable at the source-event level even when intent normalizes

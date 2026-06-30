@@ -240,6 +240,14 @@ fn excerptForPrint(allocator: std.mem.Allocator, content: []const u8) ![]u8 {
     return buf;
 }
 
+fn emptyLiveEvidence(allocator: std.mem.Allocator) !LiveModelEvidence {
+    return .{
+        .model_id = try allocator.dupe(u8, ""),
+        .excerpt = try allocator.dupe(u8, ""),
+        .matched_ticker = try allocator.dupe(u8, ""),
+    };
+}
+
 fn assertLiveModelResponse(
     allocator: std.mem.Allocator,
     response: *const model.ModelResponse,
@@ -564,11 +572,9 @@ pub fn runRestrictedScenario(
     if (!basket.hasRestrictedRejections()) return error.MissingRestrictedRejection;
     if (rejected.reason_code != .restricted_instrument) return error.UnexpectedRestrictedReason;
 
-    var replay_model_backend = model.Backend{ .fixture = .{} };
     const replay_result = try replay.verifyRestrictedInstrumentBlock(
         allocator,
         io,
-        &replay_model_backend,
         &basket,
         support.restricted_ticker,
     );
@@ -711,7 +717,9 @@ pub fn runCliDemo(
     user_text: []const u8,
 ) !CliReport {
     const parsed = try parseCliDemoRequest(user_text);
-    var live_evidence = if (live_config.use_fixture)
+    var live_evidence = if (parsed.scenario == .restricted_instrument)
+        try emptyLiveEvidence(allocator)
+    else if (live_config.use_fixture)
         try runFixtureModel(allocator, parsed.input)
     else
         try runLiveModel(allocator, io, live_config, parsed.input);

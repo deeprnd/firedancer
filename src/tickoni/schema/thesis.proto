@@ -24,35 +24,39 @@ message ThesisInput {
   Market             market_scope                 = 4;
   AssetClassList     asset_class_prefs            = 5;
   InstrumentTypeList instrument_type_prefs        = 6;
-  CanonicalId        theme                        = 7;
-  RiskPreference     risk_preference              = 8;
-  uint32             max_single_name_pct          = 9;
-  AssetClassList     asset_class_exclusions       = 10;
-  InstrumentTypeList instrument_type_exclusions   = 11;
-  repeated bytes     requested_tickers            = 12;
+  ThemeIdList        themes                       = 7;
+  ClassificationRefList sector_filters           = 8;
+  ClassificationRefList industry_filters         = 9;
+  RiskPreference     risk_preference              = 10;
+  uint32             max_single_name_pct          = 11;
+  AssetClassList     asset_class_exclusions       = 12;
+  InstrumentTypeList instrument_type_exclusions   = 13;
+  repeated bytes     requested_tickers            = 14;
 }
 
 // Validated, structured intent produced by normalize().
 message InvestorIntent {
   uint32             account_id                   = 1;
-  CanonicalId        theme                        = 2;
-  int64              target_amount_cents          = 3;
-  AssetClassList     allowed_asset_classes        = 4;
-  AssetClassList     excluded_asset_classes       = 5;
-  InstrumentTypeList allowed_instrument_types     = 6;
-  InstrumentTypeList excluded_instrument_types    = 7;
-  Market             market                       = 8;
-  repeated Venue     venues                       = 9;
-  RiskPreference     risk_preference              = 10;
-  uint32             max_single_name_pct          = 11;
-  repeated bytes     requested_tickers            = 12;
+  ThemeIdList        themes                       = 2;
+  ClassificationRefList sectors                  = 3;
+  ClassificationRefList industries               = 4;
+  int64              target_amount_cents          = 5;
+  AssetClassList     allowed_asset_classes        = 6;
+  AssetClassList     excluded_asset_classes       = 7;
+  InstrumentTypeList allowed_instrument_types     = 8;
+  InstrumentTypeList excluded_instrument_types    = 9;
+  Market             market                       = 10;
+  repeated Venue     venues                       = 11;
+  RiskPreference     risk_preference              = 12;
+  uint32             max_single_name_pct          = 13;
+  repeated bytes     requested_tickers            = 14;
 }
 
 // Audit payload for a successful thesis normalization.
 message ThesisNormalizationPayload {
   uint64      thesis_input_hash   = 1;
   uint32      account_id          = 2;
-  CanonicalId theme               = 3;
+  uint32      theme_count         = 3;
   int64       target_amount_cents = 4;
 }
 
