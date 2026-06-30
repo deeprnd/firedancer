@@ -1,4 +1,4 @@
-const schema = @import("schema.zig");
+const schema = @import("messages.zig");
 const backend = @import("backend.zig");
 
 pub const AdapterOperation = schema.AdapterOperation;
@@ -15,7 +15,7 @@ pub const FixtureBackendError = schema.BackendError;
 pub const FixtureAdapter = backend.FixtureBackend;
 
 test {
-    _ = @import("schema.zig");
+    _ = @import("messages.zig");
     _ = @import("mock.zig");
     _ = @import("backend.zig");
 }

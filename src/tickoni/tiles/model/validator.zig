@@ -1,5 +1,5 @@
 const std = @import("std");
-const schema = @import("schema.zig");
+const schema = @import("messages.zig");
 
 pub const TkModlConfig = schema.TkModlConfig;
 pub const TkModlDecision = schema.TkModlDecision;

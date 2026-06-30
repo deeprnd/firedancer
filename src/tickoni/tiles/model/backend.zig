@@ -1,5 +1,5 @@
 const std = @import("std");
-const schema = @import("schema.zig");
+const schema = @import("messages.zig");
 
 pub const ProviderRequest = schema.ProviderRequest;
 pub const ModelResponse = schema.ModelResponse;

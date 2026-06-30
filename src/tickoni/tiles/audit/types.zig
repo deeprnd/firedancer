@@ -1,4 +1,4 @@
-/// Canonical audit record schema for Tickoni tiles.
+/// Tile-owned audit event types for the tkaudt tile.
 ///
 /// Every material boundary event is a typed AuditEvent so replay and
 /// investigation do not depend on logs or UI state.
