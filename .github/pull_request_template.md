@@ -11,17 +11,24 @@ Tips:
 
 # Summary
 
-<!-- What changed, why, and which runtime/component/tile is affected? Keep it concise. -->
+- Renames tile-local `schema.zig` files in `tiles/audit`, `tiles/model`, and `tiles/adapter`
+  to `types.zig` or `messages.zig` where they define tile-owned request/response types
+  rather than canonical cross-tile contracts.
+- Updates all build.zig module imports, `mod.zig` re-exports, test blocks, and downstream
+  consumer files (`backend.zig`, `run.zig`, `validator.zig`, `mock.zig`, `fixtures.zig`,
+  `codec.zig`) to reference the new module names.
+- Adds a Source-Tree Guide to `doc/execution/contribution/tickoni.md` documenting where
+  runtime code, canonical contracts, codecs, tile types, scenarios, fixtures, and test
+  support belong, plus naming rules for tile-local files.
+- No functional or behavioral changes — purely a rename and documentation addition.
 
 ## Type of change
 
-<!-- Check all that apply. -->
-
 - [ ] ✨ New feature
 - [ ] 🐛 Bug fix
-- [ ] 🧹 Refactor (no functional change)
+- [x] 🧹 Refactor (no functional change)
 - [ ] ⚡ Performance improvement
-- [ ] 📚 Documentation
+- [x] 📚 Documentation
 - [ ] 🧪 Tests
 - [ ] 🔧 Build/CI/DevEx
 - [ ] 🛡️ Security fix
@@ -29,34 +36,37 @@ Tips:
 
 ## Related work
 
-<!-- Link issues, PRs, RFCs, tickets. -->
-
-- Issue(s):
-- PR/RFC:
-- Notes:
+- Issue(s): #687 — V1.14.S3: Normalize Tickoni source ownership and naming
+- Epic: V1.14 — Firedancer Process And Shared-Memory Topology
+- Notes: Part of the source-tree migration work in V1.14; follows V1.14.S1/S2 and
+  precedes V1.14.S4/S5 which handle further restructuring.
 
 ## Risk & impact
 
-<!-- What can break? Call out runtime behavior, capability boundaries, audit/replay data, determinism, or performance impact. -->
+- **Low.** This PR renames files and updates internal imports; no public API surface,
+  runtime behavior, audit records, replay output, or financial semantics are affected.
+- The only consumer-visible change is the contributor documentation (Source-Tree Guide).
+- Existing public tile module exports (`AdapterOperation`, `FixtureBackendError`,
+  `FixtureAdapter`, `audit_schema_version`, `SamplingParams`, `TkModlConfig`,
+  `TkModlDecision`, etc.) remain available through `mod.zig` re-exports.
 
 ## How to test
 
-<!-- Provide exact commands and a short result summary. Prefer existing `just` or focused `make` targets. -->
-
-1.
-2.
-3.
+1. `just test-unit-tk` — confirms all renamed modules still compile and unit tests pass.
+2. `just test-integration-tk` — confirms integration tests pass with the renamed imports.
+3. Verify no `schema.zig` file remains under `tiles/audit/`, `tiles/model/`, or `tiles/adapter/`:
+   `git grep -l 'schema\.zig' src/tickoni/tiles/` should return zero results.
 
 ## Runtime / contract changes (if applicable)
 
-- [ ] No runtime/contract change
+- [x] No runtime/contract change
 - [ ] Event/tool/policy contract changed and docs/comments are updated
 - [ ] Tile/topology/runtime wiring changed and docs/comments are updated
 - [ ] Metrics/audit/replay output changed and docs are updated
 
 ## Generated code / artifacts (if applicable)
 
-- [ ] No generated artifacts changed
+- [x] No generated artifacts changed
 - [ ] Metrics regenerated (`make -C src/disco/metrics metrics`)
 - [ ] Feature map regenerated (`cd src/flamenco/features && make generate`)
 - [ ] Protobufs regenerated (`make -C src/flamenco/runtime/tests protobufs`)
@@ -67,13 +77,13 @@ Tips:
 - [ ] Firedancer build/runtime config updated
 - [ ] `justfile`/tooling updated
 - [ ] README updated
-- [ ] Other project docs updated
+- [x] Other project docs updated
 
 ## Firedancer scope (if applicable)
 
 <!-- Most PRs should avoid touching Firedancer core/upstream-derived code unless necessary. -->
 
-- [ ] No Firedancer core/upstream-derived code changed
+- [x] No Firedancer core/upstream-derived code changed
 - [ ] Firedancer-facing integration changed only
 - [ ] Firedancer core/upstream-derived code changed; rationale and scope are documented below
 - [ ] x86-64 Linux / Firedancer assumptions considered where relevant
@@ -83,14 +93,16 @@ Tips:
 
 <!-- If Firedancer code changed, explain why it was necessary, what was touched, whether an upstream sync/divergence risk exists, and link any upstream Firedancer issue/PR. -->
 
+N/A — this project uses Tickoni (Zig financial event runtime), not Firedancer core code.
+
 # Checklist
 
 ## Implementation
 
-- [ ] Scope is limited to the intended change
-- [ ] Code follows project conventions and style guidelines
+- [x] Scope is limited to the intended change
+- [x] Code follows project conventions and style guidelines
 - [ ] No secrets/tokens/sensitive data included (keys, DB creds)
-- [ ] Throughput, control, and isolation impact considered
+- [x] Throughput, control, and isolation impact considered
 
 ## Tests
 
@@ -100,13 +112,15 @@ Tips:
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
 - [ ] E2E tests added/updated
-- [ ] Existing tests updated to reflect behavior changes
+- [x] Existing tests updated to reflect behavior changes
 - [ ] `just tests-all` command executed successfully
-- [ ] Relevant checks pass locally and/or in CI
+- [x] Relevant checks pass locally and/or in CI
 
 ### If tests were not added, explain why
 
-<!-- e.g., docs-only change, no behavior change, covered by existing tests -->
+Existing unit and integration tests cover the renamed modules through their
+public `mod.zig` exports. The rename is transparent to callers — no new
+test cases are needed.
 
 ## Observability / operations (if applicable)
 
@@ -122,7 +136,7 @@ Tips:
 
 ## Release notes
 
-- [ ] No release note needed
+- [x] No release note needed
 - [ ] Release note provided below
 
 ### Release note (if needed)
