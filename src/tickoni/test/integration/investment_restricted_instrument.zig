@@ -108,3 +108,4 @@ test "investment_restricted_instrument_integration: restricted ticker replay and
         try std.testing.expectEqual(audit_chain.events[i - 1].header.record_hash, event.header.prev_hash);
     }
 }
+
