@@ -6,7 +6,7 @@
 /* Schema version for the thesis input schema.
    Must match thesis_schema_version in src/tickoni/schema/thesis.zig.
    Incrementing this value changes the hash key and invalidates existing hashes. */
-#define TK_THESIS_SCHEMA_VERSION ((uint16_t)2)
+#define TK_THESIS_SCHEMA_VERSION ((uint16_t)3)
 
 /* Ticker stride for requested_tickers: same as catalog and basket stride. */
 #define TK_THESIS_MAX_TICKER_LEN ((ulong)8)
@@ -14,15 +14,31 @@
 /* Maximum explicitly requested tickers in one ThesisInput. */
 #define TK_THESIS_MAX_REQUESTED_TICKERS ((uint8_t)8)
 
+/* Byte stride for each canonical id in the themes_flat buffer.
+   Must match max_canonical_id_len in src/tickoni/schema/classification.zig. */
+#define TK_THESIS_MAX_CANONICAL_ID_LEN ((ulong)32)
+
+/* Packed byte stride for one ClassificationRef in sector/industry filter buffers.
+   Layout per entry: taxonomy_id (32 bytes, zero-padded) +
+                     taxonomy_version (2 bytes, little-endian uint16) +
+                     code (32 bytes, zero-padded) = 66 bytes. */
+#define TK_THESIS_CLASSIFICATION_REF_STRIDE ((ulong)66)
+
 /* Compute a stable content hash over a ThesisInput.
    Covers schema_version, account_id, target_notional_cents, market_scope,
-   asset_class_prefs, instrument_type_prefs, theme, risk_preference,
-   max_single_name_pct, asset_class_exclusions, instrument_type_exclusions,
-   requested_ticker_count, requested_tickers[0..requested_ticker_count]
-   (each zero-padded to TK_THESIS_MAX_TICKER_LEN bytes), user_text_len, and
-   user_text[0..user_text_len].
+   asset_class_prefs, instrument_type_prefs, theme_count + themes_flat,
+   risk_preference, max_single_name_pct, asset_class_exclusions,
+   instrument_type_exclusions, sector_filter_count + sector_filter_flat,
+   industry_filter_count + industry_filter_flat, requested_ticker_count +
+   requested_tickers[0..requested_ticker_count] (each zero-padded to
+   TK_THESIS_MAX_TICKER_LEN bytes), user_text_len, and user_text[0..user_text_len].
+   Themes and sector/industry filter entries must be passed in sorted canonical
+   order so equivalent inputs produce identical hashes regardless of source ordering.
    Hash key: "TKTHSS\0\0" LE (k0=0x0000535348544B54, k1=TK_THESIS_SCHEMA_VERSION).
    user_text must point to at least user_text_len bytes.
+   themes_flat must point to theme_count * TK_THESIS_MAX_CANONICAL_ID_LEN bytes.
+   sector_filter_flat must point to sector_filter_count * TK_THESIS_CLASSIFICATION_REF_STRIDE bytes.
+   industry_filter_flat must point to industry_filter_count * TK_THESIS_CLASSIFICATION_REF_STRIDE bytes.
    requested_tickers must point to requested_ticker_count * TK_THESIS_MAX_TICKER_LEN bytes. */
 uint64_t
 tk_thesis_input_hash( uint16_t              user_text_len,
@@ -34,14 +50,18 @@ tk_thesis_input_hash( uint16_t              user_text_len,
                       uint8_t const *       asset_class_prefs,
                       uint8_t               instrument_type_pref_count,
                       uint8_t const *       instrument_type_prefs,
-                      uint8_t               theme_len,
-                      unsigned char const * theme,
+                      uint8_t               theme_count,
+                      unsigned char const * themes_flat,
                       uint8_t               risk_preference,
                       uint8_t               max_single_name_pct,
                       uint8_t               asset_class_exclusion_count,
                       uint8_t const *       asset_class_exclusions,
                       uint8_t               instrument_type_exclusion_count,
                       uint8_t const *       instrument_type_exclusions,
+                      uint8_t               sector_filter_count,
+                      unsigned char const * sector_filter_flat,
+                      uint8_t               industry_filter_count,
+                      unsigned char const * industry_filter_flat,
                       uint8_t               requested_ticker_count,
                       unsigned char const * requested_tickers );
 

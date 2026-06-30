@@ -33,14 +33,8 @@ pub const AgentResult = struct {
 };
 
 /// Result of a restricted-instrument denial run.
-/// Caller owns model_response; call deinit(allocator) when done.
 pub const RestrictedBlockResult = struct {
     run_id: u64,
-    model_response: model.ModelResponse,
-
-    pub fn deinit(self: RestrictedBlockResult, allocator: std.mem.Allocator) void {
-        self.model_response.deinit(allocator);
-    }
 };
 
 fn baseTkModlConfig(allowed_model_id: []const u8) model.TkModlConfig {
@@ -172,16 +166,12 @@ pub fn runInvestmentAgent(
 }
 
 /// Bounded agent for restricted-instrument denial flows.
-/// Calls tkmodl for evidence; skips all adapter and ticket work.
+/// Denial happens before model, adapter, proposal, and paper-execution work.
 pub fn runRestrictedInstrumentDenialAgent(
-    allocator: std.mem.Allocator,
     work_item: disp.WorkItem,
-    model_backend: *model.Backend,
 ) !RestrictedBlockResult {
-    const model_response = try runInvestmentTkModl(allocator, work_item, model_backend);
     return .{
         .run_id = work_item.run_id,
-        .model_response = model_response,
     };
 }
 
@@ -249,28 +239,15 @@ test "runInvestmentAgent blocks oversized trade and skips paper execution" {
     try std.testing.expectEqual(@as(usize, 0), adapter_trace.paper_order_calls);
 }
 
-test "runRestrictedInstrumentDenialAgent has no adapter boundary and calls tkmodl once" {
+test "runRestrictedInstrumentDenialAgent has no model or adapter boundary" {
     const fn_info = @typeInfo(@TypeOf(runRestrictedInstrumentDenialAgent)).@"fn";
     inline for (fn_info.params) |param| {
         try std.testing.expect(param.type != *adapter.Backend);
+        try std.testing.expect(param.type != std.mem.Allocator);
+        try std.testing.expect(param.type != *model.Backend);
     }
-
-    var model_trace = model.MockBackend.CallTrace{};
-    var model_backend = model.Backend{ .mock = .{
-        .canned_content = "{\"thesis_summary\":\"restricted\"}",
-        .trace = &model_trace,
-    } };
     const work_item = disp.dispatchInvestmentRun(88, 2001, 200_000);
-    const result = try runRestrictedInstrumentDenialAgent(
-        std.testing.allocator,
-        work_item,
-        &model_backend,
-    );
-    defer result.deinit(std.testing.allocator);
+    const result = try runRestrictedInstrumentDenialAgent(work_item);
 
     try std.testing.expectEqual(work_item.run_id, result.run_id);
-    try std.testing.expectEqual(@as(usize, 1), model_trace.call_count);
-    try std.testing.expectEqualStrings("budget.demo_paper", model_trace.last_budget_id);
-    try std.testing.expectEqualStrings("v1", model_trace.last_policy_version);
-    try std.testing.expectEqualStrings("capenv.trading_order.propose.demo", model_trace.last_capability_envelope_id);
 }

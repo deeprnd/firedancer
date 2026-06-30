@@ -5,20 +5,7 @@ const portfolio = @import("portfolio");
 const thesis = @import("thesis");
 const trade_ticket = @import("trade_ticket");
 
-pub const BasketScreening = struct {
-    candidates: [basket.max_basket_instruments]*const catalog.InstrumentEntry = undefined,
-    candidate_count: u8 = 0,
-    rejected: [basket.max_rejected_instruments]basket.RejectedCandidate = std.mem.zeroes([basket.max_rejected_instruments]basket.RejectedCandidate),
-    rejected_count: u8 = 0,
-
-    pub fn candidateSlice(self: *const BasketScreening) []const *const catalog.InstrumentEntry {
-        return self.candidates[0..self.candidate_count];
-    }
-
-    pub fn rejectedSlice(self: *const BasketScreening) []const basket.RejectedCandidate {
-        return self.rejected[0..self.rejected_count];
-    }
-};
+pub const BasketScreening = basket.BasketScreening;
 
 pub const TradeGuardrailDecision = struct {
     policy_outcome: trade_ticket.PolicyOutcome,
@@ -28,61 +15,11 @@ pub const TradeGuardrailDecision = struct {
 };
 
 pub fn buildBasket(intent: thesis.InvestorIntent, thesis_id: u64) basket.BasketError!basket.Basket {
-    const screening = screenBasketIntent(intent);
-    return basket.buildFromScreening(
-        intent,
-        thesis_id,
-        screening.candidateSlice(),
-        screening.rejectedSlice(),
-    );
+    return basket.build(intent, thesis_id);
 }
 
 pub fn screenBasketIntent(intent: thesis.InvestorIntent) BasketScreening {
-    var theme_buf: [catalog.catalog.len]*const catalog.InstrumentEntry = undefined;
-    const theme_n = catalog.filterByTheme(intent.theme, &theme_buf);
-
-    var screening = BasketScreening{};
-
-    for (intent.requested_tickers[0..@as(usize, intent.requested_ticker_count)]) |slot| {
-        const ticker_str = std.mem.sliceTo(&slot, 0);
-        if (ticker_str.len == 0) continue;
-        if (isAlreadyRejected(&screening, ticker_str)) continue;
-        const entry = catalog.lookupByTicker(ticker_str) orelse continue;
-        if (entry.restricted) {
-            addRejected(&screening, entry, .restricted_instrument, restrictionMsg(entry.restriction_reason));
-        }
-    }
-
-    for (theme_buf[0..theme_n]) |entry| {
-        if (entry.restricted) {
-            if (!isAlreadyRejected(&screening, entry.ticker[0..entry.ticker_len])) {
-                addRejected(&screening, entry, .restricted_instrument, restrictionMsg(entry.restriction_reason));
-            }
-            continue;
-        }
-        if (!intent.allowed_asset_classes.has(entry.asset_class)) {
-            addRejected(&screening, entry, .wrong_asset_class, "Asset class not eligible");
-            continue;
-        }
-        if (!intent.allowed_instrument_types.has(entry.instrument_type)) {
-            addRejected(&screening, entry, .wrong_instrument_type, "Instrument type not eligible (stock/ETF only)");
-            continue;
-        }
-        if (entry.market != intent.market) {
-            addRejected(&screening, entry, .wrong_market, "Market not in US scope");
-            continue;
-        }
-        if (!venueAllowed(entry.venue, intent.venues[0..@as(usize, intent.venue_count)])) {
-            addRejected(&screening, entry, .wrong_venue, "Venue not NYSE or NASDAQ");
-            continue;
-        }
-        if (screening.candidate_count < basket.max_basket_instruments) {
-            screening.candidates[screening.candidate_count] = entry;
-            screening.candidate_count += 1;
-        }
-    }
-
-    return screening;
+    return basket.screenIntent(intent);
 }
 
 pub fn evaluateTradeGuardrails(
@@ -171,50 +108,6 @@ fn deriveBlockedReason(
     };
 }
 
-fn venueAllowed(venue: catalog.Venue, allowed: []const thesis.Venue) bool {
-    for (allowed) |allowed_venue| {
-        if (allowed_venue == venue) return true;
-    }
-    return false;
-}
-
-fn isAlreadyRejected(screening: *const BasketScreening, ticker_str: []const u8) bool {
-    for (screening.rejected[0..screening.rejected_count]) |*rejected| {
-        if (std.mem.eql(u8, rejected.ticker[0..rejected.ticker_len], ticker_str)) return true;
-    }
-    return false;
-}
-
-fn addRejected(
-    screening: *BasketScreening,
-    entry: *const catalog.InstrumentEntry,
-    code: basket.RejectionReason,
-    reason_str: []const u8,
-) void {
-    if (screening.rejected_count >= basket.max_rejected_instruments) return;
-    const rejected = &screening.rejected[screening.rejected_count];
-    rejected.ticker = entry.ticker;
-    rejected.ticker_len = entry.ticker_len;
-    rejected.reason_code = code;
-    rejected.reason = std.mem.zeroes([basket.max_reason_len]u8);
-    const len = @min(reason_str.len, basket.max_reason_len);
-    @memcpy(rejected.reason[0..len], reason_str[0..len]);
-    rejected.reason_len = @intCast(len);
-    screening.rejected_count += 1;
-}
-
-fn restrictionMsg(reason: catalog.RestrictionReason) []const u8 {
-    return switch (reason) {
-        .none => "Restricted (unexpected reason code)",
-        .leveraged_etf => "Restricted: leveraged ETF",
-        .inverse_etf => "Restricted: inverse ETF",
-        .options_contract => "Restricted: options contract",
-        .futures_contract => "Restricted: futures contract",
-        .non_us_venue => "Restricted: non-US venue",
-        .manual_denylist => "Restricted: manual denylist",
-    };
-}
-
 test "screenBasketIntent rejects restricted products and keeps eligible AI infrastructure instruments" {
     const intent = try thesis.normalize(thesis.fixtures.ai_infrastructure);
     const screening = screenBasketIntent(intent);
@@ -264,4 +157,134 @@ test "evaluateTradeGuardrails returns per-order denial for oversized allowed acc
     try std.testing.expectEqual(@as(u8, 1), decision.blocked_reason_count);
     try std.testing.expectEqual(trade_ticket.BlockedReasonCode.per_order_notional_exceeded, decision.blocked_reasons[0].code);
     try std.testing.expectEqual(@as(i64, 250_000), decision.effective_max_paper_trade_cents);
+}
+
+test "screenBasketIntent: multi-theme union finds more candidates than single theme" {
+    // ai_and_semiconductors covers two themes; must include at least what ai_infrastructure alone covers.
+    const multi_intent = try thesis.normalize(thesis.fixtures.ai_and_semiconductors);
+    const ai_intent = try thesis.normalize(thesis.fixtures.ai_infrastructure);
+
+    const multi = screenBasketIntent(multi_intent);
+    const single = screenBasketIntent(ai_intent);
+
+    // Multi-theme union must have at least as many eligible candidates as single.
+    try std.testing.expect(multi.candidate_count >= single.candidate_count);
+}
+
+test "screenBasketIntent: sector filter rejects instruments outside the allowed sector" {
+    const intent = try thesis.normalize(thesis.fixtures.ai_infrastructure_it_sector);
+    const screening = screenBasketIntent(intent);
+
+    // All candidates must be in the information_technology sector.
+    const it_ref = catalog.ClassificationRef.init("gics_sector", 2025, "information_technology") catch unreachable;
+    for (screening.candidateSlice()) |entry| {
+        try std.testing.expect(entry.sectors.has(it_ref));
+    }
+
+    // At least one rejection must have wrong_sector code.
+    var found_wrong_sector = false;
+    for (screening.rejectedSlice()) |rejected| {
+        if (rejected.reason_code == basket.RejectionReason.wrong_sector) {
+            found_wrong_sector = true;
+        }
+    }
+    try std.testing.expect(found_wrong_sector);
+}
+
+test "screenBasketIntent: industry filter rejects instruments outside the allowed industry" {
+    var input = thesis.fixtures.ai_infrastructure;
+    var industry_refs = thesis.ClassificationRefList{};
+    industry_refs.append(
+        thesis.ClassificationRef.init("gics_industry", 2025, "semiconductors") catch unreachable,
+    ) catch unreachable;
+    input.industry_filters = industry_refs;
+    const intent = try thesis.normalize(input);
+    const screening = screenBasketIntent(intent);
+
+    // All candidates must be in the semiconductors industry.
+    const semi_ref = catalog.ClassificationRef.init("gics_industry", 2025, "semiconductors") catch unreachable;
+    for (screening.candidateSlice()) |entry| {
+        try std.testing.expect(entry.industries.has(semi_ref));
+    }
+
+    // BOTZ (robotics_and_ai industry) must be rejected with wrong_industry.
+    var found_botz_wrong_industry = false;
+    for (screening.rejectedSlice()) |rejected| {
+        if (std.mem.eql(u8, rejected.tickerSlice(), "BOTZ")) {
+            try std.testing.expectEqual(basket.RejectionReason.wrong_industry, rejected.reason_code);
+            found_botz_wrong_industry = true;
+        }
+    }
+    try std.testing.expect(found_botz_wrong_industry);
+}
+
+test "screenBasketIntent: sector and industry are distinct dimensions — sector pass does not imply industry pass" {
+    // Use a sector filter (information_technology) with an industry filter (semiconductors).
+    // MSFT is IT sector but systems_software industry — should be rejected by industry filter.
+    var input = thesis.fixtures.ai_infrastructure;
+    var sector_refs = thesis.ClassificationRefList{};
+    sector_refs.append(
+        thesis.ClassificationRef.init("gics_sector", 2025, "information_technology") catch unreachable,
+    ) catch unreachable;
+    var industry_refs = thesis.ClassificationRefList{};
+    industry_refs.append(
+        thesis.ClassificationRef.init("gics_industry", 2025, "semiconductors") catch unreachable,
+    ) catch unreachable;
+    input.sector_filters = sector_refs;
+    input.industry_filters = industry_refs;
+    const intent = try thesis.normalize(input);
+    const screening = screenBasketIntent(intent);
+
+    // MSFT must not appear in candidates (systems_software industry, not semiconductors).
+    for (screening.candidateSlice()) |entry| {
+        try std.testing.expect(!std.mem.eql(u8, entry.tickerSlice(), "MSFT"));
+    }
+
+    // MSFT must appear in rejected with wrong_industry.
+    var found_msft_wrong_industry = false;
+    for (screening.rejectedSlice()) |rejected| {
+        if (std.mem.eql(u8, rejected.tickerSlice(), "MSFT")) {
+            try std.testing.expectEqual(basket.RejectionReason.wrong_industry, rejected.reason_code);
+            found_msft_wrong_industry = true;
+        }
+    }
+    try std.testing.expect(found_msft_wrong_industry);
+}
+
+test "screenBasketIntent: wrong_theme rejection for requested ticker not matching any intent theme" {
+    var input = thesis.fixtures.broad_market;
+    const wcld = "WCLD";
+    @memset(&input.requested_tickers[0], 0);
+    @memcpy(input.requested_tickers[0][0..wcld.len], wcld);
+    input.requested_ticker_count = 1;
+    const intent = try thesis.normalize(input);
+    const screening = screenBasketIntent(intent);
+
+    // WCLD (cloud theme) is not in broad_market theme — must appear rejected with wrong_theme.
+    var found_wrong_theme = false;
+    for (screening.rejectedSlice()) |rejected| {
+        if (std.mem.eql(u8, rejected.tickerSlice(), "WCLD")) {
+            try std.testing.expectEqual(basket.RejectionReason.wrong_theme, rejected.reason_code);
+            found_wrong_theme = true;
+        }
+    }
+    try std.testing.expect(found_wrong_theme);
+}
+
+test "screenBasketIntent: unknown classification in sector filter fails closed during normalize" {
+    var input = thesis.fixtures.ai_infrastructure;
+    var sector_refs = thesis.ClassificationRefList{};
+    sector_refs.append(
+        thesis.ClassificationRef.init("gics_sector", 2025, "real_estate") catch unreachable,
+    ) catch unreachable;
+    input.sector_filters = sector_refs;
+    try std.testing.expectError(thesis.ThesisError.MalformedClassification, thesis.normalize(input));
+}
+
+test "screenBasketIntent: unknown requested ticker fails closed during normalize" {
+    var input = thesis.fixtures.ai_infrastructure;
+    input.requested_ticker_count = 1;
+    @memset(&input.requested_tickers[0], 0);
+    @memcpy(input.requested_tickers[0][0..4], "ZZZZ");
+    try std.testing.expectError(thesis.ThesisError.MalformedClassification, thesis.normalize(input));
 }

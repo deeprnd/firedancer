@@ -612,7 +612,6 @@ pub fn verifyOversizedTradeBlock(
 pub fn verifyRestrictedInstrumentBlock(
     allocator: std.mem.Allocator,
     io: std.Io,
-    model_backend: *const model.Backend,
     proposed_basket: *const basket.Basket,
     requested_ticker: []const u8,
 ) !ReplayVerification {
@@ -621,7 +620,6 @@ pub fn verifyRestrictedInstrumentBlock(
     defer loaded.deinit(allocator);
 
     const capsule = loaded.parsed.value;
-    const fixture_dir = fixtureDir(capsule_path);
     var divergences = DivergenceTracker{};
 
     if (!capsule.replay_assertions.no_live_model_call) divergences.note("no_live_model_call", 5);
@@ -630,15 +628,8 @@ pub fn verifyRestrictedInstrumentBlock(
     if (!std.mem.eql(u8, capsule.replay_assertions.policy_outcome_matches, "deny")) divergences.note("policy_outcome", 2);
     if (capsule.replay_assertions.affordability_outcome_matches.len != 0) divergences.note("affordability_outcome", 5);
     if (capsule.ticket_id.len != 0) divergences.note("ticket_id", 5);
-    if (capsule.model_substitutions.len != 1) divergences.note("model_substitution_count", 3);
+    if (capsule.model_substitutions.len != 0) divergences.note("model_substitution_count", 3);
     if (capsule.adapter_substitutions.len != 0) divergences.note("adapter_substitution_count", 5);
-    if (capsule.model_substitutions.len > 0 and
-        !std.mem.eql(u8, capsule.model_substitutions[0].fixture_file, "model_response_gemma4.json"))
-        divergences.note("model_fixture_file", 3);
-    if (proposed_basket.thesis_id != 0 and
-        capsule.model_substitutions.len > 0 and
-        proposed_basket.thesis_id != capsule.model_substitutions[0].request_hash)
-        divergences.note("model_request_hash", 3);
     if (capsule.expected_basket_id) |expected| {
         if (proposed_basket.basket_id != expected) divergences.note("basket_id", 1);
     } else {
@@ -652,22 +643,8 @@ pub fn verifyRestrictedInstrumentBlock(
     } else {
         divergences.note("failed_scope_dim", 4);
     }
-
-    // Load model fixture and verify substituted content hash.
-    if (capsule.model_substitutions.len > 0) {
-        const model_content = try loadModelFixtureContent(
-            allocator,
-            io,
-            fixture_dir,
-            capsule.model_substitutions[0].fixture_file,
-        );
-        if (model_content.len == 0) divergences.note("model_response_content", 3);
-        if (model_content.hash != capsule.model_substitutions[0].response_hash)
-            divergences.note("model_response_hash", 3);
-    }
-
-    // Restricted-instrument path uses only the model backend; no adapter calls occur.
-    const external_effects_disabled = model_backend.isEffectFree();
+    // Restricted-instrument path performs no model or adapter work.
+    const external_effects_disabled = true;
     return buildReplayVerification(divergences, external_effects_disabled);
 }
 
@@ -824,12 +801,9 @@ test "verifyRestrictedInstrumentBlock stays offline with fixture model backend" 
     proposed_basket.rejected[0].ticker_len = 4;
     @memcpy(proposed_basket.rejected[0].ticker[0..4], "SOXL");
     proposed_basket.rejected[0].reason_code = .restricted_instrument;
-    var model_backend = model.Backend{ .fixture = .{} };
-
     const replay_result = try verifyRestrictedInstrumentBlock(
         std.testing.allocator,
         std.testing.io,
-        &model_backend,
         &proposed_basket,
         "SOXL",
     );

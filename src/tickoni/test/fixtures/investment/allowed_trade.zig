@@ -73,7 +73,7 @@ test "allowed_trade: thesis normalization succeeds for ops account" {
     const input = operationsThesisInput();
     const intent = try thesis.normalize(input);
     try std.testing.expectEqual(operations_account_id, intent.account_id);
-    try std.testing.expectEqualStrings("ai_infrastructure", intent.theme.slice());
+    try std.testing.expect(intent.themes.has(thesis.CanonicalId.init("ai_infrastructure") catch unreachable));
     try std.testing.expectEqual(target_notional_cents, intent.target_amount_cents);
     try std.testing.expect(intent.allowed_asset_classes.has(.equity));
     try std.testing.expect(intent.allowed_instrument_types.has(.stock));

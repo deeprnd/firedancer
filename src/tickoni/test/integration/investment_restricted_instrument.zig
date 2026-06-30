@@ -2,7 +2,6 @@ const std = @import("std");
 const audit = @import("audit_tile");
 const basket_mod = @import("basket");
 const investment_audit = @import("investment_audit");
-const model = @import("model");
 const replay = @import("replay");
 const thesis = @import("thesis");
 const support = @import("investment_support");
@@ -11,8 +10,7 @@ const tkcase = @import("tkcase");
 const tkdisp = @import("tkdisp");
 const tkpoly = @import("tkpoly");
 
-test "investment_restricted_instrument_integration: direct restricted ticker request is denied before adapter work" {
-    const allocator = std.testing.allocator;
+test "investment_restricted_instrument_integration: direct restricted ticker request is denied before model and adapter work" {
     const input = support.operationsRestrictedTickerInput();
     try std.testing.expectEqual(@as(u8, 1), input.requested_ticker_count);
     try std.testing.expectEqualSlices(u8, support.restricted_ticker, input.requested_tickers[0][0..support.restricted_ticker.len]);
@@ -33,19 +31,12 @@ test "investment_restricted_instrument_integration: direct restricted ticker req
 
     try std.testing.expect(basket.hasRestrictedRejections());
 
-    var model_backend = model.Backend{ .fixture = .{} };
-    const block_result = try tkagnt.runRestrictedInstrumentDenialAgent(
-        allocator,
-        work_item,
-        &model_backend,
-    );
-    defer block_result.deinit(allocator);
+    const block_result = try tkagnt.runRestrictedInstrumentDenialAgent(work_item);
 
     try std.testing.expectEqual(run_id, block_result.run_id);
 }
 
 test "investment_restricted_instrument_integration: restricted ticker replay and audit reproduce the deny" {
-    const allocator = std.testing.allocator;
     const input = support.operationsRestrictedTickerInput();
     try std.testing.expectEqual(@as(u8, 1), input.requested_ticker_count);
     const thesis_id = thesis.computeThesisInputHash(input);
@@ -60,18 +51,12 @@ test "investment_restricted_instrument_integration: restricted ticker replay and
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
 
-    var model_backend = model.Backend{ .fixture = .{} };
-    const block_result = try tkagnt.runRestrictedInstrumentDenialAgent(
-        allocator,
-        work_item,
-        &model_backend,
-    );
-    defer block_result.deinit(allocator);
+    const block_result = try tkagnt.runRestrictedInstrumentDenialAgent(work_item);
+    try std.testing.expectEqual(run_id, block_result.run_id);
 
     const replay_result = try replay.verifyRestrictedInstrumentBlock(
-        allocator,
+        std.testing.allocator,
         std.testing.io,
-        &model_backend,
         &basket,
         support.restricted_ticker,
     );
@@ -87,19 +72,19 @@ test "investment_restricted_instrument_integration: restricted ticker replay and
         "trading_control",
         &input,
         &basket,
-        &block_result.model_response,
         &replay_result,
     );
     try std.testing.expectEqual(investment_audit.restricted_instrument_blocked_event_count, audit_chain.slice().len);
     try std.testing.expectEqual(audit.RecordType.deduplication, std.meta.activeTag(audit_chain.events[2].payload));
     try std.testing.expectEqual(audit.RecordType.case_creation, std.meta.activeTag(audit_chain.events[3].payload));
     try std.testing.expectEqual(audit.RecordType.policy_decision, std.meta.activeTag(audit_chain.events[4].payload));
-    try std.testing.expectEqual(audit.RecordType.denial, std.meta.activeTag(audit_chain.events[6].payload));
-    try std.testing.expectEqual(audit.RecordType.replay_result, std.meta.activeTag(audit_chain.events[7].payload));
+    try std.testing.expectEqual(audit.RecordType.denial, std.meta.activeTag(audit_chain.events[5].payload));
+    try std.testing.expectEqual(audit.RecordType.replay_result, std.meta.activeTag(audit_chain.events[6].payload));
     try std.testing.expectEqual(audit.PolicyOutcome.deny, audit_chain.events[4].payload.policy_decision.outcome);
     try std.testing.expectEqualStrings("restricted_instrument", std.mem.sliceTo(&audit_chain.events[4].payload.policy_decision.failed_scope_dim, 0));
-    try std.testing.expectEqualStrings("restricted_instrument", std.mem.sliceTo(&audit_chain.events[6].payload.denial.failed_scope_dim, 0));
+    try std.testing.expectEqualStrings("restricted_instrument", std.mem.sliceTo(&audit_chain.events[5].payload.denial.failed_scope_dim, 0));
     for (audit_chain.events) |event| {
+        try std.testing.expect(std.meta.activeTag(event.payload) != audit.RecordType.model_call);
         try std.testing.expect(std.meta.activeTag(event.payload) != audit.RecordType.financial_adapter_call);
         try std.testing.expect(std.meta.activeTag(event.payload) != audit.RecordType.proposal);
     }
