@@ -1,6 +1,7 @@
 const std = @import("std");
 const adapter = @import("adapter");
 const audit = @import("audit_tile");
+const demo = @import("investment_demo");
 const investment_audit = @import("investment_audit");
 const model = @import("model");
 const replay = @import("replay");
@@ -38,14 +39,8 @@ test "investment_replay_integration: succeeds with fixture substitutions and no 
 
     const execution = agent_result.paper_result orelse return error.TestUnexpectedResult;
 
-    const replay_result = try replay.verifyAllowedTrade(
-        allocator,
-        std.testing.io,
-        &model_backend,
-        &adapter_backend,
-        &basket,
-        &agent_result.ticket,
-    );
+    const allowed_result = try demo.runAllowedTradeScenario(allocator, std.testing.io, input);
+    const replay_result = allowed_result.replay_result;
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(replay_result.replay_match);
     try std.testing.expectEqual(@as(u64, 0), replay_result.divergence_count);
@@ -63,20 +58,23 @@ test "investment_replay_integration: succeeds with fixture substitutions and no 
         &agent_result.model_response,
         &agent_result.ticket,
         &execution,
+        &allowed_result.drift_contract,
         &replay_result,
     );
     try std.testing.expectEqual(investment_audit.allowed_trade_event_count, audit_chain.slice().len);
     try std.testing.expectEqual(audit.RecordType.source_event, std.meta.activeTag(audit_chain.events[0].payload));
     try std.testing.expectEqual(audit.RecordType.deduplication, std.meta.activeTag(audit_chain.events[2].payload));
     try std.testing.expectEqual(audit.RecordType.case_creation, std.meta.activeTag(audit_chain.events[3].payload));
-    try std.testing.expectEqual(audit.RecordType.replay_result, std.meta.activeTag(audit_chain.events[10].payload));
+    try std.testing.expectEqual(audit.RecordType.proposal, std.meta.activeTag(audit_chain.events[11].payload));
+    try std.testing.expectEqual(audit.RecordType.approval_required, std.meta.activeTag(audit_chain.events[12].payload));
+    try std.testing.expectEqual(audit.RecordType.replay_result, std.meta.activeTag(audit_chain.events[14].payload));
     try std.testing.expectEqual(run_id, audit_chain.events[0].header.run_id);
     try std.testing.expectEqual(@as(u64, 0), audit_chain.events[0].header.prev_hash);
     for (audit_chain.events[1..], 1..) |event, i| {
         try std.testing.expectEqual(audit_chain.events[i - 1].header.record_hash, event.header.prev_hash);
     }
-    try std.testing.expectEqual(@as(u64, 0), audit_chain.events[10].payload.replay_result.divergences);
-    try std.testing.expectEqual(@as(u64, 0), audit_chain.events[10].payload.replay_result.first_divergent_seq);
+    try std.testing.expectEqual(@as(u64, 0), audit_chain.events[14].payload.replay_result.divergences);
+    try std.testing.expectEqual(@as(u64, 0), audit_chain.events[14].payload.replay_result.first_divergent_seq);
 }
 
 test "investment_replay_integration: allowed trade audit chain hashes are real and deterministic" {
@@ -103,13 +101,8 @@ test "investment_replay_integration: allowed trade audit chain hashes are real a
     defer agent_result.deinit(allocator);
     const execution = agent_result.paper_result orelse return error.TestUnexpectedResult;
 
-    const no_divergence = replay.ReplayVerification{
-        .external_effects_disabled = true,
-        .replay_match = true,
-        .divergence_count = 0,
-        .first_divergent_field = "",
-        .first_divergent_seq = 0,
-    };
+    const allowed_result = try demo.runAllowedTradeScenario(allocator, std.testing.io, input);
+    const no_divergence = allowed_result.replay_result;
     const chain = investment_audit.buildAllowedTradeChain(
         run_id,
         "ops_reviewer",
@@ -121,6 +114,7 @@ test "investment_replay_integration: allowed trade audit chain hashes are real a
         &agent_result.model_response,
         &agent_result.ticket,
         &execution,
+        &allowed_result.drift_contract,
         &no_divergence,
     );
 
@@ -134,7 +128,7 @@ test "investment_replay_integration: allowed trade audit chain hashes are real a
     const expected_tile_ids = [investment_audit.allowed_trade_event_count][]const u8{
         "tkings", "tknorm", "tkdedu", "tkcase", "tkpoly",
         "tkmodl", "tkadpt", "tkadpt", "tkagnt", "tkadpt",
-        "tkrepl",
+        "tkpoly", "tkagnt", "tkpoly", "tkagnt", "tkrepl",
     };
     for (chain.events, expected_tile_ids) |event, expected| {
         try std.testing.expectEqualStrings(expected, std.mem.sliceTo(&event.header.tile_id, 0));
@@ -150,7 +144,11 @@ test "investment_replay_integration: allowed trade audit chain hashes are real a
     try std.testing.expect(chain.events[7].payload.financial_adapter_call.response_hash != 0);
     try std.testing.expect(chain.events[8].payload.proposal.proposal_hash != 0);
     try std.testing.expect(chain.events[9].payload.financial_adapter_call.response_hash != 0);
-    try std.testing.expect(chain.events[10].payload.replay_result.capsule_id != 0);
+    try std.testing.expect(chain.events[10].payload.policy_decision.source_event_hash != 0);
+    try std.testing.expect(chain.events[11].payload.proposal.proposal_hash != 0);
+    try std.testing.expect(chain.events[12].payload.approval_required.proposal_hash != 0);
+    try std.testing.expect(chain.events[13].payload.proposal.proposal_hash != 0);
+    try std.testing.expect(chain.events[14].payload.replay_result.capsule_id != 0);
 
     // The chain is deterministic: identical inputs must produce identical record_hash values.
     const chain2 = investment_audit.buildAllowedTradeChain(
@@ -164,6 +162,7 @@ test "investment_replay_integration: allowed trade audit chain hashes are real a
         &agent_result.model_response,
         &agent_result.ticket,
         &execution,
+        &allowed_result.drift_contract,
         &no_divergence,
     );
     for (chain.events, chain2.events) |e1, e2| {
@@ -196,6 +195,7 @@ test "investment_replay_integration: tamper detection reports first divergent ha
 
     const execution = agent_result.paper_result orelse return error.TestUnexpectedResult;
 
+    const allowed_result = try demo.runAllowedTradeScenario(allocator, std.testing.io, input);
     const replay_result = try replay.verifyAllowedTradeWithCapsulePath(
         allocator,
         std.testing.io,
@@ -204,6 +204,7 @@ test "investment_replay_integration: tamper detection reports first divergent ha
         &adapter_backend,
         &basket,
         &agent_result.ticket,
+        &allowed_result.drift_contract,
     );
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(!replay_result.replay_match);
@@ -222,47 +223,11 @@ test "investment_replay_integration: tamper detection reports first divergent ha
         &agent_result.model_response,
         &agent_result.ticket,
         &execution,
+        &allowed_result.drift_contract,
         &replay_result,
     );
-    try std.testing.expectEqual(@as(u64, 1), audit_chain.events[10].payload.replay_result.divergences);
-    try std.testing.expectEqual(@as(u64, 7), audit_chain.events[10].payload.replay_result.first_divergent_seq);
-}
-
-test "investment_replay_integration: audit jsonl hash chain is consistent" {
-    const allocator = std.testing.allocator;
-    const input = support.operationsThesisInput();
-    const thesis_id = thesis.computeThesisInputHash(input);
-    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
-
-    const raw = try std.Io.Dir.cwd().readFileAlloc(
-        std.testing.io,
-        "src/tickoni/test/fixtures/investment/audit_allowed_2000.jsonl",
-        allocator,
-        .limited(64 * 1024),
-    );
-    defer allocator.free(raw);
-
-    const AuditLine = struct { run_id: u64, tile_id: []const u8, prev_hash: u64, record_hash: u64 };
-
-    const expected_tile_ids = [investment_audit.allowed_trade_event_count][]const u8{
-        "tkings", "tknorm", "tkdedu", "tkcase", "tkpoly",
-        "tkmodl", "tkadpt", "tkadpt", "tkagnt", "tkadpt",
-        "tkrepl",
-    };
-
-    var lines = std.mem.tokenizeScalar(u8, raw, '\n');
-    var idx: usize = 0;
-    var prev_record_hash: u64 = 0;
-    while (lines.next()) |line| {
-        const parsed = try std.json.parseFromSlice(AuditLine, allocator, line, .{ .ignore_unknown_fields = true });
-        defer parsed.deinit();
-        try std.testing.expectEqual(run_id, parsed.value.run_id);
-        try std.testing.expectEqual(prev_record_hash, parsed.value.prev_hash);
-        try std.testing.expectEqualStrings(expected_tile_ids[idx], parsed.value.tile_id);
-        prev_record_hash = parsed.value.record_hash;
-        idx += 1;
-    }
-    try std.testing.expectEqual(investment_audit.allowed_trade_event_count, idx);
+    try std.testing.expectEqual(@as(u64, 1), audit_chain.events[14].payload.replay_result.divergences);
+    try std.testing.expectEqual(@as(u64, 7), audit_chain.events[14].payload.replay_result.first_divergent_seq);
 }
 
 test "gen audit allowed trade jsonl" {
@@ -287,13 +252,8 @@ test "gen audit allowed trade jsonl" {
     );
     defer agent_result.deinit(allocator);
     const execution = agent_result.paper_result orelse return error.TestUnexpectedResult;
-    const no_divergence = replay.ReplayVerification{
-        .external_effects_disabled = true,
-        .replay_match = true,
-        .divergence_count = 0,
-        .first_divergent_field = "",
-        .first_divergent_seq = 0,
-    };
+    const allowed_result = try demo.runAllowedTradeScenario(allocator, std.testing.io, input);
+    const no_divergence = allowed_result.replay_result;
     const chain = investment_audit.buildAllowedTradeChain(
         run_id,
         "ops_reviewer",
@@ -305,6 +265,7 @@ test "gen audit allowed trade jsonl" {
         &agent_result.model_response,
         &agent_result.ticket,
         &execution,
+        &allowed_result.drift_contract,
         &no_divergence,
     );
 
@@ -319,4 +280,41 @@ test "gen audit allowed trade jsonl" {
         const written = w.buffered();
         _ = std.c.fwrite(written.ptr, 1, written.len, f);
     }
+}
+
+test "investment_replay_integration: audit jsonl hash chain is consistent" {
+    const allocator = std.testing.allocator;
+    const input = support.operationsThesisInput();
+    const thesis_id = thesis.computeThesisInputHash(input);
+    const run_id = tkcase.deriveSyntheticRunId(thesis_id);
+
+    const raw = try std.Io.Dir.cwd().readFileAlloc(
+        std.testing.io,
+        "src/tickoni/test/fixtures/investment/audit_allowed_2000.jsonl",
+        allocator,
+        .limited(64 * 1024),
+    );
+    defer allocator.free(raw);
+
+    const AuditLine = struct { run_id: u64, tile_id: []const u8, prev_hash: u64, record_hash: u64 };
+
+    const expected_tile_ids = [investment_audit.allowed_trade_event_count][]const u8{
+        "tkings", "tknorm", "tkdedu", "tkcase", "tkpoly",
+        "tkmodl", "tkadpt", "tkadpt", "tkagnt", "tkadpt",
+        "tkpoly", "tkagnt", "tkpoly", "tkagnt", "tkrepl",
+    };
+
+    var lines = std.mem.tokenizeScalar(u8, raw, '\n');
+    var idx: usize = 0;
+    var prev_record_hash: u64 = 0;
+    while (lines.next()) |line| {
+        const parsed = try std.json.parseFromSlice(AuditLine, allocator, line, .{ .ignore_unknown_fields = true });
+        defer parsed.deinit();
+        try std.testing.expectEqual(run_id, parsed.value.run_id);
+        try std.testing.expectEqual(prev_record_hash, parsed.value.prev_hash);
+        try std.testing.expectEqualStrings(expected_tile_ids[idx], parsed.value.tile_id);
+        prev_record_hash = parsed.value.record_hash;
+        idx += 1;
+    }
+    try std.testing.expectEqual(investment_audit.allowed_trade_event_count, idx);
 }

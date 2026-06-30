@@ -13,6 +13,8 @@
   "audit_chain_hash": "audit_chain_hash_allowed_2000",
   "expected_basket_id": 6651037992630488700,
   "expected_proposal_hash": 9109813778527198207,
+  "expected_rebalance_hash": 7473928435323777606,
+  "expected_payment_update_hash": 14624431484619311732,
   "model_substitutions": [
     {
       "request_hash": 15637975690355711557,
@@ -51,6 +53,8 @@
     "ticket_id_matches": "ticket_ai_infra_2000_market",
     "proposal_hash_matches": "proposal_hash_ticket_ai_infra_2000_market",
     "affordability_outcome_matches": "allow",
-    "policy_outcome_matches": "allow"
+    "policy_outcome_matches": "allow",
+    "rebalance_requires_user_action": true,
+    "payment_update_requires_user_action": true
   }
 }

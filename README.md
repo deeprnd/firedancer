@@ -275,7 +275,7 @@ No black boxes.
 
 ## Documentation
 
-- [Overview](doc/strategy/overview.md)
+- [Strategy](doc/strategy/README.md)
 - [Architecture](doc/knowledge/architecture.md)
 - [Development](doc/execution/development.md)
 - [Build](doc/execution/build.md)
