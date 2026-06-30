@@ -347,6 +347,50 @@ pub fn build(b: *std.Build) void {
     linkTickoniCodec(b, cards_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(cards_test).step);
 
+    // drift.zig: drift conditions, assessment, and suggestion generation (V1.3.S3).
+    // Fresh impact and cards module instances are required so that linkTickoniCodec
+    // does not add C source objects to drift_test more than once.
+    const impact_for_drift_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/impact.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_adapter_test_mod },
+            .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+        },
+    });
+    const cards_for_drift_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/cards.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_adapter_test_mod },
+            .{ .name = "impact", .module = impact_for_drift_mod },
+        },
+    });
+    const drift_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/drift.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "basket", .module = basket_adapter_test_mod },
+                .{ .name = "cards", .module = cards_for_drift_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, drift_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(drift_test).step);
+    const drift_replay_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/drift.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_adapter_test_mod },
+            .{ .name = "cards", .module = cards_for_drift_mod },
+        },
+    });
+
     const allowed_trade_fixture_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/test/fixtures/investment/allowed_trade.zig"),
@@ -424,6 +468,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "adapter", .module = adapter_test_mod },
                 .{ .name = "basket", .module = basket_adapter_test_mod },
+                .{ .name = "drift", .module = drift_replay_test_mod },
                 .{ .name = "model", .module = model_test_mod },
                 .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
                 .{ .name = "tkpoly", .module = tkpoly_test_mod },
@@ -537,6 +582,15 @@ pub fn build(b: *std.Build) void {
             .{ .name = "impact", .module = impact_int_mod },
         },
     });
+    const drift_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/drift.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "cards", .module = cards_int_mod },
+        },
+    });
     const tkpoly_int_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/policy/mod.zig"),
         .target = target,
@@ -609,6 +663,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "adapter", .module = adapter_int_mod },
             .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "drift", .module = drift_int_mod },
             .{ .name = "model", .module = model_int_mod },
             .{ .name = "portfolio", .module = portfolio_int_mod },
             .{ .name = "tkpoly", .module = tkpoly_int_mod },
@@ -622,6 +677,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "audit_tile", .module = audit_tile_mod },
             .{ .name = "basket", .module = basket_int_mod },
+            .{ .name = "drift", .module = drift_int_mod },
             .{ .name = "model", .module = model_int_mod },
             .{ .name = "portfolio", .module = portfolio_int_mod },
             .{ .name = "replay", .module = replay_int_mod },
@@ -647,6 +703,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "adapter", .module = adapter_int_mod },
             .{ .name = "basket", .module = basket_int_mod },
             .{ .name = "cards", .module = cards_int_mod },
+            .{ .name = "drift", .module = drift_int_mod },
             .{ .name = "impact", .module = impact_int_mod },
             .{ .name = "investment_support", .module = investment_support_int_mod },
             .{ .name = "model", .module = model_int_mod },
@@ -663,7 +720,6 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&b.addRunArtifact(investment_demo_test).step);
     for ([_][]const u8{
         "src/tickoni/test/integration/investment_allowed_trade.zig",
-        "src/tickoni/test/integration/investment_replay.zig",
         "src/tickoni/test/integration/investment_blocked_limits.zig",
         "src/tickoni/test/integration/investment_restricted_instrument.zig",
         "src/tickoni/test/integration/investment_input_policy_denials.zig",
@@ -697,6 +753,37 @@ pub fn build(b: *std.Build) void {
         linkTickoniCodec(b, integration_test, fd_lib_dir);
         integration_step.dependOn(&b.addRunArtifact(integration_test).step);
     }
+
+    const replay_integration_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/integration/investment_replay.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "adapter", .module = adapter_int_mod },
+                .{ .name = "audit_tile", .module = audit_tile_mod },
+                .{ .name = "basket", .module = basket_int_mod },
+                .{ .name = "investment_demo", .module = investment_demo_mod },
+                .{ .name = "investment_audit", .module = investment_audit_int_mod },
+                .{ .name = "investment_support", .module = investment_support_int_mod },
+                .{ .name = "model", .module = model_int_mod },
+                .{ .name = "portfolio", .module = portfolio_int_mod },
+                .{ .name = "replay", .module = replay_int_mod },
+                .{ .name = "thesis", .module = thesis_int_mod },
+                .{ .name = "tkpoly", .module = tkpoly_int_mod },
+                .{ .name = "tool", .module = tool_int_mod },
+                .{ .name = "trade_ticket", .module = trade_ticket_int_mod },
+                .{ .name = "tkcase", .module = case_int_mod },
+                .{ .name = "tkdisp", .module = disp_int_mod },
+                .{ .name = "tkagnt", .module = agent_int_mod },
+            },
+        }),
+    });
+    replay_integration_test.root_module.addLibraryPath(b.path(fd_lib_dir));
+    replay_integration_test.root_module.linkSystemLibrary("fd_util", .{});
+    replay_integration_test.root_module.linkSystemLibrary("fd_ballet", .{});
+    replay_integration_test.root_module.linkSystemLibrary("stdc++", .{});
+    integration_step.dependOn(&b.addRunArtifact(replay_integration_test).step);
 
     const decision_cards_integration_test = b.addTest(.{
         .root_module = b.createModule(.{

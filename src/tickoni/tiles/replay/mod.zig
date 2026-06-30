@@ -1,6 +1,7 @@
 const std = @import("std");
 const adapter = @import("adapter");
 const basket = @import("basket");
+const drift = @import("drift");
 const model = @import("model");
 const portfolio = @import("portfolio");
 const trade_ticket = @import("trade_ticket");
@@ -10,6 +11,8 @@ const ReplayCapsuleWire = struct {
     ticket_id: []const u8,
     expected_basket_id: ?u64 = null,
     expected_proposal_hash: ?u64 = null,
+    expected_rebalance_hash: ?u64 = null,
+    expected_payment_update_hash: ?u64 = null,
     model_substitutions: []const struct {
         request_hash: u64,
         response_hash: u64,
@@ -28,6 +31,8 @@ const ReplayCapsuleWire = struct {
         no_paper_fill_emitted: bool,
         affordability_outcome_matches: []const u8,
         policy_outcome_matches: []const u8,
+        rebalance_requires_user_action: ?bool = null,
+        payment_update_requires_user_action: ?bool = null,
         max_affordable_cents: ?i64 = null,
         effective_max_paper_trade_cents: ?i64 = null,
         blocked_reason_code_matches: ?[]const u8 = null,
@@ -332,6 +337,7 @@ pub fn verifyAllowedTradeWithCapsulePath(
     adapter_backend: *const adapter.Backend,
     proposed_basket: *const basket.Basket,
     ticket: *const trade_ticket.TradeTicket,
+    drift_contract: *const drift.DriftContract,
 ) !ReplayVerification {
     var loaded = try loadReplayCapsule(allocator, io, capsule_path);
     defer loaded.deinit(allocator);
@@ -366,6 +372,26 @@ pub fn verifyAllowedTradeWithCapsulePath(
         if (hashTicket(ticket) != expected) divergences.note("proposal_hash", 6);
     } else {
         divergences.note("proposal_hash_missing", 6);
+    }
+    if (capsule.expected_rebalance_hash) |expected| {
+        if (drift.hashRebalanceSuggestion(&drift_contract.rebalance_suggestion) != expected)
+            divergences.note("rebalance_hash", 11);
+    } else {
+        divergences.note("rebalance_hash_missing", 11);
+    }
+    if (capsule.expected_payment_update_hash) |expected| {
+        if (drift.hashPaymentProposalUpdate(&drift_contract.payment_proposal_update) != expected)
+            divergences.note("payment_update_hash", 13);
+    } else {
+        divergences.note("payment_update_hash_missing", 13);
+    }
+    if (capsule.replay_assertions.rebalance_requires_user_action) |expected| {
+        if (drift_contract.rebalance_suggestion.requires_user_action != expected)
+            divergences.note("rebalance_requires_user_action", 11);
+    }
+    if (capsule.replay_assertions.payment_update_requires_user_action) |expected| {
+        if (drift_contract.payment_proposal_update.requires_user_action != expected)
+            divergences.note("payment_update_requires_user_action", 13);
     }
 
     // Load model fixture and verify substituted content hash.
@@ -449,6 +475,7 @@ pub fn verifyAllowedTrade(
     adapter_backend: *const adapter.Backend,
     proposed_basket: *const basket.Basket,
     ticket: *const trade_ticket.TradeTicket,
+    drift_contract: *const drift.DriftContract,
 ) !ReplayVerification {
     return verifyAllowedTradeWithCapsulePath(
         allocator,
@@ -458,6 +485,7 @@ pub fn verifyAllowedTrade(
         adapter_backend,
         proposed_basket,
         ticket,
+        drift_contract,
     );
 }
 
@@ -749,6 +777,7 @@ test "verifyAllowedTradeWithCapsulePath marks live model backends as external ef
         .io = std.testing.io,
     } };
     var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var drift_contract = std.mem.zeroes(drift.DriftContract);
 
     const replay_result = try verifyAllowedTrade(
         std.testing.allocator,
@@ -757,6 +786,7 @@ test "verifyAllowedTradeWithCapsulePath marks live model backends as external ef
         &adapter_backend,
         &fixture.proposed_basket,
         &fixture.ticket,
+        &drift_contract,
     );
     try std.testing.expect(!replay_result.external_effects_disabled);
 }
@@ -765,6 +795,7 @@ test "verifyAllowedTradeWithCapsulePath detects tampered paper fill hashes" {
     const fixture = try buildAllowedReplayFixture(std.testing.allocator, std.testing.io);
     var model_backend = model.Backend{ .fixture = .{} };
     var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var drift_contract = std.mem.zeroes(drift.DriftContract);
 
     const replay_result = try verifyAllowedTradeWithCapsulePath(
         std.testing.allocator,
@@ -774,6 +805,7 @@ test "verifyAllowedTradeWithCapsulePath detects tampered paper fill hashes" {
         &adapter_backend,
         &fixture.proposed_basket,
         &fixture.ticket,
+        &drift_contract,
     );
     try std.testing.expect(replay_result.external_effects_disabled);
     try std.testing.expect(!replay_result.replay_match);

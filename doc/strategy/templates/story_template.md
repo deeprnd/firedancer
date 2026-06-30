@@ -65,20 +65,22 @@ Conditional guidance:
     expect it.
 
 Read before filling:
-  - doc/position/templates/status_template.md for status definitions and the
+  - doc/strategy/templates/status_template.md for status definitions and the
     rule that task sub-issues are created only after the story is Ready.
-  - doc/overview.md for product identity, supported workflows, and non-goals.
-  - doc/architecture.md for the runtime model, source-of-truth boundaries,
-    tile responsibilities, and replay/audit constraints.
-  - doc/contribution/tickoni.md for Zig runtime style, Firedancer substrate
-    reuse, C ABI boundaries, and separation rules.
-  - doc/build.md and doc/development.md for repo-facing build/run commands and
-    justfile command policy.
-  - doc/testing-tickoni.md and doc/ci.md for test layer selection and CI gates.
-  - doc/security.md for fail-closed behavior, no-bypass expectations, and
-    agent/tool capability boundaries.
-  - doc/observability.md and doc/telemetry.md for metrics, diagnostics, labels,
-    and operator-visible evidence.
+  - doc/strategy/README.md for product identity, supported workflows, and
+    non-goals.
+  - doc/knowledge/architecture.md for the runtime model, source-of-truth
+    boundaries, tile responsibilities, and replay/audit constraints.
+  - doc/execution/contribution/tickoni.md for Zig runtime style, Firedancer
+    substrate reuse, C ABI boundaries, and separation rules.
+  - doc/execution/build.md and doc/execution/development.md for repo-facing
+    build/run commands and justfile command policy.
+  - doc/execution/testing-tickoni.md and doc/execution/ci.md for test layer
+    selection and CI gates.
+  - doc/execution/security.md for fail-closed behavior, no-bypass expectations,
+    and agent/tool capability boundaries.
+  - doc/execution/observability.md and doc/execution/telemetry.md for metrics,
+    diagnostics, labels, and operator-visible evidence.
 -->
 
 # VX.Y.SN: [Story Title]
@@ -139,12 +141,15 @@ form. Each criterion should be independently verifiable by a task, test, demo,
 fixture, or artifact.
 
 Use the project docs to make acceptance concrete:
-  - Product behavior: doc/overview.md and doc/position/README.md.
-  - Runtime/tile behavior: doc/architecture.md and doc/contribution/tickoni.md.
-  - Build/run behavior: doc/build.md and doc/development.md.
-  - Tests and CI impact: doc/testing-tickoni.md and doc/ci.md.
-  - Security/fail-closed behavior: doc/security.md.
-  - Metrics/diagnostics evidence: doc/observability.md and doc/telemetry.md.
+  - Product behavior: doc/strategy/README.md.
+  - Runtime/tile behavior: doc/knowledge/architecture.md and
+    doc/execution/contribution/tickoni.md.
+  - Build/run behavior: doc/execution/build.md and doc/execution/development.md.
+  - Tests and CI impact: doc/execution/testing-tickoni.md and
+    doc/execution/ci.md.
+  - Security/fail-closed behavior: doc/execution/security.md.
+  - Metrics/diagnostics evidence: doc/execution/observability.md and
+    doc/execution/telemetry.md.
 -->
 
 - [ ] Given [context], when [action], then [observable result].

@@ -2,6 +2,7 @@ const std = @import("std");
 const adapter = @import("adapter");
 const basket_mod = @import("basket");
 pub const cards = @import("cards");
+pub const drift = @import("drift");
 const impact = @import("impact");
 const model = @import("model");
 const portfolio = @import("portfolio");
@@ -35,6 +36,32 @@ const supplier_payout_source_event = "payment_failed";
 const supplier_payout_currency = "USD";
 const supplier_payout_expires_at_ns: u64 = 1_765_879_200_000_000_000;
 const demo_cash_buffer_threshold_cents: i64 = 500_000;
+const drift_check_now_ns: u64 = supplier_payout_expires_at_ns + 1;
+const drift_retry_window_expiry_ns: u64 = decision_cards_now_ns - 1;
+const drift_evidence_expiry_ns: u64 = decision_cards_now_ns - 86_400_000_000_000;
+const drift_market_exposure_bp: u32 = 1_800;
+const drift_market_max_sector_bp: u32 = 6_000;
+const drift_market_max_single_name_bp: u32 = 3_500;
+const drift_market_buying_power_cents: i64 = 100_000;
+const drift_payment_available_cash_cents: i64 = 300_000;
+const drift_payment_daily_limit_cents: i64 = 100_000;
+const drift_payment_monthly_limit_cents: i64 = 500_000;
+const drift_rebalance_policy = drift.ThesisDriftPolicy{
+    .allocation_breach_threshold_bp = 800,
+    .max_sector_exposure_bp = 5_000,
+    .max_single_name_bp = 3_000,
+    .min_buying_power_to_rebalance_cents = 200_000,
+};
+const drift_payment_policy = drift.PaymentDriftPolicy{
+    .cash_buffer_threshold_cents = demo_cash_buffer_threshold_cents,
+    .daily_limit_cents_at_proposal = 200_000,
+    .monthly_limit_cents_at_proposal = 1_000_000,
+};
+const drift_payment_governance = drift.PaymentProposalGovernance{
+    .action_class = "payment_retry.propose",
+    .approval_path = "maker_checker",
+    .policy_version = "tickoni.v1",
+};
 
 const restricted_tickers = [_][]const u8{
     "SOXL", "SOXS", "TQQQ", "SQQQ", "UPRO", "SPXS",
@@ -82,6 +109,7 @@ pub const AllowedTradeScenarioResult = struct {
     basket: basket_mod.Basket,
     ticket: trade_ticket.TradeTicket,
     decision_cards: cards.DecisionCardsContract,
+    drift_contract: drift.DriftContract,
     replay_result: replay.ReplayVerification,
 };
 
@@ -116,6 +144,43 @@ pub const CliReport = struct {
         if (self.ticket_id) |ticket_id| allocator.free(ticket_id);
     }
 };
+
+pub const AllowedTradeInterfaceContract = struct {
+    schema_version: u16 = 1,
+    decision_cards: cards.DecisionCardsContract,
+    drift_contract: drift.DriftContract,
+    replay_summary: struct {
+        replay_match: bool,
+        external_effects_disabled: bool,
+        divergence_count: u64,
+    },
+};
+
+fn boolLabel(value: bool) []const u8 {
+    return if (value) "true" else "false";
+}
+
+pub fn allocAllowedTradeInterfaceJson(
+    allocator: std.mem.Allocator,
+    result: *const AllowedTradeScenarioResult,
+) ![]u8 {
+    const decision_cards_json = try cards.allocDecisionCardsJson(allocator, &result.decision_cards);
+    defer allocator.free(decision_cards_json);
+    const drift_json = try drift.allocDriftContractJson(allocator, &result.drift_contract);
+    defer allocator.free(drift_json);
+
+    return std.fmt.allocPrint(
+        allocator,
+        "{{\"schema_version\":1,\"decision_cards\":{s},\"drift_contract\":{s},\"replay_summary\":{{\"replay_match\":{s},\"external_effects_disabled\":{s},\"divergence_count\":{d}}}}}",
+        .{
+            decision_cards_json,
+            drift_json,
+            boolLabel(result.replay_result.replay_match),
+            boolLabel(result.replay_result.external_effects_disabled),
+            result.replay_result.divergence_count,
+        },
+    );
+}
 
 pub fn envOrDefault(
     allocator: std.mem.Allocator,
@@ -390,6 +455,13 @@ pub fn runAllowedTradeScenario(
     if (execution.status != .filled) return error.UnexpectedExecutionStatus;
     if (execution.total_filled_cents != support.target_notional_cents) return error.UnexpectedFilledAmount;
 
+    const contracts = try buildAllowedTradeContracts(
+        input,
+        &account,
+        &basket,
+        &execution,
+    );
+
     var replay_model_backend = model.Backend{ .fixture = .{} };
     var replay_adapter_backend = adapter.Backend{ .fixture = .{} };
     const replay_result = try replay.verifyAllowedTrade(
@@ -399,21 +471,16 @@ pub fn runAllowedTradeScenario(
         &replay_adapter_backend,
         &basket,
         &ticket,
+        &contracts.drift_contract,
     );
     if (!replay_result.external_effects_disabled) return error.ReplayExternalEffectsEnabled;
     if (!replay_result.replay_match) return error.ReplayMismatch;
 
-    const decision_cards = try buildAllowedTradeDecisionCards(
-        input,
-        &account,
-        &basket,
-        &execution,
-    );
-
     return .{
         .basket = basket,
         .ticket = ticket,
-        .decision_cards = decision_cards,
+        .decision_cards = contracts.decision_cards,
+        .drift_contract = contracts.drift_contract,
         .replay_result = replay_result,
     };
 }
@@ -783,9 +850,9 @@ pub fn runSystemSuite(
             if (allowed.replay_result.external_effects_disabled) "true" else "false",
         },
     );
-    const decision_cards_json = try cards.allocDecisionCardsJson(allocator, &allowed.decision_cards);
-    defer allocator.free(decision_cards_json);
-    std.debug.print("=== Decision Cards ===\n{s}\n", .{decision_cards_json});
+    const decision_payload_json = try allocAllowedTradeInterfaceJson(allocator, &allowed);
+    defer allocator.free(decision_payload_json);
+    std.debug.print("=== Decision Payload ===\n{s}\n", .{decision_payload_json});
 
     const blocked = try runOversizedTradeScenario(
         allocator,
@@ -847,7 +914,7 @@ test "parseCliDemoRequest: unsupported amount fails closed" {
     );
 }
 
-test "runAllowedTradeScenario persists and exposes thesis and money proposal cards" {
+test "runAllowedTradeScenario persists and exposes decision cards and drift contract" {
     const result = try runAllowedTradeScenario(std.testing.allocator, std.testing.io, support.operationsThesisInput());
 
     try std.testing.expectEqual(result.basket.basket_id, result.decision_cards.thesis_card.basket_id);
@@ -858,19 +925,28 @@ test "runAllowedTradeScenario persists and exposes thesis and money proposal car
     try std.testing.expectEqualStrings(supplier_payout_beneficiary, result.decision_cards.money_proposal_card.beneficiarySlice());
     try std.testing.expectEqualStrings(supplier_payout_source_event, result.decision_cards.money_proposal_card.sourceEventSlice());
     try std.testing.expectEqualStrings(supplier_payout_currency, result.decision_cards.money_proposal_card.currencySlice());
+    try std.testing.expect(result.drift_contract.thesis_drift.has_drift);
+    try std.testing.expect(result.drift_contract.payment_drift.has_drift);
 
-    const json = try cards.allocDecisionCardsJson(std.testing.allocator, &result.decision_cards);
+    const json = try allocAllowedTradeInterfaceJson(std.testing.allocator, &result);
     defer std.testing.allocator.free(json);
-    try std.testing.expect(std.mem.indexOf(u8, json, "\"thesis_card\"") != null);
-    try std.testing.expect(std.mem.indexOf(u8, json, "\"money_proposal_card\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, json, "\"decision_cards\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, json, "\"drift_contract\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, json, "\"rebalance_suggestion\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, json, "\"payment_proposal_update\"") != null);
 }
 
-fn buildAllowedTradeDecisionCards(
+const AllowedTradeContracts = struct {
+    decision_cards: cards.DecisionCardsContract,
+    drift_contract: drift.DriftContract,
+};
+
+fn buildAllowedTradeContracts(
     input: thesis.ThesisInput,
     account_before: *const portfolio.BrokerageAccount,
     basket: *const basket_mod.Basket,
     execution: *const trade_ticket.PaperExecutionResult,
-) !cards.DecisionCardsContract {
+) !AllowedTradeContracts {
     const target_impact = impact.computePreTradeImpact(
         account_before,
         basket,
@@ -915,5 +991,45 @@ fn buildAllowedTradeDecisionCards(
         decision_cards_now_ns,
     ));
 
-    return store.snapshot();
+    const decision_cards = try store.snapshot();
+    const thesis_drift = try drift.assessThesisDrift(
+        &decision_cards.thesis_card,
+        drift_market_exposure_bp,
+        drift_market_max_sector_bp,
+        drift_market_max_single_name_bp,
+        drift_market_buying_power_cents,
+        null,
+        drift_rebalance_policy,
+    );
+    const rebalance = try drift.generateRebalanceSuggestion(
+        &decision_cards.thesis_card,
+        thesis_drift,
+        drift_market_buying_power_cents,
+    );
+    const payment_drift = try drift.assessPaymentDrift(
+        &decision_cards.money_proposal_card,
+        drift_check_now_ns,
+        drift_retry_window_expiry_ns,
+        drift_evidence_expiry_ns,
+        cards.ApprovalState.approved,
+        drift_payment_available_cash_cents,
+        drift_payment_daily_limit_cents,
+        drift_payment_monthly_limit_cents,
+        drift_payment_policy,
+    );
+    const payment_update = try drift.generateGovernedPaymentProposalUpdate(
+        &decision_cards.money_proposal_card,
+        payment_drift,
+        drift_payment_governance,
+    );
+
+    return .{
+        .decision_cards = decision_cards,
+        .drift_contract = .{
+            .thesis_drift = thesis_drift,
+            .rebalance_suggestion = rebalance,
+            .payment_drift = payment_drift,
+            .payment_proposal_update = payment_update,
+        },
+    };
 }

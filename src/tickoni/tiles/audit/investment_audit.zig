@@ -1,13 +1,14 @@
 const std = @import("std");
 const audit = @import("audit_tile");
 const basket = @import("basket");
+const drift = @import("drift");
 const model = @import("model");
 const portfolio = @import("portfolio");
 const replay = @import("replay");
 const thesis = @import("thesis");
 const trade_ticket = @import("trade_ticket");
 
-pub const allowed_trade_event_count: usize = 11;
+pub const allowed_trade_event_count: usize = 15;
 pub const oversized_trade_blocked_event_count: usize = 12;
 pub const restricted_instrument_blocked_event_count: usize = 8;
 
@@ -41,6 +42,8 @@ const source_event_type = "investment_intent";
 const canonical_event_type = "investment.intent";
 const model_backend_id = "fixture.ai_infra";
 const proposal_type = "trading_order.propose";
+const rebalance_proposal_type = "trading_rebalance.propose";
+const payment_update_proposal_type = "payment_retry.propose";
 const replay_capsule_id = "replay_capsule_ai_infra";
 
 fn parseFixedAsciiBytes(comptime N: usize, value: []const u8) [N]u8 {
@@ -175,6 +178,7 @@ pub fn buildAllowedTradeChain(
     model_response: *const model.ModelResponse,
     ticket: *const trade_ticket.TradeTicket,
     paper_result: *const trade_ticket.PaperExecutionResult,
+    drift_contract: *const drift.DriftContract,
     replay_result: *const replay.ReplayVerification,
 ) AllowedTradeAuditChain {
     const raw_hash = thesis.computeThesisInputHash(thesis_input.*);
@@ -184,6 +188,8 @@ pub fn buildAllowedTradeChain(
     const quote_response_hash = hashQuoteSnapshot(quote_snapshot);
     const proposal_hash = hashTicket(ticket);
     const paper_response_hash = hashPaperResult(paper_result);
+    const rebalance_hash = drift.hashRebalanceSuggestion(&drift_contract.rebalance_suggestion);
+    const payment_update_hash = drift.hashPaymentProposalUpdate(&drift_contract.payment_proposal_update);
 
     var events: [allowed_trade_event_count]audit.AuditEvent = undefined;
     var prev_hash: u64 = 0;
@@ -288,7 +294,44 @@ pub fn buildAllowedTradeChain(
     });
     prev_hash = events[9].header.record_hash;
 
-    events[10] = audit.buildEvent(header(10, "tkrepl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+    events[10] = audit.buildEvent(header(10, "tkpoly", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+        .policy_decision = .{
+            .outcome = if (drift_contract.payment_proposal_update.requires_user_action) .require_approval else .allow,
+            .rule_id = 1303,
+            .failed_scope_dim = parseFixedAsciiBytes(32, firstPaymentScopeDim(&drift_contract.payment_drift)),
+            .source_event_hash = payment_update_hash,
+        },
+    });
+    prev_hash = events[10].header.record_hash;
+
+    events[11] = audit.buildEvent(header(11, "tkagnt", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+        .proposal = .{
+            .proposal_type = parseFixedAsciiBytes(32, rebalance_proposal_type),
+            .proposal_hash = rebalance_hash,
+            .approval_state = 0,
+        },
+    });
+    prev_hash = events[11].header.record_hash;
+
+    events[12] = audit.buildEvent(header(12, "tkpoly", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+        .approval_required = .{
+            .action_class = parseFixedAsciiBytes(32, drift_contract.payment_proposal_update.actionClassSlice()),
+            .approval_path = parseFixedAsciiBytes(32, drift_contract.payment_proposal_update.approvalPathSlice()),
+            .proposal_hash = payment_update_hash,
+        },
+    });
+    prev_hash = events[12].header.record_hash;
+
+    events[13] = audit.buildEvent(header(13, "tkagnt", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+        .proposal = .{
+            .proposal_type = parseFixedAsciiBytes(32, payment_update_proposal_type),
+            .proposal_hash = payment_update_hash,
+            .approval_state = @intFromEnum(drift_contract.payment_proposal_update.approval_state),
+        },
+    });
+    prev_hash = events[13].header.record_hash;
+
+    events[14] = audit.buildEvent(header(14, "tkrepl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .replay_result = .{
             .capsule_id = hashBytes(replay_capsule_id),
             .divergences = replay_result.divergence_count,
@@ -297,6 +340,11 @@ pub fn buildAllowedTradeChain(
     });
 
     return .{ .events = events };
+}
+
+fn firstPaymentScopeDim(result: *const drift.PaymentDriftResult) []const u8 {
+    if (result.condition_count == 0) return "";
+    return result.active_conditions[0].label();
 }
 
 pub fn buildOversizedTradeBlockedChain(

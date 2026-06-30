@@ -15,9 +15,13 @@ Use it to understand:
 Before making changes, read these in order:
 
 1. `README.md` — project overview
-2. `doc/knowledge/architecture.md` — project architecture
-3. `doc/execution/development.md` — dev environment, build, and workflow
-4. this file — constraints, invariants, and engineering rules
+2. `doc/strategy/README.md` - product overview
+3. `doc/knowledge/architecture.md` — product architecture
+4. `doc/knowledge/tile-topology.md` - tile topology
+5. `doc/execution/development.md` — dev environment, build, and workflow
+6. `doc/execution/contribution/tickoni.md` - contribution guide
+7. `doc/execution/testing-tickoni.md` - testing
+8. this file — constraints, invariants, and engineering rules
 
 ### Mental model
 
