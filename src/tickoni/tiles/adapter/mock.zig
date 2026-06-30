@@ -2,7 +2,7 @@ const std = @import("std");
 const portfolio = @import("portfolio");
 const portfolio_fixtures = @import("portfolio_fixtures");
 const trade_ticket = @import("trade_ticket");
-const schema = @import("schema.zig");
+const schema = @import("messages.zig");
 
 pub const MockBackend = struct {
     pub const CallTrace = struct {

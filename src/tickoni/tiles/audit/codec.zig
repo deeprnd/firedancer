@@ -1,6 +1,6 @@
 const std = @import("std");
 const audit_codec = @import("audit_cabi");
-const schema = @import("schema.zig");
+const schema = @import("types.zig");
 
 pub const max_binary_len: usize = 256;
 

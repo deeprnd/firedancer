@@ -1,4 +1,4 @@
-const schema = @import("schema.zig");
+const schema = @import("types.zig");
 const codec = @import("codec.zig");
 
 pub const audit_schema_version = schema.audit_schema_version;

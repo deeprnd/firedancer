@@ -3,7 +3,7 @@ const basket = @import("basket");
 const portfolio = @import("portfolio");
 const portfolio_fixtures = @import("portfolio_fixtures");
 const trade_ticket = @import("trade_ticket");
-const schema = @import("schema.zig");
+const schema = @import("messages.zig");
 const mock_module = @import("mock.zig");
 
 pub const MockBackend = mock_module.MockBackend;

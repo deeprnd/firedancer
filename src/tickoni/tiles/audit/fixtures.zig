@@ -1,5 +1,5 @@
 const std = @import("std");
-const schema = @import("schema.zig");
+const schema = @import("types.zig");
 const codec = @import("codec.zig");
 
 fn parseFixedAsciiBytes(comptime N: usize, value: []const u8) ![N]u8 {

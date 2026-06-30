@@ -24,6 +24,39 @@ Do not use this guide as permission to edit `src/app/firedancer`,
 Those paths remain upstream substrate unless a change is genuinely generic and
 reviewed as such.
 
+## Source-Tree Guide
+
+Use this table to decide where new code belongs. When a path is ambiguous,
+ask rather than guess — misplaced code makes the ownership invariants stated
+in CLAUDE.md harder to enforce.
+
+| What you are adding | Where it belongs |
+| --- | --- |
+| Tile lifecycle, topology descriptors, channel handles, metrics surfaces, replay hooks, process/sandbox config | `src/tickoni/runtime/` |
+| Narrow Zig `extern` declarations and small wrappers over retained Firedancer C substrate | `src/tickoni/c_abi/` |
+| Canonical cross-tile financial event, policy, audit, case, and capability schemas that must be shared across tile boundaries | `src/tickoni/schema/` |
+| Binary, JSONL, protobuf, and hash codec implementations for canonical schemas | `src/tickoni/codec/` |
+| Tile-owned implementation code: request/response types used only within one tile, tile run loop, backend variants, validators, dispatchers | `src/tickoni/tiles/<tile>/` — use `types.zig` for pure type definitions, `messages.zig` for request/response message types |
+| Reusable scenario orchestration code imported by the CLI and multiple tests (e.g. investment demo flow) | `src/tickoni/scenarios/<scenario>/` |
+| Pure test doubles (`MockBackend`), HTTP mock servers, and other test-only helpers not needed in production | `src/tickoni/test_support/` |
+| Financial fixture data files (JSON, binary) used by scenario and integration tests | `src/tickoni/test_support/fixtures/` or scenario-owned fixture paths |
+
+### Naming rules within a tile directory
+
+- `mod.zig` — public surface; re-exports types and functions from sibling files.
+- `types.zig` — tile-local type definitions (enums, structs, payload types) that
+  do not cross tile boundaries.
+- `messages.zig` — tile-local request/response message types (e.g. `TkModlRequest`,
+  `AdapterRequest`) passed between the tile and its callers.
+- `backend.zig` — backend variants and the `Backend` tagged union.
+- `validator.zig` — input validation and scope checking.
+- `run.zig` — orchestration of a governed request through validation and backend.
+- `codec.zig` — binary and JSONL encoding/decoding for tile-owned formats.
+- `fixtures.zig` — fixture builders used in tests within this tile.
+
+Do not name any tile-local file `schema.zig`. That name is reserved for files
+under `src/tickoni/schema/` that define canonical cross-tile contracts.
+
 ## Core Rule
 
 Tickoni is a financial event runtime first and an AI harness second.
