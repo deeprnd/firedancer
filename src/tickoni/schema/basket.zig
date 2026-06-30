@@ -18,6 +18,7 @@ const std = @import("std");
 const thesis = @import("thesis.zig");
 const cat = @import("catalog.zig");
 const thesis_cabi = @import("thesis_cabi");
+const basket_proto = @embedFile("basket.proto");
 
 pub const catalog = cat;
 
@@ -117,6 +118,21 @@ pub const RejectedCandidate = struct {
     }
 };
 
+pub const BasketScreening = struct {
+    candidates: [max_basket_instruments]*const cat.InstrumentEntry = undefined,
+    candidate_count: u8 = 0,
+    rejected: [max_rejected_instruments]RejectedCandidate = std.mem.zeroes([max_rejected_instruments]RejectedCandidate),
+    rejected_count: u8 = 0,
+
+    pub fn candidateSlice(self: *const BasketScreening) []const *const cat.InstrumentEntry {
+        return self.candidates[0..self.candidate_count];
+    }
+
+    pub fn rejectedSlice(self: *const BasketScreening) []const RejectedCandidate {
+        return self.rejected[0..self.rejected_count];
+    }
+};
+
 /// Deterministic basket produced from InvestorIntent and the instrument catalog.
 pub const Basket = struct {
     /// Content hash of the basket composition (computeBasketHash).
@@ -181,7 +197,12 @@ pub const BasketDenialPayload = struct {
     account_id: u32,
     target_notional_cents: i64,
     error_code: BasketErrorCode,
+    failed_scope_dim: RejectionReason,
 };
+
+pub fn failedScopeDimension(rejected_candidates: []const RejectedCandidate) RejectionReason {
+    return if (rejected_candidates.len > 0) rejected_candidates[0].reason_code else .wrong_theme;
+}
 
 // ---------------------------------------------------------------------------
 // Content hash
@@ -336,11 +357,16 @@ pub fn buildFromScreening(
 /// deterministic allocation.  Governed runtime flows should call tkpoly and
 /// then buildFromScreening() instead of relying on this helper for policy.
 pub fn build(intent: thesis.InvestorIntent, thesis_id: u64) BasketError!Basket {
-    var candidates: [max_basket_instruments]*const cat.InstrumentEntry = undefined;
-    var n: usize = 0;
-    var screened: Basket = std.mem.zeroes(Basket);
+    const screened = screenIntent(intent);
+    return buildFromScreening(
+        intent,
+        thesis_id,
+        screened.candidateSlice(),
+        screened.rejectedSlice(),
+    );
+}
 
-    // Collect theme-matching instruments: union over all intent themes, dedup by pointer.
+pub fn screenIntent(intent: thesis.InvestorIntent) BasketScreening {
     var theme_candidates: [cat.catalog.len]*const cat.InstrumentEntry = undefined;
     var theme_n: usize = 0;
     for (intent.themes.values[0..intent.themes.count]) |theme_id| {
@@ -349,7 +375,10 @@ pub fn build(intent: thesis.InvestorIntent, thesis_id: u64) BasketError!Basket {
         for (buf[0..m]) |entry| {
             var already = false;
             for (theme_candidates[0..theme_n]) |existing| {
-                if (existing == entry) { already = true; break; }
+                if (existing == entry) {
+                    already = true;
+                    break;
+                }
             }
             if (!already and theme_n < cat.catalog.len) {
                 theme_candidates[theme_n] = entry;
@@ -358,61 +387,57 @@ pub fn build(intent: thesis.InvestorIntent, thesis_id: u64) BasketError!Basket {
         }
     }
 
-    // Check explicitly requested tickers for restriction.
+    var screening = BasketScreening{};
+
     for (intent.requested_tickers[0..@as(usize, intent.requested_ticker_count)]) |slot| {
         const ticker_str = std.mem.sliceTo(&slot, 0);
-        if (ticker_str.len == 0) continue;
-        if (isAlreadyRejected(&screened, ticker_str)) continue;
-        const entry = cat.lookupByTicker(ticker_str) orelse continue;
+        if (isAlreadyRejected(&screening, ticker_str)) continue;
+        const entry = cat.lookupByTicker(ticker_str) orelse unreachable;
         if (entry.restricted) {
-            addRejected(&screened, entry, .restricted_instrument, restrictionMsg(entry.restriction_reason));
+            addRejected(&screening, entry, .restricted_instrument, restrictionMsg(entry.restriction_reason));
         } else if (!isInCandidates(theme_candidates[0..theme_n], entry)) {
-            addRejected(&screened, entry, .wrong_theme, "Ticker does not match any intent theme");
+            addRejected(&screening, entry, .wrong_theme, "Ticker does not match any intent theme");
         }
     }
 
-    for (theme_candidates[0..theme_n]) |e| {
-        if (e.restricted) {
-            if (!isAlreadyRejected(&screened, e.ticker[0..e.ticker_len]))
-                addRejected(&screened, e, .restricted_instrument, restrictionMsg(e.restriction_reason));
+    for (theme_candidates[0..theme_n]) |entry| {
+        if (entry.restricted) {
+            if (!isAlreadyRejected(&screening, entry.ticker[0..entry.ticker_len])) {
+                addRejected(&screening, entry, .restricted_instrument, restrictionMsg(entry.restriction_reason));
+            }
             continue;
         }
-        if (!intent.allowed_asset_classes.has(e.asset_class)) {
-            addRejected(&screened, e, .wrong_asset_class, "Asset class not eligible");
+        if (!intent.allowed_asset_classes.has(entry.asset_class)) {
+            addRejected(&screening, entry, .wrong_asset_class, "Asset class not eligible");
             continue;
         }
-        if (!intent.allowed_instrument_types.has(e.instrument_type)) {
-            addRejected(&screened, e, .wrong_instrument_type, "Instrument type not eligible (stock/ETF only)");
+        if (!intent.allowed_instrument_types.has(entry.instrument_type)) {
+            addRejected(&screening, entry, .wrong_instrument_type, "Instrument type not eligible (stock/ETF only)");
             continue;
         }
-        if (e.market != intent.market) {
-            addRejected(&screened, e, .wrong_market, "Market not in US scope");
+        if (entry.market != intent.market) {
+            addRejected(&screening, entry, .wrong_market, "Market not in US scope");
             continue;
         }
-        if (!venueAllowed(e.venue, intent.venues[0..@as(usize, intent.venue_count)])) {
-            addRejected(&screened, e, .wrong_venue, "Venue not NYSE or NASDAQ");
+        if (!venueAllowed(entry.venue, intent.venues[0..@as(usize, intent.venue_count)])) {
+            addRejected(&screening, entry, .wrong_venue, "Venue not NYSE or NASDAQ");
             continue;
         }
-        if (intent.sectors.count > 0 and !sectorAllowed(e, intent.sectors)) {
-            addRejected(&screened, e, .wrong_sector, "Sector not in intent sector filter");
+        if (intent.sectors.count > 0 and !sectorAllowed(entry, intent.sectors)) {
+            addRejected(&screening, entry, .wrong_sector, "Sector not in intent sector filter");
             continue;
         }
-        if (intent.industries.count > 0 and !industryAllowed(e, intent.industries)) {
-            addRejected(&screened, e, .wrong_industry, "Industry not in intent industry filter");
+        if (intent.industries.count > 0 and !industryAllowed(entry, intent.industries)) {
+            addRejected(&screening, entry, .wrong_industry, "Industry not in intent industry filter");
             continue;
         }
-        if (n < max_basket_instruments) {
-            candidates[n] = e;
-            n += 1;
+        if (screening.candidate_count < max_basket_instruments) {
+            screening.candidates[screening.candidate_count] = entry;
+            screening.candidate_count += 1;
         }
     }
 
-    return buildFromScreening(
-        intent,
-        thesis_id,
-        candidates[0..n],
-        screened.rejected[0..screened.rejected_count],
-    );
+    return screening;
 }
 
 // ---------------------------------------------------------------------------
@@ -490,8 +515,8 @@ fn applyCap(weights: []u32, cap_bp: u32) void {
     }
 }
 
-fn isAlreadyRejected(basket: *const Basket, ticker_str: []const u8) bool {
-    for (basket.rejected[0..basket.rejected_count]) |*r| {
+fn isAlreadyRejected(screening: *const BasketScreening, ticker_str: []const u8) bool {
+    for (screening.rejected[0..screening.rejected_count]) |*r| {
         if (std.mem.eql(u8, r.ticker[0..r.ticker_len], ticker_str)) return true;
     }
     return false;
@@ -519,13 +544,13 @@ fn industryAllowed(entry: *const cat.InstrumentEntry, industries: thesis.Classif
 }
 
 fn addRejected(
-    basket: *Basket,
+    screening: *BasketScreening,
     e: *const cat.InstrumentEntry,
     code: RejectionReason,
     reason_str: []const u8,
 ) void {
-    if (basket.rejected_count >= max_rejected_instruments) return;
-    const rc = &basket.rejected[basket.rejected_count];
+    if (screening.rejected_count >= max_rejected_instruments) return;
+    const rc = &screening.rejected[screening.rejected_count];
     rc.ticker = e.ticker;
     rc.ticker_len = e.ticker_len;
     rc.reason_code = code;
@@ -533,7 +558,7 @@ fn addRejected(
     const len = @min(reason_str.len, max_reason_len);
     @memcpy(rc.reason[0..len], reason_str[0..len]);
     rc.reason_len = @intCast(len);
-    basket.rejected_count += 1;
+    screening.rejected_count += 1;
 }
 
 fn copyRejectedCandidates(
@@ -607,6 +632,18 @@ fn writeRationale(
 
 test "basket_schema_version is 1" {
     try std.testing.expectEqual(@as(u16, 1), basket_schema_version);
+}
+
+test "basket proto contract stays aligned with zig definitions" {
+    const required_lines = [_][]const u8{
+        "REJECTION_REASON_WRONG_SECTOR        = 6;",
+        "REJECTION_REASON_WRONG_INDUSTRY      = 7;",
+        "REJECTION_REASON_WRONG_THEME         = 8;",
+        "RejectionReason failed_scope_dim      = 5;",
+    };
+    for (required_lines) |line| {
+        try std.testing.expect(std.mem.indexOf(u8, basket_proto, line) != null);
+    }
 }
 
 // --- Acceptance: >= 4 eligible, >= 2 rejected for scenario ---
@@ -1038,4 +1075,18 @@ test "build: wrong_theme rejection for requested ticker not in any intent theme"
         }
     }
     try std.testing.expect(found_wrong_theme);
+}
+
+test "failedScopeDimension returns the first rejected reason code" {
+    var rejected = [_]RejectedCandidate{
+        .{
+            .ticker = [_]u8{0} ** cat.max_ticker_len,
+            .ticker_len = 4,
+            .reason_code = .wrong_sector,
+            .reason = [_]u8{0} ** max_reason_len,
+            .reason_len = 0,
+        },
+    };
+    @memcpy(rejected[0].ticker[0..4], "BOTZ");
+    try std.testing.expectEqual(RejectionReason.wrong_sector, failedScopeDimension(&rejected));
 }

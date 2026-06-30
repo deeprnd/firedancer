@@ -74,8 +74,46 @@ pub const CatalogValidationError = error{
     DuplicateTicker,
 };
 
-pub const sector_taxonomy_id = thesis.CanonicalId.init("gics_sector") catch unreachable;
-pub const industry_taxonomy_id = thesis.CanonicalId.init("gics_industry") catch unreachable;
+pub const sector_taxonomy_id = thesis.canonicalId("gics_sector");
+pub const industry_taxonomy_id = thesis.canonicalId("gics_industry");
+
+const known_theme_ids = [_]CanonicalId{
+    thesis.canonicalId("ai_infrastructure"),
+    thesis.canonicalId("semiconductors"),
+    thesis.canonicalId("cloud"),
+    thesis.canonicalId("cyber_security"),
+    thesis.canonicalId("broad_market"),
+    thesis.canonicalId("dividends"),
+    thesis.canonicalId("cash_like"),
+    thesis.canonicalId("chemicals"),
+    thesis.canonicalId("gold"),
+    thesis.canonicalId("solana"),
+    thesis.canonicalId("memecoins"),
+};
+
+const known_sector_codes = [_]CanonicalId{
+    thesis.canonicalId("information_technology"),
+    thesis.canonicalId("industrials"),
+    thesis.canonicalId("consumer_discretionary"),
+    thesis.canonicalId("financials"),
+    thesis.canonicalId("health_care"),
+    thesis.canonicalId("consumer_staples"),
+    thesis.canonicalId("utilities"),
+    thesis.canonicalId("materials"),
+};
+
+const known_industry_codes = [_]CanonicalId{
+    thesis.canonicalId("semiconductors"),
+    thesis.canonicalId("systems_software"),
+    thesis.canonicalId("robotics_and_ai"),
+    thesis.canonicalId("internet_retail"),
+    thesis.canonicalId("cloud_platforms"),
+    thesis.canonicalId("cloud_software"),
+    thesis.canonicalId("cybersecurity"),
+    thesis.canonicalId("sovereign_debt"),
+    thesis.canonicalId("chemicals"),
+    thesis.canonicalId("gold"),
+};
 
 fn tickerBuf(comptime s: []const u8) [max_ticker_len]u8 {
     if (s.len > max_ticker_len) @compileError("ticker exceeds max_ticker_len");
@@ -209,8 +247,40 @@ fn validateEntry(entry: InstrumentEntry) CatalogValidationError!void {
     entry.sectors.validate() catch return CatalogValidationError.InvalidClassification;
     entry.industries.validate() catch return CatalogValidationError.InvalidClassification;
     entry.themes.validate() catch return CatalogValidationError.InvalidClassification;
+    for (entry.sectors.values[0..entry.sectors.count]) |sector| {
+        if (!isKnownSectorRef(sector)) return CatalogValidationError.InvalidClassification;
+    }
+    for (entry.industries.values[0..entry.industries.count]) |industry| {
+        if (!isKnownIndustryRef(industry)) return CatalogValidationError.InvalidClassification;
+    }
+    for (entry.themes.values[0..entry.themes.count]) |theme_id| {
+        if (!isKnownThemeId(theme_id)) return CatalogValidationError.InvalidClassification;
+    }
     if (entry.restricted and entry.restriction_reason == .none) return CatalogValidationError.InvalidClassification;
     if (!entry.restricted and entry.restriction_reason != .none) return CatalogValidationError.InvalidClassification;
+}
+
+fn isKnownThemeId(theme_id: CanonicalId) bool {
+    return hasCanonicalId(&known_theme_ids, theme_id);
+}
+
+fn isKnownSectorRef(ref: ClassificationRef) bool {
+    if (!ref.taxonomy_id.eql(sector_taxonomy_id)) return false;
+    if (ref.taxonomy_version != sector_taxonomy_version) return false;
+    return hasCanonicalId(&known_sector_codes, ref.code);
+}
+
+fn isKnownIndustryRef(ref: ClassificationRef) bool {
+    if (!ref.taxonomy_id.eql(industry_taxonomy_id)) return false;
+    if (ref.taxonomy_version != industry_taxonomy_version) return false;
+    return hasCanonicalId(&known_industry_codes, ref.code);
+}
+
+fn hasCanonicalId(known_values: []const CanonicalId, value: CanonicalId) bool {
+    for (known_values) |known| {
+        if (known.eql(value)) return true;
+    }
+    return false;
 }
 
 pub fn filterByTheme(theme: CanonicalId, out: []*const InstrumentEntry) usize {

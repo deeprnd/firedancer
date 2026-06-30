@@ -12,13 +12,7 @@
   "ticket_id": "",
   "proposal_hash": null,
   "audit_chain_hash": "audit_chain_hash_restricted_soxl",
-  "model_substitutions": [
-    {
-      "request_hash": 10580838670694305698,
-      "response_hash": 12340958204495727724,
-      "fixture_file": "model_response_gemma4.json"
-    }
-  ],
+  "model_substitutions": [],
   "adapter_substitutions": [],
   "replay_assertions": {
     "no_live_model_call": true,

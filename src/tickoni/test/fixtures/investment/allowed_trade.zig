@@ -326,4 +326,3 @@ test "allowed_trade: basket id and thesis id are distinct non-zero values" {
     try std.testing.expect(b.basket_id != b.thesis_id);
     try std.testing.expectEqual(h, b.thesis_id);
 }
-

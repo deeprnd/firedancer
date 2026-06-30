@@ -121,4 +121,3 @@ test "investment_blocked_limits_integration: oversized trade replay and audit re
         try std.testing.expectEqual(audit_chain.events[i - 1].header.record_hash, event.header.prev_hash);
     }
 }
-

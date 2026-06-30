@@ -19,6 +19,7 @@
 const std = @import("std");
 const cls = @import("classification.zig");
 const thesis_cabi = @import("thesis_cabi");
+const thesis_proto = @embedFile("thesis.proto");
 
 pub const classification = cls;
 pub const Market = cls.Market;
@@ -69,6 +70,56 @@ pub const classification_ref_stride: usize = cls.max_canonical_id_len + 2 + cls.
 comptime {
     std.debug.assert(classification_ref_stride == 66);
 }
+
+const sector_taxonomy_id = cls.canonicalId("gics_sector");
+const industry_taxonomy_id = cls.canonicalId("gics_industry");
+const sector_taxonomy_version: u16 = 2025;
+const industry_taxonomy_version: u16 = 2025;
+
+const known_theme_ids = [_]CanonicalId{
+    cls.canonicalId("ai_infrastructure"),
+    cls.canonicalId("semiconductors"),
+    cls.canonicalId("cloud"),
+    cls.canonicalId("cyber_security"),
+    cls.canonicalId("broad_market"),
+    cls.canonicalId("dividends"),
+    cls.canonicalId("cash_like"),
+    cls.canonicalId("chemicals"),
+    cls.canonicalId("gold"),
+    cls.canonicalId("solana"),
+    cls.canonicalId("memecoins"),
+};
+
+const known_sector_codes = [_]CanonicalId{
+    cls.canonicalId("information_technology"),
+    cls.canonicalId("industrials"),
+    cls.canonicalId("consumer_discretionary"),
+    cls.canonicalId("financials"),
+    cls.canonicalId("health_care"),
+    cls.canonicalId("consumer_staples"),
+    cls.canonicalId("utilities"),
+    cls.canonicalId("materials"),
+};
+
+const known_industry_codes = [_]CanonicalId{
+    cls.canonicalId("semiconductors"),
+    cls.canonicalId("systems_software"),
+    cls.canonicalId("robotics_and_ai"),
+    cls.canonicalId("internet_retail"),
+    cls.canonicalId("cloud_platforms"),
+    cls.canonicalId("cloud_software"),
+    cls.canonicalId("cybersecurity"),
+    cls.canonicalId("sovereign_debt"),
+    cls.canonicalId("chemicals"),
+    cls.canonicalId("gold"),
+};
+
+const known_tickers = [_][]const u8{
+    "NVDA", "AMD",  "AVGO", "MSFT", "BOTZ", "SOXX",
+    "AMZN", "WCLD", "PANW", "CRWD", "HACK", "CIBR",
+    "SPY",  "IVV",  "VOO",  "VTI",  "VYM",  "DVY",
+    "SHV",  "SGOV", "BIL",  "SOXL", "SOXS", "BULZ",
+};
 
 /// Raw investor thesis as received from the user or provided by a test fixture.
 ///
@@ -387,6 +438,75 @@ fn validateInputClassifications(input: ThesisInput) !void {
     try input.themes.validate();
     try input.sector_filters.validate();
     try input.industry_filters.validate();
+    try validateKnownThemes(input.themes);
+    try validateKnownSectorFilters(input.sector_filters);
+    try validateKnownIndustryFilters(input.industry_filters);
+    try validateRequestedTickers(input);
+}
+
+fn validateKnownThemes(themes: ThemeIdList) !void {
+    for (themes.values[0..themes.count]) |theme_id| {
+        if (!isKnownThemeId(theme_id)) return error.UnknownThemeId;
+    }
+}
+
+fn validateKnownSectorFilters(sectors: ClassificationRefList) !void {
+    for (sectors.values[0..sectors.count]) |sector| {
+        if (!isKnownSectorRef(sector)) return error.UnknownSectorFilter;
+    }
+}
+
+fn validateKnownIndustryFilters(industries: ClassificationRefList) !void {
+    for (industries.values[0..industries.count]) |industry| {
+        if (!isKnownIndustryRef(industry)) return error.UnknownIndustryFilter;
+    }
+}
+
+fn validateRequestedTickers(input: ThesisInput) !void {
+    if (input.requested_ticker_count > max_requested_tickers) return error.TooManyRequestedTickers;
+
+    var i: usize = 0;
+    while (i < input.requested_ticker_count) : (i += 1) {
+        const ticker = std.mem.sliceTo(&input.requested_tickers[i], 0);
+        if (ticker.len == 0) return error.EmptyRequestedTicker;
+        if (!isKnownTicker(ticker)) return error.UnknownRequestedTicker;
+
+        var j: usize = 0;
+        while (j < i) : (j += 1) {
+            const prior = std.mem.sliceTo(&input.requested_tickers[j], 0);
+            if (std.mem.eql(u8, ticker, prior)) return error.DuplicateRequestedTicker;
+        }
+    }
+}
+
+fn isKnownThemeId(theme_id: CanonicalId) bool {
+    return hasCanonicalId(&known_theme_ids, theme_id);
+}
+
+fn isKnownSectorRef(ref: ClassificationRef) bool {
+    if (!ref.taxonomy_id.eql(sector_taxonomy_id)) return false;
+    if (ref.taxonomy_version != sector_taxonomy_version) return false;
+    return hasCanonicalId(&known_sector_codes, ref.code);
+}
+
+fn isKnownIndustryRef(ref: ClassificationRef) bool {
+    if (!ref.taxonomy_id.eql(industry_taxonomy_id)) return false;
+    if (ref.taxonomy_version != industry_taxonomy_version) return false;
+    return hasCanonicalId(&known_industry_codes, ref.code);
+}
+
+fn isKnownTicker(ticker: []const u8) bool {
+    for (known_tickers) |known| {
+        if (std.mem.eql(u8, known, ticker)) return true;
+    }
+    return false;
+}
+
+fn hasCanonicalId(known_values: []const CanonicalId, value: CanonicalId) bool {
+    for (known_values) |known| {
+        if (known.eql(value)) return true;
+    }
+    return false;
 }
 
 fn buildAllowedAssetClasses(input: ThesisInput) !AssetClassList {
@@ -698,6 +818,22 @@ test "schema version matches codec constant" {
     try std.testing.expectEqual(@as(u16, 3), thesis_schema_version);
 }
 
+test "thesis proto message contract stays aligned with zig definitions" {
+    const required_lines = [_][]const u8{
+        "ThemeIdList        themes                       = 7;",
+        "ClassificationRefList sector_filters           = 8;",
+        "ClassificationRefList industry_filters         = 9;",
+        "repeated bytes     requested_tickers            = 14;",
+        "ThemeIdList        themes                       = 2;",
+        "ClassificationRefList sectors                  = 3;",
+        "ClassificationRefList industries               = 4;",
+        "uint32      theme_count         = 3;",
+    };
+    for (required_lines) |line| {
+        try std.testing.expect(std.mem.indexOf(u8, thesis_proto, line) != null);
+    }
+}
+
 test "normalize: ai_infrastructure fixture produces valid intent" {
     const intent = try normalize(fixtures.ai_infrastructure);
     try std.testing.expectEqual(@as(u32, 1001), intent.account_id);
@@ -877,12 +1013,39 @@ test "normalize: duplicate theme ids fail closed" {
     try std.testing.expectError(ThesisError.MalformedClassification, normalize(input));
 }
 
+test "normalize: unknown theme id fails closed" {
+    var input = fixtures.ai_infrastructure;
+    input.themes = ThemeIdList{};
+    input.themes.append(CanonicalId.init("quantum") catch unreachable) catch unreachable;
+    try std.testing.expectError(ThesisError.MalformedClassification, normalize(input));
+}
+
 test "normalize: sector filter with missing taxonomy_version fails closed" {
     var input = fixtures.ai_infrastructure;
     var refs = ClassificationRefList{};
     // taxonomy_version = 0 is invalid
     refs.values[0] = ClassificationRef{ .taxonomy_id = CanonicalId.init("gics_sector") catch unreachable, .taxonomy_version = 0, .code = CanonicalId.init("information_technology") catch unreachable };
     refs.count = 1;
+    input.sector_filters = refs;
+    try std.testing.expectError(ThesisError.MalformedClassification, normalize(input));
+}
+
+test "normalize: sector filter with unknown taxonomy id fails closed" {
+    var input = fixtures.ai_infrastructure;
+    var refs = ClassificationRefList{};
+    refs.append(
+        ClassificationRef.init("sic_sector", 2025, "information_technology") catch unreachable,
+    ) catch unreachable;
+    input.sector_filters = refs;
+    try std.testing.expectError(ThesisError.MalformedClassification, normalize(input));
+}
+
+test "normalize: sector filter with unknown code fails closed" {
+    var input = fixtures.ai_infrastructure;
+    var refs = ClassificationRefList{};
+    refs.append(
+        ClassificationRef.init("gics_sector", 2025, "real_estate") catch unreachable,
+    ) catch unreachable;
     input.sector_filters = refs;
     try std.testing.expectError(ThesisError.MalformedClassification, normalize(input));
 }
@@ -895,6 +1058,40 @@ test "normalize: industry filter with duplicate ref fails closed" {
     refs.values[1] = ref;
     refs.count = 2;
     input.industry_filters = refs;
+    try std.testing.expectError(ThesisError.MalformedClassification, normalize(input));
+}
+
+test "normalize: industry filter with wrong taxonomy id fails closed" {
+    var input = fixtures.ai_infrastructure;
+    var refs = ClassificationRefList{};
+    refs.append(
+        ClassificationRef.init("gics_sector", 2025, "semiconductors") catch unreachable,
+    ) catch unreachable;
+    input.industry_filters = refs;
+    try std.testing.expectError(ThesisError.MalformedClassification, normalize(input));
+}
+
+test "normalize: too many requested tickers fails closed" {
+    var input = fixtures.ai_infrastructure;
+    input.requested_ticker_count = max_requested_tickers + 1;
+    try std.testing.expectError(ThesisError.MalformedClassification, normalize(input));
+}
+
+test "normalize: duplicate requested tickers fail closed" {
+    var input = fixtures.ai_infrastructure;
+    input.requested_ticker_count = 2;
+    @memset(&input.requested_tickers[0], 0);
+    @memset(&input.requested_tickers[1], 0);
+    @memcpy(input.requested_tickers[0][0..4], "SOXL");
+    @memcpy(input.requested_tickers[1][0..4], "SOXL");
+    try std.testing.expectError(ThesisError.MalformedClassification, normalize(input));
+}
+
+test "normalize: unknown requested ticker fails closed" {
+    var input = fixtures.ai_infrastructure;
+    input.requested_ticker_count = 1;
+    @memset(&input.requested_tickers[0], 0);
+    @memcpy(input.requested_tickers[0][0..4], "ZZZZ");
     try std.testing.expectError(ThesisError.MalformedClassification, normalize(input));
 }
 

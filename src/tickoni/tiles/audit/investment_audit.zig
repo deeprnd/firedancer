@@ -10,7 +10,7 @@ const trade_ticket = @import("trade_ticket");
 
 pub const allowed_trade_event_count: usize = 15;
 pub const oversized_trade_blocked_event_count: usize = 12;
-pub const restricted_instrument_blocked_event_count: usize = 8;
+pub const restricted_instrument_blocked_event_count: usize = 7;
 
 pub const AllowedTradeAuditChain = struct {
     events: [allowed_trade_event_count]audit.AuditEvent,
@@ -496,12 +496,10 @@ pub fn buildRestrictedInstrumentBlockedChain(
     workflow: []const u8,
     thesis_input: *const thesis.ThesisInput,
     proposed_basket: *const basket.Basket,
-    model_response: *const model.ModelResponse,
     replay_result: *const replay.ReplayVerification,
 ) RestrictedInstrumentBlockedAuditChain {
     const raw_hash = thesis.computeThesisInputHash(thesis_input.*);
     const normalized_hash = proposed_basket.basket_id;
-    const model_response_hash = hashBytes(model_response.content);
     const capability_id = capabilityEnvelopeId(thesis_input, proposed_basket);
 
     var events: [restricted_instrument_blocked_event_count]audit.AuditEvent = undefined;
@@ -553,31 +551,19 @@ pub fn buildRestrictedInstrumentBlockedChain(
     });
     prev_hash = events[4].header.record_hash;
 
-    events[5] = audit.buildEvent(header(5, "tkmodl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
-        .model_call = .{
-            .model_id = parseFixedAsciiBytes(32, model_backend_id),
-            .prompt_hash = raw_hash,
-            .response_hash = model_response_hash,
-            .token_estimate = model_response.token_usage.total_tokens,
-            .retry_count = 0,
-            .actor_role = parseFixedAsciiBytes(16, actor_role),
-            .workflow = parseFixedAsciiBytes(16, workflow),
-            .policy_decision_id = 0,
-            .replay_substitution_id = 0,
-        },
-    });
-    prev_hash = events[5].header.record_hash;
+    _ = actor_role;
+    _ = workflow;
 
-    events[6] = audit.buildEvent(header(6, "tkpoly", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+    events[5] = audit.buildEvent(header(5, "tkpoly", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .denial = .{
             .action_class = parseFixedAsciiBytes(32, proposal_type),
             .reason_code = @intFromEnum(basket.RejectionReason.restricted_instrument),
             .failed_scope_dim = parseFixedAsciiBytes(32, "restricted_instrument"),
         },
     });
-    prev_hash = events[6].header.record_hash;
+    prev_hash = events[5].header.record_hash;
 
-    events[7] = audit.buildEvent(header(7, "tkrepl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
+    events[6] = audit.buildEvent(header(6, "tkrepl", thesis_input.account_id, capability_id, run_id, prev_hash), .{
         .replay_result = .{
             .capsule_id = hashBytes("replay_capsule_ai_infra_restricted_soxl"),
             .divergences = replay_result.divergence_count,
