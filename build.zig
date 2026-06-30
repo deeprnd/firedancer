@@ -320,6 +320,33 @@ pub fn build(b: *std.Build) void {
     linkTickoniCodec(b, impact_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(impact_test).step);
 
+    // cards.zig: thesis and money proposal card schemas (V1.3.S2).
+    // A separate impact module instance is required here: sharing the same
+    // module object with impact_test would cause linkTickoniCodec to add the
+    // same C source objects twice into the cards_test binary.
+    const impact_for_cards_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/schema/impact.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_adapter_test_mod },
+            .{ .name = "portfolio", .module = portfolio_adapter_test_mod },
+        },
+    });
+    const cards_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/cards.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "basket", .module = basket_adapter_test_mod },
+                .{ .name = "impact", .module = impact_for_cards_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, cards_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(cards_test).step);
+
     const allowed_trade_fixture_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/test/fixtures/investment/allowed_trade.zig"),
