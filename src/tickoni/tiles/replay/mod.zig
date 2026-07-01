@@ -356,7 +356,7 @@ pub fn verifyAllowedTradeWithCapsulePath(
     if (capsule.model_substitutions.len != 1) divergences.note("model_substitution_count", 3);
     if (capsule.adapter_substitutions.len != 3) divergences.note("adapter_substitution_count", 4);
     if (capsule.model_substitutions.len > 0 and
-        !std.mem.eql(u8, capsule.model_substitutions[0].fixture_file, "model_response_gemma4.json"))
+        !std.mem.eql(u8, capsule.model_substitutions[0].fixture_file, "fixture_model_response_gemma4.json"))
         divergences.note("model_fixture_file", 3);
     if (proposed_basket.thesis_id != 0 and
         capsule.model_substitutions.len > 0 and
@@ -480,7 +480,7 @@ pub fn verifyAllowedTrade(
     return verifyAllowedTradeWithCapsulePath(
         allocator,
         io,
-        "src/tickoni/test/fixtures/investment/replay_capsule.json",
+        "src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule.json",
         model_backend,
         adapter_backend,
         proposed_basket,
@@ -497,7 +497,7 @@ pub fn verifyOversizedTradeBlock(
     proposed_basket: *const basket.Basket,
     ticket: *const trade_ticket.TradeTicket,
 ) !ReplayVerification {
-    const capsule_path = "src/tickoni/test/fixtures/investment/replay_capsule_oversized_25000.json";
+    const capsule_path = "src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule_oversized_25000.json";
     var loaded = try loadReplayCapsule(allocator, io, capsule_path);
     defer loaded.deinit(allocator);
 
@@ -615,7 +615,7 @@ pub fn verifyRestrictedInstrumentBlock(
     proposed_basket: *const basket.Basket,
     requested_ticker: []const u8,
 ) !ReplayVerification {
-    const capsule_path = "src/tickoni/test/fixtures/investment/replay_capsule_restricted_soxl.json";
+    const capsule_path = "src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule_restricted_soxl.json";
     var loaded = try loadReplayCapsule(allocator, io, capsule_path);
     defer loaded.deinit(allocator);
 
@@ -672,12 +672,12 @@ fn buildAllowedReplayFixture(allocator: std.mem.Allocator, io: std.Io) !AllowedR
     const expected_basket_id = try loadExpectedBasketId(
         allocator,
         io,
-        "src/tickoni/test/fixtures/investment/replay_capsule.json",
+        "src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule.json",
     );
     var loaded = try loadReplayCapsule(
         allocator,
         io,
-        "src/tickoni/test/fixtures/investment/replay_capsule.json",
+        "src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule.json",
     );
     defer loaded.deinit(allocator);
 
@@ -777,7 +777,7 @@ test "verifyAllowedTradeWithCapsulePath detects tampered paper fill hashes" {
     const replay_result = try verifyAllowedTradeWithCapsulePath(
         std.testing.allocator,
         std.testing.io,
-        "src/tickoni/test/fixtures/investment/replay_capsule_tampered_paper_fill.json",
+        "src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule_tampered_paper_fill.json",
         &model_backend,
         &adapter_backend,
         &fixture.proposed_basket,
@@ -795,7 +795,7 @@ test "verifyRestrictedInstrumentBlock stays offline with fixture model backend" 
     proposed_basket.basket_id = try loadExpectedBasketId(
         std.testing.allocator,
         std.testing.io,
-        "src/tickoni/test/fixtures/investment/replay_capsule_restricted_soxl.json",
+        "src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule_restricted_soxl.json",
     );
     proposed_basket.rejected_count = 1;
     proposed_basket.rejected[0].ticker_len = 4;

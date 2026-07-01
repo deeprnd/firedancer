@@ -12,13 +12,13 @@
 /// independent of the source thesis.
 ///
 /// Canonical encoding: binary protobuf.  Wire format is defined in
-/// src/tickoni/schema/investment/basket.proto; breaking changes are enforced by buf
+/// src/tickoni/schema/proto/consumer_money/basket.proto; breaking changes are enforced by buf
 /// in CI (quality-check-proto / proto_check.yml).
 const std = @import("std");
 const thesis = @import("thesis");
 const cat = @import("catalog");
-const thesis_cabi = @import("thesis_cabi");
-const basket_proto = @embedFile("basket.proto");
+const thesis_codec = @import("thesis_codec");
+const basket_proto_path = "src/tickoni/schema/proto/consumer_money/basket.proto";
 
 pub const catalog = cat;
 
@@ -226,7 +226,7 @@ pub fn computeBasketHash(basket: *const Basket) u64 {
         weight_bps_arr[i] = basket.instruments[i].weight_bp;
         alloc_cents_arr[i] = basket.instruments[i].allocation_cents;
     }
-    return thesis_cabi.tk_basket_hash(
+    return thesis_codec.tk_basket_hash(
         basket.thesis_id,
         basket.catalog_schema_version,
         basket.instrument_count,
@@ -246,7 +246,7 @@ pub fn computeBasketHash(basket: *const Basket) u64 {
 /// candidates and rejected set here for deterministic allocation.  basket_id:
 /// content hash of the source ThesisInput; callers use
 /// computeThesisInputHash() from thesis.zig.  Passed as a parameter so
-/// basket.zig does not need to import thesis_cabi.
+/// basket.zig does not need to import thesis_codec.
 ///
 /// Allocation (T4):
 ///   - Equal-weight baseline; ETF preference (1.5x stock base weight) when
@@ -635,6 +635,9 @@ test "basket_schema_version is 1" {
 }
 
 test "basket proto contract stays aligned with zig definitions" {
+    const basket_proto = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, basket_proto_path, std.testing.allocator, .limited(32 * 1024));
+    defer std.testing.allocator.free(basket_proto);
+
     const required_lines = [_][]const u8{
         "REJECTION_REASON_WRONG_SECTOR        = 6;",
         "REJECTION_REASON_WRONG_INDUSTRY      = 7;",

@@ -35,5 +35,5 @@ pub const formatJsonLine = codec.formatJsonLine;
 pub const parseBinary = codec.parseBinary;
 
 test {
-    _ = @import("fixtures.zig");
+    _ = @import("fixture_events.zig");
 }

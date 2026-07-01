@@ -4,7 +4,7 @@
 /// classification primitives that are shared across thesis intent, catalog
 /// facts, basket construction, and policy screening.
 const std = @import("std");
-const classification_proto = @embedFile("classification.proto");
+const classification_proto_path = "src/tickoni/schema/proto/classification/classification.proto";
 
 comptime {
     @setEvalBranchQuota(50_000);
@@ -405,11 +405,12 @@ const ProtoField = struct {
 };
 
 fn expectProtoEnumMatchesZigEnum(
+    classification_proto: []const u8,
     comptime ZigEnum: type,
     comptime proto_enum_name: []const u8,
     comptime proto_prefix: []const u8,
 ) !void {
-    const proto_entries = try parseProtoEnum(proto_enum_name);
+    const proto_entries = try parseProtoEnum(classification_proto, proto_enum_name);
     const zig_fields = std.meta.fields(ZigEnum);
 
     try std.testing.expectEqual(zig_fields.len + 1, proto_entries.len);
@@ -430,10 +431,11 @@ fn expectProtoEnumMatchesZigEnum(
 }
 
 fn expectProtoMessageFields(
+    classification_proto: []const u8,
     comptime proto_message_name: []const u8,
     comptime expected_fields: []const ProtoField,
 ) !void {
-    const fields = try parseProtoMessage(proto_message_name);
+    const fields = try parseProtoMessage(classification_proto, proto_message_name);
     try std.testing.expectEqual(expected_fields.len, fields.len);
     for (expected_fields, fields) |expected, actual| {
         try std.testing.expectEqualStrings(expected.type_name, actual.type_name);
@@ -442,17 +444,17 @@ fn expectProtoMessageFields(
     }
 }
 
-fn parseProtoEnum(comptime enum_name: []const u8) ![]const ProtoEnumEntry {
-    const block = try findProtoBlock("enum", enum_name);
+fn parseProtoEnum(classification_proto: []const u8, comptime enum_name: []const u8) ![]const ProtoEnumEntry {
+    const block = try findProtoBlock(classification_proto, "enum", enum_name);
     return try parseProtoEnumBlock(block);
 }
 
-fn parseProtoMessage(comptime message_name: []const u8) ![]const ProtoField {
-    const block = try findProtoBlock("message", message_name);
+fn parseProtoMessage(classification_proto: []const u8, comptime message_name: []const u8) ![]const ProtoField {
+    const block = try findProtoBlock(classification_proto, "message", message_name);
     return try parseProtoMessageBlock(block);
 }
 
-fn findProtoBlock(comptime kind: []const u8, comptime block_name: []const u8) ![]const u8 {
+fn findProtoBlock(classification_proto: []const u8, comptime kind: []const u8, comptime block_name: []const u8) ![]const u8 {
     const needle = comptime std.fmt.comptimePrint("{s} {s} {{", .{ kind, block_name });
     const start = std.mem.indexOf(u8, classification_proto, needle) orelse return error.MissingProtoBlock;
     const body_start = start + needle.len;
@@ -546,32 +548,38 @@ test "themeIdList rejects duplicate canonical ids" {
 }
 
 test "classification proto enum contract stays aligned with zig definitions" {
-    try expectProtoEnumMatchesZigEnum(Market, "Market", "MARKET_");
-    try expectProtoEnumMatchesZigEnum(Venue, "Venue", "VENUE_");
-    try expectProtoEnumMatchesZigEnum(AssetClass, "AssetClass", "ASSET_CLASS_");
-    try expectProtoEnumMatchesZigEnum(InstrumentType, "InstrumentType", "INSTRUMENT_TYPE_");
-    try expectProtoEnumMatchesZigEnum(RiskPreference, "RiskPreference", "RISK_PREFERENCE_");
+    const classification_proto = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, classification_proto_path, std.testing.allocator, .limited(32 * 1024));
+    defer std.testing.allocator.free(classification_proto);
+
+    try expectProtoEnumMatchesZigEnum(classification_proto, Market, "Market", "MARKET_");
+    try expectProtoEnumMatchesZigEnum(classification_proto, Venue, "Venue", "VENUE_");
+    try expectProtoEnumMatchesZigEnum(classification_proto, AssetClass, "AssetClass", "ASSET_CLASS_");
+    try expectProtoEnumMatchesZigEnum(classification_proto, InstrumentType, "InstrumentType", "INSTRUMENT_TYPE_");
+    try expectProtoEnumMatchesZigEnum(classification_proto, RiskPreference, "RiskPreference", "RISK_PREFERENCE_");
 }
 
 test "classification proto message contract stays aligned with zig definitions" {
-    try expectProtoMessageFields("CanonicalId", &.{
+    const classification_proto = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, classification_proto_path, std.testing.allocator, .limited(32 * 1024));
+    defer std.testing.allocator.free(classification_proto);
+
+    try expectProtoMessageFields(classification_proto, "CanonicalId", &.{
         .{ .type_name = "string", .field_name = "value", .field_number = 1 },
     });
-    try expectProtoMessageFields("ClassificationRef", &.{
+    try expectProtoMessageFields(classification_proto, "ClassificationRef", &.{
         .{ .type_name = "CanonicalId", .field_name = "taxonomy_id", .field_number = 1 },
         .{ .type_name = "uint32", .field_name = "taxonomy_version", .field_number = 2 },
         .{ .type_name = "CanonicalId", .field_name = "code", .field_number = 3 },
     });
-    try expectProtoMessageFields("AssetClassList", &.{
+    try expectProtoMessageFields(classification_proto, "AssetClassList", &.{
         .{ .type_name = "repeated AssetClass", .field_name = "values", .field_number = 1 },
     });
-    try expectProtoMessageFields("InstrumentTypeList", &.{
+    try expectProtoMessageFields(classification_proto, "InstrumentTypeList", &.{
         .{ .type_name = "repeated InstrumentType", .field_name = "values", .field_number = 1 },
     });
-    try expectProtoMessageFields("ThemeIdList", &.{
+    try expectProtoMessageFields(classification_proto, "ThemeIdList", &.{
         .{ .type_name = "repeated CanonicalId", .field_name = "values", .field_number = 1 },
     });
-    try expectProtoMessageFields("ClassificationRefList", &.{
+    try expectProtoMessageFields(classification_proto, "ClassificationRefList", &.{
         .{ .type_name = "repeated ClassificationRef", .field_name = "values", .field_number = 1 },
     });
 }

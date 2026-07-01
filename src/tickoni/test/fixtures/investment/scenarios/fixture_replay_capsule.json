@@ -19,7 +19,7 @@
     {
       "request_hash": 1475570507200268938,
       "response_hash": 12340958204495727724,
-      "fixture_file": "model_response_gemma4.json"
+      "fixture_file": "fixture_model_response_gemma4.json"
     }
   ],
   "adapter_substitutions": [
@@ -28,21 +28,21 @@
       "operation": "quote_snapshot",
       "request_hash": 4467280193722107233,
       "response_hash": 3837264155678659392,
-      "fixture_file": "quotes.json"
+      "fixture_file": "fixture_quotes.json"
     },
     {
       "adapter_id": "paper_broker_demo",
       "operation": "portfolio_snapshot",
       "request_hash": 11880919757726111843,
       "response_hash": 12174377330011764409,
-      "fixture_file": "account_ops.json"
+      "fixture_file": "fixture_account_ops.json"
     },
     {
       "adapter_id": "paper_broker_demo",
       "operation": "paper_order",
       "request_hash": 9109813778527198207,
       "response_hash": 9389426250592958326,
-      "fixture_file": "paper_execution_allowed_2000.json"
+      "fixture_file": "fixture_paper_execution_allowed_2000.json"
     }
   ],
   "replay_assertions": {

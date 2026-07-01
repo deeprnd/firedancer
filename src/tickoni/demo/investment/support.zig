@@ -10,7 +10,7 @@ pub const policy_max_notional_per_order_cents: i64 = 250_000;
 pub const expected_ticket_id = "ticket_ai_infra_2000_market";
 pub const expected_blocked_ticket_id = "ticket_ai_infra_25000_blocked";
 pub const restricted_ticker = "SOXL";
-pub const tampered_replay_capsule_path = "src/tickoni/test/fixtures/investment/replay_capsule_tampered_paper_fill.json";
+pub const tampered_replay_capsule_path = "src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule_tampered_paper_fill.json";
 
 pub const ExpectedLine = struct {
     ticker: []const u8,

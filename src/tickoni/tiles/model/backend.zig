@@ -1,13 +1,13 @@
 const std = @import("std");
 const schema = @import("model_messages");
-const model_mock = @import("model_mock");
+const mock_model = @import("mock_model");
 
 pub const ProviderRequest = schema.ProviderRequest;
 pub const ModelResponse = schema.ModelResponse;
 
 // MockBackend is a pure test double; its definition lives in
-// src/tickoni/test/mocks/model_mock.zig, not in this tile.
-const MockBackend = model_mock.MockBackend;
+// src/tickoni/test/mocks/mock_model.zig, not in this tile.
+const MockBackend = mock_model.MockBackend;
 
 const fixture_model_id_max: usize = 128;
 const fixture_content_max: usize = 2048;
@@ -57,7 +57,7 @@ pub const FixtureBackend = struct {
         fixture_dir: []const u8,
     ) !FixtureBackend {
         var path_buf: [512]u8 = undefined;
-        const path = try std.fmt.bufPrint(&path_buf, "{s}/model_response_gemma4.json", .{fixture_dir});
+        const path = try std.fmt.bufPrint(&path_buf, "{s}/fixture_model_response_gemma4.json", .{fixture_dir});
         const raw = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(32 * 1024));
         defer allocator.free(raw);
         const parsed = try std.json.parseFromSlice(ModelResponseFileWire, allocator, raw, .{ .ignore_unknown_fields = true });
@@ -442,12 +442,12 @@ test "FixtureBackend returns deterministic response" {
     try std.testing.expectEqual(@as(u64, 842), resp.latency_ms);
 }
 
-test "FixtureBackend.initFromDir loads model_response_gemma4.json" {
+test "FixtureBackend.initFromDir loads fixture_model_response_gemma4.json" {
     const allocator = std.testing.allocator;
     const fixture = try FixtureBackend.initFromDir(
         allocator,
         std.testing.io,
-        "src/tickoni/test/fixtures/investment",
+        "src/tickoni/test/fixtures/investment/scenarios",
     );
     const req = ProviderRequest{
         .model_id = "fixture.ai_infra",

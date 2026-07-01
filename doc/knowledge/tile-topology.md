@@ -222,14 +222,18 @@ Use the product tree that is now being introduced:
 src/app/tickoni/          Zig supervisor and CLI
 src/tickoni/runtime/      Process lifecycle, topology, channels, backpressure
 src/tickoni/c_abi/        Narrow wrappers around selected Firedancer C substrate
+src/tickoni/codec/        Tickoni-owned codec bindings and implementations
 src/tickoni/schema/       Financial events, cases, capabilities, audit envelopes
+src/tickoni/schema/proto/ Protobuf wire definitions for canonical contracts
 src/tickoni/tiles/        Tickoni-owned tile implementations
+src/tickoni/demo/         Deterministic CLI/test demo orchestration
 src/tickoni/connectors/   Signed adapter manifests and connector implementations
 ```
 
 `src/app/tickoni/`, `src/tickoni/runtime/`, `src/tickoni/c_abi/`, and
-`src/tickoni/tiles/` already exist. `schema/` and `connectors/` should be added
-only when implementation work needs them.
+`src/tickoni/tiles/` already exist. Schema, codec, and demo paths are
+Tickoni-owned support roots around the runtime; `connectors/` should be added
+only when implementation work needs it.
 
 ### Runtime IDs
 

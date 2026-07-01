@@ -17,7 +17,7 @@
     {
       "request_hash": 15762600351696426601,
       "response_hash": 12340958204495727724,
-      "fixture_file": "model_response_gemma4.json"
+      "fixture_file": "fixture_model_response_gemma4.json"
     }
   ],
   "adapter_substitutions": [
@@ -26,14 +26,14 @@
       "operation": "quote_snapshot",
       "request_hash": 37245803745511443,
       "response_hash": 3837264155678659392,
-      "fixture_file": "quotes.json"
+      "fixture_file": "fixture_quotes.json"
     },
     {
       "adapter_id": "paper_broker_demo",
       "operation": "portfolio_snapshot",
       "request_hash": 11880919757726111843,
       "response_hash": 11722998568291785962,
-      "fixture_file": "account_ops.json"
+      "fixture_file": "fixture_account_ops.json"
     }
   ],
   "replay_assertions": {

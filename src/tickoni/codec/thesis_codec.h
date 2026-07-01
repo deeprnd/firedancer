@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 /* Schema version for the thesis input schema.
-   Must match thesis_schema_version in src/tickoni/schema/investment/thesis.zig.
+   Must match thesis_schema_version in src/tickoni/schema/consumer_money/thesis.zig.
    Incrementing this value changes the hash key and invalidates existing hashes. */
 #define TK_THESIS_SCHEMA_VERSION ((uint16_t)3)
 
@@ -66,12 +66,12 @@ tk_thesis_input_hash( uint16_t              user_text_len,
                       unsigned char const * requested_tickers );
 
 /* Schema version for the basket schema.
-   Must match basket_schema_version in src/tickoni/schema/investment/basket.zig.
+   Must match basket_schema_version in src/tickoni/schema/consumer_money/basket.zig.
    Incrementing this value changes the hash key and invalidates existing hashes. */
 #define TK_BASKET_SCHEMA_VERSION ((uint16_t)1)
 
 /* Basket ticker stride: each ticker entry is zero-padded to this many bytes.
-   Must match max_ticker_len in src/tickoni/schema/investment/catalog.zig. */
+   Must match max_ticker_len in src/tickoni/schema/consumer_money/catalog.zig. */
 #define TK_BASKET_MAX_TICKER_LEN ((ulong)8)
 
 /* Compute a stable content hash over a constructed basket's composition.
@@ -90,7 +90,7 @@ tk_basket_hash( uint64_t         thesis_id,
                 int64_t  const * alloc_cents );
 
 /* Schema version for the trade ticket schema.
-   Must match trade_ticket_schema_version in src/tickoni/schema/investment/trade_ticket.zig.
+   Must match trade_ticket_schema_version in src/tickoni/schema/consumer_money/trade_ticket.zig.
    Incrementing this value changes the hash key and invalidates existing hashes. */
 #define TK_TRADE_TICKET_SCHEMA_VERSION ((uint16_t)1)
 
