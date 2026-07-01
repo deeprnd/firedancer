@@ -38,7 +38,7 @@ fn operationsThesisInputWithTarget(target_notional_cents: i64) thesis.ThesisInpu
 fn loadRestrictedTicketFixture(allocator: std.mem.Allocator, io: std.Io) !LoadedRestrictedTicketFixture {
     const raw = try std.Io.Dir.cwd().readFileAlloc(
         io,
-        "src/tickoni/test/fixtures/investment/ticket_restricted_instrument_blocked.json",
+        "src/tickoni/test/fixtures/investment/scenarios/fixture_ticket_restricted_instrument_blocked.json",
         allocator,
         .limited(16 * 1024),
     );

@@ -269,7 +269,7 @@ test "gen audit allowed trade jsonl" {
         &no_divergence,
     );
 
-    const path = "src/tickoni/test/fixtures/investment/audit_allowed_2000.jsonl";
+    const path = "src/tickoni/test/fixtures/investment/scenarios/fixture_audit_allowed_2000.jsonl";
     const f = std.c.fopen(path, "w") orelse return error.FileOpenFailed;
     defer _ = std.c.fclose(f);
 
@@ -290,7 +290,7 @@ test "investment_replay_integration: audit jsonl hash chain is consistent" {
 
     const raw = try std.Io.Dir.cwd().readFileAlloc(
         std.testing.io,
-        "src/tickoni/test/fixtures/investment/audit_allowed_2000.jsonl",
+        "src/tickoni/test/fixtures/investment/scenarios/fixture_audit_allowed_2000.jsonl",
         allocator,
         .limited(64 * 1024),
     );

@@ -194,15 +194,15 @@ standalone test roots for:
 - `src/tickoni/tiles/case/mod.zig`
 - `src/tickoni/tiles/disp/mod.zig`
 - `src/tickoni/schema/classification/classification.zig`
-- `src/tickoni/schema/investment/thesis.zig`
-- `src/tickoni/schema/investment/catalog.zig`
-- `src/tickoni/schema/investment/basket.zig`
-- `src/tickoni/schema/investment/trade_ticket.zig`
-- `src/tickoni/schema/investment/impact.zig`
-- `src/tickoni/schema/investment/cards.zig`
-- `src/tickoni/schema/investment/drift.zig`
+- `src/tickoni/schema/consumer_money/thesis.zig`
+- `src/tickoni/schema/consumer_money/catalog.zig`
+- `src/tickoni/schema/consumer_money/basket.zig`
+- `src/tickoni/schema/consumer_money/trade_ticket.zig`
+- `src/tickoni/schema/consumer_money/impact.zig`
+- `src/tickoni/schema/consumer_money/cards.zig`
+- `src/tickoni/schema/consumer_money/drift.zig`
 - `src/tickoni/schema/portfolio/portfolio.zig`
-- `src/tickoni/test/fixtures/portfolio/portfolio_fixtures.zig`
+- `src/tickoni/test/fixtures/portfolio/fixture_portfolio.zig`
 - `src/tickoni/tiles/model/mod.zig`
 - `src/tickoni/tiles/adapter/mod.zig`
 
@@ -270,11 +270,11 @@ zig build integration-test
 
 This executes two real test binaries:
 
-- `src/tickoni/test/fixtures/investment/allowed_trade.zig` — fixture contract
+- `src/tickoni/test/fixtures/investment/fixture_allowed_trade.zig` — fixture contract
   tests for the schema pipeline (thesis → basket → portfolio) with external
   systems replaced by recorded fixtures; no live model, adapter, or execution
   call.
-- `src/tickoni/test/integration/allowed_trade.zig` — tile-boundary integration
+- `src/tickoni/test/integration/test_investment_allowed_trade.zig` — tile-boundary integration
   tests covering tkcase, tkdisp, tkagnt, replay, and audit scenarios. Tickoni
   internals run through production-like paths; model and adapter backends are
   substituted with fixture backends so no network calls are made.

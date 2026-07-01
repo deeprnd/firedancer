@@ -2,7 +2,7 @@ const std = @import("std");
 const adapter = @import("adapter");
 const basket = @import("basket");
 const portfolio = @import("portfolio");
-const portfolio_fixtures = @import("portfolio_fixtures");
+const fixture_portfolio = @import("fixture_portfolio");
 const trade_ticket = @import("trade_ticket");
 
 pub const ToolName = enum {
@@ -57,14 +57,14 @@ pub fn normalizePaperOrder(ticket: *const trade_ticket.TradeTicket) adapter.Adap
 }
 
 test "normalizePortfolioRead sets account and operation" {
-    const req = normalizePortfolioRead(portfolio_fixtures.fixtures.cash_rich.account_id);
+    const req = normalizePortfolioRead(fixture_portfolio.fixtures.cash_rich.account_id);
     try std.testing.expectEqual(adapter.AdapterOperation.portfolio_snapshot, req.operation);
-    try std.testing.expectEqual(portfolio_fixtures.fixtures.cash_rich.account_id, req.account_id);
+    try std.testing.expectEqual(fixture_portfolio.fixtures.cash_rich.account_id, req.account_id);
 }
 
 test "normalizeQuoteRead copies basket tickers and account scope" {
     var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
-    proposed_basket.account_id = portfolio_fixtures.fixtures.cash_rich.account_id;
+    proposed_basket.account_id = fixture_portfolio.fixtures.cash_rich.account_id;
     proposed_basket.instrument_count = 2;
     proposed_basket.instruments[0].ticker_len = 4;
     @memcpy(proposed_basket.instruments[0].ticker[0..4], "NVDA");
@@ -81,7 +81,7 @@ test "normalizeQuoteRead copies basket tickers and account scope" {
 
 test "normalizePaperOrder preserves account and ticket pointer" {
     var ticket: trade_ticket.TradeTicket = std.mem.zeroes(trade_ticket.TradeTicket);
-    ticket.account_id = portfolio_fixtures.fixtures.cash_rich.account_id;
+    ticket.account_id = fixture_portfolio.fixtures.cash_rich.account_id;
     ticket.ticket_id_len = 9;
     @memcpy(ticket.ticket_id[0..9], "ticket-01");
 
@@ -93,7 +93,7 @@ test "normalizePaperOrder preserves account and ticket pointer" {
 
 test "dispatch routes quote and paper-order tool names to adapter requests" {
     var proposed_basket: basket.Basket = std.mem.zeroes(basket.Basket);
-    proposed_basket.account_id = portfolio_fixtures.fixtures.cash_rich.account_id;
+    proposed_basket.account_id = fixture_portfolio.fixtures.cash_rich.account_id;
     proposed_basket.instrument_count = 1;
     proposed_basket.instruments[0].ticker_len = 4;
     @memcpy(proposed_basket.instruments[0].ticker[0..4], "NVDA");

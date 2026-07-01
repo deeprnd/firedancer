@@ -173,7 +173,7 @@ test "hash chain mutation changes downstream records" {
 
 test "binary and wire format pinned" {
     if (std.c.getenv("TK_GEN_FIXTURES") != null) return error.SkipZigTest;
-    const golden = @import("audit_fixtures_gen").values;
+    const golden = @import("fixture_audit_gen").values;
     for (makeFixtures(), &golden) |event, g| {
         try std.testing.expectEqual(g.expected_hash, event.header.record_hash);
         var buf: [codec.max_binary_len]u8 = undefined;
@@ -220,7 +220,7 @@ fn cwrite(f: *std.c.FILE, s: []const u8) void {
 }
 
 fn writeFixtureFile() !void {
-    const path = "src/tickoni/test/fixtures/audit_fixtures_gen.zig";
+    const path = "src/tickoni/test/fixtures/fixture_audit_gen.zig";
     const f = std.c.fopen(path, "w") orelse return error.FileOpenFailed;
     defer _ = std.c.fclose(f);
 

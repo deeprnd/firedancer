@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package tickoni.schema.v1;
 
-import "classification/classification.proto";
+import "proto/classification/classification.proto";
 
 enum ThesisErrorCode {
   THESIS_ERROR_CODE_UNSPECIFIED            = 0;

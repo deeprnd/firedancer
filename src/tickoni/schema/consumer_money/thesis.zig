@@ -14,12 +14,12 @@
 /// order regardless of source ordering.
 ///
 /// Canonical encoding: binary protobuf. Wire format is defined in
-/// src/tickoni/schema/investment/thesis.proto; breaking changes are enforced by buf
+/// src/tickoni/schema/proto/consumer_money/thesis.proto; breaking changes are enforced by buf
 /// in CI (quality-check-proto / proto_check.yml).
 const std = @import("std");
 const cls = @import("classification");
-const thesis_cabi = @import("thesis_cabi");
-const thesis_proto = @embedFile("thesis.proto");
+const thesis_codec = @import("thesis_codec");
+const thesis_proto_path = "src/tickoni/schema/proto/consumer_money/thesis.proto";
 
 pub const classification = cls;
 pub const Market = cls.Market;
@@ -329,7 +329,7 @@ pub fn computeThesisInputHash(input: ThesisInput) u64 {
     const sorted_industries = sortedClassificationRefs(input.industry_filters);
     const industry_flat = packClassificationRefs(sorted_industries);
 
-    return thesis_cabi.tk_thesis_input_hash(
+    return thesis_codec.tk_thesis_input_hash(
         input.user_text_len,
         &input.user_text,
         input.target_notional_cents,
@@ -819,6 +819,9 @@ test "schema version matches codec constant" {
 }
 
 test "thesis proto message contract stays aligned with zig definitions" {
+    const thesis_proto = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, thesis_proto_path, std.testing.allocator, .limited(32 * 1024));
+    defer std.testing.allocator.free(thesis_proto);
+
     const required_lines = [_][]const u8{
         "ThemeIdList        themes                       = 7;",
         "ClassificationRefList sector_filters           = 8;",

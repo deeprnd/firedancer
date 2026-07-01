@@ -1,7 +1,7 @@
 const std = @import("std");
 const basket = @import("basket");
 const portfolio = @import("portfolio");
-const portfolio_fixtures = @import("portfolio_fixtures");
+const fixture_portfolio = @import("fixture_portfolio");
 const thesis = @import("thesis");
 
 pub const max_ticket_id_len: usize = 64;
@@ -354,7 +354,7 @@ fn buildTicketFixture(target_notional_cents: i64, bid_cents: i64, ask_cents: i64
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const proposed_basket = try basket.build(intent, thesis_id);
-    const affordability = portfolio.checkAffordability(&portfolio_fixtures.fixtures.cash_rich, proposed_basket.total_allocated_cents);
+    const affordability = portfolio.checkAffordability(&fixture_portfolio.fixtures.cash_rich, proposed_basket.total_allocated_cents);
 
     var quotes: QuoteSnapshot = std.mem.zeroes(QuoteSnapshot);
     quotes.quote_count = proposed_basket.instrument_count;
