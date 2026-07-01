@@ -383,7 +383,7 @@ pub fn stableEventHash(raw: RawPayment) u64 {
     return h;
 }
 
-fn validFraming(raw: RawPayment) bool {
+pub fn validFraming(raw: RawPayment) bool {
     if (raw.malformed) return false;
     if (!std.mem.eql(u8, &raw.currency, "USD")) return false;
     return raw.amount_cents > 0;

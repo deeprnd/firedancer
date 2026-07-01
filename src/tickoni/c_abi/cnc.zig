@@ -84,6 +84,29 @@ pub fn appLaddr(cnc: *Cnc) [*]u8 {
     return @as([*]u8, @ptrCast(cnc)) + cnc_app_offset;
 }
 
+pub const app_counter_cap: usize = 8;
+
+/// Reads one u64 counter slot from the cnc's app-defined region
+/// (fd_cnc_app_laddr). Tickoni process-mode tiles publish their own local
+/// produced/normalized/etc. counters here so a diagnostics reader can see
+/// them across the process boundary without a separate shared object per
+/// counter. Callers must ensure the cnc was created with app_sz >=
+/// (idx+1)*8.
+pub fn appCounterRead(cnc: *Cnc, idx: usize) u64 {
+    std.debug.assert(idx < app_counter_cap);
+    const base = appLaddr(cnc);
+    const ptr: *const volatile u64 = @ptrCast(@alignCast(base + idx * 8));
+    return ptr.*;
+}
+
+/// Writes one u64 counter slot in the cnc's app-defined region.
+pub fn appCounterWrite(cnc: *Cnc, idx: usize, value: u64) void {
+    std.debug.assert(idx < app_counter_cap);
+    const base = appLaddr(cnc);
+    const ptr: *volatile u64 = @ptrCast(@alignCast(base + idx * 8));
+    ptr.* = value;
+}
+
 /// Mirrors static inline fd_cnc_heartbeat_query (fd_cnc.h).
 pub fn heartbeatQuery(cnc: *const Cnc) i64 {
     return asPrivateConst(cnc).heartbeat;
@@ -127,6 +150,16 @@ test "cnc alignment and app-region offset constants match header" {
     try std.testing.expectEqual(@as(usize, 128), cnc_align);
     try std.testing.expectEqual(@as(usize, 64), cnc_app_align);
     try std.testing.expectEqual(@as(usize, 64), cnc_app_offset);
+}
+
+test "appCounterRead/Write round-trip within a fake cnc-shaped buffer" {
+    var buf: [256]u8 align(128) = [_]u8{0} ** 256;
+    const cnc: *Cnc = @ptrCast(&buf);
+    appCounterWrite(cnc, 0, 42);
+    appCounterWrite(cnc, 7, 100);
+    try std.testing.expectEqual(@as(u64, 42), appCounterRead(cnc, 0));
+    try std.testing.expectEqual(@as(u64, 100), appCounterRead(cnc, 7));
+    try std.testing.expectEqual(@as(u64, 0), appCounterRead(cnc, 1));
 }
 
 test "cnc signal constants match header" {

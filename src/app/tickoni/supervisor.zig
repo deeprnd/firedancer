@@ -25,6 +25,21 @@ pub const ProcessPipelineConfig = struct {
     /// after this many heartbeats instead of waiting for a halt signal.
     /// 0 means run normally. Indexed by tile_idx.
     crash_after_heartbeats: [8]u32 = [_]u32{0} ** 8,
+    /// Payment pipeline behavior, shared with thread-mode
+    /// PaymentPipelineConfig so process-mode and thread-mode runs produce
+    /// byte-identical decisions/metrics for the same input.
+    event_count: u64 = 10_000,
+    policy_limit_cents: i64 = 100_000,
+    inject_duplicate: bool = true,
+    inject_malformed: bool = false,
+    /// Path to the tickoni-supervisor binary to self-exec per tile.
+    /// Defaults to /proc/self/exe (correct when the running process IS
+    /// tickoni-supervisor). Callers that are not that binary — such as
+    /// `zig build integration-test`'s test runner — must set this
+    /// explicitly, since /proc/self/exe would otherwise point at the
+    /// test runner and every `__tile-run` re-exec would fail with
+    /// "unrecognized command line argument".
+    tile_exe_path: ?[]const u8 = null,
 };
 
 /// Supervisor-owned state for a running V1.14 process-mode pipeline.
@@ -174,9 +189,14 @@ pub const Supervisor = struct {
         // would otherwise fail closed forever on the same run_dir/name.
         _ = c_abi.wksp.fd_wksp_delete_named(workspace_name_z);
 
-        var sub_page_cnt = [_]usize{256}; // 1 MiB: comfortably covers 8 small cnc allocations
+        // 8 MiB and an explicit partition count: covers 8 cncs plus 4
+        // mcache+dcache+fseq triplets (20 allocations) with headroom; the
+        // auto-estimated part_max from a smaller footprint undershoots
+        // what this many small allocations need (confirmed by
+        // fd_wksp_user.c logging "too few partitions available").
+        var sub_page_cnt = [_]usize{2048};
         var sub_cpu_idx = [_]usize{0};
-        const rc = c_abi.wksp.fd_wksp_new_named(workspace_name_z, c_abi.wksp.shmem_normal_page_sz, 1, &sub_page_cnt, &sub_cpu_idx, 0o600, 1, 0);
+        const rc = c_abi.wksp.fd_wksp_new_named(workspace_name_z, c_abi.wksp.shmem_normal_page_sz, 1, &sub_page_cnt, &sub_cpu_idx, 0o600, 1, 64);
         if (rc != 0) return error.WkspCreateFailed;
         const wksp = c_abi.wksp.fd_wksp_attach(workspace_name_z) orelse return error.WkspAttachFailed;
 
@@ -208,11 +228,30 @@ pub const Supervisor = struct {
             state.cncs[i] = c_abi.cnc.fd_cnc_join(laddr) orelse return error.CncJoinFailed;
         }
 
+        // Pre-format one mcache+dcache+fseq triplet per channel. The
+        // supervisor is the sole creator; producer/consumer tiles only
+        // join. Bounded by the topology's fixed channel count (currently
+        // always 4 for paymentPipelineProcess()).
+        var link_handles_buf: [8]rt.shm_link.LinkHandles = undefined;
+        std.debug.assert(self.topo.channels.len <= link_handles_buf.len);
+        const link_handles = link_handles_buf[0..self.topo.channels.len];
+        for (self.topo.channels, 0..) |ch, i| {
+            link_handles[i] = try rt.shm_link.create(wksp, ch.depth, ch.mtu);
+        }
+
         var self_exe_path_buf: [std.fs.max_path_bytes]u8 = undefined;
-        const self_exe_path = try c_abi.process.selfExePath(&self_exe_path_buf);
+        const self_exe_path = config.tile_exe_path orelse try c_abi.process.selfExePath(&self_exe_path_buf);
 
         for (self.handles, 0..) |*h, i| {
             const tile = self.topo.tiles[i];
+
+            var input_link: ?rt.shm_link.LinkHandles = null;
+            var output_link: ?rt.shm_link.LinkHandles = null;
+            for (self.topo.channels, 0..) |ch, ci| {
+                if (ch.dst_idx == i) input_link = link_handles[ci];
+                if (ch.src_idx == i) output_link = link_handles[ci];
+            }
+
             const spec = try rt.launch_spec.LaunchSpec.init(.{
                 .tile_idx = @intCast(i),
                 .tile_id = tile.id,
@@ -222,6 +261,12 @@ pub const Supervisor = struct {
                 .shmem_path = config.run_dir,
                 .heartbeat_interval_ns = config.heartbeat_interval_ns,
                 .crash_after_heartbeats = config.crash_after_heartbeats[i],
+                .input_link = input_link,
+                .output_link = output_link,
+                .event_count = config.event_count,
+                .policy_limit_cents = config.policy_limit_cents,
+                .inject_duplicate = config.inject_duplicate,
+                .inject_malformed = config.inject_malformed,
             });
             const spec_path = try std.fmt.allocPrint(self.allocator, "{s}/tile_{d}.spec", .{ config.run_dir, i });
             defer self.allocator.free(spec_path);
@@ -287,6 +332,46 @@ pub const Supervisor = struct {
             }
             maybe_child.* = null;
         }
+    }
+
+    /// Process-mode equivalent of tiles_mod.MetricSnapshot: every tile
+    /// publishes its own local counters into its cnc app-region (see
+    /// c_abi/cnc.zig's appCounter{Read,Write} and
+    /// src/app/tickoni/process_stage.zig's per-tile counter layout);
+    /// this reads them back across the process boundary. Must be called
+    /// before stopProcess, which leaves every cnc join and detaches the
+    /// workspace.
+    pub const ProcessMetricSnapshot = struct {
+        produced: u64 = 0,
+        normalized: u64 = 0,
+        invalid: u64 = 0,
+        duplicates: u64 = 0,
+        allowed: u64 = 0,
+        denied: u64 = 0,
+        audited: u64 = 0,
+    };
+
+    pub fn snapshotProcessMetrics(self: *const Supervisor) ProcessMetricSnapshot {
+        const state = self.process_state orelse return .{};
+        var snap = ProcessMetricSnapshot{};
+        for (self.topo.tiles, 0..) |tile, i| {
+            const cnc = state.cncs[i] orelse continue;
+            const id = tile.id.slice();
+            if (std.mem.eql(u8, id, "tkings")) {
+                snap.produced = c_abi.cnc.appCounterRead(cnc, 0);
+            } else if (std.mem.eql(u8, id, "tknorm")) {
+                snap.normalized = c_abi.cnc.appCounterRead(cnc, 0);
+                snap.invalid = c_abi.cnc.appCounterRead(cnc, 1);
+            } else if (std.mem.eql(u8, id, "tkdedu")) {
+                snap.duplicates = c_abi.cnc.appCounterRead(cnc, 0);
+            } else if (std.mem.eql(u8, id, "tkpoly")) {
+                snap.allowed = c_abi.cnc.appCounterRead(cnc, 0);
+                snap.denied = c_abi.cnc.appCounterRead(cnc, 1);
+            } else if (std.mem.eql(u8, id, "tkaudt")) {
+                snap.audited = c_abi.cnc.appCounterRead(cnc, 0);
+            }
+        }
+        return snap;
     }
 
     /// Signals every tile to halt via its cnc (crash-only shutdown, not a

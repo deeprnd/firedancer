@@ -20,15 +20,18 @@ pub fn build(b: *std.Build) void {
     const clap_mod = clap_dep.module("clap");
 
     // Shared modules used by both the exe and test binaries.
-    const runtime_mod = b.addModule("runtime", .{
-        .root_source_file = b.path("src/tickoni/runtime/runtime.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
     const c_abi_mod = b.addModule("c_abi", .{
         .root_source_file = b.path("src/tickoni/c_abi/c_abi.zig"),
         .target = target,
         .optimize = optimize,
+    });
+    const runtime_mod = b.addModule("runtime", .{
+        .root_source_file = b.path("src/tickoni/runtime/runtime.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "c_abi", .module = c_abi_mod },
+        },
     });
     const audit_codec_mod = b.addModule("audit_codec", .{
         .root_source_file = b.path("src/tickoni/codec/audit_codec.zig"),
@@ -232,7 +235,6 @@ pub fn build(b: *std.Build) void {
     for ([_][]const u8{
         "src/tickoni/runtime/topology.zig",
         "src/tickoni/runtime/tile.zig",
-        "src/tickoni/runtime/launch_spec.zig",
         "src/tickoni/c_abi/queue.zig",
         "src/tickoni/c_abi/sandbox.zig",
         "src/tickoni/c_abi/dcache.zig",
@@ -354,6 +356,33 @@ pub fn build(b: *std.Build) void {
 
     const model_messages_test = b.addTest(.{ .root_module = model_messages_mod });
     test_step.dependOn(&b.addRunArtifact(model_messages_test).step);
+
+    // shm_link.zig imports c_abi; layout/shape tests only (no real
+    // fd_wksp/fd_tango calls in the offline unit lane).
+    const shm_link_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/shm_link.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "c_abi", .module = c_abi_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(shm_link_test).step);
+
+    // launch_spec.zig embeds shm_link.LinkHandles, which imports c_abi.
+    const launch_spec_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/launch_spec.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "c_abi", .module = c_abi_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(launch_spec_test).step);
 
     // model tile: unit tests are mock/fixture-backed and must not start servers.
     const model_test_mod = b.createModule(.{
@@ -564,6 +593,19 @@ pub fn build(b: *std.Build) void {
             .{ .name = "c_abi", .module = c_abi_mod },
         },
     });
+    // Named module (vs. sup_mod's anonymous instance above) so
+    // src/tickoni/test/integration process-mode tests can import the
+    // Supervisor type without a cross-tree relative path.
+    const supervisor_named_mod = b.addModule("supervisor", .{
+        .root_source_file = b.path("src/app/tickoni/supervisor.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "runtime", .module = runtime_mod },
+            .{ .name = "tiles", .module = tiles_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
+        },
+    });
     const sup_test = b.addTest(.{ .root_module = sup_mod });
     linkTickoniCodec(b, sup_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(sup_test).step);
@@ -746,6 +788,33 @@ pub fn build(b: *std.Build) void {
         linkTickoniCodec(b, integration_test, fd_lib_dir);
         integration_step.dependOn(&b.addRunArtifact(integration_test).step);
     }
+
+    // V1.14.S1 process-mode payment pipeline: spawns real supervisor-managed
+    // tile processes over Firedancer Tango shared memory. Tickoni internals
+    // run for real; the "external tool" substituted per
+    // doc/execution/testing-tickoni.md's integration-lane rule is the
+    // operator-managed host workspace path, replaced by a scratch
+    // FD_SHMEM_PATH directory under zig-cache/tmp. No huge pages or sudo.
+    const process_pipeline_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/integration/test_process_pipeline.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "runtime", .module = runtime_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "supervisor", .module = supervisor_named_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, process_pipeline_test, fd_lib_dir);
+    linkTickoniTango(b, process_pipeline_test, fd_lib_dir);
+    const run_process_pipeline_test = b.addRunArtifact(process_pipeline_test);
+    // The test self-execs zig-out/bin/tickoni-supervisor per tile (see
+    // ProcessPipelineConfig.tile_exe_path); make sure it is built and
+    // installed first.
+    run_process_pipeline_test.step.dependOn(&b.addInstallArtifact(exe, .{}).step);
+    integration_step.dependOn(&run_process_pipeline_test.step);
 
     // Mock HTTP servers (test/mocks): self-tests of the mock
     // infrastructure itself, no tile schema imports required. Wired to

@@ -2,7 +2,9 @@ const std = @import("std");
 const File = std.Io.File;
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
-const Supervisor = @import("supervisor.zig").Supervisor;
+const supervisor_mod = @import("supervisor.zig");
+const Supervisor = supervisor_mod.Supervisor;
+const ProcessPipelineConfig = supervisor_mod.ProcessPipelineConfig;
 const tile_main = @import("tile_main.zig");
 
 const usage =
@@ -29,7 +31,7 @@ pub fn main(init: std.process.Init) !void {
     // part of the advertised command surface: `__tile-run <spec-file>`.
     if (std.mem.eql(u8, cmd, "__tile-run")) {
         const spec_path = it.next() orelse std.process.exit(1);
-        std.process.exit(tile_main.run(init.io, spec_path));
+        std.process.exit(tile_main.run(init.io, init.gpa, spec_path));
     }
 
     if (std.mem.eql(u8, cmd, "start")) {
@@ -113,7 +115,8 @@ fn cmdStartProcess(init: std.process.Init, topo: rt.topology.Topology, run_dir: 
     var sup = try Supervisor.init(init.gpa, topo);
     defer sup.deinit();
 
-    try sup.startPaymentPipelineProcess(init.io, .{ .run_dir = run_dir });
+    const process_config = ProcessPipelineConfig{ .run_dir = run_dir };
+    try sup.startPaymentPipelineProcess(init.io, process_config);
 
     try File.writeStreamingAll(stdout, init.io, "tickoni-supervisor: process-mode pipeline started\ntiles:\n");
     var buf: [256]u8 = undefined;
@@ -127,9 +130,26 @@ fn cmdStartProcess(init: std.process.Init, topo: rt.topology.Topology, run_dir: 
         try File.writeStreamingAll(stdout, init.io, line);
     }
 
-    // Brief window for manual process-isolation verification (e.g. `ps
-    // --ppid <supervisor-pid>`) before requesting a clean shutdown.
-    c_abi.process.sleepNanos(2 * std.time.ns_per_s);
+    // Poll for pipeline completion (audited count reaches event_count)
+    // instead of an arbitrary fixed sleep, matching thread-mode start's
+    // run-to-completion behavior. Process-mode tiles keep heartbeating
+    // after finishing their bounded work until asked to halt, so this
+    // is the deterministic completion signal.
+    const poll_interval_ns: u64 = 5 * std.time.ns_per_ms;
+    const max_polls: u32 = 2000; // 10s bound
+    var poll: u32 = 0;
+    while (poll < max_polls) : (poll += 1) {
+        if (sup.snapshotProcessMetrics().audited >= process_config.event_count) break;
+        c_abi.process.sleepNanos(poll_interval_ns);
+    }
+
+    const metrics = sup.snapshotProcessMetrics();
+    const metrics_line = try std.fmt.bufPrint(
+        &buf,
+        "metrics: produced={d} normalized={d} invalid={d} duplicates={d} allowed={d} denied={d} audited={d}\n",
+        .{ metrics.produced, metrics.normalized, metrics.invalid, metrics.duplicates, metrics.allowed, metrics.denied, metrics.audited },
+    );
+    try File.writeStreamingAll(stdout, init.io, metrics_line);
 
     sup.stopProcess(init.io);
     try File.writeStreamingAll(stdout, init.io, "tickoni-supervisor: process-mode pipeline stopped\n");

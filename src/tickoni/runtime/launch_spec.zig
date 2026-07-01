@@ -9,6 +9,7 @@
 /// truncated, or foreign file rather than to support format evolution.
 const std = @import("std");
 const topology = @import("topology.zig");
+const shm_link = @import("shm_link.zig");
 
 pub const magic: u32 = 0x544b5350; // "TKSP"
 pub const version: u16 = 1;
@@ -25,6 +26,13 @@ pub const LaunchSpec = struct {
     /// Global address of this tile's pre-formatted cnc object inside
     /// workspace_name, as returned by fd_wksp_gaddr in the supervisor.
     cnc_gaddr: usize,
+    /// Zeroed (depth==0) when this tile has no upstream/downstream
+    /// correctness link, e.g. tkings has no input and tkaudt has no
+    /// output in the current 5-stage core chain.
+    has_input_link: bool = false,
+    input_link: shm_link.LinkHandles = .{},
+    has_output_link: bool = false,
+    output_link: shm_link.LinkHandles = .{},
     shmem_path_buf: [shmem_path_cap]u8 = [_]u8{0} ** shmem_path_cap,
     shmem_path_len: u16,
     heartbeat_interval_ns: u64,
@@ -32,6 +40,13 @@ pub const LaunchSpec = struct {
     /// self-exits(1) after this many heartbeats instead of waiting for
     /// SIGTERM. 0 means run normally until signaled.
     crash_after_heartbeats: u32,
+    /// Payment pipeline behavior shared by every tile so process-mode and
+    /// thread-mode runs make the same decisions for the same input; see
+    /// tiles/payment_pipeline/runtime.zig's PaymentPipelineConfig.
+    event_count: u64 = 0,
+    policy_limit_cents: i64 = 0,
+    inject_duplicate: bool = false,
+    inject_malformed: bool = false,
 
     pub fn init(fields: struct {
         tile_idx: u32,
@@ -42,6 +57,12 @@ pub const LaunchSpec = struct {
         shmem_path: []const u8,
         heartbeat_interval_ns: u64,
         crash_after_heartbeats: u32 = 0,
+        input_link: ?shm_link.LinkHandles = null,
+        output_link: ?shm_link.LinkHandles = null,
+        event_count: u64 = 0,
+        policy_limit_cents: i64 = 0,
+        inject_duplicate: bool = false,
+        inject_malformed: bool = false,
     }) error{ShmemPathTooLong}!LaunchSpec {
         if (fields.shmem_path.len > shmem_path_cap) return error.ShmemPathTooLong;
         var spec = LaunchSpec{
@@ -53,6 +74,14 @@ pub const LaunchSpec = struct {
             .shmem_path_len = @intCast(fields.shmem_path.len),
             .heartbeat_interval_ns = fields.heartbeat_interval_ns,
             .crash_after_heartbeats = fields.crash_after_heartbeats,
+            .has_input_link = fields.input_link != null,
+            .input_link = fields.input_link orelse .{},
+            .has_output_link = fields.output_link != null,
+            .output_link = fields.output_link orelse .{},
+            .event_count = fields.event_count,
+            .policy_limit_cents = fields.policy_limit_cents,
+            .inject_duplicate = fields.inject_duplicate,
+            .inject_malformed = fields.inject_malformed,
         };
         @memcpy(spec.shmem_path_buf[0..fields.shmem_path.len], fields.shmem_path);
         return spec;

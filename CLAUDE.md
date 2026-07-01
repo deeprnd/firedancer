@@ -475,6 +475,12 @@ Transform tasks into verifiable goals:
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - "Refactor X" → "Ensure tests pass before and after"
 
+If development appears to require a custom throwaway verification script or
+one-off test command, treat that as evidence that the system is missing a
+proper test. Write the test instead and wire it to the correct unit,
+integration, e2e, system, quality, or security scope described in
+`doc/execution/testing-tickoni.md`.
+
 For multi-step tasks, state a brief plan:
 ```
 1. [Step] → verify: [check]
