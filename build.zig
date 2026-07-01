@@ -25,6 +25,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const c_abi_mod = b.addModule("c_abi", .{
+        .root_source_file = b.path("src/tickoni/c_abi/c_abi.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const audit_codec_mod = b.addModule("audit_codec", .{
         .root_source_file = b.path("src/tickoni/codec/audit_codec.zig"),
         .target = target,
@@ -200,6 +205,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "tiles", .module = tiles_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
         },
     });
     const exe = b.addExecutable(.{
@@ -207,6 +213,7 @@ pub fn build(b: *std.Build) void {
         .root_module = main_mod,
     });
     linkTickoniCodec(b, exe, fd_lib_dir);
+    linkTickoniTango(b, exe, fd_lib_dir);
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -225,6 +232,7 @@ pub fn build(b: *std.Build) void {
     for ([_][]const u8{
         "src/tickoni/runtime/topology.zig",
         "src/tickoni/runtime/tile.zig",
+        "src/tickoni/runtime/launch_spec.zig",
         "src/tickoni/c_abi/queue.zig",
         "src/tickoni/c_abi/sandbox.zig",
         "src/tickoni/c_abi/dcache.zig",
@@ -232,6 +240,7 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/c_abi/cnc.zig",
         "src/tickoni/c_abi/wksp.zig",
         "src/tickoni/c_abi/process.zig",
+        "src/tickoni/c_abi/boot.zig",
         "src/tickoni/tiles/audit/mod.zig",
         "src/tickoni/tiles/payment_pipeline/mod.zig",
         "src/tickoni/tiles/case/mod.zig",
@@ -544,7 +553,7 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(replay_test).step);
 
-    // supervisor.zig imports runtime and tiles modules.
+    // supervisor.zig imports runtime, tiles, and c_abi modules.
     const sup_mod = b.createModule(.{
         .root_source_file = b.path("src/app/tickoni/supervisor.zig"),
         .target = target,
@@ -552,6 +561,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "tiles", .module = tiles_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
         },
     });
     const sup_test = b.addTest(.{ .root_module = sup_mod });
@@ -1100,6 +1110,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "tiles", .module = tiles_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
             },
         }),
     });

@@ -1,14 +1,18 @@
 const std = @import("std");
 const File = std.Io.File;
 const rt = @import("runtime");
+const c_abi = @import("c_abi");
 const Supervisor = @import("supervisor.zig").Supervisor;
+const tile_main = @import("tile_main.zig");
 
 const usage =
     \\Usage: tickoni-supervisor <command>
     \\
     \\Commands:
-    \\  start    Run the Phase 0 Tickoni pipeline spike (dev/test mode)
-    \\  status   Print topology tile names
+    \\  start           Run the Phase 0 Tickoni pipeline spike (dev/test mode)
+    \\  start-process   Run the Phase 0 pipeline as isolated OS processes over
+    \\                  Tango shared memory (V1.14.S1); requires <run-dir>
+    \\  status          Print topology tile names
     \\
 ;
 
@@ -21,12 +25,23 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(1);
     };
 
-    const topo = rt.topology.paymentPipeline();
+    // Internal supervisor-to-child handoff for V1.14.S1 process mode, not
+    // part of the advertised command surface: `__tile-run <spec-file>`.
+    if (std.mem.eql(u8, cmd, "__tile-run")) {
+        const spec_path = it.next() orelse std.process.exit(1);
+        std.process.exit(tile_main.run(init.io, spec_path));
+    }
 
     if (std.mem.eql(u8, cmd, "start")) {
-        try cmdStart(init, topo);
+        try cmdStart(init, rt.topology.paymentPipeline());
+    } else if (std.mem.eql(u8, cmd, "start-process")) {
+        const run_dir = it.next() orelse {
+            try File.writeStreamingAll(File.stderr(), init.io, "start-process requires <run-dir>\n");
+            std.process.exit(1);
+        };
+        try cmdStartProcess(init, rt.topology.paymentPipelineProcess(), run_dir);
     } else if (std.mem.eql(u8, cmd, "status")) {
-        try cmdStatus(init.io, topo);
+        try cmdStatus(init.io, rt.topology.paymentPipeline());
     } else {
         var buf: [128]u8 = undefined;
         const msg = try std.fmt.bufPrint(&buf, "unknown command: {s}\n", .{cmd});
@@ -88,6 +103,36 @@ fn cmdStart(init: std.process.Init, topo: rt.topology.Topology) !void {
 
     sup.stop();
     try File.writeStreamingAll(stdout, init.io, "tickoni-supervisor: stopped\n");
+}
+
+/// V1.14.S1: run the payment pipeline as one OS process per tile connected
+/// by Tango shared memory instead of in-process threads. run_dir holds the
+/// per-tile launch specs and the FD_SHMEM_PATH workspace backing.
+fn cmdStartProcess(init: std.process.Init, topo: rt.topology.Topology, run_dir: []const u8) !void {
+    const stdout = File.stdout();
+    var sup = try Supervisor.init(init.gpa, topo);
+    defer sup.deinit();
+
+    try sup.startPaymentPipelineProcess(init.io, .{ .run_dir = run_dir });
+
+    try File.writeStreamingAll(stdout, init.io, "tickoni-supervisor: process-mode pipeline started\ntiles:\n");
+    var buf: [256]u8 = undefined;
+    for (sup.monitor()) |h| {
+        const line = try std.fmt.bufPrint(&buf, "  [{d}] {s}  pid={?d}  state={s}\n", .{
+            h.tile_idx,
+            topo.tiles[h.tile_idx].name,
+            h.pid,
+            @tagName(h.state),
+        });
+        try File.writeStreamingAll(stdout, init.io, line);
+    }
+
+    // Brief window for manual process-isolation verification (e.g. `ps
+    // --ppid <supervisor-pid>`) before requesting a clean shutdown.
+    c_abi.process.sleepNanos(2 * std.time.ns_per_s);
+
+    sup.stopProcess(init.io);
+    try File.writeStreamingAll(stdout, init.io, "tickoni-supervisor: process-mode pipeline stopped\n");
 }
 
 fn cmdStatus(io: std.Io, topo: rt.topology.Topology) !void {

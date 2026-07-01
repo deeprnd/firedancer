@@ -1,4 +1,5 @@
 const std = @import("std");
+const topology = @import("topology.zig");
 
 pub const TileState = enum {
     stopped,
@@ -9,6 +10,17 @@ pub const TileState = enum {
     crashed,
 };
 
+/// Identifies why a tile transitioned to .crashed, for supervisor
+/// diagnostics and crash-isolation tests (V1.14.S1.T12).
+pub const CrashReason = enum {
+    none,
+    /// Process exited with a non-zero status (or thread-mode equivalent).
+    exit_code,
+    /// The tile's cnc object reached FD_CNC_SIGNAL_FAIL or stopped
+    /// heartbeating (process mode only).
+    cnc_fail,
+};
+
 /// Runtime handle for one tile managed by the supervisor.
 pub const TileHandle = struct {
     tile_idx: u32,
@@ -17,6 +29,14 @@ pub const TileHandle = struct {
     thread: ?std.Thread,
     /// Meaningful only when state == .crashed.
     exit_code: u8,
+    /// Non-null when the tile runs as a supervisor-managed OS process
+    /// (V1.14 process mode).
+    pid: ?std.process.Child.Id = null,
+    /// Effective CPU placement for this tile, copied from the topology at
+    /// start time so diagnostics do not need to re-consult the topology.
+    cpu_placement: topology.CpuPlacement = .floating,
+    /// Meaningful only when state == .crashed.
+    crashed_because: CrashReason = .none,
 
     pub fn init(idx: u32) TileHandle {
         return .{ .tile_idx = idx, .state = .stopped, .thread = null, .exit_code = 0 };
