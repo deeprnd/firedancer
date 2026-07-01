@@ -45,9 +45,12 @@ jobs:
           configure-hugepages: 'false'
 
       - name: Run test suite
-        env:
-          FD_TEST_UNIT_PAGE_MODE: normal
-        run: just test-unit-fd
+        run: |
+          make -j"$(nproc)" unit-test
+          nofile_target="$(awk '/#define CONFIGURE_NR_OPEN_FILES/ { gsub(/[()U]/, "", $3); print $3 }' src/app/shared/commands/configure/configure.h)"
+          sudo prlimit --pid $$ --nofile="${nofile_target}:${nofile_target}" --memlock=unlimited
+          just mem-drop-caches || true
+          make run-unit-test TEST_OPTS="--page-sz normal -j 1"
 
   cov-fd:
     name: Engine Tests Coverage
