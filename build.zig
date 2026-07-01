@@ -227,6 +227,11 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/runtime/tile.zig",
         "src/tickoni/c_abi/queue.zig",
         "src/tickoni/c_abi/sandbox.zig",
+        "src/tickoni/c_abi/dcache.zig",
+        "src/tickoni/c_abi/fseq.zig",
+        "src/tickoni/c_abi/cnc.zig",
+        "src/tickoni/c_abi/wksp.zig",
+        "src/tickoni/c_abi/process.zig",
         "src/tickoni/tiles/audit/mod.zig",
         "src/tickoni/tiles/payment_pipeline/mod.zig",
         "src/tickoni/tiles/case/mod.zig",
@@ -918,6 +923,11 @@ pub fn build(b: *std.Build) void {
         .{ "test-tile", "src/tickoni/runtime/tile.zig" },
         .{ "test-queue", "src/tickoni/c_abi/queue.zig" },
         .{ "test-sandbox", "src/tickoni/c_abi/sandbox.zig" },
+        .{ "test-dcache", "src/tickoni/c_abi/dcache.zig" },
+        .{ "test-fseq", "src/tickoni/c_abi/fseq.zig" },
+        .{ "test-cnc", "src/tickoni/c_abi/cnc.zig" },
+        .{ "test-wksp", "src/tickoni/c_abi/wksp.zig" },
+        .{ "test-process", "src/tickoni/c_abi/process.zig" },
         .{ "test-audit", "src/tickoni/tiles/audit/mod.zig" },
         .{ "test-payment-pipeline", "src/tickoni/tiles/payment_pipeline/mod.zig" },
         .{ "test-case", "src/tickoni/tiles/case/mod.zig" },
@@ -1097,6 +1107,17 @@ pub fn build(b: *std.Build) void {
     cov_step.dependOn(&b.addInstallArtifact(sup_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
+}
+
+/// Links src/tango (mcache/dcache/fseq/cnc) and src/util/wksp (fd_wksp)
+/// substrate for V1.14 process-mode shared-memory links. Separate from
+/// linkTickoniCodec because these callers do not need the audit_pb/
+/// thesis_hash C codec sources.
+fn linkTickoniTango(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
+    step.root_module.link_libc = true;
+    step.root_module.addLibraryPath(b.path(fd_lib_dir));
+    step.root_module.linkSystemLibrary("fd_tango", .{});
+    step.root_module.linkSystemLibrary("fd_util", .{});
 }
 
 fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
