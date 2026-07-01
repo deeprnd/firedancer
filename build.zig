@@ -590,7 +590,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const investment_audit_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/tiles/audit/investment_audit.zig"),
+        .root_source_file = b.path("src/tickoni/scenarios/investment/audit_chains.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -605,7 +605,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const investment_support_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/test/integration/investment_support.zig"),
+        .root_source_file = b.path("src/tickoni/scenarios/investment/support.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -615,7 +615,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const investment_demo_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/demo/investment.zig"),
+        .root_source_file = b.path("src/tickoni/scenarios/investment/mod.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -642,8 +642,6 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/test/integration/investment_blocked_limits.zig",
         "src/tickoni/test/integration/investment_restricted_instrument.zig",
         "src/tickoni/test/integration/investment_input_policy_denials.zig",
-        "src/tickoni/test/integration/model_tile_http.zig",
-        "src/tickoni/test/integration/mock_servers.zig",
     }) |path| {
         const integration_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -672,6 +670,57 @@ pub fn build(b: *std.Build) void {
         linkTickoniCodec(b, integration_test, fd_lib_dir);
         integration_step.dependOn(&b.addRunArtifact(integration_test).step);
     }
+
+    // Mock HTTP servers (test_support/http): self-tests of the mock
+    // infrastructure itself, no tile schema imports required.
+    const mock_http_support_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test_support/http/mock_http_support.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const mock_broker_market_server_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test_support/http/mock_broker_market_server.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "mock_http_support", .module = mock_http_support_mod },
+        },
+    });
+    const mock_openai_server_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test_support/http/mock_openai_server.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "mock_http_support", .module = mock_http_support_mod },
+        },
+    });
+    const mock_servers_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test_support/http/mock_servers.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "mock_http_support", .module = mock_http_support_mod },
+                .{ .name = "mock_broker_market_server", .module = mock_broker_market_server_mod },
+                .{ .name = "mock_openai_server", .module = mock_openai_server_mod },
+            },
+        }),
+    });
+    integration_step.dependOn(&b.addRunArtifact(mock_servers_test).step);
+
+    const model_tile_http_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/integration/model_tile_http.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "model", .module = model_int_mod },
+                .{ .name = "mock_http_support", .module = mock_http_support_mod },
+                .{ .name = "mock_openai_server", .module = mock_openai_server_mod },
+            },
+        }),
+    });
+    integration_step.dependOn(&b.addRunArtifact(model_tile_http_test).step);
 
     const replay_integration_test = b.addTest(.{
         .root_module = b.createModule(.{
