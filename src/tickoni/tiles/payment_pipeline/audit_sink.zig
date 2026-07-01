@@ -77,6 +77,10 @@ pub fn buildPolicyDecisionEvent(
             .rule_id = 0,
             .failed_scope_dim = [_]u8{0} ** 32,
             .source_event_hash = event_hash,
+            .catalog_schema_version = 0,
+            .taxonomy_id = [_]u8{0} ** 32,
+            .taxonomy_version = 0,
+            .classification_code = [_]u8{0} ** 32,
         },
     });
 }

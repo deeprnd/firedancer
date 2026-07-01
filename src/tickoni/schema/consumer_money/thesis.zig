@@ -1206,6 +1206,29 @@ test "computeThesisInputHash: theme ordering does not affect hash" {
     );
 }
 
+test "computeThesisInputHash: sector filter ordering does not affect hash" {
+    // Provide sector filters in reverse alphabetical order; normalize must sort them
+    // before hashing so both orderings of the same set produce the same hash.
+    var forward = fixtures.ai_infrastructure;
+    forward.sector_filters = blk: {
+        var refs = ClassificationRefList{};
+        refs.append(cls.ClassificationRef.init("gics_sector", 2025, "consumer_discretionary") catch unreachable) catch unreachable;
+        refs.append(cls.ClassificationRef.init("gics_sector", 2025, "information_technology") catch unreachable) catch unreachable;
+        break :blk refs;
+    };
+    var reversed = fixtures.ai_infrastructure;
+    reversed.sector_filters = blk: {
+        var refs = ClassificationRefList{};
+        refs.append(cls.ClassificationRef.init("gics_sector", 2025, "information_technology") catch unreachable) catch unreachable;
+        refs.append(cls.ClassificationRef.init("gics_sector", 2025, "consumer_discretionary") catch unreachable) catch unreachable;
+        break :blk refs;
+    };
+    try std.testing.expectEqual(
+        computeThesisInputHash(forward),
+        computeThesisInputHash(reversed),
+    );
+}
+
 test "computeThesisInputHash: sector filter changes hash" {
     const h_no_sector = computeThesisInputHash(fixtures.ai_infrastructure);
     const h_with_sector = computeThesisInputHash(fixtures.ai_infrastructure_it_sector);

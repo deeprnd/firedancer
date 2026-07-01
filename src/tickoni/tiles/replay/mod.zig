@@ -7,8 +7,20 @@ const portfolio = @import("portfolio");
 const trade_ticket = @import("trade_ticket");
 const tkpoly = @import("tkpoly");
 
+/// Wire schema version of the replay capsule JSON format itself, distinct
+/// from thesis/basket/catalog schema versions since the capsule is its own
+/// artifact. Bump when the capsule's required-field shape changes.
+pub const replay_capsule_schema_version: u16 = 1;
+
 const ReplayCapsuleWire = struct {
     ticket_id: []const u8,
+    // Compatibility fields: required (no default) so a capsule missing any
+    // of these fails JSON parsing instead of silently defaulting. Checked
+    // against the runtime's current versions in checkCapsuleVersions().
+    schema_version: u16,
+    catalog_schema_version: u16,
+    taxonomy_version: u16,
+    policy_version: []const u8,
     expected_basket_id: ?u64 = null,
     expected_proposal_hash: ?u64 = null,
     expected_rebalance_hash: ?u64 = null,
@@ -91,6 +103,35 @@ fn loadReplayCapsule(
         .raw = raw,
         .parsed = parsed,
     };
+}
+
+const CapsuleVersionError = error{UnsupportedCapsuleSchemaVersion};
+
+/// Validate a loaded capsule's compatibility fields against the runtime's
+/// current schema/catalog/taxonomy/policy versions.
+///
+/// schema_version identifies the capsule wire format itself; a mismatch means
+/// the runtime cannot reliably interpret the capsule's other fields, so it is
+/// a hard reject. catalog_schema_version, taxonomy_version, and policy_version
+/// identify the classification/policy inputs that produced the capsule; a
+/// mismatch there is real, reportable drift (the capsule is still parseable),
+/// so it is recorded as a soft divergence like basket_id/proposal_hash
+/// mismatches already are.
+fn checkCapsuleVersions(capsule: ReplayCapsuleWire, divergences: *DivergenceTracker) CapsuleVersionError!void {
+    if (capsule.schema_version != replay_capsule_schema_version) {
+        return CapsuleVersionError.UnsupportedCapsuleSchemaVersion;
+    }
+    if (capsule.catalog_schema_version != basket.catalog.catalog_schema_version) {
+        divergences.note("catalog_schema_version", 1);
+    }
+    if (capsule.taxonomy_version != basket.catalog.sector_taxonomy_version or
+        capsule.taxonomy_version != basket.catalog.industry_taxonomy_version)
+    {
+        divergences.note("taxonomy_version", 1);
+    }
+    if (!std.mem.eql(u8, capsule.policy_version, tkpoly.trade_policy_version)) {
+        divergences.note("policy_version", 1);
+    }
 }
 
 fn hasAdapterOperation(capsule: ReplayCapsuleWire, operation: []const u8) bool {
@@ -345,6 +386,7 @@ pub fn verifyAllowedTradeWithCapsulePath(
     const capsule = loaded.parsed.value;
     const fixture_dir = fixtureDir(capsule_path);
     var divergences = DivergenceTracker{};
+    try checkCapsuleVersions(capsule, &divergences);
 
     if (!capsule.replay_assertions.no_live_model_call) divergences.note("no_live_model_call", 8);
     if (!capsule.replay_assertions.no_live_adapter_call) divergences.note("no_live_adapter_call", 8);
@@ -504,6 +546,7 @@ pub fn verifyOversizedTradeBlock(
     const capsule = loaded.parsed.value;
     const fixture_dir = fixtureDir(capsule_path);
     var divergences = DivergenceTracker{};
+    try checkCapsuleVersions(capsule, &divergences);
 
     if (!capsule.replay_assertions.no_live_model_call) divergences.note("no_live_model_call", 9);
     if (!capsule.replay_assertions.no_live_adapter_call) divergences.note("no_live_adapter_call", 9);
@@ -621,6 +664,7 @@ pub fn verifyRestrictedInstrumentBlock(
 
     const capsule = loaded.parsed.value;
     var divergences = DivergenceTracker{};
+    try checkCapsuleVersions(capsule, &divergences);
 
     if (!capsule.replay_assertions.no_live_model_call) divergences.note("no_live_model_call", 5);
     if (!capsule.replay_assertions.no_live_adapter_call) divergences.note("no_live_adapter_call", 5);
@@ -745,6 +789,68 @@ fn buildAllowedReplayFixture(allocator: std.mem.Allocator, io: std.Io) !AllowedR
         .proposed_basket = proposed_basket,
         .ticket = ticket,
     };
+}
+
+fn testCapsule() ReplayCapsuleWire {
+    return .{
+        .ticket_id = "ticket_test",
+        .schema_version = replay_capsule_schema_version,
+        .catalog_schema_version = basket.catalog.catalog_schema_version,
+        .taxonomy_version = basket.catalog.sector_taxonomy_version,
+        .policy_version = tkpoly.trade_policy_version,
+        .model_substitutions = &.{},
+        .adapter_substitutions = &.{},
+        .replay_assertions = .{
+            .no_live_model_call = true,
+            .no_live_adapter_call = true,
+            .no_paper_fill_emitted = true,
+            .affordability_outcome_matches = "",
+            .policy_outcome_matches = "",
+        },
+    };
+}
+
+test "checkCapsuleVersions: matching versions produce no divergence" {
+    var divergences = DivergenceTracker{};
+    try checkCapsuleVersions(testCapsule(), &divergences);
+    try std.testing.expectEqual(@as(u64, 0), divergences.count);
+}
+
+test "checkCapsuleVersions: catalog_schema_version mismatch is a soft divergence" {
+    var capsule = testCapsule();
+    capsule.catalog_schema_version += 1;
+    var divergences = DivergenceTracker{};
+    try checkCapsuleVersions(capsule, &divergences);
+    try std.testing.expectEqual(@as(u64, 1), divergences.count);
+    try std.testing.expectEqualStrings("catalog_schema_version", divergences.first_field);
+}
+
+test "checkCapsuleVersions: taxonomy_version mismatch is a soft divergence" {
+    var capsule = testCapsule();
+    capsule.taxonomy_version += 1;
+    var divergences = DivergenceTracker{};
+    try checkCapsuleVersions(capsule, &divergences);
+    try std.testing.expectEqual(@as(u64, 1), divergences.count);
+    try std.testing.expectEqualStrings("taxonomy_version", divergences.first_field);
+}
+
+test "checkCapsuleVersions: policy_version mismatch is a soft divergence" {
+    var capsule = testCapsule();
+    capsule.policy_version = "v0";
+    var divergences = DivergenceTracker{};
+    try checkCapsuleVersions(capsule, &divergences);
+    try std.testing.expectEqual(@as(u64, 1), divergences.count);
+    try std.testing.expectEqualStrings("policy_version", divergences.first_field);
+}
+
+test "checkCapsuleVersions: unsupported schema_version is a hard reject" {
+    var capsule = testCapsule();
+    capsule.schema_version += 1;
+    var divergences = DivergenceTracker{};
+    try std.testing.expectError(
+        error.UnsupportedCapsuleSchemaVersion,
+        checkCapsuleVersions(capsule, &divergences),
+    );
 }
 
 test "verifyAllowedTradeWithCapsulePath marks live model backends as external effects" {

@@ -50,10 +50,14 @@ message NormalizationPayload {
 }
 
 message PolicyDecisionPayload {
-  uint32 outcome           = 1;
-  uint32 rule_id           = 2;
-  bytes  failed_scope_dim  = 3;
-  uint64 source_event_hash = 4;
+  uint32 outcome                = 1;
+  uint32 rule_id                = 2;
+  bytes  failed_scope_dim       = 3;
+  uint64 source_event_hash      = 4;
+  uint32 catalog_schema_version = 5;
+  bytes  taxonomy_id            = 6;
+  uint32 taxonomy_version       = 7;
+  bytes  classification_code    = 8;
 }
 
 message ModelCallPayload {
@@ -101,9 +105,13 @@ message ApprovalRequiredPayload {
 }
 
 message DenialPayload {
-  bytes  action_class     = 1;
-  uint32 reason_code      = 2;
-  bytes  failed_scope_dim = 3;
+  bytes  action_class           = 1;
+  uint32 reason_code            = 2;
+  bytes  failed_scope_dim       = 3;
+  uint32 catalog_schema_version = 4;
+  bytes  taxonomy_id            = 5;
+  uint32 taxonomy_version       = 6;
+  bytes  classification_code    = 7;
 }
 
 message TelemetryCheckpointPayload {

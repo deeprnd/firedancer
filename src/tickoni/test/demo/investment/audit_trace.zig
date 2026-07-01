@@ -236,6 +236,10 @@ pub fn buildAllowedTradeChain(
             .rule_id = 1101,
             .failed_scope_dim = parseFixedAsciiBytes(32, if (ticket.policy_outcome == .allow) "" else "per_order_notional"),
             .source_event_hash = normalized_hash,
+            .catalog_schema_version = proposed_basket.catalog_schema_version,
+            .taxonomy_id = [_]u8{0} ** 32,
+            .taxonomy_version = 0,
+            .classification_code = [_]u8{0} ** 32,
         },
     });
     prev_hash = events[4].header.record_hash;
@@ -300,6 +304,10 @@ pub fn buildAllowedTradeChain(
             .rule_id = 1303,
             .failed_scope_dim = parseFixedAsciiBytes(32, firstPaymentScopeDim(&drift_contract.payment_drift)),
             .source_event_hash = payment_update_hash,
+            .catalog_schema_version = 0,
+            .taxonomy_id = [_]u8{0} ** 32,
+            .taxonomy_version = 0,
+            .classification_code = [_]u8{0} ** 32,
         },
     });
     prev_hash = events[10].header.record_hash;
@@ -412,6 +420,10 @@ pub fn buildOversizedTradeBlockedChain(
             .rule_id = 1101,
             .failed_scope_dim = parseFixedAsciiBytes(32, blocked_reason.failed_scope_dim.label()),
             .source_event_hash = normalized_hash,
+            .catalog_schema_version = proposed_basket.catalog_schema_version,
+            .taxonomy_id = [_]u8{0} ** 32,
+            .taxonomy_version = 0,
+            .classification_code = [_]u8{0} ** 32,
         },
     });
     prev_hash = events[4].header.record_hash;
@@ -475,6 +487,10 @@ pub fn buildOversizedTradeBlockedChain(
             .action_class = parseFixedAsciiBytes(32, "trading_order.place"),
             .reason_code = @intFromEnum(blocked_reason.code),
             .failed_scope_dim = parseFixedAsciiBytes(32, blocked_reason.failed_scope_dim.label()),
+            .catalog_schema_version = proposed_basket.catalog_schema_version,
+            .taxonomy_id = [_]u8{0} ** 32,
+            .taxonomy_version = 0,
+            .classification_code = [_]u8{0} ** 32,
         },
     });
     prev_hash = events[10].header.record_hash;
@@ -547,6 +563,10 @@ pub fn buildRestrictedInstrumentBlockedChain(
             .rule_id = 1101,
             .failed_scope_dim = parseFixedAsciiBytes(32, "restricted_instrument"),
             .source_event_hash = normalized_hash,
+            .catalog_schema_version = proposed_basket.catalog_schema_version,
+            .taxonomy_id = [_]u8{0} ** 32,
+            .taxonomy_version = 0,
+            .classification_code = [_]u8{0} ** 32,
         },
     });
     prev_hash = events[4].header.record_hash;
@@ -559,6 +579,10 @@ pub fn buildRestrictedInstrumentBlockedChain(
             .action_class = parseFixedAsciiBytes(32, proposal_type),
             .reason_code = @intFromEnum(basket.RejectionReason.restricted_instrument),
             .failed_scope_dim = parseFixedAsciiBytes(32, "restricted_instrument"),
+            .catalog_schema_version = proposed_basket.catalog_schema_version,
+            .taxonomy_id = [_]u8{0} ** 32,
+            .taxonomy_version = 0,
+            .classification_code = [_]u8{0} ** 32,
         },
     });
     prev_hash = events[5].header.record_hash;

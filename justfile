@@ -108,6 +108,7 @@ test-unit-fd:
   case "$page_mode" in
     normal)
       echo "running Firedancer unit tests with normal pages"
+      just mem-drop-caches || true
       make run-unit-test TEST_OPTS="--page-sz normal"
       ;;
     auto)
@@ -167,7 +168,7 @@ demo-tk:
 
 # Tickoni system lane: opt-in real-LLM investment demo proof.
 test-system-tk:
-  bash contrib/test/run_integration_model_tests.sh
+  bash contrib/test/run_system_model_tests.sh
 
 test-cli-tk:
   bash contrib/test/run_cli_demo_tests.sh
@@ -382,6 +383,9 @@ mem-alloc-auto numa="0":
 
 mem-free page_type="gigantic" numa="0":
   sudo src/util/shmem/fd_shmem_cfg free {{page_type}} {{numa}}
+  just mem-drop-caches
+
+mem-drop-caches:
   sync
   sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
   sudo sh -c 'echo 1 > /proc/sys/vm/compact_memory'

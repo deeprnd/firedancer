@@ -43,6 +43,10 @@ typedef struct {
   uint32_t rule_id;
   unsigned char failed_scope_dim[ 32 ];
   uint64_t source_event_hash;
+  uint32_t catalog_schema_version;
+  unsigned char taxonomy_id[ 32 ];
+  uint32_t taxonomy_version;
+  unsigned char classification_code[ 32 ];
 } tk_audit_policy_decision_t;
 
 typedef struct {
@@ -93,6 +97,10 @@ typedef struct {
   unsigned char action_class[ 32 ];
   uint32_t reason_code;
   unsigned char failed_scope_dim[ 32 ];
+  uint32_t catalog_schema_version;
+  unsigned char taxonomy_id[ 32 ];
+  uint32_t taxonomy_version;
+  unsigned char classification_code[ 32 ];
 } tk_audit_denial_t;
 
 typedef struct {

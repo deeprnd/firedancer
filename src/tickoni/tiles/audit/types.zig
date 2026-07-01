@@ -2,7 +2,7 @@
 ///
 /// Every material boundary event is a typed AuditEvent so replay and
 /// investigation do not depend on logs or UI state.
-pub const audit_schema_version: u16 = 1;
+pub const audit_schema_version: u16 = 2;
 
 pub const PolicyOutcome = enum(u8) {
     allow,
@@ -56,6 +56,13 @@ pub const PolicyDecisionPayload = struct {
     rule_id: u32,
     failed_scope_dim: [32]u8,
     source_event_hash: u64,
+    // Classification evidence: zero/empty when this decision is not a
+    // classification-scope decision (e.g. affordability or restricted-
+    // instrument denials).
+    catalog_schema_version: u32,
+    taxonomy_id: [32]u8,
+    taxonomy_version: u32,
+    classification_code: [32]u8,
 };
 
 pub const ModelCallPayload = struct {
@@ -107,6 +114,12 @@ pub const DenialPayload = struct {
     action_class: [32]u8,
     reason_code: u32,
     failed_scope_dim: [32]u8,
+    // Classification evidence: zero/empty when this denial is not a
+    // classification-scope decision.
+    catalog_schema_version: u32,
+    taxonomy_id: [32]u8,
+    taxonomy_version: u32,
+    classification_code: [32]u8,
 };
 
 pub const TelemetryCheckpointPayload = struct {

@@ -226,7 +226,7 @@ src/tickoni/codec/        Tickoni-owned codec bindings and implementations
 src/tickoni/schema/       Financial events, cases, capabilities, audit envelopes
 src/tickoni/schema/proto/ Protobuf wire definitions for canonical contracts
 src/tickoni/tiles/        Tickoni-owned tile implementations
-src/tickoni/demo/         Deterministic CLI/test demo orchestration
+src/tickoni/test/demo/    Deterministic CLI/test demo orchestration
 src/tickoni/connectors/   Signed adapter manifests and connector implementations
 ```
 

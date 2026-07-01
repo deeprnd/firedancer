@@ -45,9 +45,12 @@ jobs:
           configure-hugepages: 'false'
 
       - name: Run test suite
-        env:
-          FD_TEST_UNIT_PAGE_MODE: normal
-        run: just test-unit-fd
+        run: |
+          make -j"$(nproc)" unit-test
+          nofile_target="$(awk '/#define CONFIGURE_NR_OPEN_FILES/ { gsub(/[()U]/, "", $3); print $3 }' src/app/shared/commands/configure/configure.h)"
+          sudo prlimit --pid $$ --nofile="${nofile_target}:${nofile_target}" --memlock=unlimited
+          just mem-drop-caches || true
+          make run-unit-test TEST_OPTS="--page-sz normal -j 1"
 
   cov-fd:
     name: Engine Tests Coverage
@@ -64,6 +67,7 @@ jobs:
         with:
           compiler: clang
           compiler-version: '18'
+          configure-hugepages: 'false'
 
       - name: Install LLVM coverage tools
         shell: bash
@@ -75,7 +79,14 @@ jobs:
           done
 
       - name: Run coverage
-        run: just test-cov-fd
+        run: |
+          sudo prlimit --pid $$ --memlock=unlimited
+          jobs=$(( $(nproc) / 2 ))
+          (( jobs < 1 )) && jobs=1
+          make -j"${jobs}" BUILDDIR=fd-cov CC=clang-18 MACHINE=linux_clang_x86_64 EXTRAS="llvm-cov" unit-test
+          export TEST_OPTS="--page-sz normal -j 1"
+          just mem-drop-caches || true
+          python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd
 
       - name: Upload coverage summary
         if: always()
