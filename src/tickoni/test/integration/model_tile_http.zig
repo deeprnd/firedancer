@@ -4,8 +4,8 @@
 
 const std = @import("std");
 const model = @import("model");
-const http_support = @import("mock_http_support.zig");
-const openai_mock = @import("mock_openai_server.zig");
+const http_support = @import("mock_http_support");
+const openai_mock = @import("mock_openai_server");
 
 const mock_model_id = "mock-http-model";
 

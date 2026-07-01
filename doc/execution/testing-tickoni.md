@@ -202,7 +202,7 @@ standalone test roots for:
 - `src/tickoni/schema/investment/cards.zig`
 - `src/tickoni/schema/investment/drift.zig`
 - `src/tickoni/schema/portfolio/portfolio.zig`
-- `src/tickoni/test_support/fixtures/portfolio_fixtures.zig`
+- `src/tickoni/test/fixtures/portfolio/portfolio_fixtures.zig`
 - `src/tickoni/tiles/model/mod.zig`
 - `src/tickoni/tiles/adapter/mod.zig`
 

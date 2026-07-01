@@ -1,41 +1,13 @@
 const std = @import("std");
-const schema = @import("messages.zig");
+const schema = @import("model_messages");
+const model_mock = @import("model_mock");
 
 pub const ProviderRequest = schema.ProviderRequest;
 pub const ModelResponse = schema.ModelResponse;
 
-// MockBackend returns a pre-set canned response. Used in unit tests.
-pub const MockBackend = struct {
-    pub const CallTrace = struct {
-        call_count: usize = 0,
-        last_model_id: []const u8 = "",
-        last_budget_id: []const u8 = "",
-        last_policy_version: []const u8 = "",
-        last_capability_envelope_id: []const u8 = "",
-    };
-
-    canned_content: []const u8,
-    canned_model_id: []const u8 = "mock",
-    canned_finish_reason: []const u8 = "stop",
-    trace: ?*CallTrace = null,
-
-    pub fn call(self: MockBackend, allocator: std.mem.Allocator, req: ProviderRequest) error{OutOfMemory}!ModelResponse {
-        if (self.trace) |trace| {
-            trace.call_count += 1;
-            trace.last_model_id = req.model_id;
-            trace.last_budget_id = req.budget_id;
-            trace.last_policy_version = req.policy_version;
-            trace.last_capability_envelope_id = req.capability_envelope_id;
-        }
-        return .{
-            .model_id = try allocator.dupe(u8, self.canned_model_id),
-            .content = try allocator.dupe(u8, self.canned_content),
-            .finish_reason = try allocator.dupe(u8, self.canned_finish_reason),
-            .token_usage = .{ .prompt_tokens = 0, .completion_tokens = 0, .total_tokens = 0 },
-            .latency_ms = 0,
-        };
-    }
-};
+// MockBackend is a pure test double; its definition lives in
+// src/tickoni/test/mocks/model_mock.zig, not in this tile.
+const MockBackend = model_mock.MockBackend;
 
 const fixture_model_id_max: usize = 128;
 const fixture_content_max: usize = 2048;

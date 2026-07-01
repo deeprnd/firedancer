@@ -8,7 +8,7 @@
 const std = @import("std");
 const audit = @import("audit_tile");
 const queue = @import("queue.zig");
-const audit_log = @import("audit_log.zig");
+const audit_sink = @import("audit_sink.zig");
 
 pub const PolicyDecision = enum(u8) {
     allow,
@@ -68,7 +68,7 @@ pub const DiagSnapshot = struct {
 };
 
 const MessageQueue = queue.BoundedQueue(PaymentMessage);
-const AuditLog = audit_log.AuditLog;
+const AuditLog = audit_sink.AuditLog;
 const crash_none: i32 = -1;
 const tile_tkings: i32 = 0;
 
@@ -375,7 +375,7 @@ pub fn syntheticPayment(config: PaymentPipelineConfig, offset: u64) RawPayment {
 }
 
 pub fn stableEventHash(raw: RawPayment) u64 {
-    var h = audit_log.audit_seed;
+    var h = audit_sink.audit_seed;
     hashU64(&h, raw.idempotency_key);
     hashU32(&h, raw.account_id);
     hashI64(&h, raw.amount_cents);
@@ -390,7 +390,7 @@ fn validFraming(raw: RawPayment) bool {
 }
 
 fn deterministicReplayDivergences(state: *PaymentPipelineState) u64 {
-    var prev_hash = audit_log.audit_seed;
+    var prev_hash = audit_sink.audit_seed;
     var expected_seq: u64 = 0;
     var divergences: u64 = 0;
 
@@ -434,7 +434,7 @@ fn buildReplayEvent(
     decision: PolicyDecision,
     prev_hash: u64,
 ) audit.AuditEvent {
-    return audit_log.buildPolicyDecisionEvent(
+    return audit_sink.buildPolicyDecisionEvent(
         seq,
         raw.source_offset,
         event_hash,
