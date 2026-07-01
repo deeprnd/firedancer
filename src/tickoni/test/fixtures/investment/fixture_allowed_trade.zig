@@ -13,7 +13,7 @@
 //     -> basket.build()                 [real basket construction]
 //     -> portfolio.checkAffordability() [real affordability check]
 //     -> policy limits (hardcoded)
-//     -> paper execution fixture        [paper_execution_allowed_2000.json]
+//     -> paper execution fixture        [fixture_paper_execution_allowed_2000.json]
 //
 // Assertions (S6-P1):
 //   - thesis normalization succeeds
@@ -30,9 +30,9 @@ const std = @import("std");
 const thesis = @import("thesis");
 const basket_mod = @import("basket");
 const portfolio = @import("portfolio");
-const portfolio_fixtures = @import("portfolio_fixtures");
+const fixture_portfolio = @import("fixture_portfolio");
 
-// Numeric id for "brokerage.operations" as stored in portfolio_fixtures.fixtures.cash_rich.
+// Numeric id for "brokerage.operations" as stored in fixture_portfolio.fixtures.cash_rich.
 const operations_account_id: u32 = 2001;
 
 const target_notional_cents: i64 = 200_000;
@@ -43,7 +43,7 @@ const policy_max_notional_per_order_cents: i64 = 250_000;
 // SOXL and BULZ are restricted leveraged ETFs and are excluded.
 const expected_instrument_count: u8 = 7;
 
-// Paper fill amounts (cents) from paper_execution_allowed_2000.json, in basket order.
+// Paper fill amounts (cents) from fixture_paper_execution_allowed_2000.json, in basket order.
 // NVDA=25000, AMD=25000, AVGO=25000, MSFT=25000, BOTZ=37500, SOXX=37500, AMZN=25000.
 const paper_fills_cents = [expected_instrument_count]i64{
     25_000, 25_000, 25_000, 25_000, 37_500, 37_500, 25_000,
@@ -238,8 +238,8 @@ test "allowed_trade: affordability outcome is allow for ops account" {
     const thesis_id = thesis.computeThesisInputHash(input);
     const intent = try thesis.normalize(input);
     const b = try basket_mod.build(intent, thesis_id);
-    // portfolio_fixtures.fixtures.cash_rich.account_id == operations_account_id == 2001
-    const result = try portfolio.checkBasketAffordability(&portfolio_fixtures.fixtures.cash_rich, &b);
+    // fixture_portfolio.fixtures.cash_rich.account_id == operations_account_id == 2001
+    const result = try portfolio.checkBasketAffordability(&fixture_portfolio.fixtures.cash_rich, &b);
     try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, result.outcome);
     try std.testing.expectEqual(target_notional_cents, result.requested_notional_cents);
 }
@@ -247,7 +247,7 @@ test "allowed_trade: affordability outcome is allow for ops account" {
 test "allowed_trade: max affordable is day-limit-bound at USD 25000" {
     // cash_rich: cash=5M, buying_power=5M, day_remaining=2.5M, month_remaining=10M.
     // max_affordable = min(5M, 5M, 2.5M, 10M) = 2.5M (day limit binds).
-    const result = portfolio.checkAffordability(&portfolio_fixtures.fixtures.cash_rich, target_notional_cents);
+    const result = portfolio.checkAffordability(&fixture_portfolio.fixtures.cash_rich, target_notional_cents);
     try std.testing.expectEqual(portfolio.AffordabilityOutcome.allow, result.outcome);
     try std.testing.expectEqual(@as(i64, 2_500_000), result.max_affordable_cents);
     try std.testing.expectEqual(@as(i64, 5_000_000), result.cash_available_cents);
@@ -259,7 +259,7 @@ test "allowed_trade: max affordable is day-limit-bound at USD 25000" {
 test "allowed_trade: effective max paper trade is policy-per-order-bound at USD 2500" {
     // effective_max = min(max_affordable=2.5M, policy_per_order=250K) = 250K.
     // Target (200K) <= effective_max (250K): allowed.
-    const result = portfolio.checkAffordability(&portfolio_fixtures.fixtures.cash_rich, target_notional_cents);
+    const result = portfolio.checkAffordability(&fixture_portfolio.fixtures.cash_rich, target_notional_cents);
     const effective_max = @min(result.max_affordable_cents, policy_max_notional_per_order_cents);
     try std.testing.expectEqual(@as(i64, 250_000), effective_max);
     try std.testing.expect(target_notional_cents <= effective_max);
@@ -270,7 +270,7 @@ test "allowed_trade: effective max paper trade is policy-per-order-bound at USD 
 // ---------------------------------------------------------------------------
 
 test "allowed_trade: paper execution fills sum to target notional" {
-    // Validates consistency with paper_execution_allowed_2000.json.
+    // Validates consistency with fixture_paper_execution_allowed_2000.json.
     var total: i64 = 0;
     for (paper_fills_cents) |f| total += f;
     try std.testing.expectEqual(target_notional_cents, total);

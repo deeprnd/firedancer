@@ -332,46 +332,46 @@ Chosen fixture values:
   until explicitly added; `SPACEX` is denied as a non-public/private-company
   manual denylist instrument.
 
-Suggested fixture directory:
+Suggested scenario fixture directory:
 
 ```text
-src/tickoni/test/fixtures/investment/
+src/tickoni/test/fixtures/investment/scenarios/
 ```
 
 Suggested fixture files:
 
-- `thesis_allowed_2000.json`: product/test-owned plain-English AI
+- `fixture_thesis_allowed_2000.json`: product/test-owned plain-English AI
   infrastructure thesis and target notional.
-- `thesis_oversized_25000.json`: product/test-owned oversized variant.
-- `thesis_restricted_instrument.json`: product/test-owned explicit
+- `fixture_thesis_oversized_25000.json`: product/test-owned oversized variant.
+- `fixture_thesis_restricted_instrument.json`: product/test-owned explicit
   restricted-instrument request.
-- `policy_investment.json`: policy/test-owned V1.1 paper-trade
+- `fixture_policy_investment.json`: policy/test-owned V1.1 paper-trade
   capability envelope and limits.
-- `account_ops.json`: product/test-owned cash, buying power, limits,
+- `fixture_account_ops.json`: product/test-owned cash, buying power, limits,
   holdings, and open orders.
-- `quotes.json`: adapter/test-owned quote snapshot used to build
+- `fixture_quotes.json`: adapter/test-owned quote snapshot used to build
   ticket line items.
-- `market_events.json`: adapter/test-owned market-event fixture for
+- `fixture_market_events.json`: adapter/test-owned market-event fixture for
   the agent context.
-- `model_request.json`: model/test-owned exact prompt sent through
+- `fixture_model_request.json`: model/test-owned exact prompt sent through
   `tkmodl`.
-- `model_response_gemma4.json`: model/test-owned captured real-LLM
+- `fixture_model_response_gemma4.json`: model/test-owned captured real-LLM
   response and metadata.
-- `ticket_allowed_2000.json`: product/test-owned expected ticket for the
+- `fixture_ticket_allowed_2000.json`: product/test-owned expected ticket for the
   allowed paper trade.
-- `ticket_oversized_25000_blocked.json`: product/test-owned expected blocked
+- `fixture_ticket_oversized_25000_blocked.json`: product/test-owned expected blocked
   ticket and max amount evidence.
-- `ticket_restricted_instrument_blocked.json`: product/test-owned expected
+- `fixture_ticket_restricted_instrument_blocked.json`: product/test-owned expected
   restricted-instrument blocked ticket.
-- `paper_execution_allowed_2000.json`: adapter/test-owned paper fill result
+- `fixture_paper_execution_allowed_2000.json`: adapter/test-owned paper fill result
   for the allowed ticket.
-- `audit_allowed_2000.jsonl`: audit/test-owned material audit records for the
+- `fixture_audit_allowed_2000.jsonl`: audit/test-owned material audit records for the
   allowed flow.
-- `audit_oversized_25000.jsonl`: audit/test-owned audit records for the
+- `fixture_audit_oversized_25000.jsonl`: audit/test-owned audit records for the
   oversized blocked flow.
-- `audit_restricted_instrument.jsonl`: audit/test-owned audit records for the
+- `fixture_audit_restricted_instrument.jsonl`: audit/test-owned audit records for the
   restricted flow.
-- `replay_capsule.json`: replay/test-owned captured hashes and
+- `fixture_replay_capsule.json`: replay/test-owned captured hashes and
   substitutions for replay.
 
 Ticket fixture files should store real ticket information, not prose:

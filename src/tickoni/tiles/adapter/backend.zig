@@ -1,13 +1,13 @@
 const std = @import("std");
 const basket = @import("basket");
 const portfolio = @import("portfolio");
-const portfolio_fixtures = @import("portfolio_fixtures");
+const fixture_portfolio = @import("fixture_portfolio");
 const trade_ticket = @import("trade_ticket");
 const schema = @import("adapter_messages");
-const mock_module = @import("adapter_mock");
+const mock_module = @import("mock_adapter");
 
 // MockBackend is a pure test double; its definition lives in
-// src/tickoni/test/mocks/adapter_mock.zig, not in this tile.
+// src/tickoni/test/mocks/mock_adapter.zig, not in this tile.
 const MockBackend = mock_module.MockBackend;
 
 fn tickerBuf(comptime s: []const u8) [portfolio.max_ticker_len]u8 {
@@ -155,7 +155,7 @@ fn loadAccountFromDir(
     io: std.Io,
     fixture_dir: []const u8,
 ) !portfolio.BrokerageAccount {
-    const raw = try readFixtureFile(allocator, io, fixture_dir, "account_ops.json");
+    const raw = try readFixtureFile(allocator, io, fixture_dir, "fixture_account_ops.json");
     defer allocator.free(raw);
     const parsed = try std.json.parseFromSlice(AccountOpsWire, allocator, raw, .{ .ignore_unknown_fields = true });
     defer parsed.deinit();
@@ -182,7 +182,7 @@ fn loadQuoteLoaderFromDir(
     io: std.Io,
     fixture_dir: []const u8,
 ) !QuoteLoader {
-    const raw = try readFixtureFile(allocator, io, fixture_dir, "quotes.json");
+    const raw = try readFixtureFile(allocator, io, fixture_dir, "fixture_quotes.json");
     defer allocator.free(raw);
     const parsed = try std.json.parseFromSlice(QuotesFileWire, allocator, raw, .{ .ignore_unknown_fields = true });
     defer parsed.deinit();
@@ -211,7 +211,7 @@ fn loadPaperExecutionFromDir(
     io: std.Io,
     fixture_dir: []const u8,
 ) !trade_ticket.PaperExecutionResult {
-    const raw = try readFixtureFile(allocator, io, fixture_dir, "paper_execution_allowed_2000.json");
+    const raw = try readFixtureFile(allocator, io, fixture_dir, "fixture_paper_execution_allowed_2000.json");
     defer allocator.free(raw);
     const parsed = try std.json.parseFromSlice(PaperExecutionFileWire, allocator, raw, .{ .ignore_unknown_fields = true });
     defer parsed.deinit();
@@ -251,9 +251,9 @@ fn loadPaperExecutionFromDir(
 // ---------------------------------------------------------------------------
 
 pub const FixtureBackend = struct {
-    account_snapshot: portfolio.BrokerageAccount = portfolio_fixtures.fixtures.cash_rich,
+    account_snapshot: portfolio.BrokerageAccount = fixture_portfolio.fixtures.cash_rich,
     quote_loader: QuoteLoader = .{},
-    // Non-null when loaded from paper_execution_allowed_2000.json via initFromDir.
+    // Non-null when loaded from fixture_paper_execution_allowed_2000.json via initFromDir.
     // Null falls back to the dynamic paper order result built from the ticket.
     paper_execution: ?trade_ticket.PaperExecutionResult = null,
 
@@ -370,14 +370,14 @@ test "Backend union dispatches to fixture backend" {
     var backend = Backend{ .fixture = .{} };
     const result = try backend.call(.{
         .operation = .portfolio_snapshot,
-        .account_id = portfolio_fixtures.fixtures.cash_rich.account_id,
+        .account_id = fixture_portfolio.fixtures.cash_rich.account_id,
     });
 
     const snapshot = switch (result) {
         .portfolio_snapshot => |value| value,
         else => unreachable,
     };
-    try std.testing.expectEqual(portfolio_fixtures.fixtures.cash_rich.account_id, snapshot.account_id);
+    try std.testing.expectEqual(fixture_portfolio.fixtures.cash_rich.account_id, snapshot.account_id);
 }
 
 test "FixtureBackend rejects unknown account" {
@@ -390,7 +390,7 @@ test "FixtureBackend rejects unknown account" {
 test "FixtureBackend rejects unsupported ticker" {
     var req = schema.AdapterRequest{
         .operation = .quote_snapshot,
-        .account_id = portfolio_fixtures.fixtures.cash_rich.account_id,
+        .account_id = fixture_portfolio.fixtures.cash_rich.account_id,
         .ticker_count = 1,
     };
     req.tickers[0] = tickerBuf("NOPE");
@@ -400,14 +400,14 @@ test "FixtureBackend rejects unsupported ticker" {
 test "FixtureBackend rejects missing ticket for paper order" {
     try std.testing.expectError(error.MissingTicket, (FixtureBackend{}).call(.{
         .operation = .paper_order,
-        .account_id = portfolio_fixtures.fixtures.cash_rich.account_id,
+        .account_id = fixture_portfolio.fixtures.cash_rich.account_id,
         .ticket = null,
     }));
 }
 
 test "FixtureBackend rejects policy blocked ticket for paper order" {
     var ticket: trade_ticket.TradeTicket = std.mem.zeroes(trade_ticket.TradeTicket);
-    ticket.account_id = portfolio_fixtures.fixtures.cash_rich.account_id;
+    ticket.account_id = fixture_portfolio.fixtures.cash_rich.account_id;
     ticket.policy_outcome = .deny;
 
     try std.testing.expectError(error.PolicyBlocked, (FixtureBackend{}).call(.{
@@ -425,11 +425,11 @@ test "parseQuantityMicros parses fractional quantities" {
     try std.testing.expectEqual(@as(u64, 500_000), try parseQuantityMicros("0.500000"));
 }
 
-test "FixtureBackend.initFromDir loads account_ops.json" {
+test "FixtureBackend.initFromDir loads fixture_account_ops.json" {
     const backend = try FixtureBackend.initFromDir(
         std.testing.allocator,
         std.testing.io,
-        "src/tickoni/test/fixtures/investment",
+        "src/tickoni/test/fixtures/investment/scenarios",
     );
     try std.testing.expectEqual(@as(u32, 2001), backend.account_snapshot.account_id);
     try std.testing.expectEqual(@as(i64, 5_000_000), backend.account_snapshot.cash_cents);
@@ -437,11 +437,11 @@ test "FixtureBackend.initFromDir loads account_ops.json" {
     try std.testing.expectEqual(@as(i64, 2_500_000), backend.account_snapshot.day_notional_limit_cents);
 }
 
-test "FixtureBackend.initFromDir loads quotes.json" {
+test "FixtureBackend.initFromDir loads fixture_quotes.json" {
     const backend = try FixtureBackend.initFromDir(
         std.testing.allocator,
         std.testing.io,
-        "src/tickoni/test/fixtures/investment",
+        "src/tickoni/test/fixtures/investment/scenarios",
     );
     try std.testing.expectEqual(@as(u8, 7), backend.quote_loader.quote_count);
     try std.testing.expectEqual(@as(u64, 1_765_792_800_000_000_000), backend.quote_loader.as_of_ns);
@@ -450,11 +450,11 @@ test "FixtureBackend.initFromDir loads quotes.json" {
     try std.testing.expectEqual(@as(i64, 12_495), nvda.bid_cents);
 }
 
-test "FixtureBackend.initFromDir loads paper_execution_allowed_2000.json" {
+test "FixtureBackend.initFromDir loads fixture_paper_execution_allowed_2000.json" {
     const backend = try FixtureBackend.initFromDir(
         std.testing.allocator,
         std.testing.io,
-        "src/tickoni/test/fixtures/investment",
+        "src/tickoni/test/fixtures/investment/scenarios",
     );
     const pe = backend.paper_execution orelse return error.TestUnexpectedResult;
     try std.testing.expectEqualStrings("paper_order_ai_infra_2000_0001", pe.paperOrderIdSlice());
@@ -469,7 +469,7 @@ test "FixtureBackend.initFromDir data matches hardcoded defaults" {
     const from_file = try FixtureBackend.initFromDir(
         std.testing.allocator,
         std.testing.io,
-        "src/tickoni/test/fixtures/investment",
+        "src/tickoni/test/fixtures/investment/scenarios",
     );
     const from_default = FixtureBackend{};
 

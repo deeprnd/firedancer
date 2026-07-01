@@ -1,6 +1,6 @@
 const std = @import("std");
 const portfolio = @import("portfolio");
-const portfolio_fixtures = @import("portfolio_fixtures");
+const fixture_portfolio = @import("fixture_portfolio");
 const trade_ticket = @import("trade_ticket");
 const schema = @import("adapter_messages");
 
@@ -43,7 +43,7 @@ pub const MockBackend = struct {
 };
 
 test "MockBackend returns configured response for requested operation" {
-    const expected = portfolio_fixtures.fixtures.cash_rich;
+    const expected = fixture_portfolio.fixtures.cash_rich;
     const result = try (MockBackend{
         .portfolio_snapshot = expected,
     }).call(.{
@@ -60,7 +60,7 @@ test "MockBackend returns configured response for requested operation" {
 
 test "MockBackend traces adapter operation calls" {
     var trace = MockBackend.CallTrace{};
-    const expected = portfolio_fixtures.fixtures.cash_rich;
+    const expected = fixture_portfolio.fixtures.cash_rich;
     _ = try (MockBackend{
         .portfolio_snapshot = expected,
         .trace = &trace,

@@ -1,10 +1,10 @@
 const std = @import("std");
 const adapter = @import("adapter");
-const adapter_mock = @import("adapter_mock");
+const mock_adapter = @import("mock_adapter");
 const basket_mod = @import("basket");
 const disp = @import("disp");
 const model = @import("model");
-const model_mock = @import("model_mock");
+const mock_model = @import("mock_model");
 const portfolio = @import("portfolio");
 const tkpoly = @import("tkpoly");
 const tool = @import("tool");
@@ -207,8 +207,8 @@ test "runInvestmentAgent blocks oversized trade and skips paper execution" {
     account.day_notional_limit_cents = 5_000_000;
     account.month_notional_limit_cents = 10_000_000;
 
-    var model_trace = model_mock.MockBackend.CallTrace{};
-    var adapter_trace = adapter_mock.MockBackend.CallTrace{};
+    var model_trace = mock_model.MockBackend.CallTrace{};
+    var adapter_trace = mock_adapter.MockBackend.CallTrace{};
     var model_backend = model.Backend{ .mock = .{
         .canned_content = "{\"recommended_tickers\":[\"NVDA\"]}",
         .trace = &model_trace,

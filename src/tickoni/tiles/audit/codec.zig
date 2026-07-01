@@ -1,5 +1,5 @@
 const std = @import("std");
-const audit_codec = @import("audit_cabi");
+const audit_codec = @import("audit_codec");
 const schema = @import("types.zig");
 
 pub const max_binary_len: usize = 256;
@@ -436,7 +436,7 @@ fn parseEnumByValue(comptime T: type, value: anytype) error{ UnknownRecordType, 
 }
 
 test "fromCodecEvent rejects unknown record type" {
-    const fixtures = @import("fixtures.zig");
+    const fixtures = @import("fixture_events.zig");
 
     const event = fixtures.makeFixtures()[0];
     var codec_event = toCodecEvent(event);
