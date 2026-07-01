@@ -466,6 +466,95 @@ pub fn generateExplanations(
 }
 
 // ---------------------------------------------------------------------------
+// JSON export
+// ---------------------------------------------------------------------------
+
+fn railLabel(rail: PaymentRail) []const u8 {
+    return switch (rail) {
+        .ach => "ach",
+        .wire => "wire",
+        .card => "card",
+        .internal => "internal",
+    };
+}
+
+/// Encode a PortfolioImpact as UI-ready JSON so a CaseOps client can render
+/// before/after cash, exposure, and pending-obligation state without
+/// reinterpreting the fixed-point Zig representation (T4).
+pub fn allocPortfolioImpactJson(
+    allocator: std.mem.Allocator,
+    result: *const PortfolioImpact,
+) ![]u8 {
+    const AssetClassView = struct { asset_class: []const u8, before_bp: u32, after_bp: u32 };
+    const InstrumentTypeView = struct { instrument_type: []const u8, before_bp: u32, after_bp: u32 };
+    const SectorView = struct { code: []const u8, before_bp: u32, after_bp: u32 };
+    const TickerView = struct { ticker: []const u8, before_bp: u32, after_bp: u32 };
+    const RailView = struct { rail: []const u8, pending_cents: i64 };
+    const DestinationView = struct { destination_id: u64, pending_cents: i64 };
+
+    var asset_class_views: [max_asset_class_exposure_entries]AssetClassView = undefined;
+    for (result.asset_class_exposures[0..result.asset_class_exposure_count], 0..) |*e, i| {
+        asset_class_views[i] = .{ .asset_class = e.asset_class.label(), .before_bp = e.before_bp, .after_bp = e.after_bp };
+    }
+
+    var instrument_type_views: [max_instrument_type_exposure_entries]InstrumentTypeView = undefined;
+    for (result.instrument_type_exposures[0..result.instrument_type_exposure_count], 0..) |*e, i| {
+        instrument_type_views[i] = .{ .instrument_type = e.instrument_type.label(), .before_bp = e.before_bp, .after_bp = e.after_bp };
+    }
+
+    var sector_views: [max_sector_exposure_entries]SectorView = undefined;
+    for (result.sector_exposures[0..result.sector_exposure_count], 0..) |*e, i| {
+        sector_views[i] = .{ .code = e.codeSlice(), .before_bp = e.before_bp, .after_bp = e.after_bp };
+    }
+
+    var ticker_views: [max_ticker_concentration_entries]TickerView = undefined;
+    for (result.ticker_concentrations[0..result.ticker_concentration_count], 0..) |*e, i| {
+        ticker_views[i] = .{ .ticker = e.tickerSlice(), .before_bp = e.before_bp, .after_bp = e.after_bp };
+    }
+
+    var rail_views: [max_rail_exposure_entries]RailView = undefined;
+    for (result.rail_exposures[0..result.rail_exposure_count], 0..) |*e, i| {
+        rail_views[i] = .{ .rail = railLabel(e.rail), .pending_cents = e.pending_cents };
+    }
+
+    var destination_views: [max_destination_exposure_entries]DestinationView = undefined;
+    for (result.destination_exposures[0..result.destination_exposure_count], 0..) |*e, i| {
+        destination_views[i] = .{ .destination_id = e.destination_id, .pending_cents = e.pending_cents };
+    }
+
+    var explanation_views: [max_explanations][]const u8 = undefined;
+    for (result.explanations[0..result.explanation_count], 0..) |*e, i| {
+        explanation_views[i] = e.textSlice();
+    }
+
+    return std.json.Stringify.valueAlloc(allocator, .{
+        .schema_version = impact_schema_version,
+        .cash_before_cents = result.cash_before_cents,
+        .cash_after_cents = result.cash_after_cents,
+        .buying_power_before_cents = result.buying_power_before_cents,
+        .buying_power_after_cents = result.buying_power_after_cents,
+        .pending_obligations_before_cents = result.pending_obligations_before_cents,
+        .pending_obligations_after_cents = result.pending_obligations_after_cents,
+        .estimated_trade_cost_cents = result.estimated_trade_cost_cents,
+        .estimated_payment_cost_cents = result.estimated_payment_cost_cents,
+        .asset_class_exposures = asset_class_views[0..result.asset_class_exposure_count],
+        .instrument_type_exposures = instrument_type_views[0..result.instrument_type_exposure_count],
+        .sector_exposures = sector_views[0..result.sector_exposure_count],
+        .ticker_concentrations = ticker_views[0..result.ticker_concentration_count],
+        .thesis_before_bp = result.thesis_before_bp,
+        .thesis_after_bp = result.thesis_after_bp,
+        .thesis_position_count = result.thesis_position_count,
+        .rail_exposures = rail_views[0..result.rail_exposure_count],
+        .destination_exposures = destination_views[0..result.destination_exposure_count],
+        .explanations = explanation_views[0..result.explanation_count],
+        .cash_buffer_threshold_cents = result.cash_buffer_threshold_cents,
+        .cash_buffer_breached_after = result.cash_buffer_breached_after,
+        .any_approval_required = result.any_approval_required,
+        .any_obligation_expired = result.any_obligation_expired,
+    }, .{});
+}
+
+// ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
 
@@ -1651,4 +1740,33 @@ test "generateExplanations: pending payment impact does not claim cash drops whe
     for (impact.explanations[0..impact.explanation_count]) |*e| {
         try testing.expect(std.mem.indexOf(u8, e.textSlice(), "Cash drops") == null);
     }
+}
+
+// ---------------------------------------------------------------------------
+// JSON export tests
+// ---------------------------------------------------------------------------
+
+test "allocPortfolioImpactJson: encodes cash, exposures, and explanations for a UI client" {
+    const account = makeMinimalAccount(5_000_000);
+    const basket = makeBasketWith(account.account_id, 200_000, "NVDA", .equity, .stock, "SOXX", .equity, .etf);
+    const obligation = PendingObligation{
+        .proposal_id = 1_240_001,
+        .rail = .ach,
+        .destination_id = 9001,
+        .amount_cents = 124_000,
+        .approval_state = .pending,
+        .expires_at_ns = 0,
+    };
+    var impact = computeRealizedTradeImpact(&account, &basket, 200_000, &[_]PendingObligation{obligation}, 500_000, 1);
+    generateExplanations(&impact, 2_500);
+
+    const json = try allocPortfolioImpactJson(testing.allocator, &impact);
+    defer testing.allocator.free(json);
+
+    try testing.expect(std.mem.indexOf(u8, json, "\"cash_before_cents\":5000000") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "\"cash_after_cents\":4800000") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "\"pending_obligations_after_cents\":124000") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "\"rail\":\"ach\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "\"explanations\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "approval-required and unexecuted") != null);
 }

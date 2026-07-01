@@ -733,7 +733,9 @@ pub fn build(b: *std.Build) void {
     }
 
     // Mock HTTP servers (test/mocks): self-tests of the mock
-    // infrastructure itself, no tile schema imports required.
+    // infrastructure itself, no tile schema imports required. Wired to
+    // test_step (not integration_step): src/tickoni/test/integration is the
+    // integration-test boundary, and this root lives under test/mocks.
     const mock_http_support_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/test/mocks/mock_http_support.zig"),
         .target = target,
@@ -767,7 +769,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    integration_step.dependOn(&b.addRunArtifact(mock_servers_test).step);
+    test_step.dependOn(&b.addRunArtifact(mock_servers_test).step);
 
     const model_tile_http_test = b.addTest(.{
         .root_module = b.createModule(.{
@@ -831,7 +833,11 @@ pub fn build(b: *std.Build) void {
     decision_cards_integration_test.root_module.linkSystemLibrary("stdc++", .{});
     integration_step.dependOn(&b.addRunArtifact(decision_cards_integration_test).step);
 
-    const system_step = b.step("system-test", "Run live V1.1 system/demo proofs");
+    // System step — every root under src/tickoni/test/system, run with
+    // `zig build system-test` (`just test-system-tk`). This includes both the
+    // live `tkmodl` smoke proof and offline deterministic demo proofs; the
+    // directory is the boundary, not per-file live/offline status.
+    const system_step = b.step("system-test", "Run all src/tickoni/test/system proofs");
     const system_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/test/system/test_investment_demo_live.zig"),
@@ -847,6 +853,30 @@ pub fn build(b: *std.Build) void {
     system_test.root_module.linkSystemLibrary("fd_ballet", .{});
     system_test.root_module.linkSystemLibrary("stdc++", .{});
     system_step.dependOn(&b.addRunArtifact(system_test).step);
+
+    // V1.3.S4: combined portfolio/cash demo. Fixture-backed and deterministic
+    // (no live model, broker, or execution), but lives under
+    // src/tickoni/test/system so it runs as part of the system-test lane
+    // alongside the live tkmodl proof.
+    const portfolio_cash_demo_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/system/test_portfolio_cash_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "investment_demo", .module = investment_demo_mod },
+                .{ .name = "investment_support", .module = investment_support_int_mod },
+            },
+        }),
+    });
+    // investment_demo_mod already carries the thesis_hash/audit_pb C sources
+    // from linkTickoniCodec above; only add the library path here to avoid
+    // linking those C sources twice into this binary.
+    portfolio_cash_demo_test.root_module.addLibraryPath(b.path(fd_lib_dir));
+    portfolio_cash_demo_test.root_module.linkSystemLibrary("fd_util", .{});
+    portfolio_cash_demo_test.root_module.linkSystemLibrary("fd_ballet", .{});
+    portfolio_cash_demo_test.root_module.linkSystemLibrary("stdc++", .{});
+    system_step.dependOn(&b.addRunArtifact(portfolio_cash_demo_test).step);
 
     // Compatibility alias for the old live-model smoke command.
     const live_model_step = b.step("integration-test-live-model", "Alias for the live V1.1 system/demo lane");
