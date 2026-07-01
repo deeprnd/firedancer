@@ -125,6 +125,35 @@ Tickoni change:
 
 If those answers are vague, do not add the code yet.
 
+### Process Mode And CPU Placement
+
+For runtime hardening work, process isolation means separate OS processes, not
+just separate Zig or pthread threads in one address space. Thread-backed mode is
+allowed only as a fast dev/test compatibility lane unless the story explicitly
+says otherwise.
+
+When a change claims process-mode tile isolation, it must expose enough
+evidence to identify:
+
+- the supervisor PID;
+- one child PID or equivalent thread-group/process id per configured tile;
+- tile id, kind/index, configured CPU placement mode, and assigned CPU when
+  pinned;
+- the parent/child launch record that ties tile processes to the supervisor;
+- whether the tile is `exclusive`, `shared`, or `floating`.
+
+Tickoni owns CPU placement policy. Do not change Firedancer validator
+auto-layout semantics or add Tickoni product fields to `fd_topo_t` to support
+shared-core placement. Valid placement modes are:
+
+- `exclusive`: one tile process pinned to one CPU;
+- `shared`: multiple explicitly declared tile processes may reuse one CPU;
+- `floating`: no fixed CPU pinning.
+
+Undeclared oversubscription, malformed CPU ids, and unavailable CPU ids must
+fail closed. Shared-core placement is a lower-throughput mode and must be
+visible in supervisor output, metrics, diagnostics, or test evidence.
+
 ## Separation Rules
 
 Keep these boundaries hard.
@@ -192,6 +221,10 @@ Rules:
 
 - keep `src/tickoni/c_abi` narrow: Zig `extern` declarations, layout checks,
   and small wrappers that preserve C ownership semantics
+- for process-mode tile links, prefer real Firedancer substrate:
+  `src/tango/mcache`, `src/tango/dcache`, `src/tango/fseq` or
+  `src/tango/fctl`, `src/tango/cnc`, workspace/shared-memory mechanics,
+  `src/disco/topo` process/workspace patterns, and `src/util/sandbox`
 - put Tickoni-owned schema, codec, export, and domain logic in Tickoni-owned
   modules such as `src/tickoni/codec`, not under `src/tickoni/c_abi`
 - use `src/tickoni/c_abi/queue.zig` and `src/tickoni/c_abi/sandbox.zig` as
@@ -219,6 +252,28 @@ If the bridge starts needing symbol stubs, build exceptions, or ownership that
 cannot be explained in one sentence, stop and move the logic back into a
 Tickoni-owned module. The goal is to reuse Firedancer substrate faithfully,
 not to hide new product code behind the ABI membrane.
+
+### Runtime Boundary Tests
+
+Runtime process/shared-memory work needs negative tests as well as happy-path
+flow tests. Include fail-closed tests for:
+
+- malformed, missing, stale, or duplicate workspace identifiers;
+- wrong workspace join modes, such as a consumer requesting write access or a
+  producer missing required write access;
+- missing `mcache`, `dcache`, `fseq` or `fctl`, or `cnc` objects;
+- dcache chunk or fragment bounds errors;
+- link depth, MTU, burst, or fragment-size mismatches;
+- reliable consumer progress not advancing and producer backpressure engaging;
+- production process mode accidentally selecting heap-backed correctness
+  queues;
+- forced tile crash with shared-memory state still readable for diagnostics or
+  deterministic shutdown.
+
+Do not expand a focused runtime story into arbitrary kernel-memory attack
+testing, whole-Firedancer workspace fuzzing, cross-platform portable queue
+substitutes, or production throughput saturation unless the story explicitly
+owns that scope.
 
 ### Firedancer Utility Reuse
 

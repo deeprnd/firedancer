@@ -190,7 +190,9 @@ Tickoni should reuse stable systems substrate, not validator semantics.
 
 | Foundation | Use in Tickoni |
 | --- | --- |
-| `src/tango` | Shared-memory queues and flow control |
+| `src/tango/mcache` and `src/tango/dcache` | Shared-memory fragment queues for correctness-bearing inter-process links |
+| `src/tango/fseq` or `src/tango/fctl` | Reliable consumer progress and producer backpressure |
+| `src/tango/cnc` | Tile boot, heartbeat, halt, and fail state, either directly or through a narrow Tickoni wrapper |
 | `src/util/sandbox` | Process sandboxing, namespaces, file descriptor checks, Landlock, and seccomp |
 | `src/disco/topo` | Reference for process lifecycle and workspace construction; wrap only the generic parts needed by Zig |
 | `src/disco/stem` | Reference for bounded polling loops and backpressure |
@@ -213,6 +215,45 @@ validator-specific.
 If generic code is extracted later, place the extraction behind a narrow C ABI
 under `src/tickoni/c_abi/`. Avoid adding Tickoni fields to
 `src/disco/topo/fd_topo.h`, which is a likely upstream synchronization hotspot.
+
+### Process And Core Placement Boundary
+
+In Tickoni Linux full-runtime process mode, a tile is a supervisor-managed OS
+process with its own address space. A thread-backed topology may remain as a
+dev/test compatibility lane, but it is not the process-isolation target for
+runtime hardening work.
+
+CPU placement is Tickoni-owned policy layered on top of the Firedancer
+substrate. Tickoni should support:
+
+- `exclusive`: one tile process pinned to one CPU;
+- `shared`: multiple declared tile processes intentionally reuse one CPU;
+- `floating`: the tile process is not pinned and the OS scheduler may place it.
+
+Do not change Firedancer's generic tile structs or validator auto-layout
+semantics to make Tickoni shared-core placement work. Shared-core placement is
+accepted only when the Tickoni config declares it. Undeclared oversubscription,
+malformed CPU ids, and unavailable CPU ids fail closed. Shared-core placement is
+a lower-throughput placement mode and must be visible in metrics, diagnostics,
+or supervisor output.
+
+Process-mode topology tests should prove OS process identity, not only thread
+identity: one child PID or equivalent thread-group/process id per configured
+tile, tied back to the supervisor launch record. Shared CPU assignment does not
+change that process boundary.
+
+### Shared-Memory Negative Cases
+
+Topology hardening must include fail-closed tests for malformed, stale,
+missing, or duplicate workspace identifiers; wrong workspace join modes;
+missing `mcache`, `dcache`, `fseq`/`fctl`, or `cnc` objects; dcache chunk or
+fragment bounds errors; link depth, MTU, burst, or fragment-size mismatches;
+non-advancing reliable consumers; accidental heap-backed correctness queues in
+process mode; and forced tile crashes that must not corrupt sibling tile state.
+
+These tests prove Tickoni's boundary around reused Firedancer substrate. They
+do not require fuzzing every Firedancer workspace internal, proving arbitrary
+kernel memory-attack resistance, or claiming production throughput saturation.
 
 ## Proposed Tickoni Topology
 

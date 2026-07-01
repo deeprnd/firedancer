@@ -200,6 +200,34 @@ The current implementation uses heap-backed in-process bounded queues. The
 next runtime hardening step is to replace those spike rings with the selected
 shared-memory backing while keeping the same tile identities and link answers.
 
+That hardening step must use real Firedancer-style substrate, not just Zig
+workers named as tiles. In Linux full-runtime process mode:
+
+- each configured tile runs as a supervisor-managed OS process with its own
+  address space; a thread-only topology may remain for fast dev/unit tests but
+  does not satisfy process-isolation acceptance;
+- correctness-bearing links use Firedancer Tango `mcache`/`dcache` shared
+  memory, with `fseq` or `fctl` progress/flow-control state so reliable links
+  backpressure instead of dropping;
+- tile lifecycle exposes boot, heartbeat, halt, and fail state through
+  `src/tango/cnc` or a narrow Tickoni wrapper around the same control model;
+- workspaces, objects, join modes, and process-start behavior follow
+  Firedancer `src/disco/topo` patterns through Tickoni-owned wrappers;
+- seccomp, Landlock, file-descriptor discipline, and process isolation reuse
+  `src/util/sandbox` where the Linux full-runtime tier can support them.
+
+CPU placement is Tickoni-owned policy. Tickoni may support `exclusive`,
+`shared`, and `floating` placement modes; it must not inherit a hard Firedancer
+validator assumption that every tile owns an exclusive CPU core. Shared-core
+placement means multiple tile processes intentionally reuse a CPU, not that
+tiles share a process or address space. Undeclared CPU oversubscription,
+malformed CPU ids, and unavailable CPU ids fail closed.
+
+Do not add Tickoni product fields or financial semantics to upstream-hot
+Firedancer topology structs. Keep Tickoni tile IDs, placement policy, financial
+contracts, and product schema in `src/tickoni/**`, with narrow C ABI wrappers
+under `src/tickoni/c_abi/` for reused Firedancer substrate.
+
 ## Runtime Model
 
 Tickoni follows Firedancer's topology discipline: tiles, links, workspaces,
@@ -216,6 +244,16 @@ link can answer:
 For the Phase 0 pipeline, the default ownership model is one producer per link
 and one owning tile for every mutable state object. Consumers read from bounded
 links and publish their own progress counters.
+
+Process-mode validation should include negative runtime-boundary tests:
+malformed or stale workspace identifiers, wrong workspace join modes, missing
+queue/control objects, dcache bounds errors, link depth/MTU/burst mismatches,
+non-advancing reliable consumers, accidental heap-backed correctness queues in
+process mode, and forced tile crashes that leave shared-memory state readable
+for diagnostics or deterministic shutdown. Arbitrary kernel-memory attack
+resistance, full Firedancer workspace fuzzing, cross-platform queue
+substitutes, and production throughput saturation are separate security,
+platform, fuzzing, or performance stories.
 
 ### Phase 0 Tiles
 
