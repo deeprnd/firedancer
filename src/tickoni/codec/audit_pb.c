@@ -6,10 +6,10 @@
 
 #include <string.h>
 
-/* k0/k1 are fixed constants baked into the audit schema v1.
+/* k0/k1 are fixed constants baked into the audit schema.
    Changing them invalidates all existing audit logs. */
 #define TK_AUDIT_HASH_K0 (0x0000544455414B54UL) /* "TKAUDT\0\0" LE */
-#define TK_AUDIT_HASH_K1 (1UL)                  /* schema version  */
+#define TK_AUDIT_HASH_K1 (2UL)                  /* schema version  */
 
 #define TK_HASH(ptr,sz) fd_siphash13_append( sip, (uchar const *)(ptr), (sz) )
 
@@ -45,6 +45,10 @@ tk_audit_record_hash( tk_audit_event_t const * event ) {
       TK_HASH( &event->payload.policy_decision.rule_id,          sizeof(uint32_t) );
       TK_HASH( event->payload.policy_decision.failed_scope_dim,  32UL             );
       TK_HASH( &event->payload.policy_decision.source_event_hash,sizeof(uint64_t) );
+      TK_HASH( &event->payload.policy_decision.catalog_schema_version, sizeof(uint32_t) );
+      TK_HASH( event->payload.policy_decision.taxonomy_id,       32UL             );
+      TK_HASH( &event->payload.policy_decision.taxonomy_version, sizeof(uint32_t) );
+      TK_HASH( event->payload.policy_decision.classification_code, 32UL           );
       break;
     case 3U:
       TK_HASH( event->payload.model_call.model_id,              32UL             );
@@ -88,6 +92,10 @@ tk_audit_record_hash( tk_audit_event_t const * event ) {
       TK_HASH( event->payload.denial.action_class,    32UL             );
       TK_HASH( &event->payload.denial.reason_code,    sizeof(uint32_t) );
       TK_HASH( event->payload.denial.failed_scope_dim,32UL             );
+      TK_HASH( &event->payload.denial.catalog_schema_version, sizeof(uint32_t) );
+      TK_HASH( event->payload.denial.taxonomy_id,     32UL             );
+      TK_HASH( &event->payload.denial.taxonomy_version, sizeof(uint32_t) );
+      TK_HASH( event->payload.denial.classification_code, 32UL         );
       break;
     case 10U:
       TK_HASH( &event->payload.telemetry_checkpoint.metric_set_hash,        sizeof(uint64_t) );
@@ -257,6 +265,28 @@ tk_parse_payload( uint                record_type,
           case 4U:
             if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->policy_decision.source_event_hash = (uint64_t)tlv->varint;
+            break;
+          case 5U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            payload->policy_decision.catalog_schema_version = (uint32_t)tlv->varint;
+            break;
+          case 6U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            {
+              int err = tk_copy_len_bytes( payload->policy_decision.taxonomy_id, 32UL, inbuf, tlv->len );
+              if( err ) return err;
+            }
+            break;
+          case 7U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            payload->policy_decision.taxonomy_version = (uint32_t)tlv->varint;
+            break;
+          case 8U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            {
+              int err = tk_copy_len_bytes( payload->policy_decision.classification_code, 32UL, inbuf, tlv->len );
+              if( err ) return err;
+            }
             break;
           default:
             if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
@@ -453,6 +483,28 @@ tk_parse_payload( uint                record_type,
               if( err ) return err;
             }
             break;
+          case 4U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            payload->denial.catalog_schema_version = (uint32_t)tlv->varint;
+            break;
+          case 5U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            {
+              int err = tk_copy_len_bytes( payload->denial.taxonomy_id, 32UL, inbuf, tlv->len );
+              if( err ) return err;
+            }
+            break;
+          case 6U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            payload->denial.taxonomy_version = (uint32_t)tlv->varint;
+            break;
+          case 7U:
+            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            {
+              int err = tk_copy_len_bytes( payload->denial.classification_code, 32UL, inbuf, tlv->len );
+              if( err ) return err;
+            }
+            break;
           default:
             if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
@@ -582,10 +634,16 @@ tk_audit_format_protobuf( void *                   out,
     }
     case 2U: {
       size_t failed_dim_len = tk_trimmed_len( event->payload.policy_decision.failed_scope_dim, 32UL );
+      size_t taxonomy_id_len = tk_trimmed_len( event->payload.policy_decision.taxonomy_id, 32UL );
+      size_t classification_code_len = tk_trimmed_len( event->payload.policy_decision.classification_code, 32UL );
       if( !fd_pb_push_uint32( enc, 1U, (uint)event->payload.policy_decision.outcome ) ) return TK_AUDIT_CODEC_NO_SPACE;
       if( !fd_pb_push_uint32( enc, 2U, (uint)event->payload.policy_decision.rule_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
       if( !fd_pb_push_bytes( enc, 3U, event->payload.policy_decision.failed_scope_dim, failed_dim_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
       if( !fd_pb_push_uint64( enc, 4U, (ulong)event->payload.policy_decision.source_event_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_uint32( enc, 5U, (uint)event->payload.policy_decision.catalog_schema_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_bytes( enc, 6U, event->payload.policy_decision.taxonomy_id, taxonomy_id_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_uint32( enc, 7U, (uint)event->payload.policy_decision.taxonomy_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_bytes( enc, 8U, event->payload.policy_decision.classification_code, classification_code_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 3U: {
@@ -644,9 +702,15 @@ tk_audit_format_protobuf( void *                   out,
     case 9U: {
       size_t action_len = tk_trimmed_len( event->payload.denial.action_class, 32UL );
       size_t failed_len = tk_trimmed_len( event->payload.denial.failed_scope_dim, 32UL );
+      size_t taxonomy_id_len = tk_trimmed_len( event->payload.denial.taxonomy_id, 32UL );
+      size_t classification_code_len = tk_trimmed_len( event->payload.denial.classification_code, 32UL );
       if( !fd_pb_push_bytes( enc, 1U, event->payload.denial.action_class, action_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
       if( !fd_pb_push_uint32( enc, 2U, (uint)event->payload.denial.reason_code ) ) return TK_AUDIT_CODEC_NO_SPACE;
       if( !fd_pb_push_bytes( enc, 3U, event->payload.denial.failed_scope_dim, failed_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_uint32( enc, 4U, (uint)event->payload.denial.catalog_schema_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_bytes( enc, 5U, event->payload.denial.taxonomy_id, taxonomy_id_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_uint32( enc, 6U, (uint)event->payload.denial.taxonomy_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !fd_pb_push_bytes( enc, 7U, event->payload.denial.classification_code, classification_code_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 10U:

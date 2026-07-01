@@ -7,6 +7,11 @@ const trade_ticket = @import("trade_ticket");
 
 pub const BasketScreening = basket.BasketScreening;
 
+/// Version of the trade-policy ruleset implemented by this tile (guardrails,
+/// affordability, and basket screening). Replay capsules stamp the policy
+/// version that produced them so drift is explicit instead of silent.
+pub const trade_policy_version: []const u8 = "v1";
+
 pub const TradeGuardrailDecision = struct {
     policy_outcome: trade_ticket.PolicyOutcome,
     blocked_reasons: [trade_ticket.max_blocked_reasons]trade_ticket.BlockedReason = std.mem.zeroes([trade_ticket.max_blocked_reasons]trade_ticket.BlockedReason),

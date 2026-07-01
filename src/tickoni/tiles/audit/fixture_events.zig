@@ -70,6 +70,10 @@ pub fn makeFixtures() [12]schema.AuditEvent {
             .rule_id = 42,
             .failed_scope_dim = parseFixedAsciiBytes(32, "amount_limit") catch unreachable,
             .source_event_hash = 9002,
+            .catalog_schema_version = 0,
+            .taxonomy_id = [_]u8{0} ** 32,
+            .taxonomy_version = 0,
+            .classification_code = [_]u8{0} ** 32,
         } }),
         codec.buildEvent(headers[3], .{ .model_call = .{
             .model_id = parseFixedAsciiBytes(32, "gpt_local_stub") catch unreachable,
@@ -113,6 +117,10 @@ pub fn makeFixtures() [12]schema.AuditEvent {
             .action_class = parseFixedAsciiBytes(32, "trading_order.place") catch unreachable,
             .reason_code = 17,
             .failed_scope_dim = parseFixedAsciiBytes(32, "environment") catch unreachable,
+            .catalog_schema_version = 2,
+            .taxonomy_id = parseFixedAsciiBytes(32, "gics_sector") catch unreachable,
+            .taxonomy_version = 2025,
+            .classification_code = parseFixedAsciiBytes(32, "materials") catch unreachable,
         } }),
         codec.buildEvent(headers[10], .{ .telemetry_checkpoint = .{
             .metric_set_hash = 9400,
@@ -135,6 +143,10 @@ test "computeRecordHash excludes timestamp_ns" {
         .rule_id = 1,
         .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
         .source_event_hash = 2,
+        .catalog_schema_version = 0,
+        .taxonomy_id = [_]u8{0} ** 32,
+        .taxonomy_version = 0,
+        .classification_code = [_]u8{0} ** 32,
     } };
     var header_with_timestamp = header;
     header_with_timestamp.timestamp_ns = 999_999;
@@ -149,6 +161,10 @@ test "hash chain mutation changes downstream records" {
         .rule_id = 1,
         .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
         .source_event_hash = 3,
+        .catalog_schema_version = 0,
+        .taxonomy_id = [_]u8{0} ** 32,
+        .taxonomy_version = 0,
+        .classification_code = [_]u8{0} ** 32,
     } });
     var second_header = fixtureHeader(1, 1, "tkpoly", 0, "policy", 0, 0, first.header.record_hash, 0);
     const second = codec.buildEvent(second_header, .{ .policy_decision = .{
@@ -156,6 +172,10 @@ test "hash chain mutation changes downstream records" {
         .rule_id = 1,
         .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
         .source_event_hash = 3,
+        .catalog_schema_version = 0,
+        .taxonomy_id = [_]u8{0} ** 32,
+        .taxonomy_version = 0,
+        .classification_code = [_]u8{0} ** 32,
     } });
 
     const mutated_first = codec.buildEvent(fixtureHeader(0, 9, "tkpoly", 0, "policy", 0, 0, 0, 0), .{ .policy_decision = .{
@@ -163,6 +183,10 @@ test "hash chain mutation changes downstream records" {
         .rule_id = 1,
         .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
         .source_event_hash = 3,
+        .catalog_schema_version = 0,
+        .taxonomy_id = [_]u8{0} ** 32,
+        .taxonomy_version = 0,
+        .classification_code = [_]u8{0} ** 32,
     } });
     second_header.prev_hash = mutated_first.header.record_hash;
     const mutated_second = codec.buildEvent(second_header, second.payload);
@@ -180,6 +204,54 @@ test "binary and wire format pinned" {
         const binary = try codec.formatBinary(&buf, event);
         try std.testing.expectEqual(g.expected_binary_len, binary.len);
         try std.testing.expectEqualSlices(u8, g.expected_binary_bytes, binary);
+    }
+}
+
+test "policy_decision and denial classification evidence survives binary round-trip" {
+    const h = fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0, 0);
+
+    const policy_event = codec.buildEvent(h, .{ .policy_decision = .{
+        .outcome = .deny,
+        .rule_id = 1201,
+        .failed_scope_dim = parseFixedAsciiBytes(32, "wrong_sector") catch unreachable,
+        .source_event_hash = 4242,
+        .catalog_schema_version = 2,
+        .taxonomy_id = parseFixedAsciiBytes(32, "gics_sector") catch unreachable,
+        .taxonomy_version = 2025,
+        .classification_code = parseFixedAsciiBytes(32, "materials") catch unreachable,
+    } });
+
+    const denial_event = codec.buildEvent(h, .{ .denial = .{
+        .action_class = parseFixedAsciiBytes(32, "trading_order.propose") catch unreachable,
+        .reason_code = 9,
+        .failed_scope_dim = parseFixedAsciiBytes(32, "wrong_sector") catch unreachable,
+        .catalog_schema_version = 2,
+        .taxonomy_id = parseFixedAsciiBytes(32, "gics_sector") catch unreachable,
+        .taxonomy_version = 2025,
+        .classification_code = parseFixedAsciiBytes(32, "materials") catch unreachable,
+    } });
+
+    for ([_]schema.AuditEvent{ policy_event, denial_event }) |event| {
+        var binary_buf: [codec.max_binary_len]u8 = undefined;
+        const binary = try codec.formatBinary(&binary_buf, event);
+        const parsed = try codec.parseBinary(binary);
+        try std.testing.expect(codec.auditEventsEql(event, parsed.event));
+
+        switch (parsed.event.payload) {
+            .policy_decision => |p| {
+                try std.testing.expectEqual(@as(u32, 2), p.catalog_schema_version);
+                try std.testing.expectEqualStrings("gics_sector", std.mem.sliceTo(&p.taxonomy_id, 0));
+                try std.testing.expectEqual(@as(u32, 2025), p.taxonomy_version);
+                try std.testing.expectEqualStrings("materials", std.mem.sliceTo(&p.classification_code, 0));
+            },
+            .denial => |p| {
+                try std.testing.expectEqual(@as(u32, 2), p.catalog_schema_version);
+                try std.testing.expectEqualStrings("gics_sector", std.mem.sliceTo(&p.taxonomy_id, 0));
+                try std.testing.expectEqual(@as(u32, 2025), p.taxonomy_version);
+                try std.testing.expectEqualStrings("materials", std.mem.sliceTo(&p.classification_code, 0));
+            },
+            else => unreachable,
+        }
     }
 }
 
