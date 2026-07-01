@@ -104,8 +104,31 @@ test-unit-fd:
   make -j"$(nproc)" unit-test
   nofile_target="$(awk '/#define CONFIGURE_NR_OPEN_FILES/ { gsub(/[()U]/, "", $3); print $3 }' src/app/shared/commands/configure/configure.h)"
   sudo prlimit --pid $$ --nofile="${nofile_target}:${nofile_target}" --memlock=unlimited
-  echo "running Firedancer unit tests with normal pages"
-  make run-unit-test TEST_OPTS="--page-sz normal"
+  page_mode="${FD_TEST_UNIT_PAGE_MODE:-auto}"
+  case "$page_mode" in
+    normal)
+      echo "running Firedancer unit tests with normal pages"
+      make run-unit-test TEST_OPTS="--page-sz normal"
+      ;;
+    auto)
+      just mem-free || true
+      trap 'just mem-free' EXIT
+      want=$(free -g | awk '/^Mem:/{print int(($2 - 4) / 6) * 6}')
+      (( want > 0 )) && sudo src/util/shmem/fd_shmem_cfg alloc "$want" gigantic 0 >/dev/null 2>&1 || true
+      pages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/free_hugepages 2>/dev/null || echo 0)
+      if (( pages >= 6 )); then
+        echo "running Firedancer unit tests with gigantic pages"
+        make run-unit-test
+      else
+        echo "gigantic pages unavailable, falling back to normal pages"
+        make run-unit-test TEST_OPTS="--page-sz normal"
+      fi
+      ;;
+    *)
+      echo "unsupported FD_TEST_UNIT_PAGE_MODE: $page_mode" >&2
+      exit 1
+      ;;
+  esac
 
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.

@@ -41,8 +41,12 @@ jobs:
 
       - name: Setup Firedancer test environment
         uses: ./.github/actions/setup-fd-test
+        with:
+          configure-hugepages: 'false'
 
       - name: Run test suite
+        env:
+          FD_TEST_UNIT_PAGE_MODE: normal
         run: just test-unit-fd
 
   cov-fd:

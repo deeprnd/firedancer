@@ -206,11 +206,6 @@ fi
 #       same runner.
 echo "test.sh: $PAGE_CNT $PAGE_SZ pages per job (default)" >&2
 declare -a NUMA_PAGES
-MAX_TEST_PAGES="$PAGE_CNT"
-for pages in "${TEST_GIGANTIC_PAGES[@]}"; do
-  converted_pages=$(( pages * PAGES_PER_GIB ))
-  if [[ "$converted_pages" -gt "$MAX_TEST_PAGES" ]]; then MAX_TEST_PAGES="$converted_pages"; fi
-done
 for numa in "${NUMAS[@]}"; do
   case "$PAGE_SZ" in
     gigantic)
@@ -225,12 +220,6 @@ for numa in "${NUMAS[@]}"; do
       ;;
   esac
   NUMA_PAGES[$numa]="$free_pages"
-  # The largest single test must fit, or it can never be scheduled.
-  if [[ "$free_pages" -lt "$MAX_TEST_PAGES" ]]; then
-    echo "test.sh: $free_pages free $PAGE_SZ pages on NUMA $numa, but the largest test needs $MAX_TEST_PAGES" >&2
-    echo "test.sh: Not enough memory!" >&2
-    exit 1
-  fi
   echo "test.sh: NUMA $numa: ${NUMA_SLOTS[$numa]} CPU slots, $free_pages free $PAGE_SZ pages" >&2
 done
 
@@ -287,6 +276,22 @@ while read -r line; do
   TEST_LIST+=( "$line" )
 done < <(grep -v '^#' "$TESTS")
 echo "test.sh: Scheduling ${#TEST_LIST[@]} tests with $JOBS workers" >&2
+
+MAX_TEST_PAGES="$PAGE_CNT"
+for test in "${TEST_LIST[@]}"; do
+  pages="$(test_pages "${test##*/}")"
+  if [[ "$pages" -gt "$MAX_TEST_PAGES" ]]; then MAX_TEST_PAGES="$pages"; fi
+done
+
+for numa in "${NUMAS[@]}"; do
+  free_pages="${NUMA_PAGES[$numa]}"
+  # The largest single scheduled test must fit, or it can never be scheduled.
+  if [[ "$free_pages" -lt "$MAX_TEST_PAGES" ]]; then
+    echo "test.sh: $free_pages free $PAGE_SZ pages on NUMA $numa, but the largest scheduled test needs $MAX_TEST_PAGES" >&2
+    echo "test.sh: Not enough memory!" >&2
+    exit 1
+  fi
+done
 
 rc_path () {
   echo "/tmp/.pid-$1.rc"
