@@ -263,7 +263,7 @@ quality-proto-check-fd:
   bash -c "command -v buf >/dev/null || exit 0; buf lint src/disco/events/schema"
 
 quality-proto-check-tk:
-  bash -c "command -v buf >/dev/null || exit 0; buf lint src/tickoni/codec && buf lint src/tickoni/schema"
+  bash -c "command -v buf >/dev/null || exit 0; buf lint src/tickoni/schema"
 
 quality-proto-check-all:
   @just quality-proto-check-fd

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package tickoni.schema.v1;
 
-import "classification.proto";
+import "classification/classification.proto";
 
 enum RestrictionReason {
   RESTRICTION_REASON_UNSPECIFIED      = 0;

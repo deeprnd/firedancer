@@ -10,7 +10,7 @@
 /// notional, remaining monthly notional, and max affordable basket size, then
 /// returns an AffordabilityResult with outcome and all computed limits (T3).
 const std = @import("std");
-const basket = @import("basket.zig");
+const basket = @import("basket");
 
 pub const portfolio_schema_version: u16 = 1;
 
