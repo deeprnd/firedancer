@@ -101,20 +101,11 @@ _dev-image:
 test-unit-fd:
   #!/usr/bin/env bash
   set -euo pipefail
-  just mem-free || true
-  trap 'just mem-free' EXIT
-  want=$(free -g | awk '/^Mem:/{print int(($2 - 4) / 6) * 6}')
-  (( want > 0 )) && sudo src/util/shmem/fd_shmem_cfg alloc "$want" gigantic 0 >/dev/null 2>&1 || true
-  pages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/free_hugepages 2>/dev/null || echo 0)
-  sudo prlimit --pid $$ --memlock=unlimited
   make -j"$(nproc)" unit-test
-  if (( pages >= 6 )); then
-    echo "allocated $pages gigantic pages on NUMA 0"
-    make run-unit-test
-  else
-    echo "gigantic pages unavailable, falling back to normal pages"
-    make run-unit-test TEST_OPTS="--page-sz normal"
-  fi
+  nofile_target="$(awk '/#define CONFIGURE_NR_OPEN_FILES/ { gsub(/[()U]/, "", $3); print $3 }' src/app/shared/commands/configure/configure.h)"
+  sudo prlimit --pid $$ --nofile="${nofile_target}:${nofile_target}" --memlock=unlimited
+  echo "running Firedancer unit tests with normal pages"
+  make run-unit-test TEST_OPTS="--page-sz normal"
 
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.

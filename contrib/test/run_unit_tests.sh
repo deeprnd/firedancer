@@ -13,17 +13,17 @@ PAGE_CNT=
 TESTS=
 VERBOSE=0
 
-# Most unit tests fit in a single 1 GiB gigantic page.  The scheduler
-# therefore reserves one page per running job by default so that it can
-# fill every available CPU.  The handful of tests below allocate a
-# larger anonymous workspace; they are passed their own --page-cnt and
-# the scheduler accounts for those extra gigantic pages so the in-flight
-# set never over-subscribes the hugetlbfs reservation (an over-subscribed
-# test hard-fails when fd_wksp_new_anonymous cannot acquire its pages).
+# Most unit tests fit in a single 1 GiB workspace.  The scheduler
+# therefore reserves one 1 GiB-equivalent budget per running job by
+# default so that it can fill every available CPU.  The handful of tests
+# below allocate a larger anonymous workspace; the scheduler accounts for
+# those extra GiB of footprint so the in-flight set never over-subscribes
+# the selected backing pages (an over-subscribed test hard-fails when
+# fd_wksp_new_anonymous cannot acquire its pages).
 #
-# Tests are always run with --page-sz gigantic, so the count here is the
-# number of 1 GiB pages needed to hold each test's default workspace
-# footprint (ceil(default_page_cnt * default_page_sz / 1 GiB)).
+# The table below stores workspace needs in units of 1 GiB regardless of
+# the selected page size.  At dispatch time, the scheduler converts those
+# GiB units into the page count required for the active --page-sz.
 # Keep this list in sync with the sources;
 # contrib/test/gen_unit_test_pages.sh regenerates it.
 declare -A TEST_GIGANTIC_PAGES=(
@@ -150,6 +150,22 @@ if [[ -z "$PAGE_CNT" ]]; then
   esac
 fi
 
+case "$PAGE_SZ" in
+  normal)
+    PAGES_PER_GIB=$(( 0x40000000 / 0x1000 ))
+    ;;
+  huge)
+    PAGES_PER_GIB=$(( 0x40000000 / 0x200000 ))
+    ;;
+  gigantic)
+    PAGES_PER_GIB=1
+    ;;
+  *)
+    echo "Unknown page size: $PAGE_SZ" >&2
+    exit 1
+    ;;
+esac
+
 # Count and map available CPUs per NUMA
 declare -a NUMA_CPUS
 for numa in "${NUMAS[@]}"; do
@@ -185,14 +201,15 @@ else
   done
 fi
 
-# Determine the per-NUMA gigantic page budget for admission control.
+# Determine the per-NUMA page budget for admission control.
 # Note: This is far from ideal and racy when multiple jobs share the
 #       same runner.
 echo "test.sh: $PAGE_CNT $PAGE_SZ pages per job (default)" >&2
 declare -a NUMA_PAGES
-MAX_TEST_PAGES=1
+MAX_TEST_PAGES="$PAGE_CNT"
 for pages in "${TEST_GIGANTIC_PAGES[@]}"; do
-  if [[ "$pages" -gt "$MAX_TEST_PAGES" ]]; then MAX_TEST_PAGES="$pages"; fi
+  converted_pages=$(( pages * PAGES_PER_GIB ))
+  if [[ "$converted_pages" -gt "$MAX_TEST_PAGES" ]]; then MAX_TEST_PAGES="$converted_pages"; fi
 done
 for numa in "${NUMAS[@]}"; do
   case "$PAGE_SZ" in
@@ -242,18 +259,23 @@ declare -A CPU2PID
 declare -A PID2UNIT
 # Remember logfile name of each PID
 declare -A PID2LOG
-# Remember how many gigantic pages each PID reserved
+# Remember how many pages each PID reserved
 declare -A PID2PAGES
 
 # NUMA_SLOTS holds the number of free CPU slots per node and NUMA_PAGES
-# the number of free gigantic pages per node.  When a job spawns, the
+# the number of free pages per node.  When a job spawns, the
 # node's slot count is decremented by one and its page count by the
 # test's page need; both are restored when the job is reaped.
 
 # test_pages <progname>
-#   Echo the number of gigantic pages a test reserves (its --page-cnt).
+#   Echo the number of pages a test reserves for the active page size.
 test_pages () {
-  echo "${TEST_GIGANTIC_PAGES[$1]:-$PAGE_CNT}"
+  local gigantic_pages="${TEST_GIGANTIC_PAGES[$1]:-}"
+  if [[ -n "$gigantic_pages" ]]; then
+    echo $(( gigantic_pages * PAGES_PER_GIB ))
+  else
+    echo "$PAGE_CNT"
+  fi
 }
 
 # Read in list of automatic unit tests to schedule as jobs
