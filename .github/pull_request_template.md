@@ -76,6 +76,7 @@ Tips:
 - [ ] No Firedancer core/upstream-derived code changed
 - [ ] Firedancer-facing integration changed only
 - [ ] Firedancer core/upstream-derived code changed; rationale and scope are documented below
+- [ ] Firedancer test path or individual Firedancer tests changed; details are documented below
 - [ ] x86-64 Linux / Firedancer assumptions considered where relevant
 - [ ] Upstream Firedancer issue/PR created or updated; links are documented below
 
