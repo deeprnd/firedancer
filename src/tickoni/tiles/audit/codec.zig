@@ -106,7 +106,11 @@ fn writePayloadJson(payload: schema.AuditEvent.Payload, writer: anytype) !void {
             try writer.print("\"outcome\":\"{s}\",", .{@tagName(p.outcome)});
             try writer.print("\"rule_id\":{d},", .{p.rule_id});
             try writer.print("\"failed_scope_dim\":\"{s}\",", .{std.mem.sliceTo(&p.failed_scope_dim, 0)});
-            try writer.print("\"source_event_hash\":{d}", .{p.source_event_hash});
+            try writer.print("\"source_event_hash\":{d},", .{p.source_event_hash});
+            try writer.print("\"catalog_schema_version\":{d},", .{p.catalog_schema_version});
+            try writer.print("\"taxonomy_id\":\"{s}\",", .{std.mem.sliceTo(&p.taxonomy_id, 0)});
+            try writer.print("\"taxonomy_version\":{d},", .{p.taxonomy_version});
+            try writer.print("\"classification_code\":\"{s}\"", .{std.mem.sliceTo(&p.classification_code, 0)});
             try writer.writeAll("}");
         },
         .model_call => |p| {
@@ -163,7 +167,11 @@ fn writePayloadJson(payload: schema.AuditEvent.Payload, writer: anytype) !void {
             try writer.writeAll("{");
             try writer.print("\"action_class\":\"{s}\",", .{std.mem.sliceTo(&p.action_class, 0)});
             try writer.print("\"reason_code\":{d},", .{p.reason_code});
-            try writer.print("\"failed_scope_dim\":\"{s}\"", .{std.mem.sliceTo(&p.failed_scope_dim, 0)});
+            try writer.print("\"failed_scope_dim\":\"{s}\",", .{std.mem.sliceTo(&p.failed_scope_dim, 0)});
+            try writer.print("\"catalog_schema_version\":{d},", .{p.catalog_schema_version});
+            try writer.print("\"taxonomy_id\":\"{s}\",", .{std.mem.sliceTo(&p.taxonomy_id, 0)});
+            try writer.print("\"taxonomy_version\":{d},", .{p.taxonomy_version});
+            try writer.print("\"classification_code\":\"{s}\"", .{std.mem.sliceTo(&p.classification_code, 0)});
             try writer.writeAll("}");
         },
         .telemetry_checkpoint => |p| {
@@ -272,6 +280,10 @@ fn payloadToCodec(payload: schema.AuditEvent.Payload) audit_codec.Payload {
             .rule_id = p.rule_id,
             .failed_scope_dim = p.failed_scope_dim,
             .source_event_hash = p.source_event_hash,
+            .catalog_schema_version = p.catalog_schema_version,
+            .taxonomy_id = p.taxonomy_id,
+            .taxonomy_version = p.taxonomy_version,
+            .classification_code = p.classification_code,
         } },
         .model_call => |p| .{ .model_call = .{
             .model_id = p.model_id,
@@ -315,6 +327,10 @@ fn payloadToCodec(payload: schema.AuditEvent.Payload) audit_codec.Payload {
             .action_class = p.action_class,
             .reason_code = p.reason_code,
             .failed_scope_dim = p.failed_scope_dim,
+            .catalog_schema_version = p.catalog_schema_version,
+            .taxonomy_id = p.taxonomy_id,
+            .taxonomy_version = p.taxonomy_version,
+            .classification_code = p.classification_code,
         } },
         .telemetry_checkpoint => |p| .{ .telemetry_checkpoint = .{
             .metric_set_hash = p.metric_set_hash,
@@ -355,6 +371,10 @@ fn payloadFromCodec(record_type: schema.RecordType, payload: audit_codec.Payload
             .rule_id = payload.policy_decision.rule_id,
             .failed_scope_dim = payload.policy_decision.failed_scope_dim,
             .source_event_hash = payload.policy_decision.source_event_hash,
+            .catalog_schema_version = payload.policy_decision.catalog_schema_version,
+            .taxonomy_id = payload.policy_decision.taxonomy_id,
+            .taxonomy_version = payload.policy_decision.taxonomy_version,
+            .classification_code = payload.policy_decision.classification_code,
         } },
         .model_call => .{ .model_call = .{
             .model_id = payload.model_call.model_id,
@@ -398,6 +418,10 @@ fn payloadFromCodec(record_type: schema.RecordType, payload: audit_codec.Payload
             .action_class = payload.denial.action_class,
             .reason_code = payload.denial.reason_code,
             .failed_scope_dim = payload.denial.failed_scope_dim,
+            .catalog_schema_version = payload.denial.catalog_schema_version,
+            .taxonomy_id = payload.denial.taxonomy_id,
+            .taxonomy_version = payload.denial.taxonomy_version,
+            .classification_code = payload.denial.classification_code,
         } },
         .telemetry_checkpoint => .{ .telemetry_checkpoint = .{
             .metric_set_hash = payload.telemetry_checkpoint.metric_set_hash,

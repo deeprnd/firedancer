@@ -287,14 +287,14 @@ stays stable as coverage grows.
 `just test-system-tk` runs:
 
 ```bash
-bash contrib/test/run_integration_model_tests.sh
+bash contrib/test/run_system_model_tests.sh
 ```
 
 This lane starts a real local `llama.cpp` server, waits for its health endpoint,
 and runs:
 
 ```bash
-zig build integration-test-live-model
+zig build system-test
 ```
 
 It is intentionally not part of `just test-integration-all` or `just test-all`.

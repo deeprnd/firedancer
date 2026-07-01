@@ -18,7 +18,7 @@ Read "Tickoni" here as:
 - `src/tickoni/schema`: Tickoni financial event, policy, audit, case, and
   capability schemas; protobuf sources live under `src/tickoni/schema/proto`
 - `src/tickoni/tiles`: Tickoni-owned tile implementations
-- `src/tickoni/demo`: deterministic CLI and test demo orchestration
+- `src/tickoni/test/demo`: deterministic CLI and test demo orchestration
 - `src/tickoni/connectors`: signed adapter manifests and adapter code, when
   that phase exists
 
@@ -41,7 +41,7 @@ in CLAUDE.md harder to enforce.
 | Protobuf wire definitions for canonical schemas | `src/tickoni/schema/proto/<domain>/` |
 | Binary, JSONL, protobuf, and hash codec implementations for canonical schemas | `src/tickoni/codec/` |
 | Tile-owned implementation code: request/response types used only within one tile, tile run loop, backend variants, validators, dispatchers | `src/tickoni/tiles/<tile>/` — use `types.zig` for pure type definitions, `messages.zig` for request/response message types |
-| Deterministic demo orchestration code imported by the CLI and multiple tests (for example the investment demo flow) | `src/tickoni/demo/<demo>/` |
+| Deterministic demo orchestration code imported by the CLI and multiple tests (for example the investment demo flow) | `src/tickoni/test/demo/<demo>/` |
 | Pure test doubles (`MockBackend`), HTTP mock servers, and other test-only helpers not needed in production | `src/tickoni/test/mocks/` |
 | Financial fixture data files (JSON, binary) used by demo and integration tests | `src/tickoni/test/fixtures/`; scenario data belongs under a `scenarios/` child directory |
 

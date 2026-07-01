@@ -286,7 +286,7 @@ Tickoni-owned areas:
 - `src/tickoni/tiles/`: Phase 0 payment pipeline tile logic
 - `src/tickoni/c_abi/`: narrow C ABI declarations for selected runtime primitives
 - `src/tickoni/codec/`: Tickoni-owned codec bindings and C codec implementations
-- `src/tickoni/demo/`: deterministic CLI/test demo orchestration
+- `src/tickoni/test/demo/`: deterministic CLI/test demo orchestration
 - `doc/knowledge`: Tickoni architecture
 - `doc/execution`: Build, security, testing, and observability
 - `doc/strategy`: Product and roadmap docs

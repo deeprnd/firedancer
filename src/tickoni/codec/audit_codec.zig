@@ -40,6 +40,10 @@ pub const PolicyDecisionPayload = extern struct {
     rule_id: u32,
     failed_scope_dim: [32]u8,
     source_event_hash: u64,
+    catalog_schema_version: u32,
+    taxonomy_id: [32]u8,
+    taxonomy_version: u32,
+    classification_code: [32]u8,
 };
 
 pub const ModelCallPayload = extern struct {
@@ -90,6 +94,10 @@ pub const DenialPayload = extern struct {
     action_class: [32]u8,
     reason_code: u32,
     failed_scope_dim: [32]u8,
+    catalog_schema_version: u32,
+    taxonomy_id: [32]u8,
+    taxonomy_version: u32,
+    classification_code: [32]u8,
 };
 
 pub const TelemetryCheckpointPayload = extern struct {

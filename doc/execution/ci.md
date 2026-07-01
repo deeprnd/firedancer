@@ -149,12 +149,12 @@ Contains long-running tests that require additional infrastructure or model asse
 
 **Engine E2E Tests** — condition is hard-coded `if: false && …`, so it never runs. Remove `false &&` to re-enable. When enabled it configures pages via the Tickoni-owned `.github/actions/memory-management` action (not the upstream `.github/actions/hugepages` action). The `memory-management` action wraps the `just mem-*` recipes and degrades gracefully when a free GitHub-hosted runner cannot reserve all requested gigantic/huge pages, whereas upstream `hugepages` targets persistent self-hosted runners and fails the step on a short reservation. Keeping a separate action lets the shared `hugepages` file track Firedancer upstream without merge conflicts.
 
-**LLM System Tests** — runs the explicit live-model compatibility lane against a real local `llama.cpp` server. Steps in order:
+**LLM System Tests** — runs the explicit system live-model lane against a real local `llama.cpp` server. Steps in order:
 
 1. Install `cmake`, `libopenblas-dev`, `libopenblas64-dev` via apt.
 2. `just infra-ensure-llamacpp` — resolves `llama.cpp` from `TK_LLAMA_CPP_DIR` when set, otherwise auto-detects `~/work/models/llama.cpp` first and then `~/work/git/llama.cpp`; if neither exists it clones `https://github.com/ggml-org/llama.cpp` into `~/work/models/llama.cpp`, builds for CPU with OpenBLAS via cmake, and copies `llama-*` binaries to the clone root.
 3. `just infra-ensure-model` — downloads the GGUF model via the `hf` CLI (Hugging Face Hub) if not already present.
-4. `just test-system-tk` — ensures llama.cpp and model are present, starts the server, runs `zig build integration-test-live-model`, and stops the server.
+4. `just test-system-tk` — ensures llama.cpp and model are present, starts the server, runs `zig build system-test`, and stops the server.
 
 The llama.cpp path and model path can be overridden with `TK_LLAMA_CPP_DIR`, `TK_HF_MODEL_DIR`, and `TK_HF_MODEL_FILE` environment variables (see `contrib/test/ensure_llama_cpp.sh` and `contrib/test/ensure_hf_model.sh`).
 

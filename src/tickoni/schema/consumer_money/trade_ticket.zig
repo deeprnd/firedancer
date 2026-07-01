@@ -87,6 +87,7 @@ pub const TicketLineItem = struct {
     ticker: [max_ticker_len]u8,
     ticker_len: u8,
     asset_class: thesis.AssetClass,
+    instrument_type: thesis.InstrumentType,
     venue: thesis.Venue,
     side: Side,
     quantity_micros: u64,
@@ -307,6 +308,7 @@ pub fn buildTradeTicket(
         ticket.line_items[i].ticker = instrument.ticker;
         ticket.line_items[i].ticker_len = instrument.ticker_len;
         ticket.line_items[i].asset_class = instrument.asset_class;
+        ticket.line_items[i].instrument_type = instrument.instrument_type;
         ticket.line_items[i].venue = quote.venue;
         ticket.line_items[i].side = request.side;
         ticket.line_items[i].quantity_micros = @intCast(quantity_micros);
@@ -381,6 +383,39 @@ fn expectedQuantityMicros(allocation_cents: i64, price_cents: i64) u64 {
         @as(i128, allocation_cents) * @as(i128, quantity_scale),
         @as(i128, price_cents),
     ));
+}
+
+test "buildMarketBuyTicket: line items carry instrument_type distinct from asset_class" {
+    const fixture = try buildTicketFixture(200_000, 9_500, 10_000);
+
+    const ticket = try buildMarketBuyTicket(
+        &fixture.proposed_basket,
+        &fixture.quotes,
+        fixture.affordability,
+        "ticket_ai_infra_2000_instrument_type",
+    );
+
+    try std.testing.expect(ticket.line_item_count > 0);
+    for (ticket.line_items[0..ticket.line_item_count], 0..) |line, i| {
+        try std.testing.expectEqual(
+            fixture.proposed_basket.instruments[i].instrument_type,
+            line.instrument_type,
+        );
+        try std.testing.expectEqual(
+            fixture.proposed_basket.instruments[i].asset_class,
+            line.asset_class,
+        );
+    }
+    // ai_infrastructure fixture includes both stock and ETF instruments,
+    // proving instrument_type is not inferred from asset_class or ticker.
+    var found_stock = false;
+    var found_etf = false;
+    for (ticket.line_items[0..ticket.line_item_count]) |line| {
+        if (line.instrument_type == .stock) found_stock = true;
+        if (line.instrument_type == .etf) found_etf = true;
+    }
+    try std.testing.expect(found_stock);
+    try std.testing.expect(found_etf);
 }
 
 test "buildMarketBuyTicket: oversized notional produces per-order block reason" {
