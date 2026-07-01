@@ -182,44 +182,19 @@ Practical rule of thumb:
 zig build test
 ```
 
-The current Zig test graph is defined in [build.zig](../../build.zig). It includes
-standalone test roots for:
+The boundary for this lane is the directory: every Tickoni-owned test root that
+is not under `src/tickoni/test/integration/` or `src/tickoni/test/system/` runs
+here. In practice that means the runtime, C ABI, and tile modules' own inline
+`test` blocks, all schema modules under `src/tickoni/schema/`, the supervisor
+binary, and everything under `src/tickoni/test/fixtures/`,
+`src/tickoni/test/mocks/`, and `src/tickoni/test/demo/` — fixture-contract
+tests, mock self-tests, and demo-module tests are unit-lane by directory even
+where they substitute an external system, because that substitution happens
+outside `src/tickoni/test/integration/`.
 
-- `src/tickoni/runtime/topology.zig`
-- `src/tickoni/runtime/tile.zig`
-- `src/tickoni/c_abi/queue.zig`
-- `src/tickoni/c_abi/sandbox.zig`
-- `src/tickoni/tiles/audit/mod.zig`
-- `src/tickoni/tiles/payment_pipeline/mod.zig`
-- `src/tickoni/tiles/case/mod.zig`
-- `src/tickoni/tiles/disp/mod.zig`
-- `src/tickoni/schema/classification/classification.zig`
-- `src/tickoni/schema/consumer_money/thesis.zig`
-- `src/tickoni/schema/consumer_money/catalog.zig`
-- `src/tickoni/schema/consumer_money/basket.zig`
-- `src/tickoni/schema/consumer_money/trade_ticket.zig`
-- `src/tickoni/schema/consumer_money/impact.zig`
-- `src/tickoni/schema/consumer_money/cards.zig`
-- `src/tickoni/schema/consumer_money/drift.zig`
-- `src/tickoni/schema/portfolio/portfolio.zig`
-- `src/tickoni/test/fixtures/portfolio/fixture_portfolio.zig`
-- `src/tickoni/tiles/model/mod.zig`
-- `src/tickoni/tiles/adapter/mod.zig`
-
-It also builds a supervisor test binary for:
-
-- `src/app/tickoni/supervisor.zig`
-
-The Phase 0 pipeline tests cover:
-
-- deterministic event hashing
-- bounded queue behavior
-- duplicate detection
-- policy allow and deny decisions
-- audited malformed payment rejection
-- append-only JSONL audit formatting
-- deterministic replay comparison
-- sandbox failure diagnostics
+The current Zig test graph is defined in [build.zig](../../build.zig); consult
+it for the exact current set of test roots rather than treating any list here
+as authoritative.
 
 ## Engine Unit Tests
 
@@ -268,19 +243,19 @@ and full-topology `integration-test` binaries.
 zig build integration-test
 ```
 
-This executes two real test binaries:
+The boundary for this lane is the directory: every test root under
+`src/tickoni/test/integration/` runs here, and nothing outside that directory
+does. Tickoni internals run through production-like paths (tile wiring,
+replay, audit, decision cards, transport wiring); model and adapter backends
+are substituted with fixture or local mock-server backends so no network calls
+leave the process. Fixture-contract tests and mock-server self-tests live
+elsewhere in the test tree and so run under `just test-unit-tk` instead, even
+where they substitute external systems the same way integration tests do —
+the directory, not the mocking style, decides the lane.
 
-- `src/tickoni/test/fixtures/investment/fixture_allowed_trade.zig` — fixture contract
-  tests for the schema pipeline (thesis → basket → portfolio) with external
-  systems replaced by recorded fixtures; no live model, adapter, or execution
-  call.
-- `src/tickoni/test/integration/test_investment_allowed_trade.zig` — tile-boundary integration
-  tests covering tkcase, tkdisp, tkagnt, replay, and audit scenarios. Tickoni
-  internals run through production-like paths; model and adapter backends are
-  substituted with fixture backends so no network calls are made.
-
-`just test-integration-all` composes both lanes so the aggregate command shape
-stays stable as coverage grows.
+`just test-integration-all` composes this lane with the current Tickoni
+integration wiring so the aggregate command shape stays stable as coverage
+grows.
 
 ## Explicit System Lane
 
@@ -296,6 +271,13 @@ and runs:
 ```bash
 zig build system-test
 ```
+
+The boundary for this lane is also the directory: every test root under
+`src/tickoni/test/system/` runs here, and nothing outside that directory does.
+Not every root in this directory needs the live server itself — a deterministic,
+fixture-backed proof can live here too if it belongs conceptually with the
+other system-level demo proofs — but all of them run together under this one
+lane because of where they live, not because of what each one mocks.
 
 It is intentionally not part of `just test-integration-all` or `just test-all`.
 The live model server, downloaded GGUF asset, and localhost HTTP surface make

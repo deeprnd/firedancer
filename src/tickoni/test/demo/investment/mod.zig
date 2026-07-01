@@ -108,6 +108,7 @@ pub const LiveModelEvidence = struct {
 pub const AllowedTradeScenarioResult = struct {
     basket: basket_mod.Basket,
     ticket: trade_ticket.TradeTicket,
+    portfolio_impact: impact.PortfolioImpact,
     decision_cards: cards.DecisionCardsContract,
     drift_contract: drift.DriftContract,
     replay_result: replay.ReplayVerification,
@@ -147,6 +148,7 @@ pub const CliReport = struct {
 
 pub const AllowedTradeInterfaceContract = struct {
     schema_version: u16 = 1,
+    portfolio_impact: impact.PortfolioImpact,
     decision_cards: cards.DecisionCardsContract,
     drift_contract: drift.DriftContract,
     replay_summary: struct {
@@ -164,6 +166,8 @@ pub fn allocAllowedTradeInterfaceJson(
     allocator: std.mem.Allocator,
     result: *const AllowedTradeScenarioResult,
 ) ![]u8 {
+    const portfolio_impact_json = try impact.allocPortfolioImpactJson(allocator, &result.portfolio_impact);
+    defer allocator.free(portfolio_impact_json);
     const decision_cards_json = try cards.allocDecisionCardsJson(allocator, &result.decision_cards);
     defer allocator.free(decision_cards_json);
     const drift_json = try drift.allocDriftContractJson(allocator, &result.drift_contract);
@@ -171,8 +175,9 @@ pub fn allocAllowedTradeInterfaceJson(
 
     return std.fmt.allocPrint(
         allocator,
-        "{{\"schema_version\":1,\"decision_cards\":{s},\"drift_contract\":{s},\"replay_summary\":{{\"replay_match\":{s},\"external_effects_disabled\":{s},\"divergence_count\":{d}}}}}",
+        "{{\"schema_version\":1,\"portfolio_impact\":{s},\"decision_cards\":{s},\"drift_contract\":{s},\"replay_summary\":{{\"replay_match\":{s},\"external_effects_disabled\":{s},\"divergence_count\":{d}}}}}",
         .{
+            portfolio_impact_json,
             decision_cards_json,
             drift_json,
             boolLabel(result.replay_result.replay_match),
@@ -487,6 +492,7 @@ pub fn runAllowedTradeScenario(
     return .{
         .basket = basket,
         .ticket = ticket,
+        .portfolio_impact = contracts.portfolio_impact,
         .decision_cards = contracts.decision_cards,
         .drift_contract = contracts.drift_contract,
         .replay_result = replay_result,
@@ -936,8 +942,16 @@ test "runAllowedTradeScenario persists and exposes decision cards and drift cont
     try std.testing.expect(result.drift_contract.thesis_drift.has_drift);
     try std.testing.expect(result.drift_contract.payment_drift.has_drift);
 
+    // The supplier payout is a pending obligation in the same combined
+    // impact payload as the trade, and it stays approval-required.
+    try std.testing.expectEqual(supplier_payout_amount_cents, result.portfolio_impact.pending_obligations_after_cents);
+    try std.testing.expect(result.portfolio_impact.any_approval_required);
+    try std.testing.expect(result.portfolio_impact.explanation_count > 0);
+
     const json = try allocAllowedTradeInterfaceJson(std.testing.allocator, &result);
     defer std.testing.allocator.free(json);
+    try std.testing.expect(std.mem.indexOf(u8, json, "\"portfolio_impact\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, json, "\"explanations\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, json, "\"decision_cards\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, json, "\"drift_contract\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, json, "\"rebalance_suggestion\"") != null);
@@ -945,6 +959,7 @@ test "runAllowedTradeScenario persists and exposes decision cards and drift cont
 }
 
 const AllowedTradeContracts = struct {
+    portfolio_impact: impact.PortfolioImpact,
     decision_cards: cards.DecisionCardsContract,
     drift_contract: drift.DriftContract,
 };
@@ -955,21 +970,37 @@ fn buildAllowedTradeContracts(
     basket: *const basket_mod.Basket,
     execution: *const trade_ticket.PaperExecutionResult,
 ) !AllowedTradeContracts {
+    // The supplier payout is part of the same decision payload as the trade
+    // (V1.3.S4.T3), so it is included as a pending obligation in the
+    // combined portfolio/cash impact even though the trade itself does not
+    // change its approval or cash state.
+    const payout_obligation = impact.PendingObligation{
+        .proposal_id = supplier_payout_proposal_id,
+        .rail = .ach,
+        .destination_id = 9001,
+        .amount_cents = supplier_payout_amount_cents,
+        .approval_state = .pending,
+        .expires_at_ns = supplier_payout_expires_at_ns,
+    };
+    const pending_obligations = [_]impact.PendingObligation{payout_obligation};
+
     const target_impact = impact.computePreTradeImpact(
         account_before,
         basket,
-        &[_]impact.PendingObligation{},
+        &pending_obligations,
         demo_cash_buffer_threshold_cents,
         decision_cards_now_ns,
     );
-    const realized_impact = impact.computeRealizedTradeImpact(
+    var realized_impact = impact.computeRealizedTradeImpact(
         account_before,
         basket,
         execution.total_filled_cents,
-        &[_]impact.PendingObligation{},
+        &pending_obligations,
         demo_cash_buffer_threshold_cents,
         decision_cards_now_ns,
     );
+    const policy_max_single_name_bp: u32 = @as(u32, input.max_single_name_pct) * 100;
+    impact.generateExplanations(&realized_impact, policy_max_single_name_bp);
 
     var store = cards.DecisionCardsStore{};
     store.saveThesisCard(try cards.buildThesisCard(
@@ -982,14 +1013,6 @@ fn buildAllowedTradeContracts(
         decision_cards_now_ns,
     ));
 
-    const payout_obligation = impact.PendingObligation{
-        .proposal_id = supplier_payout_proposal_id,
-        .rail = .ach,
-        .destination_id = 9001,
-        .amount_cents = supplier_payout_amount_cents,
-        .approval_state = .pending,
-        .expires_at_ns = supplier_payout_expires_at_ns,
-    };
     store.saveMoneyProposalCard(try cards.buildMoneyProposalCard(
         &payout_obligation,
         supplier_payout_source_event,
@@ -1032,6 +1055,7 @@ fn buildAllowedTradeContracts(
     );
 
     return .{
+        .portfolio_impact = realized_impact,
         .decision_cards = decision_cards,
         .drift_contract = .{
             .thesis_drift = thesis_drift,
