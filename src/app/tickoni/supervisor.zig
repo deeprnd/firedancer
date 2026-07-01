@@ -51,6 +51,9 @@ const ProcessState = struct {
     /// Parent-side cnc joins, used to send the halt signal during stop.
     cncs: [8]?*c_abi.cnc.Cnc,
     children: [8]?std.process.Child,
+    /// V1.14.S1.T14 visibility: whether this run's layout is shared-core
+    /// and how many tiles are exclusive/shared/floating.
+    placement_report: rt.cpu_placement.PlacementReport,
 
     /// Kills any still-running children, leaves cnc joins, detaches the
     /// workspace, and frees owned buffers. Safe to call with a partially
@@ -142,26 +145,17 @@ pub const Supervisor = struct {
     pub fn startPaymentPipelineProcess(self: *Supervisor, io: std.Io, config: ProcessPipelineConfig) !void {
         std.debug.assert(self.process_state == null);
         std.debug.assert(self.topo.tiles.len == 8);
-        try self.topo.validate();
 
         // Fail closed on any tile pinned to a CPU id this process cannot
-        // actually use, before spawning anything. Pinning more exclusive
-        // or shared tiles than real cores exist (or above the process's
-        // own affinity mask) has driven this host unresponsive before —
-        // the full CPU placement policy (declared-shared vs. undeclared
-        // oversubscription diagnostics) lands in V1.14.S1 M5, but this
-        // minimal available-CPU guard is required before any process-mode
-        // topology with exclusive/shared placement can be started safely.
+        // actually use, before spawning anything — pinning more
+        // exclusive/shared tiles than real cores exist (or above this
+        // process's own affinity mask) has driven this host unresponsive
+        // before. Also runs topo.validate()'s structural checks (duplicate
+        // exclusive ids, channel/depth/MTU shape) and reports the
+        // resulting layout for diagnostics visibility (V1.14.S1.T14).
         var available_cpus: c_abi.process.CpuSet = undefined;
         try c_abi.process.getAffinity(0, &available_cpus);
-        for (self.topo.tiles) |tile| {
-            switch (tile.cpu_placement) {
-                .exclusive, .shared => |cpu| {
-                    if (!c_abi.process.isSet(&available_cpus, cpu)) return error.CpuUnavailable;
-                },
-                .floating => {},
-            }
-        }
+        const placement_report = try rt.cpu_placement.validate(self.topo, &available_cpus);
 
         try c_abi.boot.bootWithSyntheticArgv(config.run_dir);
 
@@ -208,6 +202,7 @@ pub const Supervisor = struct {
             .cnc_gaddrs = [_]usize{0} ** 8,
             .cncs = [_]?*c_abi.cnc.Cnc{null} ** 8,
             .children = [_]?std.process.Child{null} ** 8,
+            .placement_report = placement_report,
         };
         self.process_state = state;
         errdefer {
@@ -350,6 +345,15 @@ pub const Supervisor = struct {
         denied: u64 = 0,
         audited: u64 = 0,
     };
+
+    /// V1.14.S1.T14 visibility: the CPU placement layout validated at
+    /// start time (exclusive/shared/floating counts and whether the
+    /// layout is shared-core). Null when no process-mode pipeline has
+    /// been started.
+    pub fn processPlacementReport(self: *const Supervisor) ?rt.cpu_placement.PlacementReport {
+        const state = self.process_state orelse return null;
+        return state.placement_report;
+    }
 
     pub fn snapshotProcessMetrics(self: *const Supervisor) ProcessMetricSnapshot {
         const state = self.process_state orelse return .{};

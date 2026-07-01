@@ -371,6 +371,19 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(shm_link_test).step);
 
+    // cpu_placement.zig imports c_abi for the live-CPU-set check.
+    const cpu_placement_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/cpu_placement.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "c_abi", .module = c_abi_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(cpu_placement_test).step);
+
     // launch_spec.zig embeds shm_link.LinkHandles, which imports c_abi.
     const launch_spec_test = b.addTest(.{
         .root_module = b.createModule(.{
@@ -815,6 +828,26 @@ pub fn build(b: *std.Build) void {
     // installed first.
     run_process_pipeline_test.step.dependOn(&b.addInstallArtifact(exe, .{}).step);
     integration_step.dependOn(&run_process_pipeline_test.step);
+
+    // V1.14.S1 M5: explicit shared-core CPU placement and the
+    // CPU-unavailable fail-closed path, both through the real supervisor.
+    const process_cpu_placement_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/integration/test_process_cpu_placement.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "runtime", .module = runtime_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "supervisor", .module = supervisor_named_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, process_cpu_placement_test, fd_lib_dir);
+    linkTickoniTango(b, process_cpu_placement_test, fd_lib_dir);
+    const run_process_cpu_placement_test = b.addRunArtifact(process_cpu_placement_test);
+    run_process_cpu_placement_test.step.dependOn(&b.addInstallArtifact(exe, .{}).step);
+    integration_step.dependOn(&run_process_cpu_placement_test.step);
 
     // Mock HTTP servers (test/mocks): self-tests of the mock
     // infrastructure itself, no tile schema imports required. Wired to
