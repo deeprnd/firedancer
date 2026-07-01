@@ -10,6 +10,10 @@ inputs:
     description: Compiler version for Firedancer deps setup
     required: false
     default: system
+  configure-hugepages:
+    description: Configure hugepages for jobs that need gigantic-page-backed tests
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -25,6 +29,7 @@ runs:
       uses: ./.github/actions/cpusonline
 
     - name: Configure hugepages
+      if: inputs.configure-hugepages == 'true'
       uses: ./.github/actions/hugepages
       with:
         count_gigantic: 6
