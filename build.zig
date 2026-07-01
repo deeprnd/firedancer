@@ -651,7 +651,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const investment_audit_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/demo/investment/audit_trace.zig"),
+        .root_source_file = b.path("src/tickoni/test/demo/investment/audit_trace.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -666,7 +666,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const investment_support_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/demo/investment/support.zig"),
+        .root_source_file = b.path("src/tickoni/test/demo/investment/support.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -676,7 +676,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const investment_demo_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/demo/investment/mod.zig"),
+        .root_source_file = b.path("src/tickoni/test/demo/investment/mod.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
