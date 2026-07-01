@@ -320,7 +320,11 @@ pub const Supervisor = struct {
                         self.handles[i].crashed_because = .exit_code;
                     }
                 },
-                .signal, .stopped, .unknown => {
+                .signal => {
+                    self.handles[i].state = .crashed;
+                    self.handles[i].crashed_because = .signal;
+                },
+                .stopped, .unknown => {
                     self.handles[i].state = .crashed;
                     self.handles[i].crashed_because = .exit_code;
                 },

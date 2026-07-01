@@ -19,6 +19,11 @@ pub const CrashReason = enum {
     /// The tile's cnc object reached FD_CNC_SIGNAL_FAIL or stopped
     /// heartbeating (process mode only).
     cnc_fail,
+    /// Process was terminated by a signal (e.g. SIGKILL), process mode
+    /// only. Distinct from exit_code because the tile never got to exit
+    /// on its own terms — a forced-kill/OOM-style death rather than a
+    /// self-detected failure.
+    signal,
 };
 
 /// Runtime handle for one tile managed by the supervisor.

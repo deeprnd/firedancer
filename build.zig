@@ -849,6 +849,43 @@ pub fn build(b: *std.Build) void {
     run_process_cpu_placement_test.step.dependOn(&b.addInstallArtifact(exe, .{}).step);
     integration_step.dependOn(&run_process_cpu_placement_test.step);
 
+    // V1.14.S1 M6: process isolation (T13: one OS process per tile,
+    // parented by the supervisor), crash isolation (T12: SIGKILL one
+    // tile, siblings unaffected), and the remaining process-mode
+    // fail-closed configuration checks.
+    //
+    // NOT YET WIRED into integration_step: adding this test target's run
+    // step as an integration_step dependency causes an EARLIER, unrelated,
+    // unchanged test (test_process_pipeline_test) to hang indefinitely,
+    // reproduced 100% of the time. Confirmed NOT caused by this file's own
+    // logic (the hang reproduces even before this test binary itself ever
+    // starts running) and NOT caused by host state drift (HEAD alone, with
+    // this test target absent entirely, stays fast and green after the
+    // same long session). Prime suspect: the three process-mode
+    // integration tests each call b.addInstallArtifact(exe, .{}) separately
+    // for the same zig-out/bin/tickoni-supervisor destination; a race
+    // between one test's install step and another's already-spawned
+    // children exec'ing that path is unconfirmed but unruled-out. Needs
+    // fresh investigation (try a single shared install step reused by all
+    // three tests first) before wiring this in.
+    const process_topology_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/integration/test_process_topology.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "runtime", .module = runtime_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "supervisor", .module = supervisor_named_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, process_topology_test, fd_lib_dir);
+    linkTickoniTango(b, process_topology_test, fd_lib_dir);
+    const run_process_topology_test = b.addRunArtifact(process_topology_test);
+    run_process_topology_test.step.dependOn(&b.addInstallArtifact(exe, .{}).step);
+    _ = &run_process_topology_test;
+
     // Mock HTTP servers (test/mocks): self-tests of the mock
     // infrastructure itself, no tile schema imports required. Wired to
     // test_step (not integration_step): src/tickoni/test/integration is the
