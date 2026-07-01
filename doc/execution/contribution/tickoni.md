@@ -38,8 +38,8 @@ in CLAUDE.md harder to enforce.
 | Binary, JSONL, protobuf, and hash codec implementations for canonical schemas | `src/tickoni/codec/` |
 | Tile-owned implementation code: request/response types used only within one tile, tile run loop, backend variants, validators, dispatchers | `src/tickoni/tiles/<tile>/` — use `types.zig` for pure type definitions, `messages.zig` for request/response message types |
 | Reusable scenario orchestration code imported by the CLI and multiple tests (e.g. investment demo flow) | `src/tickoni/scenarios/<scenario>/` |
-| Pure test doubles (`MockBackend`), HTTP mock servers, and other test-only helpers not needed in production | `src/tickoni/test_support/` |
-| Financial fixture data files (JSON, binary) used by scenario and integration tests | `src/tickoni/test_support/fixtures/` or scenario-owned fixture paths |
+| Pure test doubles (`MockBackend`), HTTP mock servers, and other test-only helpers not needed in production | `src/tickoni/test/mocks/` |
+| Financial fixture data files (JSON, binary) used by scenario and integration tests | `src/tickoni/test/fixtures/` or scenario-owned fixture paths |
 
 ### Naming rules within a tile directory
 

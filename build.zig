@@ -31,7 +31,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const audit_fixtures_gen_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/test/audit_fixtures_gen.zig"),
+        .root_source_file = b.path("src/tickoni/test/fixtures/audit_fixtures_gen.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -97,7 +97,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const portfolio_fixtures_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/test_support/fixtures/portfolio_fixtures.zig"),
+        .root_source_file = b.path("src/tickoni/test/fixtures/portfolio/portfolio_fixtures.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -141,6 +141,45 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "basket", .module = basket_mod },
             .{ .name = "cards", .module = cards_mod },
+        },
+    });
+
+    // Tile-local message types promoted to singleton modules solely so that
+    // src/tickoni/test/mocks/*_mock.zig (pure test doubles, not part of a
+    // tile's production surface) can reference the exact same request/response
+    // types used by each tile's own Backend union, without an import cycle.
+    const model_messages_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/model/messages.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const model_mock_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test/mocks/model_mock.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "model_messages", .module = model_messages_mod },
+        },
+    });
+    const adapter_messages_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/adapter/messages.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_mod },
+            .{ .name = "portfolio", .module = portfolio_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_mod },
+        },
+    });
+    const adapter_mock_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test/mocks/adapter_mock.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "portfolio", .module = portfolio_mod },
+            .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_mod },
+            .{ .name = "adapter_messages", .module = adapter_messages_mod },
         },
     });
 
@@ -287,7 +326,7 @@ pub fn build(b: *std.Build) void {
 
     const portfolio_fixtures_test = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test_support/fixtures/portfolio_fixtures.zig"),
+            .root_source_file = b.path("src/tickoni/test/fixtures/portfolio/portfolio_fixtures.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -299,11 +338,18 @@ pub fn build(b: *std.Build) void {
     linkTickoniCodec(b, portfolio_fixtures_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(portfolio_fixtures_test).step);
 
+    const model_messages_test = b.addTest(.{ .root_module = model_messages_mod });
+    test_step.dependOn(&b.addRunArtifact(model_messages_test).step);
+
     // model tile: unit tests are mock/fixture-backed and must not start servers.
     const model_test_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "model_messages", .module = model_messages_mod },
+            .{ .name = "model_mock", .module = model_mock_mod },
+        },
     });
     const model_test = b.addTest(.{
         .root_module = model_test_mod,
@@ -330,12 +376,17 @@ pub fn build(b: *std.Build) void {
             .{ .name = "portfolio", .module = portfolio_mod },
             .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_mod },
+            .{ .name = "adapter_messages", .module = adapter_messages_mod },
+            .{ .name = "adapter_mock", .module = adapter_mock_mod },
         },
     });
     const adapter_test = b.addTest(.{
         .root_module = adapter_test_mod,
     });
     test_step.dependOn(&b.addRunArtifact(adapter_test).step);
+
+    const adapter_mock_test = b.addTest(.{ .root_module = adapter_mock_mod });
+    test_step.dependOn(&b.addRunArtifact(adapter_mock_test).step);
 
     // trade_ticket.zig imports basket, portfolio, portfolio_fixtures, and thesis.
     const trade_ticket_test = b.addTest(.{
@@ -456,9 +507,11 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "adapter", .module = adapter_test_mod },
+                .{ .name = "adapter_mock", .module = adapter_mock_mod },
                 .{ .name = "basket", .module = basket_mod },
                 .{ .name = "disp", .module = disp_unit_mod },
                 .{ .name = "model", .module = model_test_mod },
+                .{ .name = "model_mock", .module = model_mock_mod },
                 .{ .name = "portfolio", .module = portfolio_mod },
                 .{ .name = "tkpoly", .module = tkpoly_test_mod },
                 .{ .name = "tool", .module = tool_test_mod },
@@ -526,6 +579,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "model_messages", .module = model_messages_mod },
+            .{ .name = "model_mock", .module = model_mock_mod },
+        },
     });
     const adapter_int_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/adapter/mod.zig"),
@@ -536,6 +593,8 @@ pub fn build(b: *std.Build) void {
             .{ .name = "portfolio", .module = portfolio_mod },
             .{ .name = "portfolio_fixtures", .module = portfolio_fixtures_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_mod },
+            .{ .name = "adapter_messages", .module = adapter_messages_mod },
+            .{ .name = "adapter_mock", .module = adapter_mock_mod },
         },
     });
     const tool_int_mod = b.createModule(.{
@@ -566,9 +625,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "adapter", .module = adapter_int_mod },
+            .{ .name = "adapter_mock", .module = adapter_mock_mod },
             .{ .name = "basket", .module = basket_mod },
             .{ .name = "disp", .module = disp_int_mod },
             .{ .name = "model", .module = model_int_mod },
+            .{ .name = "model_mock", .module = model_mock_mod },
             .{ .name = "portfolio", .module = portfolio_mod },
             .{ .name = "tkpoly", .module = tkpoly_int_mod },
             .{ .name = "tool", .module = tool_int_mod },
@@ -671,15 +732,15 @@ pub fn build(b: *std.Build) void {
         integration_step.dependOn(&b.addRunArtifact(integration_test).step);
     }
 
-    // Mock HTTP servers (test_support/http): self-tests of the mock
+    // Mock HTTP servers (test/mocks): self-tests of the mock
     // infrastructure itself, no tile schema imports required.
     const mock_http_support_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/test_support/http/mock_http_support.zig"),
+        .root_source_file = b.path("src/tickoni/test/mocks/mock_http_support.zig"),
         .target = target,
         .optimize = optimize,
     });
     const mock_broker_market_server_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/test_support/http/mock_broker_market_server.zig"),
+        .root_source_file = b.path("src/tickoni/test/mocks/mock_broker_market_server.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -687,7 +748,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const mock_openai_server_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/test_support/http/mock_openai_server.zig"),
+        .root_source_file = b.path("src/tickoni/test/mocks/mock_openai_server.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -696,7 +757,7 @@ pub fn build(b: *std.Build) void {
     });
     const mock_servers_test = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test_support/http/mock_servers.zig"),
+            .root_source_file = b.path("src/tickoni/test/mocks/mock_servers.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -922,7 +983,7 @@ pub fn build(b: *std.Build) void {
     const portfolio_fixtures_cov_test = b.addTest(.{
         .name = "test-portfolio-fixtures",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test_support/fixtures/portfolio_fixtures.zig"),
+            .root_source_file = b.path("src/tickoni/test/fixtures/portfolio/portfolio_fixtures.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{

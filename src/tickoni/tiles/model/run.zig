@@ -1,5 +1,5 @@
 const std = @import("std");
-const schema = @import("messages.zig");
+const schema = @import("model_messages");
 const validator = @import("validator.zig");
 const backend_mod = @import("backend.zig");
 
