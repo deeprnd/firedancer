@@ -3,8 +3,8 @@
 /// Imports portfolio.zig for types and functions; does not export them.
 /// Consumers that need BrokerageAccount etc. import portfolio directly.
 const std = @import("std");
-const portfolio = @import("portfolio.zig");
-const basket_mod = @import("basket.zig");
+const portfolio = @import("portfolio");
+const basket_mod = @import("basket");
 
 const BrokerageAccount = portfolio.BrokerageAccount;
 const Holding = portfolio.Holding;

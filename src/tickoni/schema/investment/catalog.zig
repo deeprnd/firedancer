@@ -11,7 +11,7 @@
 /// produces audit records, it stamps the catalog version that was consulted so
 /// replay can detect classification drift.
 const std = @import("std");
-const thesis = @import("thesis.zig");
+const thesis = @import("thesis");
 
 pub const AssetClass = thesis.AssetClass;
 pub const InstrumentType = thesis.InstrumentType;

@@ -193,10 +193,16 @@ standalone test roots for:
 - `src/tickoni/tiles/payment_pipeline/mod.zig`
 - `src/tickoni/tiles/case/mod.zig`
 - `src/tickoni/tiles/disp/mod.zig`
-- `src/tickoni/schema/thesis.zig`
-- `src/tickoni/schema/catalog.zig`
-- `src/tickoni/schema/basket.zig`
-- `src/tickoni/schema/portfolio.zig`
+- `src/tickoni/schema/classification/classification.zig`
+- `src/tickoni/schema/investment/thesis.zig`
+- `src/tickoni/schema/investment/catalog.zig`
+- `src/tickoni/schema/investment/basket.zig`
+- `src/tickoni/schema/investment/trade_ticket.zig`
+- `src/tickoni/schema/investment/impact.zig`
+- `src/tickoni/schema/investment/cards.zig`
+- `src/tickoni/schema/investment/drift.zig`
+- `src/tickoni/schema/portfolio/portfolio.zig`
+- `src/tickoni/test_support/fixtures/portfolio_fixtures.zig`
 - `src/tickoni/tiles/model/mod.zig`
 - `src/tickoni/tiles/adapter/mod.zig`
 
