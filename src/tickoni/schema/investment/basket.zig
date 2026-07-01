@@ -12,11 +12,11 @@
 /// independent of the source thesis.
 ///
 /// Canonical encoding: binary protobuf.  Wire format is defined in
-/// src/tickoni/schema/basket.proto; breaking changes are enforced by buf
+/// src/tickoni/schema/investment/basket.proto; breaking changes are enforced by buf
 /// in CI (quality-check-proto / proto_check.yml).
 const std = @import("std");
-const thesis = @import("thesis.zig");
-const cat = @import("catalog.zig");
+const thesis = @import("thesis");
+const cat = @import("catalog");
 const thesis_cabi = @import("thesis_cabi");
 const basket_proto = @embedFile("basket.proto");
 
