@@ -1,7 +1,7 @@
 const std = @import("std");
-const broker_mock = @import("mock_broker_market_server.zig");
-const http_support = @import("mock_http_support.zig");
-const openai_mock = @import("mock_openai_server.zig");
+const broker_mock = @import("mock_broker_market_server");
+const http_support = @import("mock_http_support");
+const openai_mock = @import("mock_openai_server");
 
 fn fetchText(allocator: std.mem.Allocator, io: std.Io, url: []const u8, method: std.http.Method, payload: ?[]const u8) ![]u8 {
     var client = std.http.Client{ .allocator = allocator, .io = io };

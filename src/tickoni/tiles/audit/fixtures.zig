@@ -220,7 +220,7 @@ fn cwrite(f: *std.c.FILE, s: []const u8) void {
 }
 
 fn writeFixtureFile() !void {
-    const path = "src/tickoni/test/audit_fixtures_gen.zig";
+    const path = "src/tickoni/test/fixtures/audit_fixtures_gen.zig";
     const f = std.c.fopen(path, "w") orelse return error.FileOpenFailed;
     defer _ = std.c.fclose(f);
 

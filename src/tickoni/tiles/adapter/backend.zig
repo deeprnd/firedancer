@@ -3,10 +3,12 @@ const basket = @import("basket");
 const portfolio = @import("portfolio");
 const portfolio_fixtures = @import("portfolio_fixtures");
 const trade_ticket = @import("trade_ticket");
-const schema = @import("messages.zig");
-const mock_module = @import("mock.zig");
+const schema = @import("adapter_messages");
+const mock_module = @import("adapter_mock");
 
-pub const MockBackend = mock_module.MockBackend;
+// MockBackend is a pure test double; its definition lives in
+// src/tickoni/test/mocks/adapter_mock.zig, not in this tile.
+const MockBackend = mock_module.MockBackend;
 
 fn tickerBuf(comptime s: []const u8) [portfolio.max_ticker_len]u8 {
     var buf = [_]u8{0} ** portfolio.max_ticker_len;

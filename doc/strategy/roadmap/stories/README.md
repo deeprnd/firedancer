@@ -61,6 +61,7 @@ Use these project docs to fill and implement issues:
 || [V1.18](v1.18.md) | Replay Proof Bundle And Evidence Integrity |
 || [V1.19](v1.19.md) | Tickoni Terminal CaseOps UI |
 || [V1.20](v1.20.md) | Guarded Crypto Transfers |
+|| [V1.21](v1.21.md) | Cross-Platform Retail Runtime Support |
 
 ## How Roadmap Files Are Organized
 

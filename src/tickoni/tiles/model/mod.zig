@@ -1,6 +1,6 @@
 const backend = @import("backend.zig");
 const run_mod = @import("run.zig");
-const schema = @import("messages.zig");
+const schema = @import("model_messages");
 const validator = @import("validator.zig");
 
 pub const SamplingParams = schema.SamplingParams;
@@ -19,7 +19,6 @@ pub const buildProviderRequest = validator.buildProviderRequest;
 pub const TkModlResult = run_mod.TkModlResult;
 pub const runTkModlRequest = run_mod.runTkModlRequest;
 
-pub const MockBackend = backend.MockBackend;
 pub const FixtureBackend = backend.FixtureBackend;
 pub const HttpBackend = backend.HttpBackend;
 pub const ReplayEntry = backend.ReplayEntry;
@@ -29,7 +28,6 @@ pub const hashProviderRequest = backend.hashProviderRequest;
 pub const Backend = backend.Backend;
 
 test {
-    _ = @import("messages.zig");
     _ = @import("backend.zig");
     _ = @import("validator.zig");
     _ = @import("run.zig");

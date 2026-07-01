@@ -1,5 +1,5 @@
 const std = @import("std");
-const support = @import("mock_http_support.zig");
+const support = @import("mock_http_support");
 
 pub const Config = struct {
     health_body: []const u8 = "ok",
