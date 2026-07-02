@@ -25,12 +25,20 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    // Generic, Tickoni-domain-free Linux utility bindings (CPU affinity,
+    // clock, process primitives). No knowledge of tiles or topology.
+    const util_mod = b.addModule("util", .{
+        .root_source_file = b.path("src/tickoni/util/util.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const runtime_mod = b.addModule("runtime", .{
         .root_source_file = b.path("src/tickoni/runtime/runtime.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "util", .module = util_mod },
         },
     });
     // Concrete Tickoni product topologies (src/app/tickoni/topologies.zig),
@@ -229,6 +237,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "tiles", .module = tiles_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "util", .module = util_mod },
             .{ .name = "topologies", .module = topologies_named_mod },
         },
     });
@@ -256,9 +265,8 @@ pub fn build(b: *std.Build) void {
     for ([_][]const u8{
         "src/tickoni/runtime/topology.zig",
         "src/tickoni/runtime/tile.zig",
-        "src/tickoni/runtime/cpu.zig",
-        "src/tickoni/runtime/cpu_placement.zig",
-        "src/tickoni/runtime/process.zig",
+        "src/tickoni/util/cpu.zig",
+        "src/tickoni/util/process.zig",
         "src/tickoni/runtime/sandbox.zig",
         "src/tickoni/c_abi/ballet.zig",
         "src/tickoni/c_abi/queue.zig",
@@ -421,6 +429,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "util", .module = util_mod },
             },
         }),
     });
@@ -453,6 +462,20 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniFiredancer(b, cnc_counters_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(cnc_counters_test).step);
+
+    // cpu_placement.zig imports util (for the CpuSet primitive) alongside
+    // its sibling topology.zig.
+    const cpu_placement_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/cpu_placement.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "util", .module = util_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(cpu_placement_test).step);
 
     // launch_spec.zig embeds shm_link.LinkHandles, which imports c_abi.
     const launch_spec_test = b.addTest(.{
@@ -674,6 +697,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "tiles", .module = tiles_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "util", .module = util_mod },
             .{ .name = "topologies", .module = topologies_named_mod },
         },
     });
@@ -688,6 +712,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "tiles", .module = tiles_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "util", .module = util_mod },
             .{ .name = "topologies", .module = topologies_named_mod },
         },
     });
@@ -912,6 +937,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "util", .module = util_mod },
                 .{ .name = "supervisor", .module = supervisor_named_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
             },
@@ -933,6 +959,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "util", .module = util_mod },
                 .{ .name = "supervisor", .module = supervisor_named_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
             },
@@ -956,6 +983,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "util", .module = util_mod },
                 .{ .name = "supervisor", .module = supervisor_named_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
             },
@@ -978,6 +1006,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "util", .module = util_mod },
                 .{ .name = "supervisor", .module = supervisor_named_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
             },
@@ -1000,6 +1029,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "util", .module = util_mod },
             },
         }),
     });
@@ -1197,9 +1227,9 @@ pub fn build(b: *std.Build) void {
         .{ "test-fseq", "src/tickoni/c_abi/fseq.zig" },
         .{ "test-cnc", "src/tickoni/c_abi/cnc.zig" },
         .{ "test-wksp", "src/tickoni/c_abi/wksp.zig" },
-        .{ "test-cpu", "src/tickoni/runtime/cpu.zig" },
+        .{ "test-cpu", "src/tickoni/util/cpu.zig" },
         .{ "test-cpu-placement", "src/tickoni/runtime/cpu_placement.zig" },
-        .{ "test-process", "src/tickoni/runtime/process.zig" },
+        .{ "test-process", "src/tickoni/util/process.zig" },
         .{ "test-sandbox-config", "src/tickoni/runtime/sandbox.zig" },
         .{ "test-cnc-counters", "src/tickoni/runtime/cnc_counters.zig" },
         .{ "test-audit", "src/tickoni/tiles/audit/mod.zig" },
@@ -1235,6 +1265,15 @@ pub fn build(b: *std.Build) void {
                     .optimize = optimize,
                     .imports = &.{
                         .{ .name = "c_abi", .module = c_abi_mod },
+                    },
+                })
+            else if (std.mem.eql(u8, entry[1], "src/tickoni/runtime/cpu_placement.zig"))
+                b.createModule(.{
+                    .root_source_file = b.path(entry[1]),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "util", .module = util_mod },
                     },
                 })
             else
@@ -1392,6 +1431,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "tiles", .module = tiles_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "util", .module = util_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
             },
         }),

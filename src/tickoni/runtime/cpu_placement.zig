@@ -2,9 +2,9 @@
 /// against this host's live CPU set. Tickoni-owned policy layered on top
 /// of Firedancer substrate, not a Firedancer validator auto-layout concept
 /// (see doc/knowledge/tile-topology.md's "Process And Core Placement
-/// Boundary"). Combines cpu.zig's live-host affinity primitive with
-/// topology.zig's static schema; neither of those two files depends on the
-/// other or on this one.
+/// Boundary"). Combines util.cpu's live-host affinity primitive with
+/// topology.zig's static schema; neither of those two depends on the
+/// other or on this file.
 ///
 /// Topology.validate() (topology.zig) already covers the static,
 /// host-independent structural checks: two tiles claiming the same
@@ -15,7 +15,7 @@
 /// supervisor/diagnostics visibility (V1.14.S1.T14: shared-core placement
 /// must stay explicit, not an implicit auto-layout).
 const std = @import("std");
-const cpu = @import("cpu.zig");
+const cpu = @import("util").cpu;
 const topology = @import("topology.zig");
 
 pub const Topology = topology.Topology;
@@ -92,7 +92,7 @@ fn requireAvailable(available_cpus: *const cpu.CpuSet, cpu_id: u16) !void {
 
 // ---------------------------------------------------------------------------
 // Tests — pure logic against synthetic CpuSet values; no real host
-// affinity queried (matches cpu.zig's own test style).
+// affinity queried (matches util/cpu.zig's own test style).
 // ---------------------------------------------------------------------------
 
 const TileId = topology.TileId;

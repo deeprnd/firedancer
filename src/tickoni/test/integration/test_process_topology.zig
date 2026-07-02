@@ -7,6 +7,7 @@ const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
 const supervisor_mod = @import("supervisor");
+const util = @import("util");
 const topologies = @import("topologies");
 
 const Supervisor = supervisor_mod.Supervisor;
@@ -81,7 +82,7 @@ test "process_topology_integration: every tile is a distinct OS process parented
     var poll: u32 = 0;
     while (poll < max_polls) : (poll += 1) {
         if (sup.snapshotProcessMetrics().audited >= event_count) break;
-        rt.process.sleepNanos(5 * std.time.ns_per_ms);
+        util.process.sleepNanos(5 * std.time.ns_per_ms);
     }
     try std.testing.expectEqual(event_count, sup.snapshotProcessMetrics().audited);
 
@@ -128,7 +129,7 @@ test "process_topology_integration: SIGKILL on one tile is reported by identity 
     var poll: u32 = 0;
     while (poll < max_polls) : (poll += 1) {
         if (sup.snapshotProcessMetrics().audited >= event_count) break;
-        rt.process.sleepNanos(5 * std.time.ns_per_ms);
+        util.process.sleepNanos(5 * std.time.ns_per_ms);
     }
     const metrics = sup.snapshotProcessMetrics();
 

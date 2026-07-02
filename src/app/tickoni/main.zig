@@ -2,6 +2,7 @@ const std = @import("std");
 const File = std.Io.File;
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
+const util = @import("util");
 const supervisor_mod = @import("supervisor.zig");
 const Supervisor = supervisor_mod.Supervisor;
 const ProcessPipelineConfig = supervisor_mod.ProcessPipelineConfig;
@@ -141,7 +142,7 @@ fn cmdStartProcess(init: std.process.Init, topo: rt.topology.Topology, run_dir: 
     var poll: u32 = 0;
     while (poll < max_polls) : (poll += 1) {
         if (sup.snapshotProcessMetrics().audited >= process_config.event_count) break;
-        rt.process.sleepNanos(poll_interval_ns);
+        util.process.sleepNanos(poll_interval_ns);
     }
 
     const metrics = sup.snapshotProcessMetrics();

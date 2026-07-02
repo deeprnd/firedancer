@@ -268,8 +268,11 @@ non-canonical boundary debt, not an implementation pattern to extend.
 Use this product tree:
 
 ```text
-src/app/tickoni/          Zig supervisor and CLI
+src/app/tickoni/          Zig supervisor and CLI; owns concrete product topologies (which
+                           tiles run, tile IDs, channel wiring) — see src/app/tickoni/topologies.zig
 src/tickoni/runtime/      Process lifecycle, topology, channels, backpressure
+src/tickoni/util/         Generic Linux/CPU primitives with no Tickoni domain knowledge
+                           (CPU affinity, clock, process); reusable outside this codebase
 src/tickoni/c_abi/*.zig   Zig wrappers over Tickoni-owned tk_* C shim symbols
 src/tickoni/c_abi/shim/   Only C bridge; only place to include Firedancer C headers
 src/tickoni/codec/        Zig codec implementations for Tickoni-owned schemas
@@ -280,10 +283,10 @@ src/tickoni/test/demo/    Deterministic CLI/test demo orchestration
 src/tickoni/connectors/   Signed adapter manifests and connector implementations
 ```
 
-`src/app/tickoni/`, `src/tickoni/runtime/`, `src/tickoni/c_abi/`, and
-`src/tickoni/tiles/` already exist. Schema, codec, and demo paths are
-Tickoni-owned support roots around the runtime. `connectors/` should be added
-only when implementation work needs it.
+`src/app/tickoni/`, `src/tickoni/runtime/`, `src/tickoni/util/`,
+`src/tickoni/c_abi/`, and `src/tickoni/tiles/` already exist. Schema, codec,
+and demo paths are Tickoni-owned support roots around the runtime.
+`connectors/` should be added only when implementation work needs it.
 
 ### Runtime IDs
 

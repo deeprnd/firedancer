@@ -1,9 +1,8 @@
-/// CPU affinity bindings and cpu-set bit manipulation for Tickoni's V1.14
-/// process-mode tile supervisor and tiles (src/app/tickoni/*). Tickoni-owned
-/// Linux syscall bindings, not a Firedancer bridge. Pure primitive: no
-/// dependency on topology or any other runtime module. CPU placement policy
-/// (validating a Topology's declared placements against a live CpuSet) lives
-/// in src/tickoni/runtime/cpu_placement.zig, layered on top of this file.
+/// Generic CPU affinity bindings and cpu-set bit manipulation. Zero Tickoni
+/// domain knowledge (no tiles, no topology) — a plain Linux syscall wrapper
+/// usable outside this codebase unchanged. CPU placement policy (validating
+/// a Topology's declared placements against a live CpuSet) lives in
+/// src/tickoni/runtime/cpu_placement.zig, layered on top of this file.
 ///
 /// Firedancer has an internal fd_cpuset_t affinity wrapper
 /// (src/util/tile/fd_tile_private.h), but that header documents itself as

@@ -6,6 +6,7 @@ const std = @import("std");
 const rt = @import("runtime");
 const tiles_mod = @import("tiles");
 const c_abi = @import("c_abi");
+const util = @import("util");
 const topologies = @import("topologies");
 
 const Topology = rt.topology.Topology;
@@ -154,8 +155,8 @@ pub const Supervisor = struct {
         // before. Also runs topo.validate()'s structural checks (duplicate
         // exclusive ids, channel/depth/MTU shape) and reports the
         // resulting layout for diagnostics visibility (V1.14.S1.T14).
-        var available_cpus: rt.cpu.CpuSet = undefined;
-        try rt.cpu.getAffinity(0, &available_cpus);
+        var available_cpus: util.cpu.CpuSet = undefined;
+        try util.cpu.getAffinity(0, &available_cpus);
         const placement_report = try rt.cpu_placement.validate(self.topo, &available_cpus);
 
         try rt.boot.bootWithSyntheticArgv(config.run_dir);
@@ -219,7 +220,7 @@ pub const Supervisor = struct {
             const gaddr = c_abi.wksp.wkspAlloc(wksp, c_abi.cnc.cnc_align, footprint, 1);
             if (gaddr == 0) return error.CncAllocFailed;
             const laddr = c_abi.wksp.wkspLaddr(wksp, gaddr) orelse return error.CncLaddrFailed;
-            _ = c_abi.cnc.cncNew(laddr, 64, @intCast(i), rt.process.monotonicNanos()) orelse return error.CncNewFailed;
+            _ = c_abi.cnc.cncNew(laddr, 64, @intCast(i), util.process.monotonicNanos()) orelse return error.CncNewFailed;
             state.cnc_gaddrs[i] = gaddr;
             state.cncs[i] = c_abi.cnc.cncJoin(laddr) orelse return error.CncJoinFailed;
         }
@@ -236,7 +237,7 @@ pub const Supervisor = struct {
         }
 
         var self_exe_path_buf: [std.fs.max_path_bytes]u8 = undefined;
-        const self_exe_path = config.tile_exe_path orelse try rt.process.selfExePath(&self_exe_path_buf);
+        const self_exe_path = config.tile_exe_path orelse try util.process.selfExePath(&self_exe_path_buf);
 
         for (self.handles, 0..) |*h, i| {
             const tile = self.topo.tiles[i];
@@ -288,10 +289,10 @@ pub const Supervisor = struct {
 
             switch (tile.cpu_placement) {
                 .exclusive, .shared => |cpu| {
-                    var cpu_set: rt.cpu.CpuSet = undefined;
-                    rt.cpu.zero(&cpu_set);
-                    rt.cpu.set(&cpu_set, cpu);
-                    try rt.cpu.setAffinity(@intCast(child.id.?), &cpu_set);
+                    var cpu_set: util.cpu.CpuSet = undefined;
+                    util.cpu.zero(&cpu_set);
+                    util.cpu.set(&cpu_set, cpu);
+                    try util.cpu.setAffinity(@intCast(child.id.?), &cpu_set);
                 },
                 .floating => {},
             }

@@ -10,7 +10,7 @@
 /// join pre-formatted objects; they never format memory.
 const std = @import("std");
 const c_abi = @import("c_abi");
-const process = @import("process.zig");
+const process = @import("util").process;
 
 /// Fixed-size, POD handle set embeddable directly in
 /// src/tickoni/runtime/launch_spec.zig's LaunchSpec.

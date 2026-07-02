@@ -5,6 +5,7 @@
 const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
+const util = @import("util");
 
 fn attachScratchWksp(io: std.Io, run_dir: []const u8, name: [*:0]const u8) !*c_abi.wksp.Wksp {
     try rt.boot.bootWithSyntheticArgv(run_dir);
@@ -107,7 +108,7 @@ test "shm_link_bounds: producer backpressures and counts waits when the consumer
     // instead of blocking this test forever.
     const Flipper = struct {
         fn run(flag: *std.atomic.Value(bool)) void {
-            rt.process.sleepNanos(20 * std.time.ns_per_ms);
+            util.process.sleepNanos(20 * std.time.ns_per_ms);
             flag.store(true, .release);
         }
     };

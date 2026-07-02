@@ -14,6 +14,7 @@
 const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
+const util = @import("util");
 const tiles = @import("tiles");
 const process_stage = @import("process_stage.zig");
 
@@ -51,7 +52,7 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
     };
     defer _ = c_abi.cnc.cncLeave(cnc);
 
-    c_abi.cnc.heartbeat(cnc, rt.process.monotonicNanos());
+    c_abi.cnc.heartbeat(cnc, util.process.monotonicNanos());
     // Unconditional BOOT->RUN transition: if the supervisor's stopProcess
     // writes HALT to this cnc before this line runs (a tile caught mid-boot),
     // this write silently clobbers it back to RUN and the halt request is
@@ -79,8 +80,8 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
             return 1;
         }
 
-        rt.process.sleepNanos(spec.heartbeat_interval_ns);
-        c_abi.cnc.heartbeat(cnc, rt.process.monotonicNanos());
+        util.process.sleepNanos(spec.heartbeat_interval_ns);
+        c_abi.cnc.heartbeat(cnc, util.process.monotonicNanos());
     }
 
     c_abi.cnc.signal(cnc, c_abi.cnc.signal_boot);

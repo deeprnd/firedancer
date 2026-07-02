@@ -1,8 +1,8 @@
-/// Monotonic clock, self-exe path resolution, and blocking sleep for
-/// Tickoni's V1.14 process-mode tile supervisor and tiles
-/// (src/app/tickoni/*). Tickoni-owned runtime utilities, not a
-/// Firedancer bridge. CPU affinity and CPU placement policy live in
-/// src/tickoni/runtime/cpu.zig.
+/// Generic monotonic clock, self-exe path resolution, and blocking sleep.
+/// Zero Tickoni domain knowledge — a plain Linux syscall wrapper usable
+/// outside this codebase unchanged. CPU affinity lives alongside this in
+/// src/tickoni/util/cpu.zig; CPU placement policy lives in
+/// src/tickoni/runtime/cpu_placement.zig.
 const std = @import("std");
 
 /// Monotonic nanosecond clock reading, used for fd_cnc heartbeat values
