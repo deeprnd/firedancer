@@ -241,6 +241,7 @@ pub fn build(b: *std.Build) void {
     for ([_][]const u8{
         "src/tickoni/runtime/topology.zig",
         "src/tickoni/runtime/tile.zig",
+        "src/tickoni/runtime/cpu.zig",
         "src/tickoni/runtime/process.zig",
         "src/tickoni/runtime/sandbox.zig",
         "src/tickoni/c_abi/ballet.zig",
@@ -408,16 +409,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
     test_step.dependOn(&b.addRunArtifact(shm_link_test).step);
-
-    // cpu_placement.zig imports sibling process.zig for the live-CPU-set check.
-    const cpu_placement_test = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/runtime/cpu_placement.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    test_step.dependOn(&b.addRunArtifact(cpu_placement_test).step);
 
     // boot.zig imports c_abi for the raw fd_boot bridge call.
     const boot_test = b.addTest(.{
@@ -1169,6 +1160,7 @@ pub fn build(b: *std.Build) void {
         .{ "test-fseq", "src/tickoni/c_abi/fseq.zig" },
         .{ "test-cnc", "src/tickoni/c_abi/cnc.zig" },
         .{ "test-wksp", "src/tickoni/c_abi/wksp.zig" },
+        .{ "test-cpu", "src/tickoni/runtime/cpu.zig" },
         .{ "test-process", "src/tickoni/runtime/process.zig" },
         .{ "test-sandbox-config", "src/tickoni/runtime/sandbox.zig" },
         .{ "test-cnc-counters", "src/tickoni/runtime/cnc_counters.zig" },

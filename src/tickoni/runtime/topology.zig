@@ -119,8 +119,8 @@ pub const Topology = struct {
 
 /// Rejects two tiles pinned to the same CPU id unless both declare
 /// `shared`. Available-CPU-id and oversubscription-against-the-live-host
-/// checks belong to src/tickoni/runtime/cpu_placement.zig, which has
-/// runtime CPU-set information this static topology does not.
+/// checks belong to src/tickoni/runtime/cpu.zig, which has runtime
+/// CPU-set information this static topology does not.
 fn validateCpuPlacement(tiles: []const TileDescriptor) !void {
     for (tiles, 0..) |a, i| {
         const a_cpu = switch (a.cpu_placement) {

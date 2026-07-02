@@ -53,7 +53,7 @@ const ProcessState = struct {
     children: [8]?std.process.Child,
     /// V1.14.S1.T14 visibility: whether this run's layout is shared-core
     /// and how many tiles are exclusive/shared/floating.
-    placement_report: rt.cpu_placement.PlacementReport,
+    placement_report: rt.cpu.PlacementReport,
 
     /// Kills any still-running children, leaves cnc joins, detaches the
     /// workspace, and frees owned buffers. Safe to call with a partially
@@ -153,9 +153,9 @@ pub const Supervisor = struct {
         // before. Also runs topo.validate()'s structural checks (duplicate
         // exclusive ids, channel/depth/MTU shape) and reports the
         // resulting layout for diagnostics visibility (V1.14.S1.T14).
-        var available_cpus: rt.process.CpuSet = undefined;
-        try rt.process.getAffinity(0, &available_cpus);
-        const placement_report = try rt.cpu_placement.validate(self.topo, &available_cpus);
+        var available_cpus: rt.cpu.CpuSet = undefined;
+        try rt.cpu.getAffinity(0, &available_cpus);
+        const placement_report = try rt.cpu.validate(self.topo, &available_cpus);
 
         try rt.boot.bootWithSyntheticArgv(config.run_dir);
 
@@ -287,10 +287,10 @@ pub const Supervisor = struct {
 
             switch (tile.cpu_placement) {
                 .exclusive, .shared => |cpu| {
-                    var cpu_set: rt.process.CpuSet = undefined;
-                    rt.process.zero(&cpu_set);
-                    rt.process.set(&cpu_set, cpu);
-                    try rt.process.setAffinity(@intCast(child.id.?), &cpu_set);
+                    var cpu_set: rt.cpu.CpuSet = undefined;
+                    rt.cpu.zero(&cpu_set);
+                    rt.cpu.set(&cpu_set, cpu);
+                    try rt.cpu.setAffinity(@intCast(child.id.?), &cpu_set);
                 },
                 .floating => {},
             }
@@ -354,7 +354,7 @@ pub const Supervisor = struct {
     /// start time (exclusive/shared/floating counts and whether the
     /// layout is shared-core). Null when no process-mode pipeline has
     /// been started.
-    pub fn processPlacementReport(self: *const Supervisor) ?rt.cpu_placement.PlacementReport {
+    pub fn processPlacementReport(self: *const Supervisor) ?rt.cpu.PlacementReport {
         const state = self.process_state orelse return null;
         return state.placement_report;
     }

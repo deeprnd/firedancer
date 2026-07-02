@@ -3,7 +3,7 @@
 /// processes pinned to the same CPU — proving shared-core placement means
 /// shared CPU assignment, not a shared process or address space — and the
 /// pipeline still completes correctly. Runs through real
-/// startPaymentPipelineProcess/cpu_placement.validate(), not a mock.
+/// startPaymentPipelineProcess/cpu.validate(), not a mock.
 const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
