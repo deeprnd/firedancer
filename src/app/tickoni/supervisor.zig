@@ -6,6 +6,7 @@ const std = @import("std");
 const rt = @import("runtime");
 const tiles_mod = @import("tiles");
 const c_abi = @import("c_abi");
+const topologies = @import("topologies");
 
 const Topology = rt.topology.Topology;
 const TileHandle = rt.tile.TileHandle;
@@ -53,7 +54,7 @@ const ProcessState = struct {
     children: [8]?std.process.Child,
     /// V1.14.S1.T14 visibility: whether this run's layout is shared-core
     /// and how many tiles are exclusive/shared/floating.
-    placement_report: rt.cpu.PlacementReport,
+    placement_report: rt.cpu_placement.PlacementReport,
 
     /// Kills any still-running children, leaves cnc joins, detaches the
     /// workspace, and frees owned buffers. Safe to call with a partially
@@ -155,7 +156,7 @@ pub const Supervisor = struct {
         // resulting layout for diagnostics visibility (V1.14.S1.T14).
         var available_cpus: rt.cpu.CpuSet = undefined;
         try rt.cpu.getAffinity(0, &available_cpus);
-        const placement_report = try rt.cpu.validate(self.topo, &available_cpus);
+        const placement_report = try rt.cpu_placement.validate(self.topo, &available_cpus);
 
         try rt.boot.bootWithSyntheticArgv(config.run_dir);
 
@@ -354,7 +355,7 @@ pub const Supervisor = struct {
     /// start time (exclusive/shared/floating counts and whether the
     /// layout is shared-core). Null when no process-mode pipeline has
     /// been started.
-    pub fn processPlacementReport(self: *const Supervisor) ?rt.cpu.PlacementReport {
+    pub fn processPlacementReport(self: *const Supervisor) ?rt.cpu_placement.PlacementReport {
         const state = self.process_state orelse return null;
         return state.placement_report;
     }
@@ -446,7 +447,7 @@ pub const Supervisor = struct {
 // ---------------------------------------------------------------------------
 
 test "Supervisor initialises all handles as stopped" {
-    const topo = rt.topology.paymentPipeline();
+    const topo = topologies.paymentPipeline();
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 
@@ -456,7 +457,7 @@ test "Supervisor initialises all handles as stopped" {
 }
 
 test "Supervisor starts and stops Phase 0 pipeline without crashes" {
-    const topo = rt.topology.paymentPipeline();
+    const topo = topologies.paymentPipeline();
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 
@@ -484,7 +485,7 @@ test "Supervisor starts and stops Phase 0 pipeline without crashes" {
 }
 
 test "Supervisor monitor returns correct tile count" {
-    const topo = rt.topology.paymentPipeline();
+    const topo = topologies.paymentPipeline();
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 
@@ -492,7 +493,7 @@ test "Supervisor monitor returns correct tile count" {
 }
 
 test "Supervisor pipeline state is nil after stop" {
-    const topo = rt.topology.paymentPipeline();
+    const topo = topologies.paymentPipeline();
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 
@@ -503,7 +504,7 @@ test "Supervisor pipeline state is nil after stop" {
 }
 
 test "Supervisor marks tkings crashed on sandbox failure" {
-    const topo = rt.topology.paymentPipeline();
+    const topo = topologies.paymentPipeline();
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 

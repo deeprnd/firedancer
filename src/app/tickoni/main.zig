@@ -6,6 +6,7 @@ const supervisor_mod = @import("supervisor.zig");
 const Supervisor = supervisor_mod.Supervisor;
 const ProcessPipelineConfig = supervisor_mod.ProcessPipelineConfig;
 const tile_main = @import("tile_main.zig");
+const topologies = @import("topologies");
 
 const usage =
     \\Usage: tickoni-supervisor <command>
@@ -35,15 +36,15 @@ pub fn main(init: std.process.Init) !void {
     }
 
     if (std.mem.eql(u8, cmd, "start")) {
-        try cmdStart(init, rt.topology.paymentPipeline());
+        try cmdStart(init, topologies.paymentPipeline());
     } else if (std.mem.eql(u8, cmd, "start-process")) {
         const run_dir = it.next() orelse {
             try File.writeStreamingAll(File.stderr(), init.io, "start-process requires <run-dir>\n");
             std.process.exit(1);
         };
-        try cmdStartProcess(init, rt.topology.paymentPipelineProcess(), run_dir);
+        try cmdStartProcess(init, topologies.paymentPipelineProcess(), run_dir);
     } else if (std.mem.eql(u8, cmd, "status")) {
-        try cmdStatus(init.io, rt.topology.paymentPipeline());
+        try cmdStatus(init.io, topologies.paymentPipeline());
     } else {
         var buf: [128]u8 = undefined;
         const msg = try std.fmt.bufPrint(&buf, "unknown command: {s}\n", .{cmd});

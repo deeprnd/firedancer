@@ -11,6 +11,7 @@ const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
 const supervisor_mod = @import("supervisor");
+const topologies = @import("topologies");
 
 const Supervisor = supervisor_mod.Supervisor;
 
@@ -22,7 +23,7 @@ test "process_pipeline_integration: process-mode payment pipeline matches expect
     const len = try tmp.dir.realPath(std.testing.io, &path_buf);
     const run_dir = path_buf[0..len];
 
-    const topo = rt.topology.paymentPipelineProcess();
+    const topo = topologies.paymentPipelineProcess();
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 

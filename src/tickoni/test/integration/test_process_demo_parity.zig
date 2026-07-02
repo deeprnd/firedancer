@@ -9,11 +9,12 @@ const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
 const supervisor_mod = @import("supervisor");
+const topologies = @import("topologies");
 
 const Supervisor = supervisor_mod.Supervisor;
 const TileId = rt.topology.TileId;
 
-/// Same 8 tiles as rt.topology.paymentPipelineProcess(), except tkpoly and
+/// Same 8 tiles as topologies.paymentPipelineProcess(), except tkpoly and
 /// tkaudt both declare an explicit shared placement on CPU 0 — a different
 /// pair than test_process_cpu_placement.zig pins, so this test's coverage
 /// is not just a duplicate of M5's.
@@ -79,7 +80,7 @@ test "process_demo_parity: floating, shared-core, and exclusive-core CPU placeme
     const floating_len = try tmp_floating.dir.realPath(std.testing.io, &floating_path_buf);
     const floating_run_dir = floating_path_buf[0..floating_len];
 
-    const floating_metrics = try runToCompletion(std.testing.io, rt.topology.paymentPipelineProcess(), floating_run_dir);
+    const floating_metrics = try runToCompletion(std.testing.io, topologies.paymentPipelineProcess(), floating_run_dir);
 
     var tmp_shared = std.testing.tmpDir(.{});
     defer tmp_shared.cleanup();
@@ -89,7 +90,7 @@ test "process_demo_parity: floating, shared-core, and exclusive-core CPU placeme
 
     const shared_topo = rt.topology.Topology{
         .tiles = &shared_core_tiles,
-        .channels = rt.topology.paymentPipelineProcess().channels,
+        .channels = topologies.paymentPipelineProcess().channels,
     };
     const shared_metrics = try runToCompletion(std.testing.io, shared_topo, shared_run_dir);
 
@@ -101,7 +102,7 @@ test "process_demo_parity: floating, shared-core, and exclusive-core CPU placeme
 
     const exclusive_topo = rt.topology.Topology{
         .tiles = &exclusive_core_tiles,
-        .channels = rt.topology.paymentPipelineProcess().channels,
+        .channels = topologies.paymentPipelineProcess().channels,
     };
     const exclusive_metrics = try runToCompletion(std.testing.io, exclusive_topo, exclusive_run_dir);
 

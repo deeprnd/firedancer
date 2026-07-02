@@ -33,6 +33,20 @@ pub fn build(b: *std.Build) void {
             .{ .name = "c_abi", .module = c_abi_mod },
         },
     });
+    // Concrete Tickoni product topologies (src/app/tickoni/topologies.zig),
+    // layered on the generic runtime.topology schema. Declared here (ahead
+    // of main_mod/sup_mod below) so every consumer — the exe, the
+    // supervisor module, and integration tests — imports it by name
+    // instead of by relative path, so the file belongs to exactly one
+    // module instance.
+    const topologies_named_mod = b.addModule("topologies", .{
+        .root_source_file = b.path("src/app/tickoni/topologies.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "runtime", .module = runtime_mod },
+        },
+    });
     const audit_codec_mod = b.addModule("audit_codec", .{
         .root_source_file = b.path("src/tickoni/codec/audit.zig"),
         .target = target,
@@ -215,6 +229,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "tiles", .module = tiles_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "topologies", .module = topologies_named_mod },
         },
     });
     const exe = b.addExecutable(.{
@@ -242,6 +257,7 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/runtime/topology.zig",
         "src/tickoni/runtime/tile.zig",
         "src/tickoni/runtime/cpu.zig",
+        "src/tickoni/runtime/cpu_placement.zig",
         "src/tickoni/runtime/process.zig",
         "src/tickoni/runtime/sandbox.zig",
         "src/tickoni/c_abi/ballet.zig",
@@ -658,6 +674,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "tiles", .module = tiles_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "topologies", .module = topologies_named_mod },
         },
     });
     // Named module (vs. sup_mod's anonymous instance above) so
@@ -671,11 +688,27 @@ pub fn build(b: *std.Build) void {
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "tiles", .module = tiles_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "topologies", .module = topologies_named_mod },
         },
     });
     const sup_test = b.addTest(.{ .root_module = sup_mod });
     linkTickoniCodec(b, sup_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(sup_test).step);
+
+    // topologies.zig: fresh root module (not the shared topologies_named_mod)
+    // so it gets its own dedicated test run, since named-import module
+    // boundaries do not propagate test discovery to importers.
+    const topologies_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/app/tickoni/topologies.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "runtime", .module = runtime_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(topologies_test).step);
 
     // ---------------------------------------------------------------------------
     // Integration-test step — transport and boundary wiring against local mocks.
@@ -880,6 +913,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "supervisor", .module = supervisor_named_mod },
+                .{ .name = "topologies", .module = topologies_named_mod },
             },
         }),
     });
@@ -900,6 +934,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "supervisor", .module = supervisor_named_mod },
+                .{ .name = "topologies", .module = topologies_named_mod },
             },
         }),
     });
@@ -922,6 +957,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "supervisor", .module = supervisor_named_mod },
+                .{ .name = "topologies", .module = topologies_named_mod },
             },
         }),
     });
@@ -943,6 +979,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "supervisor", .module = supervisor_named_mod },
+                .{ .name = "topologies", .module = topologies_named_mod },
             },
         }),
     });
@@ -1161,6 +1198,7 @@ pub fn build(b: *std.Build) void {
         .{ "test-cnc", "src/tickoni/c_abi/cnc.zig" },
         .{ "test-wksp", "src/tickoni/c_abi/wksp.zig" },
         .{ "test-cpu", "src/tickoni/runtime/cpu.zig" },
+        .{ "test-cpu-placement", "src/tickoni/runtime/cpu_placement.zig" },
         .{ "test-process", "src/tickoni/runtime/process.zig" },
         .{ "test-sandbox-config", "src/tickoni/runtime/sandbox.zig" },
         .{ "test-cnc-counters", "src/tickoni/runtime/cnc_counters.zig" },
@@ -1354,11 +1392,27 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "runtime", .module = runtime_mod },
                 .{ .name = "tiles", .module = tiles_mod },
                 .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "topologies", .module = topologies_named_mod },
             },
         }),
     });
     linkTickoniCodec(b, sup_cov_test, fd_lib_dir);
     cov_step.dependOn(&b.addInstallArtifact(sup_cov_test, .{
+        .dest_dir = .{ .override = .{ .custom = "cov" } },
+    }).step);
+
+    const topologies_cov_test = b.addTest(.{
+        .name = "test-topologies",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/app/tickoni/topologies.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "runtime", .module = runtime_mod },
+            },
+        }),
+    });
+    cov_step.dependOn(&b.addInstallArtifact(topologies_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
 }

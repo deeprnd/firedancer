@@ -8,11 +8,12 @@ const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
 const supervisor_mod = @import("supervisor");
+const topologies = @import("topologies");
 
 const Supervisor = supervisor_mod.Supervisor;
 const TileId = rt.topology.TileId;
 
-/// Same 8 tiles as rt.topology.paymentPipelineProcess(), except tkings and
+/// Same 8 tiles as topologies.paymentPipelineProcess(), except tkings and
 /// tknorm both declare an explicit shared placement on CPU 0.
 const shared_core_tiles = [_]rt.topology.TileDescriptor{
     .{ .id = TileId.parse("tkings") catch unreachable, .name = "ingest_tile", .phase = 0, .cpu_placement = .{ .shared = 0 } },
@@ -37,7 +38,7 @@ test "process_cpu_placement_integration: two tiles sharing one cpu get distinct 
     // process-mode channel shape and only override the tile placements.
     const topo = rt.topology.Topology{
         .tiles = &shared_core_tiles,
-        .channels = rt.topology.paymentPipelineProcess().channels,
+        .channels = topologies.paymentPipelineProcess().channels,
     };
 
     var sup = try Supervisor.init(std.testing.allocator, topo);
@@ -100,7 +101,7 @@ test "process_cpu_placement_integration: a malformed (out-of-range) cpu id fails
     };
     const topo = rt.topology.Topology{
         .tiles = &bogus_tiles,
-        .channels = rt.topology.paymentPipelineProcess().channels,
+        .channels = topologies.paymentPipelineProcess().channels,
     };
 
     var sup = try Supervisor.init(std.testing.allocator, topo);

@@ -7,6 +7,7 @@ const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
 const supervisor_mod = @import("supervisor");
+const topologies = @import("topologies");
 
 const Supervisor = supervisor_mod.Supervisor;
 const TileId = rt.topology.TileId;
@@ -44,7 +45,7 @@ test "process_topology_integration: every tile is a distinct OS process parented
     const len = try tmp.dir.realPath(std.testing.io, &path_buf);
     const run_dir = path_buf[0..len];
 
-    const topo = rt.topology.paymentPipelineProcess();
+    const topo = topologies.paymentPipelineProcess();
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 
@@ -98,7 +99,7 @@ test "process_topology_integration: SIGKILL on one tile is reported by identity 
     const len = try tmp.dir.realPath(std.testing.io, &path_buf);
     const run_dir = path_buf[0..len];
 
-    const topo = rt.topology.paymentPipelineProcess();
+    const topo = topologies.paymentPipelineProcess();
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 
@@ -160,7 +161,7 @@ test "process_topology_integration: process mode refuses to start a heap_dev-bac
 
     // Same shape as paymentPipelineProcess() but the first channel is left
     // at its heap_dev default instead of being declared tango_shm.
-    const base = rt.topology.paymentPipelineProcess();
+    const base = topologies.paymentPipelineProcess();
     var channels: [4]rt.topology.Channel = undefined;
     @memcpy(&channels, base.channels[0..4]);
     channels[0].backing = .heap_dev;
@@ -184,7 +185,7 @@ test "process_topology_integration: process mode refuses to start with a missing
     const len = try tmp.dir.realPath(std.testing.io, &path_buf);
     const run_dir = path_buf[0..len];
 
-    const base = rt.topology.paymentPipelineProcess();
+    const base = topologies.paymentPipelineProcess();
     var channels: [4]rt.topology.Channel = undefined;
     @memcpy(&channels, base.channels[0..4]);
     channels[0].workspace_name = .{};
