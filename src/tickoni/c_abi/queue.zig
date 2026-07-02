@@ -1,10 +1,11 @@
 /// Narrow Zig bindings over src/tango mcache/dcache primitives.
 ///
-/// Mirrors the public API in src/tango/mcache/fd_mcache.h.
-/// These declarations are not called during Step 1 tests; the C substrate
-/// is linked only when building the supervisor binary against Firedancer.
+/// Mirrors the public API in src/tango/mcache/fd_mcache.h. The
+/// mcacheLineIdx/mcachePublish/fragMetaSeqQuery wrappers bind to
+/// shim/tango.c. See doc/knowledge/architecture.md.
 ///
-/// Link requirements: -lfd_tango -lfd_util (built by GNUmakefile).
+/// Link requirements: -lfd_tango -lfd_util plus shim/tango.c, via
+/// linkTickoniTango in build.zig.
 const std = @import("std");
 
 // ---------------------------------------------------------------------------
@@ -54,24 +55,29 @@ pub extern fn fd_mcache_seq0(mcache: [*]const FragMeta) u64;
 pub extern fn fd_mcache_seq_laddr(mcache: [*]FragMeta) [*]volatile u64;
 pub extern fn fd_mcache_seq_laddr_const(mcache: [*]const FragMeta) [*]const volatile u64;
 
-/// Mirrors FD_COMPILER_MFENCE (fd_tango_base.h): a compiler-only ordering
-/// barrier (no CPU fence instruction), matching Firedancer's reliance on
-/// x86-64 TSO for cross-thread/process visibility.
-fn compilerFence() void {
-    asm volatile ("" ::: .{ .memory = true });
-}
-
-/// Mirrors static inline fd_mcache_line_idx (fd_mcache.h) for the
-/// FD_MCACHE_LG_INTERLEAVE==0 build (the header's compiled-in default) —
-/// not callable via extern; it is a static inline with no linkable symbol.
+/// Wraps fd_mcache_line_idx (fd_mcache.h) for the FD_MCACHE_LG_INTERLEAVE==0
+/// build (the header's compiled-in default). Binds to shim/tango.c.
+extern fn tickoni_mcache_line_idx(seq: u64, depth: u64) u64;
 pub fn mcacheLineIdx(seq: u64, depth: usize) usize {
-    return @intCast(seq & (depth - 1));
+    return @intCast(tickoni_mcache_line_idx(seq, depth));
 }
 
-/// Mirrors static inline fd_mcache_publish (fd_mcache.h): writes frag
-/// metadata for `seq` into the ring, marking the line in-progress (seq-1)
-/// before the payload-adjacent fields are written and only publishing the
-/// real `seq` once they are, so a consumer never observes a torn frag.
+/// Wraps fd_mcache_publish (fd_mcache.h): writes frag metadata for `seq`
+/// into the ring, marking the line in-progress (seq-1) before the
+/// payload-adjacent fields are written and only publishing the real `seq`
+/// once they are, so a consumer never observes a torn frag. Binds to
+/// shim/tango.c.
+extern fn tickoni_mcache_publish(
+    mcache: [*]FragMeta,
+    depth: u64,
+    seq: u64,
+    sig: u64,
+    chunk: u64,
+    sz: u64,
+    ctl: u64,
+    tsorig: u64,
+    tspub: u64,
+) void;
 pub fn mcachePublish(
     mcache: [*]FragMeta,
     depth: usize,
@@ -83,26 +89,18 @@ pub fn mcachePublish(
     tsorig: u32,
     tspub: u32,
 ) void {
-    const meta: *volatile FragMeta = @ptrCast(&mcache[mcacheLineIdx(seq, depth)]);
-    meta.seq = seq -% 1;
-    compilerFence();
-    meta.sig = sig;
-    meta.chunk = chunk;
-    meta.sz = sz;
-    meta.ctl = ctl;
-    meta.tsorig = tsorig;
-    meta.tspub = tspub;
-    compilerFence();
-    meta.seq = seq;
+    tickoni_mcache_publish(mcache, depth, seq, sig, chunk, sz, ctl, tsorig, tspub);
 }
 
-/// Mirrors static inline fd_frag_meta_seq_query (fd_tango_base.h).
+/// Wraps fd_frag_meta_seq_query (fd_tango_base.h). Binds to shim/tango.c.
+extern fn tickoni_frag_meta_seq_query(meta: *const volatile FragMeta) u64;
 pub fn fragMetaSeqQuery(meta: *const volatile FragMeta) u64 {
-    return meta.seq;
+    return tickoni_frag_meta_seq_query(meta);
 }
 
 // ---------------------------------------------------------------------------
-// Tests — layout only; no C linkage required
+// Tests — FragMeta layout and the mcache_align constant need no C linkage;
+// mcacheLineIdx/mcachePublish/fragMetaSeqQuery tests link shim/tango.c.
 // ---------------------------------------------------------------------------
 
 test "FragMeta is 32 bytes" {

@@ -68,14 +68,6 @@ fn joinTriplet(wksp: *c_abi.wksp.Wksp, handles: LinkHandles) !struct {
     return .{ .mcache = mcache, .dcache_base = dcache_base, .fseq = fseq };
 }
 
-fn fseqQuery(fseq: [*]volatile u64) u64 {
-    return fseq[0];
-}
-
-fn fseqUpdate(fseq: [*]volatile u64, seq: u64) void {
-    fseq[0] = seq;
-}
-
 /// Bounded, backpressuring producer side of a reliable link (T4/T5): waits
 /// for the consumer's fseq progress instead of dropping when the ring is
 /// full at `depth`. Lossy telemetry links use publishLossy instead.
@@ -120,7 +112,7 @@ pub const Producer = struct {
         stop: *const std.atomic.Value(bool),
     ) error{ Stopped, PayloadTooLarge }!void {
         while (true) {
-            const consumer_seq = fseqQuery(self.fseq);
+            const consumer_seq = c_abi.fseq.fseqQuery(self.fseq);
             const lag = self.next_seq -% consumer_seq;
             if (lag < self.depth) break;
             _ = backpressure_waits.fetchAdd(1, .release);
@@ -139,7 +131,7 @@ pub const Producer = struct {
     /// loss is counted, matching the "telemetry links may be lossy only
     /// when explicitly declared and counted" rule.
     pub fn publishLossy(self: *Producer, payload: []const u8, dropped: *std.atomic.Value(u64)) error{PayloadTooLarge}!void {
-        const consumer_seq = fseqQuery(self.fseq);
+        const consumer_seq = c_abi.fseq.fseqQuery(self.fseq);
         const lag = self.next_seq -% consumer_seq;
         if (lag >= self.depth) _ = dropped.fetchAdd(1, .release);
 
@@ -199,7 +191,7 @@ pub const Consumer = struct {
         if (c_abi.queue.fragMetaSeqQuery(meta) != self.next_seq) return null;
 
         self.next_seq += 1;
-        fseqUpdate(self.fseq, self.next_seq);
+        c_abi.fseq.fseqUpdate(self.fseq, self.next_seq);
         return sz;
     }
 };

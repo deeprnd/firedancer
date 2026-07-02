@@ -251,7 +251,7 @@ for `mcache_publish`, `fseq_query`, `line_idx`, or Firedancer's own
 higher-level `fd_stem_publish`/`fd_stem_advance`.
 
 The standing approach for these is a thin, non-inline wrapper in a new
-Tickoni-owned translation unit, `src/tickoni/c_abi/tango_shim.c`, that calls
+Tickoni-owned translation unit, `src/tickoni/c_abi/shim/tango.c`, that calls
 the real inline function and does nothing else — one line per function, no
 algorithm of its own. `queue.zig`'s `mcacheLineIdx`, `mcachePublish`, and
 `fragMetaSeqQuery`, and `shm_link.zig`'s `fseq` query/update helpers, bind to
@@ -274,7 +274,7 @@ dependency.
 
 The working rule: default to a real Firedancer `extern fn` even at FFI cost;
 when `nm` on the built `.a` confirms no linkable symbol exists for a specific
-function, add a one-line wrapper to `tango_shim.c` rather than reimplementing
+function, add a one-line wrapper to `shim/tango.c` rather than reimplementing
 the logic in Zig. See
 [rant/static-inline-and-ffi.md](rant/static-inline-and-ffi.md) for why
 this is the standing default over the alternatives.

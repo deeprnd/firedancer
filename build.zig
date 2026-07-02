@@ -279,6 +279,14 @@ pub fn build(b: *std.Build) void {
         {
             linkTickoniCodec(b, t, fd_lib_dir);
         }
+        if (std.mem.eql(u8, path, "src/tickoni/c_abi/queue.zig") or
+            std.mem.eql(u8, path, "src/tickoni/c_abi/fseq.zig"))
+        {
+            // mcacheLineIdx/mcachePublish/fragMetaSeqQuery (queue.zig) and
+            // fseqQuery/fseqUpdate (fseq.zig) tests call the real
+            // shim/tango.c pass-through, not a native Zig mirror.
+            linkTickoniTango(b, t, fd_lib_dir);
+        }
         const t_run = b.addRunArtifact(t);
         test_step.dependOn(&t_run.step);
     }
@@ -1145,6 +1153,11 @@ pub fn build(b: *std.Build) void {
         {
             linkTickoniCodec(b, t, fd_lib_dir);
         }
+        if (std.mem.eql(u8, entry[1], "src/tickoni/c_abi/queue.zig") or
+            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/fseq.zig"))
+        {
+            linkTickoniTango(b, t, fd_lib_dir);
+        }
         cov_step.dependOn(&b.addInstallArtifact(t, .{
             .dest_dir = .{ .override = .{ .custom = "cov" } },
         }).step);
@@ -1311,9 +1324,16 @@ fn addPlainTestRun(b: *std.Build, test_compile: *std.Build.Step.Compile) *std.Bu
 /// Links src/tango (mcache/dcache/fseq/cnc) and src/util/wksp (fd_wksp)
 /// substrate for V1.14 process-mode shared-memory links. Separate from
 /// linkTickoniCodec because these callers do not need the audit_pb/
-/// thesis_hash C codec sources.
+/// thesis_hash C codec sources. Also compiles shim/tango.c — see that
+/// file and doc/knowledge/architecture.md's "How Firedancer Reuse
+/// Actually Works" for why a shim exists instead of a native Zig mirror.
 fn linkTickoniTango(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
+    step.root_module.addIncludePath(b.path("src"));
+    step.root_module.addCSourceFiles(.{
+        .files = &.{"src/tickoni/c_abi/shim/tango.c"},
+        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+    });
     step.root_module.addLibraryPath(b.path(fd_lib_dir));
     step.root_module.linkSystemLibrary("fd_tango", .{});
     step.root_module.linkSystemLibrary("fd_util", .{});

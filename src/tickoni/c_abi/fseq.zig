@@ -1,12 +1,8 @@
 /// Narrow Zig bindings over src/tango/fseq/fd_fseq.h.
 ///
-/// Only mirrors real (non-`static inline`) C symbols: align/footprint/
-/// new/join/leave/delete. `fd_fseq_query`/`fd_fseq_update`/`fd_fseq_seq0`/
-/// `fd_fseq_app_laddr` are `static inline` in the header (no linkable
-/// symbol); src/tickoni/runtime/shm_link.zig operates on the joined
-/// `[*]volatile u64` directly at the documented offsets instead of wrapping
-/// them here, matching src/tickoni/c_abi/queue.zig's existing
-/// `fd_mcache_seq_laddr` precedent.
+/// align/footprint/new/join/leave/delete are bound directly.
+/// `fseqQuery`/`fseqUpdate` wrap `fd_fseq_query`/`fd_fseq_update` via
+/// shim/tango.c. See doc/knowledge/architecture.md.
 const std = @import("std");
 
 // ---------------------------------------------------------------------------
@@ -29,8 +25,21 @@ pub extern fn fd_fseq_join(shfseq: *anyopaque) ?[*]volatile u64;
 pub extern fn fd_fseq_leave(fseq: [*]const u64) ?*anyopaque;
 pub extern fn fd_fseq_delete(shfseq: *anyopaque) ?*anyopaque;
 
+/// Wraps fd_fseq_query (fd_fseq.h). Binds to shim/tango.c.
+extern fn tickoni_fseq_query(fseq: [*]const u64) u64;
+pub fn fseqQuery(fseq: [*]volatile u64) u64 {
+    return tickoni_fseq_query(@volatileCast(fseq));
+}
+
+/// Wraps fd_fseq_update (fd_fseq.h). Binds to shim/tango.c.
+extern fn tickoni_fseq_update(fseq: [*]u64, seq: u64) void;
+pub fn fseqUpdate(fseq: [*]volatile u64, seq: u64) void {
+    tickoni_fseq_update(@volatileCast(fseq), seq);
+}
+
 // ---------------------------------------------------------------------------
-// Tests — layout only; no C linkage required
+// Tests — alignment constants need no C linkage; fseqQuery/fseqUpdate tests
+// link shim/tango.c.
 // ---------------------------------------------------------------------------
 
 test "fseq alignment constants match header" {
@@ -38,4 +47,11 @@ test "fseq alignment constants match header" {
     try std.testing.expectEqual(@as(usize, 128), fseq_footprint);
     try std.testing.expectEqual(@as(usize, 32), fseq_app_align);
     try std.testing.expectEqual(@as(usize, 96), fseq_app_footprint);
+}
+
+test "fseqUpdate then fseqQuery round-trips the published sequence number" {
+    var slot: [1]u64 = .{0};
+    const fseq: [*]volatile u64 = @ptrCast(&slot);
+    fseqUpdate(fseq, 42);
+    try std.testing.expectEqual(@as(u64, 42), fseqQuery(fseq));
 }
