@@ -48,9 +48,10 @@ test "process_topology_integration: every tile is a distinct OS process parented
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 
+    const event_count: u64 = 8;
     try sup.startPaymentPipelineProcess(std.testing.io, .{
         .run_dir = run_dir,
-        .event_count = 8,
+        .event_count = event_count,
         .tile_exe_path = "zig-out/bin/tickoni-supervisor",
     });
 
@@ -67,6 +68,21 @@ test "process_topology_integration: every tile is a distinct OS process parented
         const ppid = try parentPidOf(std.testing.io, pid);
         try std.testing.expectEqual(supervisor_pid, ppid);
     }
+
+    // Wait for the pipeline to actually reach real completion before
+    // requesting a stop. stopProcess()'s halt signal races a still-booting
+    // tile's own boot->run cnc transition (tile_main.zig signals RUN
+    // unconditionally on boot, clobbering an earlier HALT write) — a tile
+    // caught mid-boot would silently ignore the halt and then block forever
+    // waiting on an upstream tile that already exited. Same poll-until-real
+    // completion pattern as test_process_pipeline.zig/test_process_cpu_placement.zig.
+    const max_polls: u32 = 400; // 2s bound at 5ms per poll
+    var poll: u32 = 0;
+    while (poll < max_polls) : (poll += 1) {
+        if (sup.snapshotProcessMetrics().audited >= event_count) break;
+        c_abi.process.sleepNanos(5 * std.time.ns_per_ms);
+    }
+    try std.testing.expectEqual(event_count, sup.snapshotProcessMetrics().audited);
 
     sup.stopProcess(std.testing.io);
     for (sup.monitor()) |h| {
@@ -177,7 +193,7 @@ test "process_topology_integration: process mode refuses to start with a missing
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 
-    try std.testing.expectError(error.MissingWorkspaceName, sup.startPaymentPipelineProcess(std.testing.io, .{
+    try std.testing.expectError(error.ChannelWorkspaceNameMissing, sup.startPaymentPipelineProcess(std.testing.io, .{
         .run_dir = run_dir,
         .tile_exe_path = "zig-out/bin/tickoni-supervisor",
     }));

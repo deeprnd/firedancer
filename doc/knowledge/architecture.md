@@ -228,6 +228,54 @@ Firedancer topology structs. Keep Tickoni tile IDs, placement policy, financial
 contracts, and product schema in `src/tickoni/**`, with narrow C ABI wrappers
 under `src/tickoni/c_abi/` for reused Firedancer substrate.
 
+### How Firedancer Reuse Actually Works
+
+`src/tickoni/c_abi/` is composition over Firedancer, not a parallel
+reimplementation. Each wrapper file (`queue.zig`, `dcache.zig`, `fseq.zig`,
+`cnc.zig`, `wksp.zig`, `process.zig`, ...) declares `extern fn` bindings that
+resolve to real compiled symbols in `libfd_tango.a`, `libfd_util.a`, and
+`libfd_disco.a`: object lifecycle (`fd_mcache_new`/`join`/`leave`/`delete`,
+the matching `fd_dcache_*`/`fd_fseq_*`/`fd_cnc_*`/`fd_wksp_*` families),
+footprint/alignment math, and `fd_cnc`'s boot/heartbeat/halt/fail
+command-and-control state machine all execute the real Firedancer C
+implementation. That is where the actual complexity and bug risk lives
+(object formatting, alignment, footprint math), so that is exactly the part
+Tickoni must not hand-roll.
+
+A small number of hot-path functions are mirrored natively in Zig instead of
+called through `extern fn` — for example `mcachePublish`, `mcacheLineIdx`,
+and `fragMetaSeqQuery` in `queue.zig`, and the `fseq` query/update helpers in
+`shm_link.zig`. This is not a shortcut around reuse; it is a hard linkage
+fact. Firedancer declares these as `static inline` in their headers
+(`fd_mcache.h`, `fd_fseq.h`), and C's `static inline` has no exported symbol
+in the compiled `.a` — there is nothing for an `extern fn` to bind to. This
+was confirmed empirically with `nm` against the built `libfd_tango.a` and
+`libfd_disco.a`: zero matches for `mcache_publish`, `fseq_query`,
+`line_idx`, or Firedancer's own higher-level `fd_stem_publish`/
+`fd_stem_advance`. Each such mirror carries a doc comment naming the exact
+inline function it reproduces, and its tests are pinned to the real
+on-the-wire field layout and offsets rather than an independent design —
+same precedent `queue.zig`'s `fd_mcache_seq_laddr` already set (a real
+linked symbol that hands back a raw pointer specifically so the one
+volatile read happens at the Tickoni call site instead of being wrapped).
+
+This also explains why `src/disco/stem` (Firedancer's tile polling/
+backpressure framework) is not linked directly, even though it looks like
+exactly the abstraction process-mode links need. `fd_stem_publish` itself
+just calls the same inline `fd_mcache_publish` underneath, so linking it
+would not add real reuse — it would only add `fd_stem`'s "credit"/burst
+accounting, which is tied to `fd_topo_t`'s full validator tile-housekeeping
+model. Tile-topology.md's [Reuse Boundary](tile-topology.md#reuse-boundary)
+already rules that model out for Tickoni (no Tickoni fields on
+`fd_topo.h`, no `fd_topo_run_tile` validator lifecycle). `fd_stem` stays a
+design reference for the bounded-polling/backpressure pattern, not a linked
+dependency.
+
+The working rule: default to a real Firedancer `extern fn` even at FFI cost;
+only write a native Zig mirror once `nm` on the built `.a` confirms no
+linkable symbol exists for that specific function, and document which C
+function is being mirrored when you do.
+
 ## Runtime Model
 
 Tickoni follows Firedancer's topology discipline: tiles, links, workspaces,

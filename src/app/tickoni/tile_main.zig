@@ -52,6 +52,14 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
     defer _ = c_abi.cnc.fd_cnc_leave(cnc);
 
     c_abi.cnc.heartbeat(cnc, c_abi.process.monotonicNanos());
+    // Unconditional BOOT->RUN transition: if the supervisor's stopProcess
+    // writes HALT to this cnc before this line runs (a tile caught mid-boot),
+    // this write silently clobbers it back to RUN and the halt request is
+    // lost — this tile then blocks forever waiting on an upstream tile that
+    // already honored the same halt and stopped producing. Callers must not
+    // request a stop before every tile has demonstrably reached RUN (see
+    // startPaymentPipelineProcess's callers, which poll for real pipeline
+    // progress before calling stopProcess).
     c_abi.cnc.signal(cnc, c_abi.cnc.signal_run);
 
     runPipelineStage(wksp, &spec, cnc, allocator) catch |err| {
@@ -61,7 +69,8 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
 
     var heartbeats: u32 = 0;
     while (true) {
-        if (c_abi.cnc.signalQuery(cnc) == c_abi.cnc.signal_halt) break;
+        const sig = c_abi.cnc.signalQuery(cnc);
+        if (sig == c_abi.cnc.signal_halt) break;
 
         heartbeats += 1;
         if (spec.crash_after_heartbeats > 0 and heartbeats >= spec.crash_after_heartbeats) {

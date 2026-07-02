@@ -802,6 +802,15 @@ pub fn build(b: *std.Build) void {
         integration_step.dependOn(&b.addRunArtifact(integration_test).step);
     }
 
+    // Shared by every process-mode integration test below: each self-execs
+    // zig-out/bin/tickoni-supervisor per tile (see
+    // ProcessPipelineConfig.tile_exe_path). One shared install step, not
+    // one addInstallArtifact(exe, .{}) call per test — three separate
+    // install actions targeting the same destination file were the prime
+    // suspect for a hang where one test's install raced another test's
+    // already-spawned children exec'ing that same path.
+    const process_mode_exe_install = b.addInstallArtifact(exe, .{});
+
     // V1.14.S1 process-mode payment pipeline: spawns real supervisor-managed
     // tile processes over Firedancer Tango shared memory. Tickoni internals
     // run for real; the "external tool" substituted per
@@ -822,11 +831,8 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_pipeline_test, fd_lib_dir);
     linkTickoniTango(b, process_pipeline_test, fd_lib_dir);
-    const run_process_pipeline_test = b.addRunArtifact(process_pipeline_test);
-    // The test self-execs zig-out/bin/tickoni-supervisor per tile (see
-    // ProcessPipelineConfig.tile_exe_path); make sure it is built and
-    // installed first.
-    run_process_pipeline_test.step.dependOn(&b.addInstallArtifact(exe, .{}).step);
+    const run_process_pipeline_test = addPlainTestRun(b, process_pipeline_test);
+    run_process_pipeline_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_pipeline_test.step);
 
     // V1.14.S1 M5: explicit shared-core CPU placement and the
@@ -845,29 +851,14 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_cpu_placement_test, fd_lib_dir);
     linkTickoniTango(b, process_cpu_placement_test, fd_lib_dir);
-    const run_process_cpu_placement_test = b.addRunArtifact(process_cpu_placement_test);
-    run_process_cpu_placement_test.step.dependOn(&b.addInstallArtifact(exe, .{}).step);
+    const run_process_cpu_placement_test = addPlainTestRun(b, process_cpu_placement_test);
+    run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_cpu_placement_test.step);
 
     // V1.14.S1 M6: process isolation (T13: one OS process per tile,
     // parented by the supervisor), crash isolation (T12: SIGKILL one
     // tile, siblings unaffected), and the remaining process-mode
     // fail-closed configuration checks.
-    //
-    // NOT YET WIRED into integration_step: adding this test target's run
-    // step as an integration_step dependency causes an EARLIER, unrelated,
-    // unchanged test (test_process_pipeline_test) to hang indefinitely,
-    // reproduced 100% of the time. Confirmed NOT caused by this file's own
-    // logic (the hang reproduces even before this test binary itself ever
-    // starts running) and NOT caused by host state drift (HEAD alone, with
-    // this test target absent entirely, stays fast and green after the
-    // same long session). Prime suspect: the three process-mode
-    // integration tests each call b.addInstallArtifact(exe, .{}) separately
-    // for the same zig-out/bin/tickoni-supervisor destination; a race
-    // between one test's install step and another's already-spawned
-    // children exec'ing that path is unconfirmed but unruled-out. Needs
-    // fresh investigation (try a single shared install step reused by all
-    // three tests first) before wiring this in.
     const process_topology_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/test/integration/test_process_topology.zig"),
@@ -882,9 +873,48 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_topology_test, fd_lib_dir);
     linkTickoniTango(b, process_topology_test, fd_lib_dir);
-    const run_process_topology_test = b.addRunArtifact(process_topology_test);
-    run_process_topology_test.step.dependOn(&b.addInstallArtifact(exe, .{}).step);
-    _ = &run_process_topology_test;
+    const run_process_topology_test = addPlainTestRun(b, process_topology_test);
+    run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
+    integration_step.dependOn(&run_process_topology_test.step);
+
+    // V1.14.S1 M6: demo/replay parity — floating vs. explicit shared-core
+    // CPU placement must reach identical final pipeline metrics through the
+    // real supervisor (T14).
+    const process_demo_parity_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/integration/test_process_demo_parity.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "runtime", .module = runtime_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "supervisor", .module = supervisor_named_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, process_demo_parity_test, fd_lib_dir);
+    linkTickoniTango(b, process_demo_parity_test, fd_lib_dir);
+    const run_process_demo_parity_test = addPlainTestRun(b, process_demo_parity_test);
+    run_process_demo_parity_test.step.dependOn(&process_mode_exe_install.step);
+    integration_step.dependOn(&run_process_demo_parity_test.step);
+
+    // V1.14.S1 M6: shm_link fail-closed matrix (dcache bounds, missing link
+    // objects) and backpressure visibility. Single-process — no tile spawn,
+    // so no stdio-inheritance hang risk — uses the normal test-runner path.
+    const shm_link_bounds_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/test/integration/test_shm_link_bounds.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "runtime", .module = runtime_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, shm_link_bounds_test, fd_lib_dir);
+    linkTickoniTango(b, shm_link_bounds_test, fd_lib_dir);
+    integration_step.dependOn(&b.addRunArtifact(shm_link_bounds_test).step);
 
     // Mock HTTP servers (test/mocks): self-tests of the mock
     // infrastructure itself, no tile schema imports required. Wired to
@@ -1257,6 +1287,25 @@ pub fn build(b: *std.Build) void {
     cov_step.dependOn(&b.addInstallArtifact(sup_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
+}
+
+/// b.addRunArtifact on a test binary always enables Zig's test-server
+/// protocol (--listen=- plus .stdio = .zig_test), which communicates with
+/// the build runner over the test binary's own stdin/stdout. A test that
+/// spawns real child OS processes (V1.14 process-mode tests) risks those
+/// children inheriting that stdout descriptor, which keeps the pipe's
+/// write end open after the test itself finishes and hangs the build
+/// runner waiting for EOF that never arrives. This builds the Run step by
+/// hand instead, skipping std.Build.addRunArtifact's
+/// enableTestRunnerMode call entirely (plain argv + exit-code check, real
+/// stdio inherited, no IPC protocol for a spawned process to interfere
+/// with).
+fn addPlainTestRun(b: *std.Build, test_compile: *std.Build.Step.Compile) *std.Build.Step.Run {
+    const run_step = std.Build.Step.Run.create(b, b.fmt("run {s} (plain)", .{test_compile.name}));
+    run_step.producer = test_compile;
+    run_step.addArtifactArg(test_compile);
+    run_step.has_side_effects = true;
+    return run_step;
 }
 
 /// Links src/tango (mcache/dcache/fseq/cnc) and src/util/wksp (fd_wksp)
