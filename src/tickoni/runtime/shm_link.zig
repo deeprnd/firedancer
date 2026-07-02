@@ -29,27 +29,27 @@ const wksp_tag: usize = 2;
 pub fn create(wksp: *c_abi.wksp.Wksp, depth: usize, mtu: usize) !LinkHandles {
     std.debug.assert(std.math.isPowerOfTwo(depth));
 
-    const mcache_footprint = c_abi.queue.fd_mcache_footprint(depth, 0);
+    const mcache_footprint = c_abi.queue.mcacheFootprint(depth, 0);
     if (mcache_footprint == 0) return error.InvalidDepth;
-    const mcache_gaddr = c_abi.wksp.alloc(wksp, c_abi.queue.mcache_align, mcache_footprint, wksp_tag);
+    const mcache_gaddr = c_abi.wksp.wkspAlloc(wksp, c_abi.queue.mcache_align, mcache_footprint, wksp_tag);
     if (mcache_gaddr == 0) return error.McacheAllocFailed;
-    const mcache_laddr = c_abi.wksp.fd_wksp_laddr(wksp, mcache_gaddr) orelse return error.McacheLaddrFailed;
-    _ = c_abi.queue.fd_mcache_new(mcache_laddr, depth, 0, 0) orelse return error.McacheNewFailed;
+    const mcache_laddr = c_abi.wksp.wkspLaddr(wksp, mcache_gaddr) orelse return error.McacheLaddrFailed;
+    _ = c_abi.queue.mcacheNew(mcache_laddr, depth, 0, 0) orelse return error.McacheNewFailed;
 
     const data_sz = c_abi.dcache.dcacheReqDataSz(mtu, depth, 1, false);
     if (data_sz == 0) return error.InvalidMtu;
-    const dcache_footprint = c_abi.dcache.fd_dcache_footprint(data_sz, 0);
+    const dcache_footprint = c_abi.dcache.dcacheFootprint(data_sz, 0);
     if (dcache_footprint == 0) return error.InvalidMtu;
-    const dcache_gaddr = c_abi.wksp.alloc(wksp, c_abi.dcache.dcache_align, dcache_footprint, wksp_tag);
+    const dcache_gaddr = c_abi.wksp.wkspAlloc(wksp, c_abi.dcache.dcache_align, dcache_footprint, wksp_tag);
     if (dcache_gaddr == 0) return error.DcacheAllocFailed;
-    const dcache_laddr = c_abi.wksp.fd_wksp_laddr(wksp, dcache_gaddr) orelse return error.DcacheLaddrFailed;
-    _ = c_abi.dcache.fd_dcache_new(dcache_laddr, data_sz, 0) orelse return error.DcacheNewFailed;
+    const dcache_laddr = c_abi.wksp.wkspLaddr(wksp, dcache_gaddr) orelse return error.DcacheLaddrFailed;
+    _ = c_abi.dcache.dcacheNew(dcache_laddr, data_sz, 0) orelse return error.DcacheNewFailed;
 
-    const fseq_footprint = c_abi.fseq.fd_fseq_footprint();
-    const fseq_gaddr = c_abi.wksp.alloc(wksp, c_abi.fseq.fseq_align, fseq_footprint, wksp_tag);
+    const fseq_footprint = c_abi.fseq.fseqFootprint();
+    const fseq_gaddr = c_abi.wksp.wkspAlloc(wksp, c_abi.fseq.fseq_align, fseq_footprint, wksp_tag);
     if (fseq_gaddr == 0) return error.FseqAllocFailed;
-    const fseq_laddr = c_abi.wksp.fd_wksp_laddr(wksp, fseq_gaddr) orelse return error.FseqLaddrFailed;
-    _ = c_abi.fseq.fd_fseq_new(fseq_laddr, 0) orelse return error.FseqNewFailed;
+    const fseq_laddr = c_abi.wksp.wkspLaddr(wksp, fseq_gaddr) orelse return error.FseqLaddrFailed;
+    _ = c_abi.fseq.fseqNew(fseq_laddr, 0) orelse return error.FseqNewFailed;
 
     return .{ .mcache_gaddr = mcache_gaddr, .dcache_gaddr = dcache_gaddr, .fseq_gaddr = fseq_gaddr, .depth = depth, .mtu = mtu };
 }
@@ -59,12 +59,12 @@ fn joinTriplet(wksp: *c_abi.wksp.Wksp, handles: LinkHandles) !struct {
     dcache_base: [*]u8,
     fseq: [*]volatile u64,
 } {
-    const mcache_laddr = c_abi.wksp.fd_wksp_laddr(wksp, handles.mcache_gaddr) orelse return error.McacheLaddrFailed;
-    const mcache = c_abi.queue.fd_mcache_join(mcache_laddr) orelse return error.McacheJoinFailed;
-    const dcache_laddr = c_abi.wksp.fd_wksp_laddr(wksp, handles.dcache_gaddr) orelse return error.DcacheLaddrFailed;
-    const dcache_base = c_abi.dcache.fd_dcache_join(dcache_laddr) orelse return error.DcacheJoinFailed;
-    const fseq_laddr = c_abi.wksp.fd_wksp_laddr(wksp, handles.fseq_gaddr) orelse return error.FseqLaddrFailed;
-    const fseq = c_abi.fseq.fd_fseq_join(fseq_laddr) orelse return error.FseqJoinFailed;
+    const mcache_laddr = c_abi.wksp.wkspLaddr(wksp, handles.mcache_gaddr) orelse return error.McacheLaddrFailed;
+    const mcache = c_abi.queue.mcacheJoin(mcache_laddr) orelse return error.McacheJoinFailed;
+    const dcache_laddr = c_abi.wksp.wkspLaddr(wksp, handles.dcache_gaddr) orelse return error.DcacheLaddrFailed;
+    const dcache_base = c_abi.dcache.dcacheJoin(dcache_laddr) orelse return error.DcacheJoinFailed;
+    const fseq_laddr = c_abi.wksp.wkspLaddr(wksp, handles.fseq_gaddr) orelse return error.FseqLaddrFailed;
+    const fseq = c_abi.fseq.fseqJoin(fseq_laddr) orelse return error.FseqJoinFailed;
     return .{ .mcache = mcache, .dcache_base = dcache_base, .fseq = fseq };
 }
 
@@ -86,9 +86,9 @@ pub const Producer = struct {
     }
 
     pub fn leave(self: *Producer) void {
-        _ = c_abi.queue.fd_mcache_leave(self.mcache);
-        _ = c_abi.dcache.fd_dcache_leave(self.dcache_base);
-        _ = c_abi.fseq.fd_fseq_leave(@volatileCast(self.fseq));
+        _ = c_abi.queue.mcacheLeave(self.mcache);
+        _ = c_abi.dcache.dcacheLeave(self.dcache_base);
+        _ = c_abi.fseq.fseqLeave(@volatileCast(self.fseq));
     }
 
     fn writeSlot(self: *Producer, payload: []const u8) !u32 {
@@ -97,7 +97,7 @@ pub const Producer = struct {
         const slot_footprint = c_abi.dcache.dcacheSlotFootprint(self.mtu);
         const slot = self.dcache_base[line * slot_footprint ..][0..slot_footprint];
         @memcpy(slot[0..payload.len], payload);
-        const gaddr = c_abi.wksp.fd_wksp_gaddr(self.wksp, &slot[0]);
+        const gaddr = c_abi.wksp.wkspGaddr(self.wksp, &slot[0]);
         return @intCast(gaddr / c_abi.dcache.chunk_align);
     }
 
@@ -158,8 +158,8 @@ pub const Consumer = struct {
     }
 
     pub fn leave(self: *Consumer) void {
-        _ = c_abi.queue.fd_mcache_leave(self.mcache);
-        _ = c_abi.fseq.fd_fseq_leave(@volatileCast(self.fseq));
+        _ = c_abi.queue.mcacheLeave(self.mcache);
+        _ = c_abi.fseq.fseqLeave(@volatileCast(self.fseq));
     }
 
     /// Blocks until the next frag is available or `stop` is signalled.
@@ -182,7 +182,7 @@ pub const Consumer = struct {
 
         const sz = meta.sz;
         const chunk = meta.chunk;
-        const laddr = c_abi.wksp.fd_wksp_laddr(self.wksp, @as(usize, chunk) * c_abi.dcache.chunk_align) orelse return null;
+        const laddr = c_abi.wksp.wkspLaddr(self.wksp, @as(usize, chunk) * c_abi.dcache.chunk_align) orelse return null;
         const src: [*]const u8 = @ptrCast(laddr);
         @memcpy(out_buf[0..sz], src[0..sz]);
 

@@ -280,11 +280,12 @@ pub fn build(b: *std.Build) void {
             linkTickoniCodec(b, t, fd_lib_dir);
         }
         if (std.mem.eql(u8, path, "src/tickoni/c_abi/queue.zig") or
-            std.mem.eql(u8, path, "src/tickoni/c_abi/fseq.zig"))
+            std.mem.eql(u8, path, "src/tickoni/c_abi/dcache.zig") or
+            std.mem.eql(u8, path, "src/tickoni/c_abi/fseq.zig") or
+            std.mem.eql(u8, path, "src/tickoni/c_abi/cnc.zig"))
         {
-            // mcacheLineIdx/mcachePublish/fragMetaSeqQuery (queue.zig) and
-            // fseqQuery/fseqUpdate (fseq.zig) tests call the real
-            // shim/tango.c pass-through, not a native Zig mirror.
+            // These tests call real Firedancer substrate through the tk_ shim
+            // layer, not native Zig mirrors or direct fd_* externs.
             linkTickoniTango(b, t, fd_lib_dir);
         }
         const t_run = b.addRunArtifact(t);
@@ -1154,7 +1155,9 @@ pub fn build(b: *std.Build) void {
             linkTickoniCodec(b, t, fd_lib_dir);
         }
         if (std.mem.eql(u8, entry[1], "src/tickoni/c_abi/queue.zig") or
-            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/fseq.zig"))
+            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/dcache.zig") or
+            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/fseq.zig") or
+            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/cnc.zig"))
         {
             linkTickoniTango(b, t, fd_lib_dir);
         }
@@ -1337,6 +1340,7 @@ fn linkTickoniTango(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []
     step.root_module.addLibraryPath(b.path(fd_lib_dir));
     step.root_module.linkSystemLibrary("fd_tango", .{});
     step.root_module.linkSystemLibrary("fd_util", .{});
+    step.root_module.linkSystemLibrary("stdc++", .{});
 }
 
 fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {

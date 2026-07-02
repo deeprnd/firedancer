@@ -1,8 +1,7 @@
 /// Narrow Zig bindings over src/tango/fseq/fd_fseq.h.
 ///
-/// align/footprint/new/join/leave/delete are bound directly.
-/// `fseqQuery`/`fseqUpdate` wrap `fd_fseq_query`/`fd_fseq_update` via
-/// shim/tango.c. See doc/knowledge/architecture.md.
+/// Zig callers bind only through Tickoni-owned `tk_*` shim symbols; the shim
+/// calls the real Firedancer functions/static inline helpers.
 const std = @import("std");
 
 // ---------------------------------------------------------------------------
@@ -18,23 +17,47 @@ pub const fseq_app_footprint: usize = 96;
 // Extern declarations — require -lfd_tango at link time
 // ---------------------------------------------------------------------------
 
-pub extern fn fd_fseq_align() usize;
-pub extern fn fd_fseq_footprint() usize;
-pub extern fn fd_fseq_new(shmem: *anyopaque, seq0: u64) ?*anyopaque;
-pub extern fn fd_fseq_join(shfseq: *anyopaque) ?[*]volatile u64;
-pub extern fn fd_fseq_leave(fseq: [*]const u64) ?*anyopaque;
-pub extern fn fd_fseq_delete(shfseq: *anyopaque) ?*anyopaque;
+extern fn tk_fseq_align() usize;
+extern fn tk_fseq_footprint() usize;
+extern fn tk_fseq_new(shmem: *anyopaque, seq0: u64) ?*anyopaque;
+extern fn tk_fseq_join(shfseq: *anyopaque) ?[*]volatile u64;
+extern fn tk_fseq_leave(fseq: [*]const u64) ?*anyopaque;
+extern fn tk_fseq_delete(shfseq: *anyopaque) ?*anyopaque;
+
+pub fn fseqAlign() usize {
+    return tk_fseq_align();
+}
+
+pub fn fseqFootprint() usize {
+    return tk_fseq_footprint();
+}
+
+pub fn fseqNew(shmem: *anyopaque, seq0: u64) ?*anyopaque {
+    return tk_fseq_new(shmem, seq0);
+}
+
+pub fn fseqJoin(shfseq: *anyopaque) ?[*]volatile u64 {
+    return tk_fseq_join(shfseq);
+}
+
+pub fn fseqLeave(fseq: [*]const u64) ?*anyopaque {
+    return tk_fseq_leave(fseq);
+}
+
+pub fn fseqDelete(shfseq: *anyopaque) ?*anyopaque {
+    return tk_fseq_delete(shfseq);
+}
 
 /// Wraps fd_fseq_query (fd_fseq.h). Binds to shim/tango.c.
-extern fn tickoni_fseq_query(fseq: [*]const u64) u64;
+extern fn tk_fseq_query(fseq: [*]const u64) u64;
 pub fn fseqQuery(fseq: [*]volatile u64) u64 {
-    return tickoni_fseq_query(@volatileCast(fseq));
+    return tk_fseq_query(@volatileCast(fseq));
 }
 
 /// Wraps fd_fseq_update (fd_fseq.h). Binds to shim/tango.c.
-extern fn tickoni_fseq_update(fseq: [*]u64, seq: u64) void;
+extern fn tk_fseq_update(fseq: [*]u64, seq: u64) void;
 pub fn fseqUpdate(fseq: [*]volatile u64, seq: u64) void {
-    tickoni_fseq_update(@volatileCast(fseq), seq);
+    tk_fseq_update(@volatileCast(fseq), seq);
 }
 
 // ---------------------------------------------------------------------------

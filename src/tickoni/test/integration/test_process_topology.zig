@@ -55,7 +55,7 @@ test "process_topology_integration: every tile is a distinct OS process parented
         .tile_exe_path = "zig-out/bin/tickoni-supervisor",
     });
 
-    const supervisor_pid = c_abi.sandbox.fd_sandbox_getpid();
+    const supervisor_pid = c_abi.sandbox.getpid();
 
     // Every tile has a distinct pid, and every pid's own /proc/<pid>/status
     // reports this test process (the "supervisor") as its parent.

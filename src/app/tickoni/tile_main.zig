@@ -27,7 +27,7 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
         std.debug.print("tile_main: bootWithSyntheticArgv failed for tile {d}: {t}\n", .{ spec.tile_idx, err });
         return 1;
     };
-    defer c_abi.boot.fd_halt();
+    defer c_abi.boot.halt();
 
     var workspace_name_buf: [64]u8 = undefined;
     const workspace_name_z = std.fmt.bufPrintZ(&workspace_name_buf, "{s}", .{spec.workspace_name.slice()}) catch {
@@ -35,21 +35,21 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
         return 1;
     };
 
-    const wksp = c_abi.wksp.fd_wksp_attach(workspace_name_z) orelse {
+    const wksp = c_abi.wksp.wkspAttach(workspace_name_z) orelse {
         std.debug.print("tile_main: fd_wksp_attach failed for tile {d}\n", .{spec.tile_idx});
         return 1;
     };
-    defer _ = c_abi.wksp.fd_wksp_detach(wksp);
+    defer _ = c_abi.wksp.wkspDetach(wksp);
 
-    const laddr = c_abi.wksp.fd_wksp_laddr(wksp, spec.cnc_gaddr) orelse {
+    const laddr = c_abi.wksp.wkspLaddr(wksp, spec.cnc_gaddr) orelse {
         std.debug.print("tile_main: fd_wksp_laddr failed for tile {d}\n", .{spec.tile_idx});
         return 1;
     };
-    const cnc = c_abi.cnc.fd_cnc_join(laddr) orelse {
+    const cnc = c_abi.cnc.cncJoin(laddr) orelse {
         std.debug.print("tile_main: fd_cnc_join failed for tile {d}\n", .{spec.tile_idx});
         return 1;
     };
-    defer _ = c_abi.cnc.fd_cnc_leave(cnc);
+    defer _ = c_abi.cnc.cncLeave(cnc);
 
     c_abi.cnc.heartbeat(cnc, c_abi.process.monotonicNanos());
     // Unconditional BOOT->RUN transition: if the supervisor's stopProcess

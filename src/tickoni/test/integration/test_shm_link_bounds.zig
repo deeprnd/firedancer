@@ -16,12 +16,12 @@ fn attachScratchWksp(io: std.Io, run_dir: []const u8, name: [*:0]const u8) !*c_a
     var normal_dir_handle = try std.Io.Dir.cwd().createDirPathOpen(io, normal_dir, .{});
     normal_dir_handle.close(io);
 
-    _ = c_abi.wksp.fd_wksp_delete_named(name);
+    _ = c_abi.wksp.wkspDeleteNamed(name);
     var sub_page_cnt = [_]usize{256};
     var sub_cpu_idx = [_]usize{0};
-    const rc = c_abi.wksp.fd_wksp_new_named(name, c_abi.wksp.shmem_normal_page_sz, 1, &sub_page_cnt, &sub_cpu_idx, 0o600, 1, 32);
+    const rc = c_abi.wksp.wkspNewNamed(name, c_abi.wksp.shmem_normal_page_sz, 1, &sub_page_cnt, &sub_cpu_idx, 0o600, 1, 32);
     if (rc != 0) return error.WkspCreateFailed;
-    return c_abi.wksp.fd_wksp_attach(name) orelse error.WkspAttachFailed;
+    return c_abi.wksp.wkspAttach(name) orelse error.WkspAttachFailed;
 }
 
 test "shm_link_bounds: publish larger than the link's mtu fails closed instead of overrunning the dcache slot" {
@@ -33,9 +33,9 @@ test "shm_link_bounds: publish larger than the link's mtu fails closed instead o
 
     const wksp = try attachScratchWksp(std.testing.io, run_dir, "tkbnd0");
     defer {
-        _ = c_abi.wksp.fd_wksp_detach(wksp);
-        _ = c_abi.wksp.fd_wksp_delete_named("tkbnd0");
-        c_abi.boot.fd_halt();
+        _ = c_abi.wksp.wkspDetach(wksp);
+        _ = c_abi.wksp.wkspDeleteNamed("tkbnd0");
+        c_abi.boot.halt();
     }
 
     const handles = try rt.shm_link.create(wksp, 4, 8);
@@ -61,9 +61,9 @@ test "shm_link_bounds: joining a zeroed (missing) link handle set fails closed" 
 
     const wksp = try attachScratchWksp(std.testing.io, run_dir, "tkbnd1");
     defer {
-        _ = c_abi.wksp.fd_wksp_detach(wksp);
-        _ = c_abi.wksp.fd_wksp_delete_named("tkbnd1");
-        c_abi.boot.fd_halt();
+        _ = c_abi.wksp.wkspDetach(wksp);
+        _ = c_abi.wksp.wkspDeleteNamed("tkbnd1");
+        c_abi.boot.halt();
     }
 
     // A never-created LinkHandles set (all gaddrs 0) simulates a missing
@@ -83,9 +83,9 @@ test "shm_link_bounds: producer backpressures and counts waits when the consumer
 
     const wksp = try attachScratchWksp(std.testing.io, run_dir, "tkbnd2");
     defer {
-        _ = c_abi.wksp.fd_wksp_detach(wksp);
-        _ = c_abi.wksp.fd_wksp_delete_named("tkbnd2");
-        c_abi.boot.fd_halt();
+        _ = c_abi.wksp.wkspDetach(wksp);
+        _ = c_abi.wksp.wkspDeleteNamed("tkbnd2");
+        c_abi.boot.halt();
     }
 
     // Depth 2: the 3rd publish must block on backpressure since no consumer

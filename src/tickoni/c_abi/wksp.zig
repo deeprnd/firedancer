@@ -8,7 +8,7 @@
 /// pages or root privileges are required, matching the roadmap requirement
 /// that Tickoni not inherit Firedancer validator's hugepage assumption.
 ///
-/// Link requirements: -lfd_util at link time (fd_wksp lives under src/util).
+/// Link requirements: -lfd_util plus shim/tango.c at link time.
 const std = @import("std");
 
 // ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ pub const wksp_success: c_int = 0;
 
 /// Returns FD_WKSP_SUCCESS (0) or a negative FD_WKSP_ERR_* code — NOT a
 /// workspace handle. Call fd_wksp_attach(name) afterward to join it.
-pub extern fn fd_wksp_new_named(
+extern fn tk_wksp_new_named(
     name: [*:0]const u8,
     page_sz: usize,
     sub_cnt: usize,
@@ -38,10 +38,10 @@ pub extern fn fd_wksp_new_named(
     seed: u32,
     opt_part_max: usize,
 ) c_int;
-pub extern fn fd_wksp_delete_named(name: [*:0]const u8) c_int;
-pub extern fn fd_wksp_attach(name: [*:0]const u8) ?*Wksp;
-pub extern fn fd_wksp_detach(wksp: *Wksp) c_int;
-pub extern fn fd_wksp_alloc_at_least(
+extern fn tk_wksp_delete_named(name: [*:0]const u8) c_int;
+extern fn tk_wksp_attach(name: [*:0]const u8) ?*Wksp;
+extern fn tk_wksp_detach(wksp: *Wksp) c_int;
+extern fn tk_wksp_alloc_at_least(
     wksp: *Wksp,
     alignment: usize,
     sz: usize,
@@ -49,15 +49,56 @@ pub extern fn fd_wksp_alloc_at_least(
     lo: *usize,
     hi: *usize,
 ) usize;
-pub extern fn fd_wksp_free(wksp: *Wksp, gaddr: usize) void;
-pub extern fn fd_wksp_laddr(wksp: *const Wksp, gaddr: usize) ?*anyopaque;
-pub extern fn fd_wksp_gaddr(wksp: *const Wksp, laddr: *const anyopaque) usize;
+extern fn tk_wksp_alloc(wksp: *Wksp, alignment: usize, sz: usize, tag: usize) usize;
+extern fn tk_wksp_free(wksp: *Wksp, gaddr: usize) void;
+extern fn tk_wksp_laddr(wksp: *const Wksp, gaddr: usize) ?*anyopaque;
+extern fn tk_wksp_gaddr(wksp: *const Wksp, laddr: *const anyopaque) usize;
+
+pub fn wkspNewNamed(
+    name: [*:0]const u8,
+    page_sz: usize,
+    sub_cnt: usize,
+    sub_page_cnt: [*]const usize,
+    sub_cpu_idx: [*]const usize,
+    mode: usize,
+    seed: u32,
+    opt_part_max: usize,
+) c_int {
+    return tk_wksp_new_named(name, page_sz, sub_cnt, sub_page_cnt, sub_cpu_idx, mode, seed, opt_part_max);
+}
+
+pub fn wkspDeleteNamed(name: [*:0]const u8) c_int {
+    return tk_wksp_delete_named(name);
+}
+
+pub fn wkspAttach(name: [*:0]const u8) ?*Wksp {
+    return tk_wksp_attach(name);
+}
+
+pub fn wkspDetach(wksp: *Wksp) c_int {
+    return tk_wksp_detach(wksp);
+}
+
+pub fn wkspAllocAtLeast(wksp: *Wksp, alignment: usize, sz: usize, tag: usize, lo: *usize, hi: *usize) usize {
+    return tk_wksp_alloc_at_least(wksp, alignment, sz, tag, lo, hi);
+}
 
 /// Mirrors static inline fd_wksp_alloc (fd_wksp.h): a fixed-alignment
 /// wrapper around fd_wksp_alloc_at_least with dummy [lo,hi) outputs.
-pub fn alloc(wksp: *Wksp, alignment: usize, sz: usize, tag: usize) usize {
-    var dummy: [2]usize = .{ 0, 0 };
-    return fd_wksp_alloc_at_least(wksp, alignment, sz, tag, &dummy[0], &dummy[1]);
+pub fn wkspAlloc(wksp: *Wksp, alignment: usize, sz: usize, tag: usize) usize {
+    return tk_wksp_alloc(wksp, alignment, sz, tag);
+}
+
+pub fn wkspFree(wksp: *Wksp, gaddr: usize) void {
+    tk_wksp_free(wksp, gaddr);
+}
+
+pub fn wkspLaddr(wksp: *const Wksp, gaddr: usize) ?*anyopaque {
+    return tk_wksp_laddr(wksp, gaddr);
+}
+
+pub fn wkspGaddr(wksp: *const Wksp, laddr: *const anyopaque) usize {
+    return tk_wksp_gaddr(wksp, laddr);
 }
 
 // ---------------------------------------------------------------------------

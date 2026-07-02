@@ -1,8 +1,7 @@
 /// Narrow Zig bindings over src/tango/dcache/fd_dcache.h.
 ///
-/// Only mirrors real (non-`static inline`) C symbols. `fd_dcache_new`
-/// formats a raw payload region; producers/consumers index into it with
-/// chunk arithmetic owned by src/tickoni/runtime/shm_link.zig, not here.
+/// Zig callers bind only through Tickoni-owned `tk_*` shim symbols; the shim
+/// calls the real Firedancer functions/macros.
 ///
 /// Link requirements: -lfd_tango -lfd_util at link time.
 const std = @import("std");
@@ -16,35 +15,71 @@ pub const dcache_align: usize = 4096;
 pub const dcache_slot_align: usize = 128;
 pub const dcache_guard_footprint: usize = 3968;
 
-/// Mirrors the FD_DCACHE_SLOT_FOOTPRINT macro (fd_dcache.h): round mtu up to
-/// a dcache_slot_align multiple. Not callable via extern; macros have no
-/// linkable symbol.
+extern fn tk_dcache_slot_footprint(mtu: usize) usize;
+extern fn tk_dcache_req_data_sz(mtu: usize, depth: usize, burst: usize, compact: c_int) usize;
+extern fn tk_dcache_align() usize;
+extern fn tk_dcache_footprint(data_sz: usize, app_sz: usize) usize;
+extern fn tk_dcache_new(shmem: *anyopaque, data_sz: usize, app_sz: usize) ?*anyopaque;
+extern fn tk_dcache_join(shdcache: *anyopaque) ?[*]u8;
+extern fn tk_dcache_leave(dcache: [*]const u8) ?*anyopaque;
+extern fn tk_dcache_delete(shdcache: *anyopaque) ?*anyopaque;
+extern fn tk_dcache_data_sz(dcache: [*]const u8) usize;
+extern fn tk_dcache_app_sz(dcache: [*]const u8) usize;
+extern fn tk_dcache_app_laddr(dcache: [*]u8) ?[*]u8;
+extern fn tk_dcache_app_laddr_const(dcache: [*]const u8) ?[*]const u8;
+extern fn tk_dcache_compact_is_safe(base: *const anyopaque, dcache: *const anyopaque, mtu: usize, depth: usize) c_int;
+
 pub fn dcacheSlotFootprint(mtu: usize) usize {
-    return std.mem.alignForward(usize, mtu, dcache_slot_align);
+    return tk_dcache_slot_footprint(mtu);
 }
 
-/// Mirrors the FD_DCACHE_REQ_DATA_SZ macro (fd_dcache.h).
 pub fn dcacheReqDataSz(mtu: usize, depth: usize, burst: usize, compact: bool) usize {
-    const extra: usize = if (compact) 1 else 0;
-    return dcacheSlotFootprint(mtu) * (depth + burst + extra);
+    return tk_dcache_req_data_sz(mtu, depth, burst, @intFromBool(compact));
 }
 
-// ---------------------------------------------------------------------------
-// Extern declarations — require -lfd_tango at link time
-// ---------------------------------------------------------------------------
+pub fn dcacheAlign() usize {
+    return tk_dcache_align();
+}
 
-pub extern fn fd_dcache_req_data_sz(mtu: usize, depth: usize, burst: usize, compact: c_int) usize;
-pub extern fn fd_dcache_align() usize;
-pub extern fn fd_dcache_footprint(data_sz: usize, app_sz: usize) usize;
-pub extern fn fd_dcache_new(shmem: *anyopaque, data_sz: usize, app_sz: usize) ?*anyopaque;
-pub extern fn fd_dcache_join(shdcache: *anyopaque) ?[*]u8;
-pub extern fn fd_dcache_leave(dcache: [*]const u8) ?*anyopaque;
-pub extern fn fd_dcache_delete(shdcache: *anyopaque) ?*anyopaque;
-pub extern fn fd_dcache_data_sz(dcache: [*]const u8) usize;
-pub extern fn fd_dcache_app_sz(dcache: [*]const u8) usize;
-pub extern fn fd_dcache_app_laddr(dcache: [*]u8) ?[*]u8;
-pub extern fn fd_dcache_app_laddr_const(dcache: [*]const u8) ?[*]const u8;
-pub extern fn fd_dcache_compact_is_safe(base: *const anyopaque, dcache: *const anyopaque, mtu: usize, depth: usize) c_int;
+pub fn dcacheFootprint(data_sz: usize, app_sz: usize) usize {
+    return tk_dcache_footprint(data_sz, app_sz);
+}
+
+pub fn dcacheNew(shmem: *anyopaque, data_sz: usize, app_sz: usize) ?*anyopaque {
+    return tk_dcache_new(shmem, data_sz, app_sz);
+}
+
+pub fn dcacheJoin(shdcache: *anyopaque) ?[*]u8 {
+    return tk_dcache_join(shdcache);
+}
+
+pub fn dcacheLeave(dcache: [*]const u8) ?*anyopaque {
+    return tk_dcache_leave(dcache);
+}
+
+pub fn dcacheDelete(shdcache: *anyopaque) ?*anyopaque {
+    return tk_dcache_delete(shdcache);
+}
+
+pub fn dcacheDataSz(dcache: [*]const u8) usize {
+    return tk_dcache_data_sz(dcache);
+}
+
+pub fn dcacheAppSz(dcache: [*]const u8) usize {
+    return tk_dcache_app_sz(dcache);
+}
+
+pub fn dcacheAppLaddr(dcache: [*]u8) ?[*]u8 {
+    return tk_dcache_app_laddr(dcache);
+}
+
+pub fn dcacheAppLaddrConst(dcache: [*]const u8) ?[*]const u8 {
+    return tk_dcache_app_laddr_const(dcache);
+}
+
+pub fn dcacheCompactIsSafe(base: *const anyopaque, dcache: *const anyopaque, mtu: usize, depth: usize) bool {
+    return tk_dcache_compact_is_safe(base, dcache, mtu, depth) != 0;
+}
 
 // ---------------------------------------------------------------------------
 // Tests — layout and macro-mirror checks only; no C linkage required

@@ -19,8 +19,12 @@
 /// only the supervisor's own process env is under its direct control here.
 const std = @import("std");
 
-pub extern fn fd_boot(pargc: *c_int, pargv: *[*][*:0]u8) void;
-pub extern fn fd_halt() void;
+extern fn tk_boot(pargc: *c_int, pargv: *[*][*:0]u8) void;
+extern fn tk_halt() void;
+
+pub fn halt() void {
+    tk_halt();
+}
 
 var synthetic_prog_name = "tickoni-tile".*;
 var flag_name = "--shmem-path".*;
@@ -48,7 +52,7 @@ pub fn bootWithSyntheticArgv(shmem_path: ?[]const u8) error{ShmemPathTooLong}!vo
     }
 
     var argv: [*][*:0]u8 = @ptrCast(&synthetic_argv);
-    fd_boot(&argc, &argv);
+    tk_boot(&argc, &argv);
 }
 
 // ---------------------------------------------------------------------------

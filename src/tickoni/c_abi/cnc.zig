@@ -1,15 +1,8 @@
 /// Narrow Zig bindings over src/tango/cnc/fd_cnc.h.
 ///
 /// `fd_cnc_t` owns tile boot/heartbeat/halt/fail state for V1.14 process
-/// mode. Only real (non-`static inline`) C symbols are declared as
-/// `extern fn` below. The header's tiny inline accessors
-/// (`fd_cnc_signal`, `fd_cnc_signal_query`, `fd_cnc_heartbeat`,
-/// `fd_cnc_heartbeat_query`, `fd_cnc_app_laddr`, `fd_cnc_close`) have no
-/// linkable symbol, so they are mirrored here as direct volatile
-/// field/offset access — the same precedent as
-/// src/tickoni/c_abi/queue.zig's `fd_mcache_seq_laddr`. The field offsets
-/// and the `+64` app-region offset are pinned by the layout test below
-/// against the `struct fd_cnc_private` declaration in the header.
+/// mode. Zig callers bind only through Tickoni-owned `tk_*` shim symbols; the
+/// shim calls the real Firedancer functions/static inline helpers.
 const std = @import("std");
 
 // ---------------------------------------------------------------------------
@@ -55,33 +48,75 @@ pub const Cnc = opaque {};
 // Extern declarations — require -lfd_tango at link time
 // ---------------------------------------------------------------------------
 
-pub extern fn fd_cnc_align() usize;
-pub extern fn fd_cnc_footprint(app_sz: usize) usize;
-pub extern fn fd_cnc_new(shmem: *anyopaque, app_sz: usize, cnc_type: u64, now: i64) ?*anyopaque;
-pub extern fn fd_cnc_join(shcnc: *anyopaque) ?*Cnc;
-pub extern fn fd_cnc_leave(cnc: *const Cnc) ?*anyopaque;
-pub extern fn fd_cnc_delete(shcnc: *anyopaque) ?*anyopaque;
-pub extern fn fd_cnc_open(cnc: *Cnc) c_int;
-pub extern fn fd_cnc_wait(cnc: *const Cnc, test_signal: u64, dt: i64, opt_now: ?*i64) u64;
-pub extern fn fd_cnc_strerror(err: c_int) [*:0]const u8;
-pub extern fn fd_cstr_to_cnc_signal(cstr: [*:0]const u8) u64;
-pub extern fn fd_cnc_signal_cstr(signal: u64, buf: [*]u8) [*:0]u8;
+extern fn tk_cnc_align() usize;
+extern fn tk_cnc_footprint(app_sz: usize) usize;
+extern fn tk_cnc_new(shmem: *anyopaque, app_sz: usize, cnc_type: u64, now: i64) ?*anyopaque;
+extern fn tk_cnc_join(shcnc: *anyopaque) ?*Cnc;
+extern fn tk_cnc_leave(cnc: *const Cnc) ?*anyopaque;
+extern fn tk_cnc_delete(shcnc: *anyopaque) ?*anyopaque;
+extern fn tk_cnc_open(cnc: *Cnc) c_int;
+extern fn tk_cnc_wait(cnc: *const Cnc, test_signal: u64, dt: i64, opt_now: ?*i64) u64;
+extern fn tk_cnc_strerror(err: c_int) [*:0]const u8;
+extern fn tk_cstr_to_cnc_signal(cstr: [*:0]const u8) u64;
+extern fn tk_cnc_signal_cstr(signal: u64, buf: [*]u8) [*:0]u8;
+extern fn tk_cnc_app_laddr(cnc: *Cnc) [*]u8;
+extern fn tk_cnc_heartbeat_query(cnc: *const Cnc) i64;
+extern fn tk_cnc_heartbeat(cnc: *Cnc, now: i64) void;
+extern fn tk_cnc_signal_query(cnc: *const Cnc) u64;
+extern fn tk_cnc_signal(cnc: *Cnc, s: u64) void;
+extern fn tk_cnc_close(cnc: *Cnc) void;
 
 // ---------------------------------------------------------------------------
-// Direct volatile mirrors of the header's `static inline` accessors.
+// Public Zig wrappers.
 // ---------------------------------------------------------------------------
 
-fn asPrivate(cnc: *Cnc) *volatile CncPrivate {
-    return @ptrCast(@alignCast(cnc));
+pub fn cncAlign() usize {
+    return tk_cnc_align();
 }
 
-fn asPrivateConst(cnc: *const Cnc) *const volatile CncPrivate {
-    return @ptrCast(@alignCast(cnc));
+pub fn cncFootprint(app_sz: usize) usize {
+    return tk_cnc_footprint(app_sz);
+}
+
+pub fn cncNew(shmem: *anyopaque, app_sz: usize, cnc_type: u64, now: i64) ?*anyopaque {
+    return tk_cnc_new(shmem, app_sz, cnc_type, now);
+}
+
+pub fn cncJoin(shcnc: *anyopaque) ?*Cnc {
+    return tk_cnc_join(shcnc);
+}
+
+pub fn cncLeave(cnc: *const Cnc) ?*anyopaque {
+    return tk_cnc_leave(cnc);
+}
+
+pub fn cncDelete(shcnc: *anyopaque) ?*anyopaque {
+    return tk_cnc_delete(shcnc);
+}
+
+pub fn cncOpen(cnc: *Cnc) c_int {
+    return tk_cnc_open(cnc);
+}
+
+pub fn cncWait(cnc: *const Cnc, test_signal: u64, dt: i64, opt_now: ?*i64) u64 {
+    return tk_cnc_wait(cnc, test_signal, dt, opt_now);
+}
+
+pub fn cncStrerror(err: c_int) [*:0]const u8 {
+    return tk_cnc_strerror(err);
+}
+
+pub fn cstrToCncSignal(cstr: [*:0]const u8) u64 {
+    return tk_cstr_to_cnc_signal(cstr);
+}
+
+pub fn cncSignalCstr(s: u64, buf: [*]u8) [*:0]u8 {
+    return tk_cnc_signal_cstr(s, buf);
 }
 
 /// Mirrors static inline fd_cnc_app_laddr (fd_cnc.h).
 pub fn appLaddr(cnc: *Cnc) [*]u8 {
-    return @as([*]u8, @ptrCast(cnc)) + cnc_app_offset;
+    return tk_cnc_app_laddr(cnc);
 }
 
 pub const app_counter_cap: usize = 8;
@@ -109,27 +144,27 @@ pub fn appCounterWrite(cnc: *Cnc, idx: usize, value: u64) void {
 
 /// Mirrors static inline fd_cnc_heartbeat_query (fd_cnc.h).
 pub fn heartbeatQuery(cnc: *const Cnc) i64 {
-    return asPrivateConst(cnc).heartbeat;
+    return tk_cnc_heartbeat_query(cnc);
 }
 
 /// Mirrors static inline fd_cnc_heartbeat (fd_cnc.h).
 pub fn heartbeat(cnc: *Cnc, now: i64) void {
-    asPrivate(cnc).heartbeat = now;
+    tk_cnc_heartbeat(cnc, now);
 }
 
 /// Mirrors static inline fd_cnc_signal_query (fd_cnc.h).
 pub fn signalQuery(cnc: *const Cnc) u64 {
-    return asPrivateConst(cnc).signal;
+    return tk_cnc_signal_query(cnc);
 }
 
 /// Mirrors static inline fd_cnc_signal (fd_cnc.h).
 pub fn signal(cnc: *Cnc, s: u64) void {
-    asPrivate(cnc).signal = s;
+    tk_cnc_signal(cnc, s);
 }
 
 /// Mirrors static inline fd_cnc_close (fd_cnc.h).
 pub fn close(cnc: *Cnc) void {
-    asPrivate(cnc).lock = 0;
+    tk_cnc_close(cnc);
 }
 
 // ---------------------------------------------------------------------------

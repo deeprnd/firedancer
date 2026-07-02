@@ -63,9 +63,9 @@ const ProcessState = struct {
             if (maybe_child.*) |*child| child.kill(io);
         }
         for (&self.cncs) |*maybe_cnc| {
-            if (maybe_cnc.*) |cnc| _ = c_abi.cnc.fd_cnc_leave(cnc);
+            if (maybe_cnc.*) |cnc| _ = c_abi.cnc.cncLeave(cnc);
         }
-        _ = c_abi.wksp.fd_wksp_detach(self.wksp);
+        _ = c_abi.wksp.wkspDetach(self.wksp);
         allocator.free(self.workspace_name);
         allocator.free(self.run_dir);
     }
@@ -181,7 +181,7 @@ pub const Supervisor = struct {
         // Best-effort cleanup of a stale workspace left behind by a prior
         // crashed or killed supervisor; fd_wksp_new_named uses O_EXCL and
         // would otherwise fail closed forever on the same run_dir/name.
-        _ = c_abi.wksp.fd_wksp_delete_named(workspace_name_z);
+        _ = c_abi.wksp.wkspDeleteNamed(workspace_name_z);
 
         // 8 MiB and an explicit partition count: covers 8 cncs plus 4
         // mcache+dcache+fseq triplets (20 allocations) with headroom; the
@@ -190,9 +190,9 @@ pub const Supervisor = struct {
         // fd_wksp_user.c logging "too few partitions available").
         var sub_page_cnt = [_]usize{2048};
         var sub_cpu_idx = [_]usize{0};
-        const rc = c_abi.wksp.fd_wksp_new_named(workspace_name_z, c_abi.wksp.shmem_normal_page_sz, 1, &sub_page_cnt, &sub_cpu_idx, 0o600, 1, 64);
+        const rc = c_abi.wksp.wkspNewNamed(workspace_name_z, c_abi.wksp.shmem_normal_page_sz, 1, &sub_page_cnt, &sub_cpu_idx, 0o600, 1, 64);
         if (rc != 0) return error.WkspCreateFailed;
-        const wksp = c_abi.wksp.fd_wksp_attach(workspace_name_z) orelse return error.WkspAttachFailed;
+        const wksp = c_abi.wksp.wkspAttach(workspace_name_z) orelse return error.WkspAttachFailed;
 
         const state = try self.allocator.create(ProcessState);
         state.* = .{
@@ -214,13 +214,13 @@ pub const Supervisor = struct {
         // Pre-format one cnc per tile inside the shared workspace. The
         // supervisor is the sole creator; tile processes only join.
         for (self.topo.tiles, 0..) |_, i| {
-            const footprint = c_abi.cnc.fd_cnc_footprint(64);
-            const gaddr = c_abi.wksp.alloc(wksp, c_abi.cnc.cnc_align, footprint, 1);
+            const footprint = c_abi.cnc.cncFootprint(64);
+            const gaddr = c_abi.wksp.wkspAlloc(wksp, c_abi.cnc.cnc_align, footprint, 1);
             if (gaddr == 0) return error.CncAllocFailed;
-            const laddr = c_abi.wksp.fd_wksp_laddr(wksp, gaddr) orelse return error.CncLaddrFailed;
-            _ = c_abi.cnc.fd_cnc_new(laddr, 64, @intCast(i), c_abi.process.monotonicNanos()) orelse return error.CncNewFailed;
+            const laddr = c_abi.wksp.wkspLaddr(wksp, gaddr) orelse return error.CncLaddrFailed;
+            _ = c_abi.cnc.cncNew(laddr, 64, @intCast(i), c_abi.process.monotonicNanos()) orelse return error.CncNewFailed;
             state.cnc_gaddrs[i] = gaddr;
-            state.cncs[i] = c_abi.cnc.fd_cnc_join(laddr) orelse return error.CncJoinFailed;
+            state.cncs[i] = c_abi.cnc.cncJoin(laddr) orelse return error.CncJoinFailed;
         }
 
         // Pre-format one mcache+dcache+fseq triplet per channel. The
