@@ -12,6 +12,7 @@
 ///     proposal record, always requires explicit user action.
 const std = @import("std");
 const basket_mod = @import("basket");
+const c_abi = @import("c_abi");
 const cards_mod = @import("cards");
 
 pub const drift_schema_version: u16 = 1;
@@ -839,79 +840,92 @@ fn suggestProposalStatus(conditions: []const PaymentDriftCondition) SuggestedPro
     return .no_change;
 }
 
-fn updateValue(hasher: *std.hash.Wyhash, value: anytype) void {
+/// Firedancer-backed SipHash13 domain for rebalance/payment-update/drift
+/// proposal hashes. One shared runtime hash boundary per CLAUDE.md's
+/// hash-boundary contract, instead of a separate ad hoc std.hash.Wyhash mix
+/// per call site.
+const drift_hash_k0: u64 = 0x0000_5446_5244_4b54; // "TKDRFT\0\0" LE
+const drift_hash_k1: u64 = 1; // drift hash boundary version
+
+fn updateValue(sip: *c_abi.ballet.Siphash13, value: anytype) void {
     var copy = value;
-    hasher.update(std.mem.asBytes(&copy));
+    c_abi.ballet.siphashAppend(sip, std.mem.asBytes(&copy));
+}
+
+fn initDriftSip() c_abi.ballet.Siphash13 {
+    var sip: c_abi.ballet.Siphash13 = .{};
+    c_abi.ballet.siphashInit(&sip, drift_hash_k0, drift_hash_k1);
+    return sip;
 }
 
 pub fn hashRebalanceSuggestion(suggestion: *const RebalanceSuggestion) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    updateValue(&hasher, suggestion.schema_version);
-    updateValue(&hasher, suggestion.thesis_id);
-    updateValue(&hasher, suggestion.basket_id);
-    updateValue(&hasher, suggestion.status);
-    hasher.update(suggestion.reasonSlice());
-    updateValue(&hasher, suggestion.target_exposure_bp);
-    updateValue(&hasher, suggestion.current_exposure_bp);
-    updateValue(&hasher, suggestion.adjustment_count);
+    var sip = initDriftSip();
+    updateValue(&sip, suggestion.schema_version);
+    updateValue(&sip, suggestion.thesis_id);
+    updateValue(&sip, suggestion.basket_id);
+    updateValue(&sip, suggestion.status);
+    c_abi.ballet.siphashAppend(&sip, suggestion.reasonSlice());
+    updateValue(&sip, suggestion.target_exposure_bp);
+    updateValue(&sip, suggestion.current_exposure_bp);
+    updateValue(&sip, suggestion.adjustment_count);
     for (suggestion.adjustments[0..suggestion.adjustment_count]) |adjustment| {
-        hasher.update(adjustment.tickerSlice());
-        updateValue(&hasher, adjustment.direction);
-        updateValue(&hasher, adjustment.current_weight_bp);
-        updateValue(&hasher, adjustment.target_weight_bp);
-        updateValue(&hasher, adjustment.suggested_notional_cents);
+        c_abi.ballet.siphashAppend(&sip, adjustment.tickerSlice());
+        updateValue(&sip, adjustment.direction);
+        updateValue(&sip, adjustment.current_weight_bp);
+        updateValue(&sip, adjustment.target_weight_bp);
+        updateValue(&sip, adjustment.suggested_notional_cents);
     }
-    updateValue(&hasher, suggestion.requires_user_action);
-    return hasher.final();
+    updateValue(&sip, suggestion.requires_user_action);
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 pub fn hashPaymentProposalUpdate(update: *const PaymentProposalUpdate) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    updateValue(&hasher, update.schema_version);
-    updateValue(&hasher, update.proposal_id);
-    hasher.update(update.sourceEventSlice());
-    hasher.update(update.beneficiarySlice());
-    updateValue(&hasher, update.rail);
-    hasher.update(update.currencySlice());
-    updateValue(&hasher, update.amount_cents);
-    updateValue(&hasher, update.approval_state);
-    updateValue(&hasher, update.expires_at_ns);
-    updateValue(&hasher, update.evidence_hash);
-    hasher.update(update.actionClassSlice());
-    hasher.update(update.approvalPathSlice());
-    hasher.update(update.policyVersionSlice());
-    updateValue(&hasher, update.suggested_status);
-    updateValue(&hasher, update.drift_condition_count);
+    var sip = initDriftSip();
+    updateValue(&sip, update.schema_version);
+    updateValue(&sip, update.proposal_id);
+    c_abi.ballet.siphashAppend(&sip, update.sourceEventSlice());
+    c_abi.ballet.siphashAppend(&sip, update.beneficiarySlice());
+    updateValue(&sip, update.rail);
+    c_abi.ballet.siphashAppend(&sip, update.currencySlice());
+    updateValue(&sip, update.amount_cents);
+    updateValue(&sip, update.approval_state);
+    updateValue(&sip, update.expires_at_ns);
+    updateValue(&sip, update.evidence_hash);
+    c_abi.ballet.siphashAppend(&sip, update.actionClassSlice());
+    c_abi.ballet.siphashAppend(&sip, update.approvalPathSlice());
+    c_abi.ballet.siphashAppend(&sip, update.policyVersionSlice());
+    updateValue(&sip, update.suggested_status);
+    updateValue(&sip, update.drift_condition_count);
     for (update.drift_conditions[0..update.drift_condition_count]) |condition| {
-        updateValue(&hasher, condition);
+        updateValue(&sip, condition);
     }
-    updateValue(&hasher, update.requires_user_action);
-    return hasher.final();
+    updateValue(&sip, update.requires_user_action);
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 pub fn hashDriftContract(contract: *const DriftContract) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    updateValue(&hasher, contract.schema_version);
-    updateValue(&hasher, contract.thesis_drift.condition_count);
+    var sip = initDriftSip();
+    updateValue(&sip, contract.schema_version);
+    updateValue(&sip, contract.thesis_drift.condition_count);
     for (contract.thesis_drift.active_conditions[0..contract.thesis_drift.condition_count]) |condition| {
-        updateValue(&hasher, condition);
+        updateValue(&sip, condition);
     }
-    updateValue(&hasher, contract.thesis_drift.allocation_actual_bp);
-    updateValue(&hasher, contract.thesis_drift.allocation_target_bp);
-    updateValue(&hasher, contract.thesis_drift.allocation_delta_abs_bp);
-    updateValue(&hasher, contract.thesis_drift.max_sector_exposure_bp);
-    updateValue(&hasher, contract.thesis_drift.max_single_name_bp);
-    hasher.update(contract.thesis_drift.restrictedTickerSlice());
-    updateValue(&hasher, contract.thesis_drift.buying_power_cents);
-    updateValue(&hasher, contract.thesis_drift.has_drift);
-    updateValue(&hasher, hashRebalanceSuggestion(&contract.rebalance_suggestion));
-    updateValue(&hasher, contract.payment_drift.condition_count);
+    updateValue(&sip, contract.thesis_drift.allocation_actual_bp);
+    updateValue(&sip, contract.thesis_drift.allocation_target_bp);
+    updateValue(&sip, contract.thesis_drift.allocation_delta_abs_bp);
+    updateValue(&sip, contract.thesis_drift.max_sector_exposure_bp);
+    updateValue(&sip, contract.thesis_drift.max_single_name_bp);
+    c_abi.ballet.siphashAppend(&sip, contract.thesis_drift.restrictedTickerSlice());
+    updateValue(&sip, contract.thesis_drift.buying_power_cents);
+    updateValue(&sip, contract.thesis_drift.has_drift);
+    updateValue(&sip, hashRebalanceSuggestion(&contract.rebalance_suggestion));
+    updateValue(&sip, contract.payment_drift.condition_count);
     for (contract.payment_drift.active_conditions[0..contract.payment_drift.condition_count]) |condition| {
-        updateValue(&hasher, condition);
+        updateValue(&sip, condition);
     }
-    updateValue(&hasher, contract.payment_drift.has_drift);
-    updateValue(&hasher, hashPaymentProposalUpdate(&contract.payment_proposal_update));
-    return hasher.final();
+    updateValue(&sip, contract.payment_drift.has_drift);
+    updateValue(&sip, hashPaymentProposalUpdate(&contract.payment_proposal_update));
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 // ---------------------------------------------------------------------------

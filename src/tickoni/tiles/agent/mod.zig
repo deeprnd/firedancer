@@ -210,15 +210,17 @@ test "runInvestmentAgent blocks oversized trade and skips paper execution" {
 
     var model_trace = mock_model.MockBackend.CallTrace{};
     var adapter_trace = mock_adapter.MockBackend.CallTrace{};
-    var model_backend = model.Backend{ .mock = .{
+    var model_mock = mock_model.MockBackend{
         .canned_content = "{\"recommended_tickers\":[\"NVDA\"]}",
         .trace = &model_trace,
-    } };
-    var adapter_backend = adapter.Backend{ .mock = .{
+    };
+    var adapter_mock = mock_adapter.MockBackend{
         .portfolio_snapshot = account,
         .quote_snapshot = quote_snapshot,
         .trace = &adapter_trace,
-    } };
+    };
+    var model_backend = mock_model.MockBackend.asBackend(model.Backend, &model_mock);
+    var adapter_backend = mock_adapter.MockBackend.asBackend(adapter.Backend, &adapter_mock);
     const result = try runInvestmentAgent(
         std.testing.allocator,
         work_item,

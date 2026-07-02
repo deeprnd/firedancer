@@ -179,6 +179,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "basket", .module = basket_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
             .{ .name = "cards", .module = cards_mod },
         },
     });
@@ -428,6 +429,9 @@ pub fn build(b: *std.Build) void {
     const model_messages_test = b.addTest(.{ .root_module = model_messages_mod });
     test_step.dependOn(&b.addRunArtifact(model_messages_test).step);
 
+    const mock_model_test = b.addTest(.{ .root_module = mock_model_mod });
+    test_step.dependOn(&b.addRunArtifact(mock_model_test).step);
+
     // link handle/type roots keep their own unit tests independent of the
     // aggregate runtime module.
     const link_handles_test = b.addTest(.{
@@ -511,11 +515,25 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "model_messages", .module = model_messages_mod },
             .{ .name = "mock_model", .module = mock_model_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
         },
     });
+    // model/mod.zig: fresh root module so linkTickoniCodec adds C sources
+    // only to this binary's root module, not to the shared model_test_mod
+    // reused as an import by other test artifacts (agent_test etc.).
     const model_test = b.addTest(.{
-        .root_module = model_test_mod,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "model_messages", .module = model_messages_mod },
+                .{ .name = "mock_model", .module = mock_model_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
+            },
+        }),
     });
+    linkTickoniCodec(b, model_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(model_test).step);
 
     const tkpoly_test_mod = b.createModule(.{
@@ -539,7 +557,6 @@ pub fn build(b: *std.Build) void {
             .{ .name = "fixture_portfolio", .module = fixture_portfolio_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_mod },
             .{ .name = "adapter_messages", .module = adapter_messages_mod },
-            .{ .name = "mock_adapter", .module = mock_adapter_mod },
         },
     });
     const adapter_test = b.addTest(.{
@@ -605,6 +622,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "basket", .module = basket_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "cards", .module = cards_mod },
             },
         }),
@@ -682,6 +700,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    linkTickoniCodec(b, agent_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(agent_test).step);
 
     const replay_test = b.addTest(.{
@@ -692,6 +711,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "adapter", .module = adapter_test_mod },
                 .{ .name = "basket", .module = basket_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "drift", .module = drift_mod },
                 .{ .name = "model", .module = model_test_mod },
                 .{ .name = "portfolio", .module = portfolio_mod },
@@ -700,6 +720,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    linkTickoniCodec(b, replay_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(replay_test).step);
 
     // supervisor.zig imports runtime, tiles, and c_abi modules.
@@ -778,6 +799,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "model_messages", .module = model_messages_mod },
             .{ .name = "mock_model", .module = mock_model_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
         },
     });
     const adapter_int_mod = b.createModule(.{
@@ -790,7 +812,6 @@ pub fn build(b: *std.Build) void {
             .{ .name = "fixture_portfolio", .module = fixture_portfolio_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_mod },
             .{ .name = "adapter_messages", .module = adapter_messages_mod },
-            .{ .name = "mock_adapter", .module = mock_adapter_mod },
         },
     });
     const tool_int_mod = b.createModule(.{
@@ -840,6 +861,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "adapter", .module = adapter_int_mod },
             .{ .name = "basket", .module = basket_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
             .{ .name = "drift", .module = drift_mod },
             .{ .name = "model", .module = model_int_mod },
             .{ .name = "portfolio", .module = portfolio_mod },

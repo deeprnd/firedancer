@@ -1,6 +1,7 @@
 const std = @import("std");
 const adapter = @import("adapter");
 const basket = @import("basket");
+const c_abi = @import("c_abi");
 const drift = @import("drift");
 const model = @import("model");
 const portfolio = @import("portfolio");
@@ -151,88 +152,103 @@ fn findAdapterSubstitution(
     return null;
 }
 
-fn updateValue(hasher: *std.hash.Wyhash, value: anytype) void {
+/// Firedancer-backed SipHash13 domain for replay-critical proposal/result
+/// hashes (quote snapshot, affordability, trade ticket, paper execution
+/// result). One shared runtime hash boundary per CLAUDE.md's hash-boundary
+/// contract, instead of a separate ad hoc std.hash.Wyhash mix per call site.
+const replay_hash_k0: u64 = 0x0000_4c50_4552_4b54; // "TKREPL\0\0" LE
+const replay_hash_k1: u64 = 1; // replay hash boundary version
+
+fn updateValue(sip: *c_abi.ballet.Siphash13, value: anytype) void {
     var copy = value;
-    hasher.update(std.mem.asBytes(&copy));
+    c_abi.ballet.siphashAppend(sip, std.mem.asBytes(&copy));
+}
+
+fn initReplaySip() c_abi.ballet.Siphash13 {
+    var sip: c_abi.ballet.Siphash13 = .{};
+    c_abi.ballet.siphashInit(&sip, replay_hash_k0, replay_hash_k1);
+    return sip;
 }
 
 pub fn hashBytes(bytes: []const u8) u64 {
-    return std.hash.Wyhash.hash(0, bytes);
+    var sip = initReplaySip();
+    c_abi.ballet.siphashAppend(&sip, bytes);
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 pub fn hashQuoteSnapshot(snapshot: *const trade_ticket.QuoteSnapshot) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    updateValue(&hasher, snapshot.as_of_ns);
-    updateValue(&hasher, snapshot.quote_count);
+    var sip = initReplaySip();
+    updateValue(&sip, snapshot.as_of_ns);
+    updateValue(&sip, snapshot.quote_count);
     for (snapshot.quotes[0..snapshot.quote_count]) |quote| {
-        hasher.update(quote.tickerSlice());
-        updateValue(&hasher, quote.venue);
-        updateValue(&hasher, quote.bid_cents);
-        updateValue(&hasher, quote.ask_cents);
-        updateValue(&hasher, quote.last_cents);
+        c_abi.ballet.siphashAppend(&sip, quote.tickerSlice());
+        updateValue(&sip, quote.venue);
+        updateValue(&sip, quote.bid_cents);
+        updateValue(&sip, quote.ask_cents);
+        updateValue(&sip, quote.last_cents);
     }
-    return hasher.final();
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 pub fn hashAffordability(result: portfolio.AffordabilityResult) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    updateValue(&hasher, result.outcome);
-    updateValue(&hasher, result.requested_notional_cents);
-    updateValue(&hasher, result.max_affordable_cents);
-    updateValue(&hasher, result.cash_available_cents);
-    updateValue(&hasher, result.buying_power_cents);
-    updateValue(&hasher, result.remaining_daily_notional_cents);
-    updateValue(&hasher, result.remaining_monthly_notional_cents);
-    return hasher.final();
+    var sip = initReplaySip();
+    updateValue(&sip, result.outcome);
+    updateValue(&sip, result.requested_notional_cents);
+    updateValue(&sip, result.max_affordable_cents);
+    updateValue(&sip, result.cash_available_cents);
+    updateValue(&sip, result.buying_power_cents);
+    updateValue(&sip, result.remaining_daily_notional_cents);
+    updateValue(&sip, result.remaining_monthly_notional_cents);
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 pub fn hashTicket(ticket: *const trade_ticket.TradeTicket) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    hasher.update(ticket.ticketIdSlice());
-    updateValue(&hasher, ticket.account_id);
-    updateValue(&hasher, ticket.side);
-    updateValue(&hasher, ticket.order_type);
-    updateValue(&hasher, ticket.target_notional_cents);
-    updateValue(&hasher, ticket.estimated_cost_cents);
-    updateValue(&hasher, ticket.policy_outcome);
-    updateValue(&hasher, ticket.affordability_result.max_affordable_cents);
-    updateValue(&hasher, ticket.affordability_result.effective_max_paper_trade_cents);
-    updateValue(&hasher, ticket.line_item_count);
+    var sip = initReplaySip();
+    c_abi.ballet.siphashAppend(&sip, ticket.ticketIdSlice());
+    updateValue(&sip, ticket.account_id);
+    updateValue(&sip, ticket.side);
+    updateValue(&sip, ticket.order_type);
+    updateValue(&sip, ticket.target_notional_cents);
+    updateValue(&sip, ticket.estimated_cost_cents);
+    updateValue(&sip, ticket.policy_outcome);
+    updateValue(&sip, ticket.affordability_result.max_affordable_cents);
+    updateValue(&sip, ticket.affordability_result.effective_max_paper_trade_cents);
+    updateValue(&sip, ticket.line_item_count);
     for (ticket.line_items[0..ticket.line_item_count]) |line| {
-        hasher.update(line.tickerSlice());
-        updateValue(&hasher, line.quantity_micros);
-        updateValue(&hasher, line.price_cents);
-        updateValue(&hasher, line.line_notional_cents);
+        c_abi.ballet.siphashAppend(&sip, line.tickerSlice());
+        updateValue(&sip, line.quantity_micros);
+        updateValue(&sip, line.price_cents);
+        updateValue(&sip, line.line_notional_cents);
     }
-    updateValue(&hasher, ticket.blocked_reason_count);
+    updateValue(&sip, ticket.blocked_reason_count);
     for (ticket.blocked_reasons[0..ticket.blocked_reason_count]) |reason| {
-        updateValue(&hasher, reason.code);
-        updateValue(&hasher, reason.failed_scope_dim);
-        updateValue(&hasher, reason.requested_cents);
-        updateValue(&hasher, reason.limit_cents);
+        updateValue(&sip, reason.code);
+        updateValue(&sip, reason.failed_scope_dim);
+        updateValue(&sip, reason.requested_cents);
+        updateValue(&sip, reason.limit_cents);
     }
-    return hasher.final();
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 pub fn hashPaperResult(result: *const trade_ticket.PaperExecutionResult) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    hasher.update(result.paperOrderIdSlice());
-    hasher.update(result.ticketIdSlice());
-    updateValue(&hasher, result.account_id);
-    updateValue(&hasher, result.status);
-    updateValue(&hasher, result.total_filled_cents);
-    updateValue(&hasher, result.fill_count);
+    var sip = initReplaySip();
+    c_abi.ballet.siphashAppend(&sip, result.paperOrderIdSlice());
+    c_abi.ballet.siphashAppend(&sip, result.ticketIdSlice());
+    updateValue(&sip, result.account_id);
+    updateValue(&sip, result.status);
+    updateValue(&sip, result.total_filled_cents);
+    updateValue(&sip, result.fill_count);
     for (result.fills[0..result.fill_count]) |fill| {
-        hasher.update(fill.tickerSlice());
-        updateValue(&hasher, fill.quantity_micros);
-        updateValue(&hasher, fill.fill_price_cents);
-        updateValue(&hasher, fill.filled_notional_cents);
+        c_abi.ballet.siphashAppend(&sip, fill.tickerSlice());
+        updateValue(&sip, fill.quantity_micros);
+        updateValue(&sip, fill.fill_price_cents);
+        updateValue(&sip, fill.filled_notional_cents);
     }
-    updateValue(&hasher, result.resulting_account_snapshot.cash_cents);
-    updateValue(&hasher, result.resulting_account_snapshot.buying_power_cents);
-    updateValue(&hasher, result.resulting_account_snapshot.day_notional_used_cents);
-    updateValue(&hasher, result.resulting_account_snapshot.month_notional_used_cents);
-    return hasher.final();
+    updateValue(&sip, result.resulting_account_snapshot.cash_cents);
+    updateValue(&sip, result.resulting_account_snapshot.buying_power_cents);
+    updateValue(&sip, result.resulting_account_snapshot.day_notional_used_cents);
+    updateValue(&sip, result.resulting_account_snapshot.month_notional_used_cents);
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 fn buildReplayVerification(divergences: DivergenceTracker, external_effects_disabled: bool) ReplayVerification {
@@ -855,11 +871,13 @@ test "checkCapsuleVersions: unsupported schema_version is a hard reject" {
 
 test "verifyAllowedTradeWithCapsulePath marks live model backends as external effects" {
     const fixture = try buildAllowedReplayFixture(std.testing.allocator, std.testing.io);
-    var model_backend = model.Backend{ .http = .{
+    var model_backend_impl = model.HttpBackend{
         .endpoint = "http://127.0.0.1:65535/v1",
         .io = std.testing.io,
-    } };
-    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    };
+    var model_backend = model_backend_impl.asBackend();
+    var adapter_backend_impl = adapter.FixtureBackend{};
+    var adapter_backend = adapter_backend_impl.asBackend();
     var drift_contract = std.mem.zeroes(drift.DriftContract);
 
     const replay_result = try verifyAllowedTrade(
@@ -876,8 +894,10 @@ test "verifyAllowedTradeWithCapsulePath marks live model backends as external ef
 
 test "verifyAllowedTradeWithCapsulePath detects tampered paper fill hashes" {
     const fixture = try buildAllowedReplayFixture(std.testing.allocator, std.testing.io);
-    var model_backend = model.Backend{ .fixture = .{} };
-    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var model_backend_impl = model.FixtureBackend{};
+    var model_backend = model_backend_impl.asBackend();
+    var adapter_backend_impl = adapter.FixtureBackend{};
+    var adapter_backend = adapter_backend_impl.asBackend();
     var drift_contract = std.mem.zeroes(drift.DriftContract);
 
     const replay_result = try verifyAllowedTradeWithCapsulePath(

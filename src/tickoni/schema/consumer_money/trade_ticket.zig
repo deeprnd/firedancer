@@ -194,25 +194,6 @@ fn copyAscii(comptime N: usize, dst: *[N]u8, src: []const u8) !u8 {
     return @intCast(src.len);
 }
 
-pub fn applyPolicyDecision(
-    ticket: *TradeTicket,
-    policy_outcome: PolicyOutcome,
-    blocked_reasons: []const BlockedReason,
-    effective_max_paper_trade_cents: i64,
-) void {
-    ticket.policy_outcome = policy_outcome;
-    ticket.blocked_reasons = std.mem.zeroes([max_blocked_reasons]BlockedReason);
-    const count = if (policy_outcome == .deny)
-        @min(blocked_reasons.len, max_blocked_reasons)
-    else
-        0;
-    for (blocked_reasons[0..count], 0..) |blocked_reason, i| {
-        ticket.blocked_reasons[i] = blocked_reason;
-    }
-    ticket.blocked_reason_count = @intCast(count);
-    ticket.affordability_result.effective_max_paper_trade_cents = effective_max_paper_trade_cents;
-}
-
 pub fn buildMarketBuyTicket(
     proposed_basket: *const basket.Basket,
     quote_snapshot: *const QuoteSnapshot,
@@ -292,7 +273,11 @@ pub fn buildTradeTicket(
         .max_affordable_cents = affordability.max_affordable_cents,
         .effective_max_paper_trade_cents = affordability.max_affordable_cents,
     };
-    ticket.policy_outcome = .allow;
+    // Fail closed: a freshly built ticket is not yet policy-checked, so it
+    // starts denied until tkpoly.applyTradeGuardrails() (or an equivalent
+    // policy decision) explicitly allows it. Callers must not treat an
+    // unchecked ticket as approved.
+    ticket.policy_outcome = .deny;
 
     var estimated_cost: i64 = 0;
     for (proposed_basket.instruments[0..proposed_basket.instrument_count], 0..) |instrument, i| {
@@ -428,7 +413,10 @@ test "buildMarketBuyTicket: oversized notional produces per-order block reason" 
         "ticket_ai_infra_25000_blocked",
     );
 
-    try std.testing.expectEqual(PolicyOutcome.allow, ticket.policy_outcome);
+    // buildMarketBuyTicket() does not itself decide policy — it defaults to
+    // .deny until tkpoly.applyTradeGuardrails() (not called here) explicitly
+    // allows the ticket. This test only covers the builder's own output.
+    try std.testing.expectEqual(PolicyOutcome.deny, ticket.policy_outcome);
     try std.testing.expectEqual(@as(u8, 0), ticket.blocked_reason_count);
     try std.testing.expectEqual(fixture.affordability.max_affordable_cents, ticket.affordability_result.effective_max_paper_trade_cents);
 }

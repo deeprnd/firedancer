@@ -22,7 +22,8 @@ test "investment_input_policy_denials_integration: direct trading_order.place by
     const intent = try thesis.normalize(input);
     const basket = try tkpoly.buildBasket(intent, thesis_id);
 
-    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var adapter_backend_impl = adapter.FixtureBackend{};
+    var adapter_backend = adapter_backend_impl.asBackend();
     const portfolio_result = try adapter_backend.call(tool.normalizePortfolioRead(input.account_id));
     const account = switch (portfolio_result) {
         .portfolio_snapshot => |snapshot| snapshot,
