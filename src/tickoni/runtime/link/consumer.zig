@@ -3,6 +3,7 @@ const c_abi = @import("c_abi");
 const process = @import("util").process;
 const LinkHandles = @import("handles.zig").LinkHandles;
 const join_mod = @import("join.zig");
+const wait = @import("wait.zig");
 
 /// Bounded consumer side of a link: blocks until the next sequence number is
 /// published, then publishes its own progress via fseq.
@@ -30,11 +31,22 @@ pub const Consumer = struct {
         _ = c_abi.fseq.fseqLeave(@volatileCast(self.fseq));
     }
 
-    pub fn consume(self: *Consumer, out_buf: []u8, stop: *const std.atomic.Value(bool)) ?usize {
+    /// Blocks until a fragment is available or stop is signalled. Polls with
+    /// a bounded spin-pause budget before backing off to a bounded sleep;
+    /// see runtime/link/wait.zig for why this deviates from Firedancer's
+    /// non-sleeping hot receive path. idle_polls counts how many spin
+    /// budgets were exhausted without a fragment, for backpressure/idle
+    /// diagnostics.
+    pub fn consume(self: *Consumer, out_buf: []u8, idle_polls: *std.atomic.Value(u64), stop: *const std.atomic.Value(bool)) ?usize {
         while (true) {
-            if (self.tryConsume(out_buf)) |sz| return sz;
+            var spins: u32 = 0;
+            while (spins < wait.spin_poll_max) : (spins += 1) {
+                if (self.tryConsume(out_buf)) |sz| return sz;
+                c_abi.boot.spinPause();
+            }
+            _ = idle_polls.fetchAdd(1, .release);
             if (stop.load(.acquire)) return null;
-            process.sleepNanos(100_000);
+            process.sleepNanos(wait.idle_sleep_ns);
         }
     }
 

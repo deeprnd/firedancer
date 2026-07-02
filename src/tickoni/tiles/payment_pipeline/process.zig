@@ -63,6 +63,7 @@ pub fn runIngestProcess(spec: *const rt.launch_spec.LaunchSpec, output: *rt.link
 pub fn runNormalizeProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.link.Consumer, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
     var stop_flag = std.atomic.Value(bool).init(false);
     var backpressure_waits = std.atomic.Value(u64).init(0);
+    var idle_polls = std.atomic.Value(u64).init(0);
     var buf: [msg_size]u8 = undefined;
 
     var normalized: u64 = 0;
@@ -70,7 +71,7 @@ pub fn runNormalizeProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.li
     var i: u64 = 0;
     while (i < spec.event_count) : (i += 1) {
         if (halted(cnc)) break;
-        _ = input.consume(&buf, &stop_flag) orelse break;
+        _ = input.consume(&buf, &idle_polls, &stop_flag) orelse break;
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
         msg.pipeline_hops += 1;
         msg.event_hash = payment_runtime.stableEventHash(msg.raw);
@@ -96,6 +97,7 @@ pub fn runDedupeProcess(
 ) void {
     var stop_flag = std.atomic.Value(bool).init(false);
     var backpressure_waits = std.atomic.Value(u64).init(0);
+    var idle_polls = std.atomic.Value(u64).init(0);
     var buf: [msg_size]u8 = undefined;
     var seen_count: usize = 0;
 
@@ -103,7 +105,7 @@ pub fn runDedupeProcess(
     var i: u64 = 0;
     while (i < spec.event_count) : (i += 1) {
         if (halted(cnc)) break;
-        _ = input.consume(&buf, &stop_flag) orelse break;
+        _ = input.consume(&buf, &idle_polls, &stop_flag) orelse break;
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
         msg.pipeline_hops += 1;
         if (msg.decision != .malformed_drop and seenOrRemember(seen_keys, seen_hashes, &seen_count, msg)) {
@@ -128,6 +130,7 @@ fn seenOrRemember(seen_keys: []u64, seen_hashes: []u64, seen_count: *usize, msg:
 pub fn runPolicyProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.link.Consumer, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
     var stop_flag = std.atomic.Value(bool).init(false);
     var backpressure_waits = std.atomic.Value(u64).init(0);
+    var idle_polls = std.atomic.Value(u64).init(0);
     var buf: [msg_size]u8 = undefined;
 
     var allowed: u64 = 0;
@@ -135,7 +138,7 @@ pub fn runPolicyProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.link.
     var i: u64 = 0;
     while (i < spec.event_count) : (i += 1) {
         if (halted(cnc)) break;
-        _ = input.consume(&buf, &stop_flag) orelse break;
+        _ = input.consume(&buf, &idle_polls, &stop_flag) orelse break;
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
         msg.pipeline_hops += 1;
         if (msg.decision == .malformed_drop) {
@@ -163,13 +166,14 @@ pub fn runAuditProcess(
     audit_log: *audit_sink.AuditLog,
 ) void {
     var stop_flag = std.atomic.Value(bool).init(false);
+    var idle_polls = std.atomic.Value(u64).init(0);
     var buf: [msg_size]u8 = undefined;
 
     var audited: u64 = 0;
     var i: u64 = 0;
     while (i < spec.event_count) : (i += 1) {
         if (halted(cnc)) break;
-        _ = input.consume(&buf, &stop_flag) orelse break;
+        _ = input.consume(&buf, &idle_polls, &stop_flag) orelse break;
         const msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
         audit_log.append(.{
             .source_offset = msg.raw.source_offset,

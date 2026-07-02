@@ -153,6 +153,62 @@ test "process_topology_integration: SIGKILL on one tile is reported by identity 
     try std.testing.expectEqual(event_count, metrics.audited);
 }
 
+test "process_topology_integration: a self-exiting tile is reported crashed via exit_code, not signal" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const len = try tmp.dir.realPath(std.testing.io, &path_buf);
+    const run_dir = path_buf[0..len];
+
+    const topo = topologies.paymentPipelineProcess();
+    var sup = try Supervisor.init(std.testing.allocator, topo);
+    defer sup.deinit();
+
+    // tkrepl (index 5) only heartbeats in its idle loop (see the SIGKILL
+    // test above), so crashing it via the crash_after_heartbeats test hook
+    // (runtime/tile_process.zig: exit(1) without a clean cnc transition)
+    // cannot itself corrupt the tkings..tkaudt pipeline running in sibling
+    // processes. Crash on the first heartbeat so the self-exit happens
+    // immediately after RUN, well before this test's own poll loop below
+    // could observe pipeline completion and call stopProcess() — avoiding a
+    // race against a HALT arriving before tkrepl reaches its crash check.
+    const tkrepl_idx = 5;
+    var crash_after_heartbeats = [_]u32{0} ** 8;
+    crash_after_heartbeats[tkrepl_idx] = 1;
+
+    const event_count: u64 = 16;
+    try sup.startPaymentPipelineProcess(std.testing.io, .{
+        .run_dir = run_dir,
+        .event_count = event_count,
+        .crash_after_heartbeats = crash_after_heartbeats,
+        .tile_exe_path = "zig-out/bin/tickoni-supervisor",
+    });
+    try std.testing.expectEqualStrings("tkrepl", topo.tiles[tkrepl_idx].id.slice());
+
+    const max_polls: u32 = 400; // 2s bound at 5ms per poll
+    var poll: u32 = 0;
+    while (poll < max_polls) : (poll += 1) {
+        if (sup.snapshotProcessMetrics().audited >= event_count) break;
+        util.process.sleepNanos(5 * std.time.ns_per_ms);
+    }
+    const metrics = sup.snapshotProcessMetrics();
+
+    sup.stopProcess(std.testing.io);
+
+    try std.testing.expectEqual(rt.tile.TileState.crashed, sup.monitor()[tkrepl_idx].state);
+    try std.testing.expectEqual(rt.tile.CrashReason.exit_code, sup.monitor()[tkrepl_idx].crashed_because);
+    try std.testing.expectEqual(@as(u8, 1), sup.monitor()[tkrepl_idx].exit_code);
+
+    for (sup.monitor(), 0..) |h, i| {
+        if (i == tkrepl_idx) continue;
+        try std.testing.expectEqual(rt.tile.TileState.stopped, h.state);
+        try std.testing.expectEqual(rt.tile.CrashReason.none, h.crashed_because);
+    }
+    try std.testing.expectEqual(event_count, metrics.produced);
+    try std.testing.expectEqual(event_count, metrics.audited);
+}
+
 test "process_topology_integration: process mode refuses to start a heap_dev-backed channel" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
@@ -180,25 +236,15 @@ test "process_topology_integration: process mode refuses to start a heap_dev-bac
 }
 
 test "process_topology_integration: process mode refuses to start with a missing workspace name" {
-    var tmp = std.testing.tmpDir(.{});
-    defer tmp.cleanup();
-
-    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
-    const len = try tmp.dir.realPath(std.testing.io, &path_buf);
-    const run_dir = path_buf[0..len];
-
     const base = topologies.paymentPipelineProcess();
     var channels: [4]rt.topology.Channel = undefined;
     @memcpy(&channels, base.channels[0..4]);
     channels[0].workspace_name = .{};
     const topo = rt.topology.Topology{ .tiles = base.tiles, .channels = &channels };
 
-    var sup = try Supervisor.init(std.testing.allocator, topo);
-    defer sup.deinit();
-
-    try std.testing.expectError(error.ChannelWorkspaceNameMissing, sup.startPaymentPipelineProcess(std.testing.io, .{
-        .run_dir = run_dir,
-        .tile_exe_path = "zig-out/bin/tickoni-supervisor",
-    }));
-    for (sup.monitor()) |h| try std.testing.expect(h.pid == null);
+    // Supervisor.init() now runs topo.validate()'s structural checks (see
+    // Supervisor.init()'s doc comment), so a missing workspace name on a
+    // tango_shm channel fails closed here rather than needing a tile to
+    // reach startPaymentPipelineProcess first.
+    try std.testing.expectError(error.ChannelWorkspaceNameMissing, Supervisor.init(std.testing.allocator, topo));
 }

@@ -22,13 +22,28 @@ pub const TileId = struct {
     }
 };
 
+/// Tile plan phase, matching the Phase 0-4 rollout in
+/// doc/execution/contribution/tickoni.md.
+pub const TilePhase = enum(u8) {
+    /// Phase 0: tkings, tknorm, tkdedu, tkpoly, tkaudt, tkrepl, tkmetr, tkdiag.
+    core = 0,
+    /// Phase 1: tkcase, tkevid.
+    case = 1,
+    /// Phase 2: tkdisp, tkagnt, tkmodl, tktool, tkadpt.
+    agent = 2,
+    /// Phase 3: tkapi.
+    api = 3,
+    /// Phase 4: tkexec.
+    exec = 4,
+};
+
 /// Static description of one tile in a topology.
 pub const TileDescriptor = struct {
     id: TileId,
     /// Human-readable name used in logs and diagnostics.
     name: []const u8,
-    /// Phase from the tile plan: 0=core, 1=case, 2=agent, 3=api, 4=exec.
-    phase: u8,
+    /// Phase from the tile plan.
+    phase: TilePhase,
     /// Defaults to floating: existing thread-mode topologies do not pin
     /// CPUs. Process-mode topologies set this explicitly.
     cpu_placement: cpu_placement.CpuPlacement = .floating,
@@ -44,14 +59,17 @@ pub const TileState = enum {
 };
 
 /// Identifies why a tile transitioned to .crashed, for supervisor
-/// diagnostics and crash-isolation tests (V1.14.S1.T12).
+/// diagnostics and crash-isolation tests (V1.14.S1.T12). Every retained
+/// value must be producible by an implemented supervisor monitoring path
+/// (src/app/tickoni/supervisor.zig's waitProcess()); CNC signal/heartbeat
+/// failure detection is not implemented today; a `cnc_fail` variant is
+/// intentionally deferred until the supervisor actually classifies CNC
+/// FD_CNC_SIGNAL_FAIL or stale-heartbeat state, rather than existing
+/// unreachable.
 pub const CrashReason = enum {
     none,
     /// Process exited with a non-zero status (or thread-mode equivalent).
     exit_code,
-    /// The tile's cnc object reached FD_CNC_SIGNAL_FAIL or stopped
-    /// heartbeating (process mode only).
-    cnc_fail,
     /// Process was terminated by a signal (e.g. SIGKILL), process mode
     /// only. Distinct from exit_code because the tile never got to exit
     /// on its own terms — a forced-kill/OOM-style death rather than a

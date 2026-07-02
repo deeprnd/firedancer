@@ -3,6 +3,7 @@ const c_abi = @import("c_abi");
 const process = @import("util").process;
 const LinkHandles = @import("handles.zig").LinkHandles;
 const join_mod = @import("join.zig");
+const wait = @import("wait.zig");
 
 /// Bounded, backpressuring producer side of a reliable link: waits for the
 /// consumer's fseq progress instead of dropping when the ring is full.
@@ -43,19 +44,27 @@ pub const Producer = struct {
         return @intCast(gaddr / c_abi.dcache.chunk_align);
     }
 
+    /// Blocks until the consumer has room or stop is signalled. Polls with a
+    /// bounded spin-pause budget before backing off to a bounded sleep; see
+    /// runtime/link/wait.zig for why this deviates from Firedancer's
+    /// non-sleeping hot transmit path.
     pub fn publish(
         self: *Producer,
         payload: []const u8,
         backpressure_waits: *std.atomic.Value(u64),
         stop: *const std.atomic.Value(bool),
     ) error{ Stopped, PayloadTooLarge }!void {
-        while (true) {
-            const consumer_seq = c_abi.fseq.fseqQuery(self.fseq);
-            const lag = self.next_seq -% consumer_seq;
-            if (lag < self.depth) break;
+        ready: while (true) {
+            var spins: u32 = 0;
+            while (spins < wait.spin_poll_max) : (spins += 1) {
+                const consumer_seq = c_abi.fseq.fseqQuery(self.fseq);
+                const lag = self.next_seq -% consumer_seq;
+                if (lag < self.depth) break :ready;
+                c_abi.boot.spinPause();
+            }
             _ = backpressure_waits.fetchAdd(1, .release);
             if (stop.load(.acquire)) return error.Stopped;
-            process.sleepNanos(100_000);
+            process.sleepNanos(wait.idle_sleep_ns);
         }
 
         const chunk = try self.writeSlot(payload);

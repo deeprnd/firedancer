@@ -82,7 +82,16 @@ pub const Supervisor = struct {
     /// Non-null while a V1.14 process-mode pipeline is running.
     process_state: ?*ProcessState = null,
 
+    /// Runs topo.validate()'s structural checks (duplicate tile ids, channel
+    /// depth/MTU shape, exclusive/shared CPU placement conflicts) once, at
+    /// the one entrypoint every start path shares — so a caller cannot reach
+    /// startPaymentPipeline (thread mode) without the check that
+    /// startPaymentPipelineProcess already ran via cpu_placement.validate().
+    /// Host-aware checks (is a declared CPU id actually available on this
+    /// host) still belong to startPaymentPipelineProcess: thread mode never
+    /// pins CPUs, so it has no live affinity mask to check against here.
     pub fn init(allocator: std.mem.Allocator, topo: Topology) !Supervisor {
+        try topo.validate();
         const handles = try allocator.alloc(TileHandle, topo.tiles.len);
         for (handles, 0..) |*h, i| h.* = TileHandle.init(@intCast(i));
         return .{
@@ -429,6 +438,7 @@ pub const Supervisor = struct {
                 if (crashed_tile >= 0 and @as(i32, @intCast(h.tile_idx)) == crashed_tile) {
                     h.state = .crashed;
                     h.exit_code = 1;
+                    h.crashed_because = .exit_code;
                 } else {
                     h.state = .stopped;
                 }
@@ -454,6 +464,16 @@ test "Supervisor initialises all handles as stopped" {
     for (sup.monitor()) |h| {
         try std.testing.expectEqual(TileState.stopped, h.state);
     }
+}
+
+test "Supervisor init fails closed on a structural CPU placement conflict, even in thread mode" {
+    const base = topologies.paymentPipeline();
+    var conflicting_tiles: [8]rt.topology.TileDescriptor = base.tiles[0..8].*;
+    conflicting_tiles[0].cpu_placement = .{ .exclusive = 0 };
+    conflicting_tiles[1].cpu_placement = .{ .exclusive = 0 };
+    const topo = rt.topology.Topology{ .tiles = &conflicting_tiles, .channels = base.channels };
+
+    try std.testing.expectError(error.CpuPlacementConflict, Supervisor.init(std.testing.allocator, topo));
 }
 
 test "Supervisor starts and stops Phase 0 pipeline without crashes" {
@@ -513,4 +533,5 @@ test "Supervisor marks tkings crashed on sandbox failure" {
     sup.stop();
     try std.testing.expectEqual(TileState.crashed, sup.monitor()[0].state);
     try std.testing.expectEqual(@as(u8, 1), sup.monitor()[0].exit_code);
+    try std.testing.expectEqual(CrashReason.exit_code, sup.monitor()[0].crashed_because);
 }

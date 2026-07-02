@@ -160,7 +160,7 @@ pub fn hashBytes(bytes: []const u8) u64 {
     return std.hash.Wyhash.hash(0, bytes);
 }
 
-fn hashQuoteSnapshot(snapshot: *const trade_ticket.QuoteSnapshot) u64 {
+pub fn hashQuoteSnapshot(snapshot: *const trade_ticket.QuoteSnapshot) u64 {
     var hasher = std.hash.Wyhash.init(0);
     updateValue(&hasher, snapshot.as_of_ns);
     updateValue(&hasher, snapshot.quote_count);
@@ -174,7 +174,7 @@ fn hashQuoteSnapshot(snapshot: *const trade_ticket.QuoteSnapshot) u64 {
     return hasher.final();
 }
 
-fn hashAffordability(result: portfolio.AffordabilityResult) u64 {
+pub fn hashAffordability(result: portfolio.AffordabilityResult) u64 {
     var hasher = std.hash.Wyhash.init(0);
     updateValue(&hasher, result.outcome);
     updateValue(&hasher, result.requested_notional_cents);

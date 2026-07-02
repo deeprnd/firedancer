@@ -17,14 +17,14 @@ const TileId = rt.topology.TileId;
 /// Same 8 tiles as topologies.paymentPipelineProcess(), except tkings and
 /// tknorm both declare an explicit shared placement on CPU 0.
 const shared_core_tiles = [_]rt.topology.TileDescriptor{
-    .{ .id = TileId.parse("tkings") catch unreachable, .name = "ingest_tile", .phase = 0, .cpu_placement = .{ .shared = 0 } },
-    .{ .id = TileId.parse("tknorm") catch unreachable, .name = "normalize_tile", .phase = 0, .cpu_placement = .{ .shared = 0 } },
-    .{ .id = TileId.parse("tkdedu") catch unreachable, .name = "dedupe_tile", .phase = 0 },
-    .{ .id = TileId.parse("tkpoly") catch unreachable, .name = "policy_tile", .phase = 0 },
-    .{ .id = TileId.parse("tkaudt") catch unreachable, .name = "audit_tile", .phase = 0 },
-    .{ .id = TileId.parse("tkrepl") catch unreachable, .name = "replay_tile", .phase = 0 },
-    .{ .id = TileId.parse("tkmetr") catch unreachable, .name = "metric_tile", .phase = 0 },
-    .{ .id = TileId.parse("tkdiag") catch unreachable, .name = "diag_tile", .phase = 0 },
+    .{ .id = TileId.parse("tkings") catch unreachable, .name = "ingest_tile", .phase = .core, .cpu_placement = .{ .shared = 0 } },
+    .{ .id = TileId.parse("tknorm") catch unreachable, .name = "normalize_tile", .phase = .core, .cpu_placement = .{ .shared = 0 } },
+    .{ .id = TileId.parse("tkdedu") catch unreachable, .name = "dedupe_tile", .phase = .core },
+    .{ .id = TileId.parse("tkpoly") catch unreachable, .name = "policy_tile", .phase = .core },
+    .{ .id = TileId.parse("tkaudt") catch unreachable, .name = "audit_tile", .phase = .core },
+    .{ .id = TileId.parse("tkrepl") catch unreachable, .name = "replay_tile", .phase = .core },
+    .{ .id = TileId.parse("tkmetr") catch unreachable, .name = "metric_tile", .phase = .core },
+    .{ .id = TileId.parse("tkdiag") catch unreachable, .name = "diag_tile", .phase = .core },
 };
 
 test "process_cpu_placement_integration: two tiles sharing one cpu get distinct pids and still complete" {
@@ -91,14 +91,14 @@ test "process_cpu_placement_integration: a malformed (out-of-range) cpu id fails
     const run_dir = path_buf[0..len];
 
     const bogus_tiles = [_]rt.topology.TileDescriptor{
-        .{ .id = TileId.parse("tkings") catch unreachable, .name = "ingest_tile", .phase = 0, .cpu_placement = .{ .exclusive = 65000 } },
-        .{ .id = TileId.parse("tknorm") catch unreachable, .name = "normalize_tile", .phase = 0 },
-        .{ .id = TileId.parse("tkdedu") catch unreachable, .name = "dedupe_tile", .phase = 0 },
-        .{ .id = TileId.parse("tkpoly") catch unreachable, .name = "policy_tile", .phase = 0 },
-        .{ .id = TileId.parse("tkaudt") catch unreachable, .name = "audit_tile", .phase = 0 },
-        .{ .id = TileId.parse("tkrepl") catch unreachable, .name = "replay_tile", .phase = 0 },
-        .{ .id = TileId.parse("tkmetr") catch unreachable, .name = "metric_tile", .phase = 0 },
-        .{ .id = TileId.parse("tkdiag") catch unreachable, .name = "diag_tile", .phase = 0 },
+        .{ .id = TileId.parse("tkings") catch unreachable, .name = "ingest_tile", .phase = .core, .cpu_placement = .{ .exclusive = 65000 } },
+        .{ .id = TileId.parse("tknorm") catch unreachable, .name = "normalize_tile", .phase = .core },
+        .{ .id = TileId.parse("tkdedu") catch unreachable, .name = "dedupe_tile", .phase = .core },
+        .{ .id = TileId.parse("tkpoly") catch unreachable, .name = "policy_tile", .phase = .core },
+        .{ .id = TileId.parse("tkaudt") catch unreachable, .name = "audit_tile", .phase = .core },
+        .{ .id = TileId.parse("tkrepl") catch unreachable, .name = "replay_tile", .phase = .core },
+        .{ .id = TileId.parse("tkmetr") catch unreachable, .name = "metric_tile", .phase = .core },
+        .{ .id = TileId.parse("tkdiag") catch unreachable, .name = "diag_tile", .phase = .core },
     };
     const topo = rt.topology.Topology{
         .tiles = &bogus_tiles,

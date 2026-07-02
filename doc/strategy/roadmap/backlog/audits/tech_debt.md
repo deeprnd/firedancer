@@ -10,6 +10,8 @@ Readable backlog for small cleanup work in the Tickoni runtime and supervisor.
 and `1 << 28` with named constants. If there are standard sizes the runtime
 will reuse, define them once and reference them from `SandboxConfig` and tests.
 
+**Clarification:** the consts need to be "global" for tickoni and reused across all tikoni code - maybe under commons.zip? essentially any << operations that calculate on fly one of the 8mb->>8gb need to be defined and reused.
+
 **Done when:**
 
 - `SandboxConfig` defaults use shared constant names.

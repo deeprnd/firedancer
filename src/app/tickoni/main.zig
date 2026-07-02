@@ -167,8 +167,8 @@ fn cmdStatus(io: std.Io, topo: rt.topology.Topology) !void {
     try File.writeStreamingAll(stdout, io, header);
 
     for (topo.tiles, 0..) |t, i| {
-        const line = try std.fmt.bufPrint(&buf, "  [{d}] id={s}  name={s}  phase={d}\n", .{
-            i, t.id.slice(), t.name, t.phase,
+        const line = try std.fmt.bufPrint(&buf, "  [{d}] id={s}  name={s}  phase={s}\n", .{
+            i, t.id.slice(), t.name, @tagName(t.phase),
         });
         try File.writeStreamingAll(stdout, io, line);
     }

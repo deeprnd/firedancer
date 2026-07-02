@@ -16,3 +16,13 @@ pub fn boot(pargc: *c_int, pargv: *[*][*:0]u8) void {
 pub fn halt() void {
     tk_halt();
 }
+
+/// Wraps FD_SPIN_PAUSE (src/util/fd_util_base.h): yields the calling logical
+/// core for one bounded-poll iteration without a scheduler-visible yield.
+/// Used between polls in hot mcache-consumer wait loops, matching the
+/// FD_MCACHE_WAIT pattern in src/tango/mcache/fd_mcache.h.
+extern fn tk_spin_pause() void;
+
+pub fn spinPause() void {
+    tk_spin_pause();
+}
