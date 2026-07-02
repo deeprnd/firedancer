@@ -1,8 +1,5 @@
 #include "audit_codec.h"
-
-#include "../../ballet/pb/fd_pb_encode.h"
-#include "../../ballet/pb/fd_pb_tokenize.h"
-#include "../../ballet/siphash13/fd_siphash13.h"
+#include "../c_abi/shim/firedancer.h"
 
 #include <string.h>
 
@@ -11,12 +8,12 @@
 #define TK_AUDIT_HASH_K0 (0x0000544455414B54UL) /* "TKAUDT\0\0" LE */
 #define TK_AUDIT_HASH_K1 (2UL)                  /* schema version  */
 
-#define TK_HASH(ptr,sz) fd_siphash13_append( sip, (uchar const *)(ptr), (sz) )
+#define TK_HASH(ptr,sz) tk_siphash13_append( sip, (ptr), (sz) )
 
 uint64_t
 tk_audit_record_hash( tk_audit_event_t const * event ) {
-  fd_siphash13_t _sip[1];
-  fd_siphash13_t * sip = fd_siphash13_init( _sip, TK_AUDIT_HASH_K0, TK_AUDIT_HASH_K1 );
+  tk_siphash13_t _sip[1];
+  tk_siphash13_t * sip = tk_siphash13_init( _sip, TK_AUDIT_HASH_K0, TK_AUDIT_HASH_K1 );
 
   TK_HASH( &event->header.schema_version,          sizeof(uint16_t) );
   TK_HASH( &event->header.run_id,                  sizeof(uint64_t) );
@@ -119,7 +116,7 @@ tk_audit_record_hash( tk_audit_event_t const * event ) {
     default: break;
   }
 
-  return fd_siphash13_fini( sip );
+  return tk_siphash13_fini( sip );
 }
 
 #undef TK_HASH
@@ -170,415 +167,415 @@ tk_zero_tail( unsigned char * buf,
 }
 
 static int
-tk_skip_bytes( fd_pb_inbuf_t * buf,
-               ulong           len ) {
-  if( fd_pb_inbuf_sz( buf )<len ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
-  buf->cur += len;
+tk_skip_bytes( tk_pb_inbuf_t * buf,
+               uint64_t        len ) {
+  if( tk_pb_inbuf_sz( buf )<len ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+  tk_pb_inbuf_advance( buf, len );
   return TK_AUDIT_CODEC_OK;
 }
 
 static int
 tk_copy_len_bytes( unsigned char *  dst,
                    size_t           dst_sz,
-                   fd_pb_inbuf_t *  buf,
-                   ulong            len ) {
+                   tk_pb_inbuf_t *  buf,
+                   uint64_t         len ) {
   if( len>dst_sz ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
-  if( fd_pb_inbuf_sz( buf )<len ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
-  memcpy( dst, buf->cur, len );
+  if( tk_pb_inbuf_sz( buf )<len ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+  memcpy( dst, tk_pb_inbuf_cur( buf ), (size_t)len );
   tk_zero_tail( dst, dst_sz, (size_t)len );
-  buf->cur += len;
+  tk_pb_inbuf_advance( buf, len );
   return TK_AUDIT_CODEC_OK;
 }
 
 static int
-tk_parse_payload( uint                record_type,
-                  fd_pb_inbuf_t *     inbuf,
+tk_parse_payload( uint32_t            record_type,
+                  tk_pb_inbuf_t *     inbuf,
                   tk_audit_payload_t *payload ) {
-  fd_pb_tlv_t tlv[1];
-  while( fd_pb_inbuf_sz( inbuf ) ) {
-    if( FD_UNLIKELY( !fd_pb_read_tlv( inbuf, tlv ) ) ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+  tk_pb_tlv_t tlv[1];
+  while( tk_pb_inbuf_sz( inbuf ) ) {
+    if( !tk_pb_read_tlv( inbuf, tlv ) ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
     switch( record_type ) {
       case 0U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->source_event.source_system, 16UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->source_event.event_type, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->source_event.raw_hash = (uint64_t)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 1U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->normalization.source_event_hash = (uint64_t)tlv->varint;
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->normalization.normalized_hash = (uint64_t)tlv->varint;
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->normalization.canonical_event_type, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 2U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->policy_decision.outcome = (uint8_t)tlv->varint;
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->policy_decision.rule_id = (uint32_t)tlv->varint;
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->policy_decision.failed_scope_dim, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 4U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->policy_decision.source_event_hash = (uint64_t)tlv->varint;
             break;
           case 5U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->policy_decision.catalog_schema_version = (uint32_t)tlv->varint;
             break;
           case 6U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->policy_decision.taxonomy_id, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 7U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->policy_decision.taxonomy_version = (uint32_t)tlv->varint;
             break;
           case 8U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->policy_decision.classification_code, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 3U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->model_call.model_id, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->model_call.prompt_hash = (uint64_t)tlv->varint;
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->model_call.response_hash = (uint64_t)tlv->varint;
             break;
           case 4U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->model_call.token_estimate = (uint32_t)tlv->varint;
             break;
           case 5U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->model_call.retry_count = (uint8_t)tlv->varint;
             break;
           case 6U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->model_call.actor_role, 16UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 7U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->model_call.workflow, 16UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 8U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->model_call.policy_decision_id = (uint64_t)tlv->varint;
             break;
           case 9U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->model_call.replay_substitution_id = (uint64_t)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 4U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->financial_adapter_call.adapter_id, 16UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->financial_adapter_call.request_hash = (uint64_t)tlv->varint;
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->financial_adapter_call.response_hash = (uint64_t)tlv->varint;
             break;
           case 4U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->financial_adapter_call.fixture_id = (uint32_t)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 5U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->proposal.proposal_type, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->proposal.proposal_hash = (uint64_t)tlv->varint;
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->proposal.approval_state = (uint8_t)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 6U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->destination_check.destination_type, 16UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->destination_check.allowlist_version = (uint32_t)tlv->varint;
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->destination_check.outcome = (uint8_t)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 7U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->limit_check.limit_type = (uint8_t)tlv->varint;
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->limit_check.value = (int64_t)(long)tlv->varint;
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->limit_check.limit = (int64_t)(long)tlv->varint;
             break;
           case 4U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->limit_check.outcome = (uint8_t)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 8U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->approval_required.action_class, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->approval_required.approval_path, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->approval_required.proposal_hash = (uint64_t)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 9U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->denial.action_class, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->denial.reason_code = (uint32_t)tlv->varint;
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->denial.failed_scope_dim, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 4U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->denial.catalog_schema_version = (uint32_t)tlv->varint;
             break;
           case 5U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->denial.taxonomy_id, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           case 6U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->denial.taxonomy_version = (uint32_t)tlv->varint;
             break;
           case 7U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             {
               int err = tk_copy_len_bytes( payload->denial.classification_code, 32UL, inbuf, tlv->len );
               if( err ) return err;
             }
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 10U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->telemetry_checkpoint.metric_set_hash = (uint64_t)tlv->varint;
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->telemetry_checkpoint.source_offset_watermark = (uint64_t)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 11U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->replay_result.capsule_id = (uint64_t)tlv->varint;
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->replay_result.divergences = (uint64_t)tlv->varint;
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->replay_result.first_divergent_seq = (uint64_t)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 12U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->deduplication.idempotency_key = (uint64_t)tlv->varint;
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->deduplication.is_duplicate = (uint8_t)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
       case 13U:
         switch( tlv->field_id ) {
           case 1U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->case_creation.basket_id = (uint64_t)tlv->varint;
             break;
           case 2U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->case_creation.instrument_count = (uint8_t)tlv->varint;
             break;
           case 3U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->case_creation.rejected_count = (uint8_t)tlv->varint;
             break;
           case 4U:
-            if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+            if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
             payload->case_creation.total_allocated_cents = (int64_t)(long)tlv->varint;
             break;
           default:
-            if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+            if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
             break;
         }
         break;
@@ -596,107 +593,107 @@ tk_audit_format_protobuf( void *                   out,
                           size_t *                 written ) {
   unsigned char scratch[ 512 ] __attribute__((aligned(32)));
   if( out_sz>sizeof(scratch) ) out_sz = sizeof(scratch);
-  fd_pb_encoder_t enc_[1];
-  fd_pb_encoder_t * enc = fd_pb_encoder_init( enc_, scratch, out_sz );
-  if( FD_UNLIKELY( !enc ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  tk_pb_encoder_t enc_[1];
+  tk_pb_encoder_t * enc = tk_pb_encoder_init( enc_, scratch, out_sz );
+  if( !enc ) return TK_AUDIT_CODEC_NO_SPACE;
 
   size_t tile_len = tk_trimmed_len( event->header.tile_id, 6UL );
   size_t policy_len = tk_trimmed_len( event->header.policy_version, 32UL );
 
-  if( !fd_pb_push_uint32( enc, TK_AUDIT_FIELD_SCHEMA_VERSION, (uint)event->header.schema_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_RUN_ID,         (ulong)event->header.run_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_SEQ,            (ulong)event->header.seq ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_SOURCE_OFFSET,  (ulong)event->header.source_offset ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_bytes(  enc, TK_AUDIT_FIELD_TILE_ID,        event->header.tile_id, tile_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_LOGICAL_ACTOR_ID, (ulong)event->header.logical_actor_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_bytes(  enc, TK_AUDIT_FIELD_POLICY_VERSION, event->header.policy_version, policy_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_bytes(  enc, TK_AUDIT_FIELD_CAPABILITY_ENVELOPE_ID, event->header.capability_envelope_id_le, 16UL ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_TIMESTAMP_NS,   (ulong)event->header.timestamp_ns ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_PREV_HASH,      (ulong)event->header.prev_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  if( !fd_pb_push_uint64( enc, TK_AUDIT_FIELD_RECORD_HASH,    (ulong)event->header.record_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_uint32( enc, TK_AUDIT_FIELD_SCHEMA_VERSION, (uint32_t)event->header.schema_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_uint64( enc, TK_AUDIT_FIELD_RUN_ID,         (uint64_t)event->header.run_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_uint64( enc, TK_AUDIT_FIELD_SEQ,            (uint64_t)event->header.seq ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_uint64( enc, TK_AUDIT_FIELD_SOURCE_OFFSET,  (uint64_t)event->header.source_offset ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_bytes(  enc, TK_AUDIT_FIELD_TILE_ID,        event->header.tile_id, tile_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_uint64( enc, TK_AUDIT_FIELD_LOGICAL_ACTOR_ID, (uint64_t)event->header.logical_actor_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_bytes(  enc, TK_AUDIT_FIELD_POLICY_VERSION, event->header.policy_version, policy_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_bytes(  enc, TK_AUDIT_FIELD_CAPABILITY_ENVELOPE_ID, event->header.capability_envelope_id_le, 16UL ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_uint64( enc, TK_AUDIT_FIELD_TIMESTAMP_NS,   (uint64_t)event->header.timestamp_ns ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_uint64( enc, TK_AUDIT_FIELD_PREV_HASH,      (uint64_t)event->header.prev_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_push_uint64( enc, TK_AUDIT_FIELD_RECORD_HASH,    (uint64_t)event->header.record_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
 
-  if( !fd_pb_submsg_open( enc, TK_AUDIT_FIELD_PAYLOAD_BASE + (uint)event->record_type ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_submsg_open( enc, TK_AUDIT_FIELD_PAYLOAD_BASE + (uint32_t)event->record_type ) ) return TK_AUDIT_CODEC_NO_SPACE;
   switch( event->record_type ) {
     case 0U: {
       size_t source_len = tk_trimmed_len( event->payload.source_event.source_system, 16UL );
       size_t event_type_len = tk_trimmed_len( event->payload.source_event.event_type, 32UL );
-      if( !fd_pb_push_bytes( enc, 1U, event->payload.source_event.source_system, source_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_bytes( enc, 2U, event->payload.source_event.event_type, event_type_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 3U, (ulong)event->payload.source_event.raw_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 1U, event->payload.source_event.source_system, source_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 2U, event->payload.source_event.event_type, event_type_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 3U, (uint64_t)event->payload.source_event.raw_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 1U: {
       size_t event_type_len = tk_trimmed_len( event->payload.normalization.canonical_event_type, 32UL );
-      if( !fd_pb_push_uint64( enc, 1U, (ulong)event->payload.normalization.source_event_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 2U, (ulong)event->payload.normalization.normalized_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_bytes( enc, 3U, event->payload.normalization.canonical_event_type, event_type_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 1U, (uint64_t)event->payload.normalization.source_event_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 2U, (uint64_t)event->payload.normalization.normalized_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 3U, event->payload.normalization.canonical_event_type, event_type_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 2U: {
       size_t failed_dim_len = tk_trimmed_len( event->payload.policy_decision.failed_scope_dim, 32UL );
       size_t taxonomy_id_len = tk_trimmed_len( event->payload.policy_decision.taxonomy_id, 32UL );
       size_t classification_code_len = tk_trimmed_len( event->payload.policy_decision.classification_code, 32UL );
-      if( !fd_pb_push_uint32( enc, 1U, (uint)event->payload.policy_decision.outcome ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 2U, (uint)event->payload.policy_decision.rule_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_bytes( enc, 3U, event->payload.policy_decision.failed_scope_dim, failed_dim_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 4U, (ulong)event->payload.policy_decision.source_event_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 5U, (uint)event->payload.policy_decision.catalog_schema_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_bytes( enc, 6U, event->payload.policy_decision.taxonomy_id, taxonomy_id_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 7U, (uint)event->payload.policy_decision.taxonomy_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_bytes( enc, 8U, event->payload.policy_decision.classification_code, classification_code_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 1U, (uint32_t)event->payload.policy_decision.outcome ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 2U, (uint32_t)event->payload.policy_decision.rule_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 3U, event->payload.policy_decision.failed_scope_dim, failed_dim_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 4U, (uint64_t)event->payload.policy_decision.source_event_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 5U, (uint32_t)event->payload.policy_decision.catalog_schema_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 6U, event->payload.policy_decision.taxonomy_id, taxonomy_id_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 7U, (uint32_t)event->payload.policy_decision.taxonomy_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 8U, event->payload.policy_decision.classification_code, classification_code_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 3U: {
       size_t model_len = tk_trimmed_len( event->payload.model_call.model_id, 32UL );
       size_t actor_role_len = tk_trimmed_len( event->payload.model_call.actor_role, 16UL );
       size_t workflow_len = tk_trimmed_len( event->payload.model_call.workflow, 16UL );
-      if( !fd_pb_push_bytes( enc, 1U, event->payload.model_call.model_id, model_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 2U, (ulong)event->payload.model_call.prompt_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 3U, (ulong)event->payload.model_call.response_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 4U, (uint)event->payload.model_call.token_estimate ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 5U, (uint)event->payload.model_call.retry_count ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( actor_role_len && !fd_pb_push_bytes( enc, 6U, event->payload.model_call.actor_role, actor_role_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( workflow_len && !fd_pb_push_bytes( enc, 7U, event->payload.model_call.workflow, workflow_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 1U, event->payload.model_call.model_id, model_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 2U, (uint64_t)event->payload.model_call.prompt_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 3U, (uint64_t)event->payload.model_call.response_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 4U, (uint32_t)event->payload.model_call.token_estimate ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 5U, (uint32_t)event->payload.model_call.retry_count ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( actor_role_len && !tk_pb_push_bytes( enc, 6U, event->payload.model_call.actor_role, actor_role_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( workflow_len && !tk_pb_push_bytes( enc, 7U, event->payload.model_call.workflow, workflow_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
       if( event->payload.model_call.policy_decision_id &&
-          !fd_pb_push_uint64( enc, 8U, (ulong)event->payload.model_call.policy_decision_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
+          !tk_pb_push_uint64( enc, 8U, (uint64_t)event->payload.model_call.policy_decision_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
       if( event->payload.model_call.replay_substitution_id &&
-          !fd_pb_push_uint64( enc, 9U, (ulong)event->payload.model_call.replay_substitution_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
+          !tk_pb_push_uint64( enc, 9U, (uint64_t)event->payload.model_call.replay_substitution_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 4U: {
       size_t adapter_len = tk_trimmed_len( event->payload.financial_adapter_call.adapter_id, 16UL );
-      if( !fd_pb_push_bytes( enc, 1U, event->payload.financial_adapter_call.adapter_id, adapter_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 2U, (ulong)event->payload.financial_adapter_call.request_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 3U, (ulong)event->payload.financial_adapter_call.response_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 4U, (uint)event->payload.financial_adapter_call.fixture_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 1U, event->payload.financial_adapter_call.adapter_id, adapter_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 2U, (uint64_t)event->payload.financial_adapter_call.request_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 3U, (uint64_t)event->payload.financial_adapter_call.response_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 4U, (uint32_t)event->payload.financial_adapter_call.fixture_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 5U: {
       size_t proposal_len = tk_trimmed_len( event->payload.proposal.proposal_type, 32UL );
-      if( !fd_pb_push_bytes( enc, 1U, event->payload.proposal.proposal_type, proposal_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 2U, (ulong)event->payload.proposal.proposal_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 3U, (uint)event->payload.proposal.approval_state ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 1U, event->payload.proposal.proposal_type, proposal_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 2U, (uint64_t)event->payload.proposal.proposal_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 3U, (uint32_t)event->payload.proposal.approval_state ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 6U: {
       size_t dest_len = tk_trimmed_len( event->payload.destination_check.destination_type, 16UL );
-      if( !fd_pb_push_bytes( enc, 1U, event->payload.destination_check.destination_type, dest_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 2U, (uint)event->payload.destination_check.allowlist_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 3U, (uint)event->payload.destination_check.outcome ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 1U, event->payload.destination_check.destination_type, dest_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 2U, (uint32_t)event->payload.destination_check.allowlist_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 3U, (uint32_t)event->payload.destination_check.outcome ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 7U:
-      if( !fd_pb_push_uint32( enc, 1U, (uint)event->payload.limit_check.limit_type ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_int64( enc, 2U, (long)event->payload.limit_check.value ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_int64( enc, 3U, (long)event->payload.limit_check.limit ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 4U, (uint)event->payload.limit_check.outcome ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 1U, (uint32_t)event->payload.limit_check.limit_type ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_int64( enc, 2U, (long)event->payload.limit_check.value ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_int64( enc, 3U, (long)event->payload.limit_check.limit ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 4U, (uint32_t)event->payload.limit_check.outcome ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     case 8U: {
       size_t action_len = tk_trimmed_len( event->payload.approval_required.action_class, 32UL );
       size_t path_len = tk_trimmed_len( event->payload.approval_required.approval_path, 32UL );
-      if( !fd_pb_push_bytes( enc, 1U, event->payload.approval_required.action_class, action_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_bytes( enc, 2U, event->payload.approval_required.approval_path, path_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 3U, (ulong)event->payload.approval_required.proposal_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 1U, event->payload.approval_required.action_class, action_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 2U, event->payload.approval_required.approval_path, path_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 3U, (uint64_t)event->payload.approval_required.proposal_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 9U: {
@@ -704,40 +701,40 @@ tk_audit_format_protobuf( void *                   out,
       size_t failed_len = tk_trimmed_len( event->payload.denial.failed_scope_dim, 32UL );
       size_t taxonomy_id_len = tk_trimmed_len( event->payload.denial.taxonomy_id, 32UL );
       size_t classification_code_len = tk_trimmed_len( event->payload.denial.classification_code, 32UL );
-      if( !fd_pb_push_bytes( enc, 1U, event->payload.denial.action_class, action_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 2U, (uint)event->payload.denial.reason_code ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_bytes( enc, 3U, event->payload.denial.failed_scope_dim, failed_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 4U, (uint)event->payload.denial.catalog_schema_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_bytes( enc, 5U, event->payload.denial.taxonomy_id, taxonomy_id_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 6U, (uint)event->payload.denial.taxonomy_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_bytes( enc, 7U, event->payload.denial.classification_code, classification_code_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 1U, event->payload.denial.action_class, action_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 2U, (uint32_t)event->payload.denial.reason_code ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 3U, event->payload.denial.failed_scope_dim, failed_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 4U, (uint32_t)event->payload.denial.catalog_schema_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 5U, event->payload.denial.taxonomy_id, taxonomy_id_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 6U, (uint32_t)event->payload.denial.taxonomy_version ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_bytes( enc, 7U, event->payload.denial.classification_code, classification_code_len ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     }
     case 10U:
-      if( !fd_pb_push_uint64( enc, 1U, (ulong)event->payload.telemetry_checkpoint.metric_set_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 2U, (ulong)event->payload.telemetry_checkpoint.source_offset_watermark ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 1U, (uint64_t)event->payload.telemetry_checkpoint.metric_set_hash ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 2U, (uint64_t)event->payload.telemetry_checkpoint.source_offset_watermark ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     case 11U:
-      if( !fd_pb_push_uint64( enc, 1U, (ulong)event->payload.replay_result.capsule_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 2U, (ulong)event->payload.replay_result.divergences ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint64( enc, 3U, (ulong)event->payload.replay_result.first_divergent_seq ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 1U, (uint64_t)event->payload.replay_result.capsule_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 2U, (uint64_t)event->payload.replay_result.divergences ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 3U, (uint64_t)event->payload.replay_result.first_divergent_seq ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     case 12U:
-      if( !fd_pb_push_uint64( enc, 1U, (ulong)event->payload.deduplication.idempotency_key ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 2U, (uint)event->payload.deduplication.is_duplicate ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 1U, (uint64_t)event->payload.deduplication.idempotency_key ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 2U, (uint32_t)event->payload.deduplication.is_duplicate ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     case 13U:
-      if( !fd_pb_push_uint64( enc, 1U, (ulong)event->payload.case_creation.basket_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 2U, (uint)event->payload.case_creation.instrument_count ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_uint32( enc, 3U, (uint)event->payload.case_creation.rejected_count ) ) return TK_AUDIT_CODEC_NO_SPACE;
-      if( !fd_pb_push_int64(  enc, 4U, (long)event->payload.case_creation.total_allocated_cents ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint64( enc, 1U, (uint64_t)event->payload.case_creation.basket_id ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 2U, (uint32_t)event->payload.case_creation.instrument_count ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_uint32( enc, 3U, (uint32_t)event->payload.case_creation.rejected_count ) ) return TK_AUDIT_CODEC_NO_SPACE;
+      if( !tk_pb_push_int64(  enc, 4U, (long)event->payload.case_creation.total_allocated_cents ) ) return TK_AUDIT_CODEC_NO_SPACE;
       break;
     default:
       return TK_AUDIT_CODEC_INVALID_FIELD;
   }
-  if( !fd_pb_submsg_close( enc ) ) return TK_AUDIT_CODEC_NO_SPACE;
-  *written = (size_t)( enc->cur - enc->buf0 );
-  if( !fd_pb_encoder_fini( enc ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  if( !tk_pb_submsg_close( enc ) ) return TK_AUDIT_CODEC_NO_SPACE;
+  *written = (size_t)tk_pb_encoder_out_sz( enc );
+  if( !tk_pb_encoder_fini( enc ) ) return TK_AUDIT_CODEC_NO_SPACE;
   memcpy( out, scratch, *written );
   return TK_AUDIT_CODEC_OK;
 }
@@ -746,7 +743,7 @@ int
 tk_audit_peek_binary_len( void const * in,
                           size_t       in_sz,
                           size_t *     out_total_len ) {
-  if( FD_UNLIKELY( in_sz<sizeof(uint32_t) ) ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+  if( in_sz<sizeof(uint32_t) ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
   uint32_t body_len;
   memcpy( &body_len, in, sizeof(uint32_t) );
   *out_total_len = sizeof(uint32_t) + (size_t)body_len;
@@ -759,83 +756,83 @@ tk_audit_parse_protobuf( void const *       in,
                          tk_audit_event_t * event ) {
   memset( event, 0, sizeof(*event) );
 
-  fd_pb_inbuf_t inbuf_[1];
-  fd_pb_inbuf_t * inbuf = fd_pb_inbuf_init( inbuf_, in, in_sz );
-  fd_pb_tlv_t tlv[1];
+  tk_pb_inbuf_t inbuf_[1];
+  tk_pb_inbuf_t * inbuf = tk_pb_inbuf_init( inbuf_, in, in_sz );
+  tk_pb_tlv_t tlv[1];
 
-  while( fd_pb_inbuf_sz( inbuf ) ) {
-    if( FD_UNLIKELY( !fd_pb_read_tlv( inbuf, tlv ) ) ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+  while( tk_pb_inbuf_sz( inbuf ) ) {
+    if( !tk_pb_read_tlv( inbuf, tlv ) ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
     switch( tlv->field_id ) {
       case TK_AUDIT_FIELD_SCHEMA_VERSION:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.schema_version = (uint16_t)tlv->varint;
         break;
       case TK_AUDIT_FIELD_RUN_ID:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.run_id = (uint64_t)tlv->varint;
         break;
       case TK_AUDIT_FIELD_SEQ:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.seq = (uint64_t)tlv->varint;
         break;
       case TK_AUDIT_FIELD_SOURCE_OFFSET:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.source_offset = (uint64_t)tlv->varint;
         break;
       case TK_AUDIT_FIELD_TILE_ID:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         {
           int err = tk_copy_len_bytes( event->header.tile_id, 6UL, inbuf, tlv->len );
           if( err ) return err;
         }
         break;
       case TK_AUDIT_FIELD_LOGICAL_ACTOR_ID:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.logical_actor_id = (uint64_t)tlv->varint;
         break;
       case TK_AUDIT_FIELD_POLICY_VERSION:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         {
           int err = tk_copy_len_bytes( event->header.policy_version, 32UL, inbuf, tlv->len );
           if( err ) return err;
         }
         break;
       case TK_AUDIT_FIELD_CAPABILITY_ENVELOPE_ID:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         {
           int err = tk_copy_len_bytes( event->header.capability_envelope_id_le, 16UL, inbuf, tlv->len );
           if( err ) return err;
         }
         break;
       case TK_AUDIT_FIELD_TIMESTAMP_NS:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.timestamp_ns = (uint64_t)tlv->varint;
         break;
       case TK_AUDIT_FIELD_PREV_HASH:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.prev_hash = (uint64_t)tlv->varint;
         break;
       case TK_AUDIT_FIELD_RECORD_HASH:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_VARINT ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         event->header.record_hash = (uint64_t)tlv->varint;
         break;
       case 12U: case 13U: case 14U: case 15U: case 16U: case 17U:
       case 18U: case 19U: case 20U: case 21U: case 22U: case 23U:
       case 24U: case 25U:
-        if( tlv->wire_type!=FD_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
-        if( fd_pb_inbuf_sz( inbuf )<tlv->len ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tlv->wire_type!=TK_PB_WIRE_TYPE_LEN ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
+        if( tk_pb_inbuf_sz( inbuf )<tlv->len ) return TK_AUDIT_CODEC_INVALID_PROTOBUF;
         {
-          uint rt = tlv->field_id - TK_AUDIT_FIELD_PAYLOAD_BASE;
+          uint32_t rt = tlv->field_id - TK_AUDIT_FIELD_PAYLOAD_BASE;
           event->record_type = (uint8_t)rt;
-          fd_pb_inbuf_t payload_buf_[1];
-          fd_pb_inbuf_t * payload_buf = fd_pb_inbuf_init( payload_buf_, inbuf->cur, tlv->len );
+          tk_pb_inbuf_t payload_buf_[1];
+          tk_pb_inbuf_t * payload_buf = tk_pb_inbuf_init( payload_buf_, tk_pb_inbuf_cur( inbuf ), tlv->len );
           int err = tk_parse_payload( rt, payload_buf, &event->payload );
           if( err ) return err;
-          inbuf->cur += tlv->len;
+          tk_pb_inbuf_advance( inbuf, tlv->len );
         }
         break;
       default:
-        if( tlv->wire_type==FD_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
+        if( tlv->wire_type==TK_PB_WIRE_TYPE_LEN ) tk_skip_bytes( inbuf, tlv->len );
         break;
     }
   }

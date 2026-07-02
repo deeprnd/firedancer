@@ -587,7 +587,7 @@ fn restrictionMsg(reason: cat.RestrictionReason) []const u8 {
 /// Write a rationale string into out.rationale/rationale_len.
 /// Format: "Eligible {stock|ETF}/{asset_class} on {NYSE|NASDAQ}; {pct}% = ${dollars}[, ETF preferred]"
 ///
-/// fd_cstr_printf (src/util/cstr) wraps snprintf and is available at runtime, but
+/// Firedancer's cstr formatter wraps snprintf and is available at runtime, but
 /// Zig's typed std.fmt.bufPrint is used here: it keeps typed fixed-point formatting
 /// (two-decimal cents display) in the owning Zig module without a C round-trip for
 /// display-only strings.  src/util/cstr provides no fixed-point decimal formatting.

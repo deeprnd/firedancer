@@ -275,11 +275,14 @@ testing, whole-Firedancer workspace fuzzing, cross-platform portable queue
 substitutes, or production throughput saturation unless the story explicitly
 owns that scope.
 
-### Firedancer Utility Reuse
+### Firedancer Boundary And Utility Reuse
 
-Default to Firedancer. When a Firedancer utility covers a need, call it through
-a C extern even at FFI cost. Do not write Tickoni-owned helpers that duplicate
-what Firedancer already provides.
+Default to Firedancer substrate where it is generic, but do not call Firedancer
+or vendored C APIs directly from Tickoni code. Every Firedancer dependency
+crosses a Tickoni-owned C shim under `src/tickoni/c_abi/shim/**` with a `tk_*`
+symbol, then a Zig wrapper in `src/tickoni/c_abi/*.zig` when Zig needs access.
+The build may still link `fd_*` libraries because the shim object files need
+those symbols; the source-level call boundary is the shim.
 
 The reuse boundary is wide. Everything outside Solana validator semantics is
 in scope:
@@ -291,15 +294,18 @@ in scope:
   string handling and number formatting
 - `src/util/math` and `src/util/hist` — fixed-point arithmetic, statistics
 - `src/util/io` and `src/util/log` — structured IO and the `fd_log_*` family
-- `src/ballet/siphash13` — `fd_siphash13` for streaming hash (current audit
-  hash function)
+- `src/ballet/siphash13` — `fd_siphash13` behind `tk_siphash13_*` for
+  streaming hash (current audit hash function)
 - `src/ballet/sha256`, `src/ballet/sha512`, `src/ballet/keccak` — for
   content-addressed audit evidence and any future crypto needs
-- `src/ballet/pb` — `fd_pb_encoder` and `fd_pb_tokenize` for protobuf
-  encoding and decoding
+- `src/ballet/pb` — protobuf encoding and decoding behind `tk_pb_*`
+- `src/ballet/json/cJSON` — vendored JSON behind `tk_json_*`
 - `src/waltz/http` — `fd_http_server` for the `tkapi` tile HTTP/WebSocket
   surface
-- `src/tango` — mcache, dcache, and workspace queue substrate
+- `src/tango` — mcache, dcache, fseq, cnc, and queue substrate behind
+  `tk_*`
+- `src/util/wksp`, `src/util/sandbox`, and `src/util/fd_util` — workspace,
+  sandbox, boot, and halt behavior behind `tk_*`
 
 The only exclusion is Solana-specific substrate: consensus, gossip, RPC wire
 formats, account/slot/epoch/leader-schedule structs, vote program logic, SVM
@@ -309,16 +315,17 @@ that do not belong in Tickoni financial event processing.
 When evaluating whether to write a helper:
 
 1. Check `src/util` and `src/ballet` first. If the function exists there, use
-   it via C extern, even if the Zig stdlib has an equivalent.
+   it via a `src/tickoni/c_abi/shim/**` `tk_*` symbol, even if the Zig stdlib
+   has an equivalent.
 2. If the operation belongs to codec framing, encoding, or parsing, implement
    it in the owning C codec file alongside the format and parse functions that
    share the same frame boundary knowledge. Then call it from Zig as an extern.
 3. Write a Tickoni-owned helper only when the need is genuinely Tickoni-
    specific and nothing in Firedancer covers it. Add a comment naming the
    Firedancer function checked and why it does not apply.
-4. Do not wrap a Firedancer function in a Zig function that adds no behavior.
-   Call the extern directly, or inline the `@bitCast` / `std.mem.readInt` at
-   the call site if it truly requires no C at all.
+4. Do not expose a Firedancer symbol directly to Tickoni Zig or codec code.
+   Add the narrow `tk_*` shim first, then expose a lower-camel Zig wrapper only
+   where Zig needs the primitive.
 
 ### Zig To C Action Diagram
 
@@ -339,15 +346,15 @@ sequenceDiagram
   Sup->>Topo: validate tile IDs, links, depth, MTU
   Topo-->>Sup: fixed topology snapshot
   Sup->>ABI: request align/footprint(depth, mtu)
-  ABI->>C: fd_align / fd_footprint
+  ABI->>C: tk_* shim calls Firedancer align/footprint
   C-->>ABI: size and alignment
   ABI-->>Sup: primitive layout requirements
   Sup->>ABI: allocate or join workspace through retained substrate
-  ABI->>C: fd_wksp / shmem setup calls
+  ABI->>C: tk_* shim calls workspace/shmem setup
   C-->>ABI: workspace/object memory
   ABI-->>Sup: workspace handle with explicit ownership
   Sup->>ABI: new/join queue object
-  ABI->>C: fd_mcache_new / fd_mcache_join
+  ABI->>C: tk_* shim calls mcache new/join
   C->>Q: format queue metadata and payload storage
   C-->>ABI: opaque queue handle
   ABI-->>Topo: typed narrow Zig handle
@@ -358,7 +365,7 @@ sequenceDiagram
   ABI-->>Tile: explicit status or typed error
   Tile->>Topo: update local counters and output link
   Tile->>ABI: leave/delete during shutdown
-  ABI->>C: fd_leave / fd_delete
+  ABI->>C: tk_* shim calls leave/delete
   C-->>ABI: released substrate object
   ABI-->>Sup: shutdown complete
 ```

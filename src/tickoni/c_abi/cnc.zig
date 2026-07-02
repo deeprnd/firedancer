@@ -114,7 +114,7 @@ pub fn cncSignalCstr(s: u64, buf: [*]u8) [*:0]u8 {
     return tk_cnc_signal_cstr(s, buf);
 }
 
-/// Mirrors static inline fd_cnc_app_laddr (fd_cnc.h).
+/// Mirrors the upstream cnc app-laddr helper.
 pub fn appLaddr(cnc: *Cnc) [*]u8 {
     return tk_cnc_app_laddr(cnc);
 }
@@ -142,27 +142,27 @@ pub fn appCounterWrite(cnc: *Cnc, idx: usize, value: u64) void {
     ptr.* = value;
 }
 
-/// Mirrors static inline fd_cnc_heartbeat_query (fd_cnc.h).
+/// Mirrors the upstream cnc heartbeat-query helper.
 pub fn heartbeatQuery(cnc: *const Cnc) i64 {
     return tk_cnc_heartbeat_query(cnc);
 }
 
-/// Mirrors static inline fd_cnc_heartbeat (fd_cnc.h).
+/// Mirrors the upstream cnc heartbeat helper.
 pub fn heartbeat(cnc: *Cnc, now: i64) void {
     tk_cnc_heartbeat(cnc, now);
 }
 
-/// Mirrors static inline fd_cnc_signal_query (fd_cnc.h).
+/// Mirrors the upstream cnc signal-query helper.
 pub fn signalQuery(cnc: *const Cnc) u64 {
     return tk_cnc_signal_query(cnc);
 }
 
-/// Mirrors static inline fd_cnc_signal (fd_cnc.h).
+/// Mirrors the upstream cnc signal helper.
 pub fn signal(cnc: *Cnc, s: u64) void {
     tk_cnc_signal(cnc, s);
 }
 
-/// Mirrors static inline fd_cnc_close (fd_cnc.h).
+/// Mirrors the upstream cnc close helper.
 pub fn close(cnc: *Cnc) void {
     tk_cnc_close(cnc);
 }

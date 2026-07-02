@@ -1,6 +1,5 @@
 #include "audit_codec.h"
-
-#include "../../ballet/json/cJSON.h"
+#include "../c_abi/shim/firedancer.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -75,17 +74,17 @@ tk_limit_type_name( uint8_t limit_type ) {
 }
 
 static int
-tk_add_raw_number( cJSON *       obj,
+tk_add_raw_number( tk_json_t *   obj,
                    char const *  key,
                    char const *  value ) {
-  cJSON * raw = cJSON_CreateRaw( value );
+  tk_json_t * raw = tk_json_create_raw( value );
   if( !raw ) return TK_AUDIT_CODEC_INVALID_JSON;
-  cJSON_AddItemToObject( obj, key, raw );
+  tk_json_add_item_to_object( obj, key, raw );
   return TK_AUDIT_CODEC_OK;
 }
 
 static int
-tk_add_u64( cJSON *       obj,
+tk_add_u64( tk_json_t *   obj,
             char const *  key,
             uint64_t      value ) {
   char buf[ 32 ];
@@ -95,14 +94,14 @@ tk_add_u64( cJSON *       obj,
 }
 
 static int
-tk_add_u32( cJSON *       obj,
+tk_add_u32( tk_json_t *   obj,
             char const *  key,
             uint32_t      value ) {
   return tk_add_u64( obj, key, (uint64_t)value );
 }
 
 static int
-tk_add_i64( cJSON *       obj,
+tk_add_i64( tk_json_t *   obj,
             char const *  key,
             int64_t       value ) {
   char buf[ 32 ];
@@ -112,7 +111,7 @@ tk_add_i64( cJSON *       obj,
 }
 
 static int
-tk_add_u128_le( cJSON *               obj,
+tk_add_u128_le( tk_json_t *           obj,
                 char const *          key,
                 unsigned char const * value_le ) {
   unsigned __int128 value = 0;
@@ -133,7 +132,7 @@ tk_add_u128_le( cJSON *               obj,
 }
 
 static int
-tk_add_string( cJSON *               obj,
+tk_add_string( tk_json_t *           obj,
                char const *          key,
                unsigned char const * value,
                size_t                value_sz ) {
@@ -142,7 +141,7 @@ tk_add_string( cJSON *               obj,
   int err = tk_trimmed_ascii( value, value_sz, buf, &len );
   if( err ) return err;
   (void)len;
-  if( !cJSON_AddStringToObject( obj, key, buf ) ) return TK_AUDIT_CODEC_INVALID_JSON;
+  if( !tk_json_add_string_to_object( obj, key, buf ) ) return TK_AUDIT_CODEC_INVALID_JSON;
   return TK_AUDIT_CODEC_OK;
 }
 
@@ -152,17 +151,17 @@ tk_audit_format_jsonl( char *                    out,
                        tk_audit_event_t const *  event,
                        size_t *                  written ) {
   int err = TK_AUDIT_CODEC_OK;
-  cJSON * root = cJSON_CreateObject();
+  tk_json_t * root = tk_json_create_object();
   if( !root ) return TK_AUDIT_CODEC_INVALID_JSON;
 
   char const * record_type_name = tk_record_type_name( event->record_type );
   if( !record_type_name ) {
-    cJSON_Delete( root );
+    tk_json_delete( root );
     return TK_AUDIT_CODEC_INVALID_FIELD;
   }
 
   if( !( err = tk_add_u32( root, "schema_version", event->header.schema_version ) ) &&
-      !( err = ( cJSON_AddStringToObject( root, "record_type", record_type_name ) ? TK_AUDIT_CODEC_OK : TK_AUDIT_CODEC_INVALID_JSON ) ) &&
+      !( err = ( tk_json_add_string_to_object( root, "record_type", record_type_name ) ? TK_AUDIT_CODEC_OK : TK_AUDIT_CODEC_INVALID_JSON ) ) &&
       !( err = tk_add_u64( root, "seq", event->header.seq ) ) &&
       !( err = tk_add_u64( root, "source_offset", event->header.source_offset ) ) &&
       !( err = tk_add_string( root, "tile_id", event->header.tile_id, 6UL ) ) &&
@@ -186,7 +185,7 @@ tk_audit_format_jsonl( char *                    out,
       case 2U: {
         char const * outcome = tk_policy_outcome_name( event->payload.policy_decision.outcome );
         if( !outcome ) err = TK_AUDIT_CODEC_INVALID_FIELD;
-        if( !err && !cJSON_AddStringToObject( root, "outcome", outcome ) ) err = TK_AUDIT_CODEC_INVALID_JSON;
+        if( !err && !tk_json_add_string_to_object( root, "outcome", outcome ) ) err = TK_AUDIT_CODEC_INVALID_JSON;
         if( !err ) err = tk_add_u32( root, "rule_id", event->payload.policy_decision.rule_id );
         if( !err ) err = tk_add_string( root, "failed_scope_dim", event->payload.policy_decision.failed_scope_dim, 32UL );
         if( !err ) err = tk_add_u64( root, "source_event_hash", event->payload.policy_decision.source_event_hash );
@@ -219,17 +218,17 @@ tk_audit_format_jsonl( char *                    out,
         if( !outcome ) err = TK_AUDIT_CODEC_INVALID_FIELD;
         if( !err ) err = tk_add_string( root, "destination_type", event->payload.destination_check.destination_type, 16UL );
         if( !err ) err = tk_add_u32( root, "allowlist_version", event->payload.destination_check.allowlist_version );
-        if( !err && !cJSON_AddStringToObject( root, "outcome", outcome ) ) err = TK_AUDIT_CODEC_INVALID_JSON;
+        if( !err && !tk_json_add_string_to_object( root, "outcome", outcome ) ) err = TK_AUDIT_CODEC_INVALID_JSON;
         break;
       }
       case 7U: {
         char const * limit_type = tk_limit_type_name( event->payload.limit_check.limit_type );
         char const * outcome = tk_policy_outcome_name( event->payload.limit_check.outcome );
         if( !limit_type || !outcome ) err = TK_AUDIT_CODEC_INVALID_FIELD;
-        if( !err && !cJSON_AddStringToObject( root, "limit_type", limit_type ) ) err = TK_AUDIT_CODEC_INVALID_JSON;
+        if( !err && !tk_json_add_string_to_object( root, "limit_type", limit_type ) ) err = TK_AUDIT_CODEC_INVALID_JSON;
         if( !err ) err = tk_add_i64( root, "value", event->payload.limit_check.value );
         if( !err ) err = tk_add_i64( root, "limit", event->payload.limit_check.limit );
-        if( !err && !cJSON_AddStringToObject( root, "outcome", outcome ) ) err = TK_AUDIT_CODEC_INVALID_JSON;
+        if( !err && !tk_json_add_string_to_object( root, "outcome", outcome ) ) err = TK_AUDIT_CODEC_INVALID_JSON;
         break;
       }
       case 8U:
@@ -260,7 +259,7 @@ tk_audit_format_jsonl( char *                    out,
   if( !err ) {
     if( out_sz<2UL ) {
       err = TK_AUDIT_CODEC_NO_SPACE;
-    } else if( !cJSON_PrintPreallocated( root, out, (int)( out_sz-1UL ), 0 ) ) {
+    } else if( !tk_json_print_preallocated( root, out, (int)( out_sz-1UL ), 0 ) ) {
       err = TK_AUDIT_CODEC_NO_SPACE;
     } else {
       size_t len = strlen( out );
@@ -274,6 +273,6 @@ tk_audit_format_jsonl( char *                    out,
     }
   }
 
-  cJSON_Delete( root );
+  tk_json_delete( root );
   return err;
 }

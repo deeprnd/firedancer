@@ -150,15 +150,15 @@ financial meaning.
 
 | Tile or source | Solana-specific? | Tickoni use | Reuse mode |
 | --- | --- | --- | --- |
-| `net` | Mostly generic packet I/O, but configured around validator UDP flows | Useful only if Tickoni later needs high-rate packet ingress/egress below normal HTTP/WebSocket APIs, such as market-data UDP capture or colocated adapter feeds. Not needed for the current in-process spike. | Drop-in only inside a retained C topology with compatible links; otherwise wrap the XDP substrate behind a small `tkings`/adapter-facing C ABI. |
-| `sock` | Mostly generic UDP socket I/O | Useful for lower-rate UDP adapter feeds or tests where XDP is unnecessary. Not a replacement for `tkapi` HTTP/WebSocket. | Drop-in only with compatible Firedancer topology links; small adaptation if exposed through Zig runtime wrappers. |
-| `netlnk` | Generic Linux network metadata | Useful with `net` if Tickoni owns route/neighbour-aware packet I/O. | Drop-in with `net`; otherwise omit. |
-| `metric` | Mostly generic, but assumes Firedancer metric layout and C topology | Useful model for `tkmetr` Prometheus export and `fd_http_server` integration. | Minimal adaptation: keep metric workspace/rendering patterns, expose Tickoni metric names and Zig/C ABI instead of validator metric schema. |
+| `net` | Mostly generic packet I/O, but configured around validator UDP flows | Useful only if Tickoni later needs high-rate packet ingress/egress below normal HTTP/WebSocket APIs, such as market-data UDP capture or colocated adapter feeds. Not needed for the current in-process spike. | Adapt only the generic packet-I/O discipline; do not inherit validator packet schemas. |
+| `sock` | Mostly generic UDP socket I/O | Useful for lower-rate UDP adapter feeds or tests where XDP is unnecessary. Not a replacement for `tkapi` HTTP/WebSocket. | Adapt only if Tickoni needs low-level UDP feeds. |
+| `netlnk` | Generic Linux network metadata | Useful with `net` if Tickoni owns route/neighbour-aware packet I/O. | Keep paired with low-level network work; otherwise omit. |
+| `metric` | Mostly generic, but assumes Firedancer metric layout and C topology | Useful model for `tkmetr` Prometheus export and `fd_http_server` integration. | Keep metric workspace/rendering patterns; expose Tickoni metric names instead of validator metric schema. |
 | `diag` | Mixed: generic process diagnostics plus validator health checks | Useful model for `tkdiag` process, queue, crash, CPU, and interrupt diagnostics. | Minimal adaptation: remove validator-specific replay/tower/bundle checks and keep process/topology sampling. |
-| `fd_http_server` used by `metric`, `rpc`, and `gui` | Generic HTTP/WebSocket infrastructure, not itself a tile | Useful for `tkapi`, `tkmetr`, and `tkdiag` HTTP surfaces. | Small wrapper around `src/waltz/http`; do not reuse Solana RPC or GUI schemas. |
-| `src/disco/topo` and `src/disco/stem` | Generic tile lifecycle/polling substrate | Useful for process lifecycle, workspace construction, link validation, bounded polling, and backpressure. | Minimal adaptation behind `src/tickoni/c_abi/` or Zig-native equivalents. Avoid adding Tickoni fields to upstream-hot `fd_topo.h`. |
-| `src/tango` | Generic queue substrate | Core Tickoni shared-memory queue and flow-control substrate. | Reuse/wrap directly with Tickoni-owned link schemas. |
-| `src/util/sandbox` and generated seccomp pattern | Generic sandbox infrastructure with per-tile policies | Useful for tile isolation, file descriptor discipline, Landlock/seccomp, and crash-only operation. | Minimal adaptation per Tickoni tile class. |
+| `fd_http_server` used by `metric`, `rpc`, and `gui` | Generic HTTP/WebSocket infrastructure, not itself a tile | Useful for `tkapi`, `tkmetr`, and `tkdiag` HTTP surfaces. | Reuse the HTTP/WebSocket substrate, not Solana RPC or GUI schemas. |
+| `src/disco/topo` and `src/disco/stem` | Generic tile lifecycle/polling substrate | Useful for process lifecycle, workspace construction, link validation, bounded polling, and backpressure. | Use as lifecycle/backpressure reference material. Avoid adding Tickoni fields to upstream-hot `fd_topo.h`. |
+| `src/tango` | Generic queue substrate | Core Tickoni shared-memory queue and flow-control substrate. | Reuse with Tickoni-owned link schemas. |
+| `src/util/sandbox` and generated seccomp pattern | Generic sandbox infrastructure with per-tile policies | Useful for tile isolation, file descriptor discipline, Landlock/seccomp, and crash-only operation. | Adapt per Tickoni tile class. |
 | `backtest`, `forkt`, benchmark tiles | Solana payloads, generic offline-run idea | Useful only as examples for replay/backtest command structure and test topologies. | Do not drop in; copy patterns for `tkrepl` and harness load tests. |
 
 ### Solana-Specific Tiles To Replace Or Exclude
@@ -192,9 +192,9 @@ Tickoni should reuse stable systems substrate, not validator semantics.
 | --- | --- |
 | `src/tango/mcache` and `src/tango/dcache` | Shared-memory fragment queues for correctness-bearing inter-process links |
 | `src/tango/fseq` or `src/tango/fctl` | Reliable consumer progress and producer backpressure |
-| `src/tango/cnc` | Tile boot, heartbeat, halt, and fail state, either directly or through a narrow Tickoni wrapper |
+| `src/tango/cnc` | Tile boot, heartbeat, halt, and fail state |
 | `src/util/sandbox` | Process sandboxing, namespaces, file descriptor checks, Landlock, and seccomp |
-| `src/disco/topo` | Reference for process lifecycle and workspace construction; wrap only the generic parts needed by Zig |
+| `src/disco/topo` | Reference for process lifecycle and workspace construction |
 | `src/disco/stem` | Reference for bounded polling loops and backpressure |
 | `src/disco/metrics` | Reference for low-overhead per-tile metrics; do not copy validator metric names as financial facts |
 | `src/waltz/http` | HTTP/WebSocket substrate for `tkapi`, `tkmetr`, and diagnostics surfaces |
@@ -212,8 +212,11 @@ register `genesi`, `ipecho`, `gossvf`, `gossip`, `shred`, `repair`, `rserve`,
 Tickoni product topology. Their schemas, state, and security assumptions are
 validator-specific.
 
-If generic code is extracted later, place the extraction behind a narrow C ABI
-under `src/tickoni/c_abi/`. Avoid adding Tickoni fields to
+If generic Firedancer code is needed, expose it through the canonical Tickoni
+bridge: a lower-camel Zig wrapper in `src/tickoni/c_abi/*.zig`, a private
+`extern fn tk_*` declaration, and a Tickoni-owned C shim under
+`src/tickoni/c_abi/shim/**` that is the only place allowed to include
+Firedancer or vendored C headers. Avoid adding Tickoni fields to
 `src/disco/topo/fd_topo.h`, which is a likely upstream synchronization hotspot.
 
 ### Process And Core Placement Boundary
@@ -255,15 +258,21 @@ These tests prove Tickoni's boundary around reused Firedancer substrate. They
 do not require fuzzing every Firedancer workspace internal, proving arbitrary
 kernel memory-attack resistance, or claiming production throughput saturation.
 
-## Proposed Tickoni Topology
+## Canonical Tickoni Source Tree
 
-Use the product tree that is now being introduced:
+Tickoni application, runtime, tile, schema, codec, connector, and business
+logic is Zig. C is restricted to the Firedancer bridge under
+`src/tickoni/c_abi/shim/**`; C code outside that shim directory is
+non-canonical boundary debt, not an implementation pattern to extend.
+
+Use this product tree:
 
 ```text
 src/app/tickoni/          Zig supervisor and CLI
 src/tickoni/runtime/      Process lifecycle, topology, channels, backpressure
-src/tickoni/c_abi/        Narrow wrappers around selected Firedancer C substrate
-src/tickoni/codec/        Tickoni-owned codec bindings and implementations
+src/tickoni/c_abi/*.zig   Zig wrappers over Tickoni-owned tk_* C shim symbols
+src/tickoni/c_abi/shim/   Only C bridge; only place to include Firedancer C headers
+src/tickoni/codec/        Zig codec implementations for Tickoni-owned schemas
 src/tickoni/schema/       Financial events, cases, capabilities, audit envelopes
 src/tickoni/schema/proto/ Protobuf wire definitions for canonical contracts
 src/tickoni/tiles/        Tickoni-owned tile implementations
@@ -273,7 +282,7 @@ src/tickoni/connectors/   Signed adapter manifests and connector implementations
 
 `src/app/tickoni/`, `src/tickoni/runtime/`, `src/tickoni/c_abi/`, and
 `src/tickoni/tiles/` already exist. Schema, codec, and demo paths are
-Tickoni-owned support roots around the runtime; `connectors/` should be added
+Tickoni-owned support roots around the runtime. `connectors/` should be added
 only when implementation work needs it.
 
 ### Runtime IDs

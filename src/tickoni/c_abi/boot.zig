@@ -33,7 +33,7 @@ var synthetic_argv: [4]?[*:0]u8 = .{ null, null, null, null };
 
 /// Boots fd_util's substrate with a synthetic argv: program name only, or
 /// program name + "--shmem-path <path>" when shmem_path is given. Must be
-/// paired with fd_halt(). Not thread-safe to call concurrently with
+/// paired with halt(). Not thread-safe to call concurrently with
 /// itself; call once per process at startup.
 pub fn bootWithSyntheticArgv(shmem_path: ?[]const u8) error{ShmemPathTooLong}!void {
     synthetic_argv[0] = &synthetic_prog_name;

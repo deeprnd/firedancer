@@ -8,7 +8,7 @@
 /// pages or root privileges are required, matching the roadmap requirement
 /// that Tickoni not inherit Firedancer validator's hugepage assumption.
 ///
-/// Link requirements: -lfd_util plus shim/tango.c at link time.
+/// Link requirements: -lfd_util plus shim/wksp.c at link time.
 const std = @import("std");
 
 // ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ pub const Wksp = opaque {};
 pub const wksp_success: c_int = 0;
 
 /// Returns FD_WKSP_SUCCESS (0) or a negative FD_WKSP_ERR_* code — NOT a
-/// workspace handle. Call fd_wksp_attach(name) afterward to join it.
+/// workspace handle. Call wkspAttach afterward to join it.
 extern fn tk_wksp_new_named(
     name: [*:0]const u8,
     page_sz: usize,
@@ -83,7 +83,7 @@ pub fn wkspAllocAtLeast(wksp: *Wksp, alignment: usize, sz: usize, tag: usize, lo
     return tk_wksp_alloc_at_least(wksp, alignment, sz, tag, lo, hi);
 }
 
-/// Mirrors static inline fd_wksp_alloc (fd_wksp.h): a fixed-alignment
+/// Mirrors the upstream workspace allocation helper: a fixed-alignment
 /// wrapper around fd_wksp_alloc_at_least with dummy [lo,hi) outputs.
 pub fn wkspAlloc(wksp: *Wksp, alignment: usize, sz: usize, tag: usize) usize {
     return tk_wksp_alloc(wksp, alignment, sz, tag);

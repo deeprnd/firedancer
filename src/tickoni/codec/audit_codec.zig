@@ -1,8 +1,7 @@
 /// Narrow Zig extern bindings for the Tickoni audit codec C surface.
 ///
-/// The implementation lives under src/tickoni/codec/ and reuses
-/// Firedancer protobuf/tokenizer and cJSON primitives. This file stays
-/// ABI-only so src/tickoni/c_abi remains a thin binding layer.
+/// The implementation lives under src/tickoni/codec/ and reaches Firedancer
+/// protobuf/hash/JSON primitives only through src/tickoni/c_abi/shim/**.
 pub const status_ok: c_int = 0;
 pub const status_no_space: c_int = 1;
 pub const status_invalid_protobuf: c_int = 2;

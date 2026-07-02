@@ -89,6 +89,17 @@ tile lifecycle, sandboxing, low-overhead metric and diagnostic paths,
 and crash-only behavior. Tickoni should reuse or wrap Firedancer infra tiles
 and primitives where they are generic.
 
+Tickoni application, runtime, tile, schema, codec, and business logic is Zig.
+Firedancer and vendored C code are reachable only through one explicit bridge:
+Zig code calls narrow Zig wrappers in `src/tickoni/c_abi/*.zig`; those wrappers
+declare private `extern fn tk_*` symbols; the `tk_*` symbols are implemented by
+Tickoni-owned C shims under `src/tickoni/c_abi/shim/**`; only those shim files
+include Firedancer or vendored C headers. This applies to Tango, Util,
+Workspace, Sandbox, Ballet protobuf/hash primitives, and vendored JSON. C code
+outside `src/tickoni/c_abi/shim/**` is not part of the canonical Tickoni
+architecture and should be treated as boundary debt to remove, not as a pattern
+to extend.
+
 Tickoni reuses generic Firedancer tiles and infrastructure primitives, but Solana validator tiles and Solana schemas are not Tickoni framework concepts. That generic Firedancer reuse is what lets Tickoni position itself as an ultra-TPS financial event harness instead of a normal web backend with agents attached.
 
 The **Tickoni AI-harness tiles** own financial correctness. Financial events
@@ -231,16 +242,17 @@ under `src/tickoni/c_abi/` for reused Firedancer substrate.
 ### How Firedancer Reuse Actually Works
 
 `src/tickoni/c_abi/` is composition over Firedancer, not a parallel
-reimplementation. Each wrapper file (`queue.zig`, `dcache.zig`, `fseq.zig`,
-`cnc.zig`, `wksp.zig`, `process.zig`, ...) declares `extern fn` bindings that
-resolve to real compiled symbols in `libfd_tango.a`, `libfd_util.a`, and
-`libfd_disco.a`: object lifecycle (`fd_mcache_new`/`join`/`leave`/`delete`,
-the matching `fd_dcache_*`/`fd_fseq_*`/`fd_cnc_*`/`fd_wksp_*` families),
-footprint/alignment math, and `fd_cnc`'s boot/heartbeat/halt/fail
-command-and-control state machine all execute the real Firedancer C
-implementation. That is where the actual complexity and bug risk lives
-(object formatting, alignment, footprint math), so that is exactly the part
-Tickoni must not hand-roll.
+reimplementation. Each Zig wrapper file (`queue.zig`, `dcache.zig`,
+`fseq.zig`, `cnc.zig`, `wksp.zig`, `process.zig`, ...) exposes lower-camel Zig
+functions to the rest of Tickoni and keeps its `extern fn tk_*` declarations
+private. Those `tk_*` symbols resolve to Tickoni-owned C shims in
+`src/tickoni/c_abi/shim/**`. The shims call real Firedancer C implementation
+for object lifecycle, footprint/alignment math, workspace setup, sandboxing,
+command-and-control state, protobuf/tokenizer helpers, hashing, and vendored
+JSON. The build links upstream `libfd_tango.a`, `libfd_util.a`,
+`libfd_ballet.a`, or related libraries only so the shim object files can
+resolve their upstream calls; Tickoni source must not call or bind `fd_*`
+symbols directly.
 
 A small number of hot-path functions have no exported symbol to bind at all.
 Firedancer declares these as `static inline` in their headers (`fd_mcache.h`,
@@ -250,15 +262,17 @@ with `nm` against the built `libfd_tango.a` and `libfd_disco.a`: zero matches
 for `mcache_publish`, `fseq_query`, `line_idx`, or Firedancer's own
 higher-level `fd_stem_publish`/`fd_stem_advance`.
 
-The standing approach for these is a thin, non-inline wrapper in a new
-Tickoni-owned translation unit, `src/tickoni/c_abi/shim/tango.c`, that calls
-the real inline function and does nothing else — one line per function, no
-algorithm of its own. `queue.zig`'s `mcacheLineIdx`, `mcachePublish`, and
-`fragMetaSeqQuery`, and `shm_link.zig`'s `fseq` query/update helpers, bind to
-this shim via `extern fn` rather than reimplementing the logic natively in
-Zig. No Firedancer file is edited; the shim is a new file only, compiled and
-linked in alongside `libfd_tango.a`/`libfd_util.a` via `linkTickoniTango` in
-`build.zig`.
+The standing approach is a thin, non-inline Tickoni-owned shim under
+`src/tickoni/c_abi/shim/**` that calls the real Firedancer function and does
+nothing else. The current split is `tango.c`, `util.c`, `wksp.c`,
+`sandbox.c`, and `ballet.c`; `firedancer.h` exposes only Tickoni-owned `tk_*`
+types and declarations to Tickoni-owned C shim consumers. Zig code still goes
+through `src/tickoni/c_abi/*.zig`, not through this header. `queue.zig`'s
+`mcacheLineIdx`, `mcachePublish`, and `fragMetaSeqQuery`, and
+`shm_link.zig`'s `fseq` query/update helpers, bind to `tk_*` symbols via
+private `extern fn` declarations rather than reimplementing the logic natively
+in Zig. No Firedancer file is edited; the shim files are compiled and linked
+alongside upstream libraries via `linkTickoniFiredancer` in `build.zig`.
 
 This also explains why `src/disco/stem` (Firedancer's tile polling/
 backpressure framework) is not linked directly, even though it looks like
@@ -272,11 +286,37 @@ already rules that model out for Tickoni (no Tickoni fields on
 design reference for the bounded-polling/backpressure pattern, not a linked
 dependency.
 
-The working rule: default to a real Firedancer `extern fn` even at FFI cost;
-when `nm` on the built `.a` confirms no linkable symbol exists for a specific
-function, add a one-line wrapper to `shim/tango.c` rather than reimplementing
-the logic in Zig. See
-[rant/static-inline-and-ffi.md](rant/static-inline-and-ffi.md) for why
+The working rule: default to a real Firedancer primitive behind a `tk_*` shim
+even at FFI cost. Whether the upstream function is exported, `static inline`,
+or macro-like does not change the Tickoni boundary: Tickoni Zig calls a Zig
+wrapper, the Zig wrapper calls `tk_*`, and the C shim calls Firedancer.
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ Tickoni Zig logic                                                    │
+│ app, runtime, tiles, schema, codec, policy, audit, replay            │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ lower-camel Zig calls
+                               v
+┌─────────────────────────────────────────────────────────────────────┐
+│ src/tickoni/c_abi/*.zig                                              │
+│ narrow Zig wrappers with private extern fn tk_* declarations         │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ tk_* symbols only
+                               v
+┌─────────────────────────────────────────────────────────────────────┐
+│ src/tickoni/c_abi/shim/**                                            │
+│ Tickoni-owned C shim; only layer that includes Firedancer/vendored C │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ fd_* / cJSON_* calls contained here
+                               v
+┌─────────────────────────────────────────────────────────────────────┐
+│ Firedancer and vendored C substrate                                  │
+│ Tango, Util, Workspace, Sandbox, Ballet, protobuf, hash, JSON        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+See [rant/static-inline-and-ffi.md](rant/static-inline-and-ffi.md) for why
 this is the standing default over the alternatives.
 
 ## Runtime Model

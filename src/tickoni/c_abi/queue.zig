@@ -4,8 +4,8 @@
 /// mcacheLineIdx/mcachePublish/fragMetaSeqQuery wrappers bind to
 /// shim/tango.c. See doc/knowledge/architecture.md.
 ///
-/// Link requirements: -lfd_tango -lfd_util plus shim/tango.c, via
-/// linkTickoniTango in build.zig.
+/// Link requirements: -lfd_tango -lfd_util plus the runtime shim files, via
+/// linkTickoniFiredancer in build.zig.
 const std = @import("std");
 
 // ---------------------------------------------------------------------------
@@ -95,14 +95,14 @@ pub fn mcacheSeqLaddrConst(mcache: [*]const FragMeta) [*]const volatile u64 {
     return tk_mcache_seq_laddr_const(mcache);
 }
 
-/// Wraps fd_mcache_line_idx (fd_mcache.h) for the FD_MCACHE_LG_INTERLEAVE==0
+/// Wraps the upstream mcache line-index helper for the non-interleaved
 /// build (the header's compiled-in default). Binds to shim/tango.c.
 extern fn tk_mcache_line_idx(seq: u64, depth: u64) u64;
 pub fn mcacheLineIdx(seq: u64, depth: usize) usize {
     return @intCast(tk_mcache_line_idx(seq, depth));
 }
 
-/// Wraps fd_mcache_publish (fd_mcache.h): writes frag metadata for `seq`
+/// Wraps the upstream mcache publish helper: writes frag metadata for `seq`
 /// into the ring, marking the line in-progress (seq-1) before the
 /// payload-adjacent fields are written and only publishing the real `seq`
 /// once they are, so a consumer never observes a torn frag. Binds to
@@ -132,7 +132,7 @@ pub fn mcachePublish(
     tk_mcache_publish(mcache, depth, seq, sig, chunk, sz, ctl, tsorig, tspub);
 }
 
-/// Wraps fd_frag_meta_seq_query (fd_tango_base.h). Binds to shim/tango.c.
+/// Wraps the upstream frag-meta sequence query helper. Binds to shim/tango.c.
 extern fn tk_frag_meta_seq_query(meta: *const volatile FragMeta) u64;
 pub fn fragMetaSeqQuery(meta: *const volatile FragMeta) u64 {
     return tk_frag_meta_seq_query(meta);

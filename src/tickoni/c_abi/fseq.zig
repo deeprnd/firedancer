@@ -48,13 +48,13 @@ pub fn fseqDelete(shfseq: *anyopaque) ?*anyopaque {
     return tk_fseq_delete(shfseq);
 }
 
-/// Wraps fd_fseq_query (fd_fseq.h). Binds to shim/tango.c.
+/// Wraps the upstream fseq query helper. Binds to shim/tango.c.
 extern fn tk_fseq_query(fseq: [*]const u64) u64;
 pub fn fseqQuery(fseq: [*]volatile u64) u64 {
     return tk_fseq_query(@volatileCast(fseq));
 }
 
-/// Wraps fd_fseq_update (fd_fseq.h). Binds to shim/tango.c.
+/// Wraps the upstream fseq update helper. Binds to shim/tango.c.
 extern fn tk_fseq_update(fseq: [*]u64, seq: u64) void;
 pub fn fseqUpdate(fseq: [*]volatile u64, seq: u64) void {
     tk_fseq_update(@volatileCast(fseq), seq);

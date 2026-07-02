@@ -9,20 +9,20 @@
 #define TK_THESIS_SCHEMA_VERSION ((uint16_t)3)
 
 /* Ticker stride for requested_tickers: same as catalog and basket stride. */
-#define TK_THESIS_MAX_TICKER_LEN ((ulong)8)
+#define TK_THESIS_MAX_TICKER_LEN (8UL)
 
 /* Maximum explicitly requested tickers in one ThesisInput. */
 #define TK_THESIS_MAX_REQUESTED_TICKERS ((uint8_t)8)
 
 /* Byte stride for each canonical id in the themes_flat buffer.
    Must match max_canonical_id_len in src/tickoni/schema/classification/classification.zig. */
-#define TK_THESIS_MAX_CANONICAL_ID_LEN ((ulong)32)
+#define TK_THESIS_MAX_CANONICAL_ID_LEN (32UL)
 
 /* Packed byte stride for one ClassificationRef in sector/industry filter buffers.
    Layout per entry: taxonomy_id (32 bytes, zero-padded) +
                      taxonomy_version (2 bytes, little-endian uint16) +
                      code (32 bytes, zero-padded) = 66 bytes. */
-#define TK_THESIS_CLASSIFICATION_REF_STRIDE ((ulong)66)
+#define TK_THESIS_CLASSIFICATION_REF_STRIDE (66UL)
 
 /* Compute a stable content hash over a ThesisInput.
    Covers schema_version, account_id, target_notional_cents, market_scope,
@@ -72,7 +72,7 @@ tk_thesis_input_hash( uint16_t              user_text_len,
 
 /* Basket ticker stride: each ticker entry is zero-padded to this many bytes.
    Must match max_ticker_len in src/tickoni/schema/consumer_money/catalog.zig. */
-#define TK_BASKET_MAX_TICKER_LEN ((ulong)8)
+#define TK_BASKET_MAX_TICKER_LEN (8UL)
 
 /* Compute a stable content hash over a constructed basket's composition.
    Covers basket_schema_version, thesis_id, catalog_schema_version,
@@ -95,7 +95,7 @@ tk_basket_hash( uint64_t         thesis_id,
 #define TK_TRADE_TICKET_SCHEMA_VERSION ((uint16_t)1)
 
 /* Ticker stride for trade tickets: same as the basket and catalog stride. */
-#define TK_TICKET_MAX_TICKER_LEN ((ulong)8)
+#define TK_TICKET_MAX_TICKER_LEN (8UL)
 
 /* Compute a stable content hash for a trade ticket.
    Covers schema_version, basket_id, account_id, side, order_type,

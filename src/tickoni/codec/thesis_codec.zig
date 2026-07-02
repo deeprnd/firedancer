@@ -1,7 +1,7 @@
 /// Narrow Zig extern bindings for the Tickoni thesis/basket codec C surface.
 ///
-/// The implementation lives in src/tickoni/codec/thesis_hash.c and uses
-/// fd_siphash13 from src/ballet/siphash13.  This file stays ABI-only.
+/// The implementation lives in src/tickoni/codec/thesis_hash.c and reaches
+/// Firedancer hashing only through src/tickoni/c_abi/shim/**.
 /// Compute a stable content hash over a ThesisInput.
 /// See src/tickoni/codec/thesis_codec.h for field coverage and key constants.
 /// Callers must ensure user_text_len <= max_user_text_len before calling.

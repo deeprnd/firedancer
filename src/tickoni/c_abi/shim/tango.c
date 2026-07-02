@@ -1,16 +1,11 @@
-/* Thin, non-inline wrappers around Firedancer functions. Zig binds only to
-   Tickoni-owned `tk_*` symbols, regardless of whether the underlying
-   Firedancer function is already exported or is `static inline`/macro-only.
-   Each wrapper only calls the real Firedancer API; no algorithm lives here.
-   Firedancer's own headers are not modified. See doc/knowledge/architecture.md. */
+/* Thin wrappers around Firedancer Tango queue/control primitives.
+   Tickoni code binds only to Tickoni-owned tk_* symbols. */
 
 #include "../../../tango/mcache/fd_mcache.h"
 #include "../../../tango/dcache/fd_dcache.h"
 #include "../../../tango/fseq/fd_fseq.h"
 #include "../../../tango/cnc/fd_cnc.h"
 #include "../../../util/fd_util.h"
-#include "../../../util/wksp/fd_wksp.h"
-#include "../../../util/sandbox/fd_sandbox.h"
 
 ulong tk_mcache_align( void ) { return fd_mcache_align(); }
 ulong tk_mcache_footprint( ulong depth, ulong app_sz ) { return fd_mcache_footprint( depth, app_sz ); }
@@ -96,54 +91,3 @@ void tk_cnc_heartbeat( fd_cnc_t * cnc, long now ) { fd_cnc_heartbeat( cnc, now )
 ulong tk_cnc_signal_query( fd_cnc_t const * cnc ) { return fd_cnc_signal_query( cnc ); }
 void tk_cnc_signal( fd_cnc_t * cnc, ulong signal ) { fd_cnc_signal( cnc, signal ); }
 void tk_cnc_close( fd_cnc_t * cnc ) { fd_cnc_close( cnc ); }
-
-void tk_boot( int * pargc, char *** pargv ) { fd_boot( pargc, pargv ); }
-void tk_halt( void ) { fd_halt(); }
-
-int tk_wksp_new_named( char const * name, ulong page_sz, ulong sub_cnt, ulong const * sub_page_cnt, ulong const * sub_cpu_idx, ulong mode, uint seed, ulong opt_part_max ) {
-  return fd_wksp_new_named( name, page_sz, sub_cnt, sub_page_cnt, sub_cpu_idx, mode, seed, opt_part_max );
-}
-int tk_wksp_delete_named( char const * name ) { return fd_wksp_delete_named( name ); }
-fd_wksp_t * tk_wksp_attach( char const * name ) { return fd_wksp_attach( name ); }
-int tk_wksp_detach( fd_wksp_t * wksp ) { return fd_wksp_detach( wksp ); }
-ulong tk_wksp_alloc_at_least( fd_wksp_t * wksp, ulong alignment, ulong sz, ulong tag, ulong * lo, ulong * hi ) { return fd_wksp_alloc_at_least( wksp, alignment, sz, tag, lo, hi ); }
-ulong tk_wksp_alloc( fd_wksp_t * wksp, ulong alignment, ulong sz, ulong tag ) { return fd_wksp_alloc( wksp, alignment, sz, tag ); }
-void tk_wksp_free( fd_wksp_t * wksp, ulong gaddr ) { fd_wksp_free( wksp, gaddr ); }
-void * tk_wksp_laddr( fd_wksp_t const * wksp, ulong gaddr ) { return fd_wksp_laddr( wksp, gaddr ); }
-ulong tk_wksp_gaddr( fd_wksp_t const * wksp, void const * laddr ) { return fd_wksp_gaddr( wksp, laddr ); }
-
-int tk_sandbox_requires_cap_sys_admin( uint desired_uid, uint desired_gid ) { return fd_sandbox_requires_cap_sys_admin( desired_uid, desired_gid ); }
-void tk_sandbox_enter( uint desired_uid,
-                       uint desired_gid,
-                       int keep_host_networking,
-                       int allow_connect,
-                       int allow_renameat,
-                       int keep_controlling_terminal,
-                       int dumpable,
-                       ulong rlimit_file_cnt,
-                       ulong rlimit_address_space,
-                       ulong rlimit_data,
-                       ulong rlimit_nproc,
-                       ulong allowed_file_descriptor_cnt,
-                       int const * allowed_file_descriptor,
-                       ulong seccomp_filter_cnt,
-                       void * seccomp_filter ) {
-  fd_sandbox_enter( desired_uid,
-                    desired_gid,
-                    keep_host_networking,
-                    allow_connect,
-                    allow_renameat,
-                    keep_controlling_terminal,
-                    dumpable,
-                    rlimit_file_cnt,
-                    rlimit_address_space,
-                    rlimit_data,
-                    rlimit_nproc,
-                    allowed_file_descriptor_cnt,
-                    allowed_file_descriptor,
-                    seccomp_filter_cnt,
-                    seccomp_filter );
-}
-void tk_sandbox_switch_uid_gid( uint desired_uid, uint desired_gid ) { fd_sandbox_switch_uid_gid( desired_uid, desired_gid ); }
-int tk_sandbox_getpid( void ) { return fd_sandbox_getpid(); }
-int tk_sandbox_gettid( void ) { return fd_sandbox_gettid(); }

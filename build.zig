@@ -216,7 +216,7 @@ pub fn build(b: *std.Build) void {
         .root_module = main_mod,
     });
     linkTickoniCodec(b, exe, fd_lib_dir);
-    linkTickoniTango(b, exe, fd_lib_dir);
+    linkTickoniFiredancer(b, exe, fd_lib_dir);
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -286,7 +286,7 @@ pub fn build(b: *std.Build) void {
         {
             // These tests call real Firedancer substrate through the tk_ shim
             // layer, not native Zig mirrors or direct fd_* externs.
-            linkTickoniTango(b, t, fd_lib_dir);
+            linkTickoniFiredancer(b, t, fd_lib_dir);
         }
         const t_run = b.addRunArtifact(t);
         test_step.dependOn(&t_run.step);
@@ -839,7 +839,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, process_pipeline_test, fd_lib_dir);
-    linkTickoniTango(b, process_pipeline_test, fd_lib_dir);
+    linkTickoniFiredancer(b, process_pipeline_test, fd_lib_dir);
     const run_process_pipeline_test = addPlainTestRun(b, process_pipeline_test);
     run_process_pipeline_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_pipeline_test.step);
@@ -859,7 +859,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, process_cpu_placement_test, fd_lib_dir);
-    linkTickoniTango(b, process_cpu_placement_test, fd_lib_dir);
+    linkTickoniFiredancer(b, process_cpu_placement_test, fd_lib_dir);
     const run_process_cpu_placement_test = addPlainTestRun(b, process_cpu_placement_test);
     run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_cpu_placement_test.step);
@@ -881,7 +881,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, process_topology_test, fd_lib_dir);
-    linkTickoniTango(b, process_topology_test, fd_lib_dir);
+    linkTickoniFiredancer(b, process_topology_test, fd_lib_dir);
     const run_process_topology_test = addPlainTestRun(b, process_topology_test);
     run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_topology_test.step);
@@ -902,7 +902,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, process_demo_parity_test, fd_lib_dir);
-    linkTickoniTango(b, process_demo_parity_test, fd_lib_dir);
+    linkTickoniFiredancer(b, process_demo_parity_test, fd_lib_dir);
     const run_process_demo_parity_test = addPlainTestRun(b, process_demo_parity_test);
     run_process_demo_parity_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_demo_parity_test.step);
@@ -922,7 +922,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, shm_link_bounds_test, fd_lib_dir);
-    linkTickoniTango(b, shm_link_bounds_test, fd_lib_dir);
+    linkTickoniFiredancer(b, shm_link_bounds_test, fd_lib_dir);
     integration_step.dependOn(&b.addRunArtifact(shm_link_bounds_test).step);
 
     // Mock HTTP servers (test/mocks): self-tests of the mock
@@ -1159,7 +1159,7 @@ pub fn build(b: *std.Build) void {
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/fseq.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/cnc.zig"))
         {
-            linkTickoniTango(b, t, fd_lib_dir);
+            linkTickoniFiredancer(b, t, fd_lib_dir);
         }
         cov_step.dependOn(&b.addInstallArtifact(t, .{
             .dest_dir = .{ .override = .{ .custom = "cov" } },
@@ -1324,17 +1324,19 @@ fn addPlainTestRun(b: *std.Build, test_compile: *std.Build.Step.Compile) *std.Bu
     return run_step;
 }
 
-/// Links src/tango (mcache/dcache/fseq/cnc) and src/util/wksp (fd_wksp)
-/// substrate for V1.14 process-mode shared-memory links. Separate from
-/// linkTickoniCodec because these callers do not need the audit_pb/
-/// thesis_hash C codec sources. Also compiles shim/tango.c — see that
-/// file and doc/knowledge/architecture.md's "How Firedancer Reuse
-/// Actually Works" for why a shim exists instead of a native Zig mirror.
-fn linkTickoniTango(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
+/// Links the Firedancer substrate used by Tickoni runtime wrappers. Tickoni
+/// code crosses Firedancer only through src/tickoni/c_abi/shim/**, so this
+/// compiles the required Tickoni-owned shim files alongside upstream libs.
+fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
     step.root_module.addCSourceFiles(.{
-        .files = &.{"src/tickoni/c_abi/shim/tango.c"},
+        .files = &.{
+            "src/tickoni/c_abi/shim/tango.c",
+            "src/tickoni/c_abi/shim/util.c",
+            "src/tickoni/c_abi/shim/wksp.c",
+            "src/tickoni/c_abi/shim/sandbox.c",
+        },
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
     });
     step.root_module.addLibraryPath(b.path(fd_lib_dir));
@@ -1348,7 +1350,9 @@ fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []
     step.root_module.addIncludePath(b.path("src"));
     step.root_module.addCSourceFiles(.{
         .files = &.{
+            "src/tickoni/c_abi/shim/ballet.c",
             "src/tickoni/codec/audit_pb.c",
+            "src/tickoni/codec/audit_json.c",
             "src/tickoni/codec/thesis_hash.c",
         },
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
