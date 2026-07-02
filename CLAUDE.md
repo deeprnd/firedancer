@@ -141,7 +141,20 @@ Runtime & Operations:
 
 ## Source Of Truth
 
-When documentation and code disagree, trust sources in this order:
+This ordering answers "what does the system currently do" — use it when you
+need ground truth about present behavior, not when you need to know what the
+system is supposed to do. Code decides on runtime behavior. Documentation is
+future-looking: it describes decided target behavior, which code may not have
+caught up to yet, or which code may have quietly drifted away from. A mismatch
+between code and documented intent is a discrepancy to flag explicitly, not a
+tiebreaker to resolve silently in whichever direction is convenient. Unless the
+user or an explicit decision record says the documentation itself is stale,
+the default remediation is to bring the code into alignment with the logic
+described in the docs — not to rewrite the docs to match whatever the code
+currently happens to do.
+
+When documentation and code disagree on current behavior, trust sources in
+this order:
 
 1. `justfile`, `build.zig`, `build.zig.zon`, and `GNUmakefile`
 2. Tickoni executable and supervisor code in `src/app/tickoni/**`
@@ -468,12 +481,21 @@ The test: Every changed line should trace directly to the user's request.
 
 ### Goal-Driven Execution
 
-**Define success criteria. Loop until verified.**
+**Documents, requirements, and tests first. Implementation follows, verified against them.**
 
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
+Transform tasks into verifiable goals, in this order — docs/requirements,
+then tests, then implementation:
+- "Add validation" → "Write down what invalid input should trigger, write tests for it, then make them pass"
+- "Fix the bug" → "Write down the correct behavior, write a test that reproduces the bug, then make it pass"
+- "Refactor X" → "Confirm the documented behavior is still accurate, ensure tests pass before and after"
+
+Docs are future-looking: they describe decided target behavior, not a
+write-up produced after the fact to match whatever the code happened to do.
+Once written, scan code against docs for correctness — don't reverse-engineer
+intended behavior by tracing through implementation details and deducing the
+logic behind it. If code and docs disagree, that is a discrepancy to flag,
+not to silently resolve by rewriting the doc to match the code (see Source
+Of Truth).
 
 If development appears to require a custom throwaway verification script or
 one-off test command, treat that as evidence that the system is missing a

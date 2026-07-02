@@ -242,22 +242,23 @@ implementation. That is where the actual complexity and bug risk lives
 (object formatting, alignment, footprint math), so that is exactly the part
 Tickoni must not hand-roll.
 
-A small number of hot-path functions are mirrored natively in Zig instead of
-called through `extern fn` — for example `mcachePublish`, `mcacheLineIdx`,
-and `fragMetaSeqQuery` in `queue.zig`, and the `fseq` query/update helpers in
-`shm_link.zig`. This is not a shortcut around reuse; it is a hard linkage
-fact. Firedancer declares these as `static inline` in their headers
-(`fd_mcache.h`, `fd_fseq.h`), and C's `static inline` has no exported symbol
-in the compiled `.a` — there is nothing for an `extern fn` to bind to. This
-was confirmed empirically with `nm` against the built `libfd_tango.a` and
-`libfd_disco.a`: zero matches for `mcache_publish`, `fseq_query`,
-`line_idx`, or Firedancer's own higher-level `fd_stem_publish`/
-`fd_stem_advance`. Each such mirror carries a doc comment naming the exact
-inline function it reproduces, and its tests are pinned to the real
-on-the-wire field layout and offsets rather than an independent design —
-same precedent `queue.zig`'s `fd_mcache_seq_laddr` already set (a real
-linked symbol that hands back a raw pointer specifically so the one
-volatile read happens at the Tickoni call site instead of being wrapped).
+A small number of hot-path functions have no exported symbol to bind at all.
+Firedancer declares these as `static inline` in their headers (`fd_mcache.h`,
+`fd_fseq.h`), and C's `static inline` has no exported symbol in the compiled
+`.a` — there is nothing for an `extern fn` to bind to. Confirmed empirically
+with `nm` against the built `libfd_tango.a` and `libfd_disco.a`: zero matches
+for `mcache_publish`, `fseq_query`, `line_idx`, or Firedancer's own
+higher-level `fd_stem_publish`/`fd_stem_advance`.
+
+The standing approach for these is a thin, non-inline wrapper in a new
+Tickoni-owned translation unit, `src/tickoni/c_abi/tango_shim.c`, that calls
+the real inline function and does nothing else — one line per function, no
+algorithm of its own. `queue.zig`'s `mcacheLineIdx`, `mcachePublish`, and
+`fragMetaSeqQuery`, and `shm_link.zig`'s `fseq` query/update helpers, bind to
+this shim via `extern fn` rather than reimplementing the logic natively in
+Zig. No Firedancer file is edited; the shim is a new file only, compiled and
+linked in alongside `libfd_tango.a`/`libfd_util.a` via `linkTickoniTango` in
+`build.zig`.
 
 This also explains why `src/disco/stem` (Firedancer's tile polling/
 backpressure framework) is not linked directly, even though it looks like
@@ -272,9 +273,11 @@ design reference for the bounded-polling/backpressure pattern, not a linked
 dependency.
 
 The working rule: default to a real Firedancer `extern fn` even at FFI cost;
-only write a native Zig mirror once `nm` on the built `.a` confirms no
-linkable symbol exists for that specific function, and document which C
-function is being mirrored when you do.
+when `nm` on the built `.a` confirms no linkable symbol exists for a specific
+function, add a one-line wrapper to `tango_shim.c` rather than reimplementing
+the logic in Zig. See
+[rant/static-inline-and-ffi.md](rant/static-inline-and-ffi.md) for why
+this is the standing default over the alternatives.
 
 ## Runtime Model
 

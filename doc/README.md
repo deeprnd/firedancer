@@ -85,8 +85,7 @@ Files at the root of this directory (not under `strategy/`, `execution/`, or
 `knowledge/`) are Firedancer engine reference material carried over from
 upstream Firedancer infrastructure:
 
-* [`build-system.md`](build-system.md)
+* [`Firedancer build-system.md`](build-system.md)
 * [`codeql.md`](codeql.md)
-* [`testing.md`](testing.md)
-* [`rant/`](rant/)
+* [`Firedancer testing.md`](testing.md)
 * [`organization.txt`](organization.txt)
