@@ -95,6 +95,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const capability_mod = b.addModule("capability", .{
+        .root_source_file = b.path("src/tickoni/schema/capability/capability.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const thesis_mod = b.addModule("thesis", .{
         .root_source_file = b.path("src/tickoni/schema/consumer_money/thesis.zig"),
         .target = target,
@@ -673,6 +678,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "tkpoly", .module = tkpoly_test_mod },
                 .{ .name = "tool", .module = tool_test_mod },
                 .{ .name = "trade_ticket", .module = trade_ticket_mod },
+                .{ .name = "capability", .module = capability_mod },
             },
         }),
     });
@@ -824,6 +830,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "tkpoly", .module = tkpoly_int_mod },
             .{ .name = "tool", .module = tool_int_mod },
             .{ .name = "trade_ticket", .module = trade_ticket_mod },
+            .{ .name = "capability", .module = capability_mod },
         },
     });
     const replay_int_mod = b.createModule(.{
