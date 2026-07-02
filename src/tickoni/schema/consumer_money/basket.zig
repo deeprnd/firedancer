@@ -210,7 +210,7 @@ pub fn failedScopeDimension(rejected_candidates: []const RejectedCandidate) Reje
 
 /// Compute a stable content hash over a basket's composition via fd_siphash13.
 ///
-/// Uses tk_basket_hash() from src/tickoni/codec/thesis_hash.c.
+/// Uses tk_basket_hash() from src/tickoni/codec/thesis_codec.zig.
 /// Covers basket_schema_version, thesis_id, catalog_schema_version,
 /// instrument_count, and per-instrument ticker, weight_bp, and allocation_cents.
 /// The hash is stable across process restarts; it changes when any instrument,

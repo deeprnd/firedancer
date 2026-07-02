@@ -41,7 +41,7 @@ pub const themeIdList = cls.themeIdList;
 pub const classificationRefList = cls.classificationRefList;
 pub const validateCanonicalId = cls.validateCanonicalId;
 
-/// Schema version. Must match TK_THESIS_SCHEMA_VERSION in thesis_codec.h.
+/// Schema version. Must match thesis_schema_version in thesis_codec.zig.
 /// Incrementing this value changes the hash key and invalidates existing hashes.
 pub const thesis_schema_version: u16 = 3;
 
@@ -49,11 +49,11 @@ pub const thesis_schema_version: u16 = 3;
 pub const max_user_text_len: usize = 512;
 
 /// Byte width of each ticker slot in requested_tickers.
-/// Must match TK_THESIS_MAX_TICKER_LEN in thesis_codec.h and max_ticker_len in catalog.zig.
+/// Must match thesis_max_ticker_len in thesis_codec.zig and max_ticker_len in catalog.zig.
 pub const max_ticker_len: usize = 8;
 
 /// Maximum number of explicitly requested tickers in one ThesisInput.
-/// Must match TK_THESIS_MAX_REQUESTED_TICKERS in thesis_codec.h.
+/// Must match thesis_max_requested_tickers in thesis_codec.zig.
 pub const max_requested_tickers: usize = 8;
 
 /// Minimum allowed target notional: USD 1.00 = 100 cents.
@@ -64,7 +64,7 @@ pub const max_target_notional_cents: i64 = 1_000_000_000_000;
 
 /// Packed byte stride for one ClassificationRef in the hash flat buffers.
 /// Layout: taxonomy_id (max_canonical_id_len bytes) + taxonomy_version (2 bytes LE) + code (max_canonical_id_len bytes).
-/// Must match TK_THESIS_CLASSIFICATION_REF_STRIDE in thesis_codec.h.
+/// Must match thesis_classification_ref_stride in thesis_codec.zig.
 pub const classification_ref_stride: usize = cls.max_canonical_id_len + 2 + cls.max_canonical_id_len;
 
 comptime {
@@ -302,7 +302,7 @@ pub fn normalize(input: ThesisInput) ThesisError!InvestorIntent {
 
 /// Compute a stable content hash over a ThesisInput via fd_siphash13.
 ///
-/// Uses tk_thesis_input_hash() from src/tickoni/codec/thesis_hash.c.
+/// Uses tk_thesis_input_hash() from src/tickoni/codec/thesis_codec.zig.
 ///
 /// Returns 0 when user_text_len > max_user_text_len to fail closed without
 /// reading out of bounds. Callers building ThesisDenialPayload should record

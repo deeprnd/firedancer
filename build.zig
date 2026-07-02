@@ -37,6 +37,9 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/tickoni/codec/audit_codec.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "c_abi", .module = c_abi_mod },
+        },
     });
     const fixture_audit_gen_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/test/fixtures/fixture_audit_gen.zig"),
@@ -56,6 +59,9 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/tickoni/codec/thesis_codec.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "c_abi", .module = c_abi_mod },
+        },
     });
 
     // ---------------------------------------------------------------------------
@@ -235,6 +241,7 @@ pub fn build(b: *std.Build) void {
     for ([_][]const u8{
         "src/tickoni/runtime/topology.zig",
         "src/tickoni/runtime/tile.zig",
+        "src/tickoni/c_abi/ballet.zig",
         "src/tickoni/c_abi/queue.zig",
         "src/tickoni/c_abi/sandbox.zig",
         "src/tickoni/c_abi/dcache.zig",
@@ -288,9 +295,29 @@ pub fn build(b: *std.Build) void {
             // layer, not native Zig mirrors or direct fd_* externs.
             linkTickoniFiredancer(b, t, fd_lib_dir);
         }
+        if (std.mem.eql(u8, path, "src/tickoni/c_abi/ballet.zig")) {
+            // siphash/pb/json primitives live in shim/ballet.c, linked via
+            // linkTickoniCodec.
+            linkTickoniCodec(b, t, fd_lib_dir);
+        }
         const t_run = b.addRunArtifact(t);
         test_step.dependOn(&t_run.step);
     }
+
+    // thesis_codec.zig: fresh root module (not the shared thesis_codec_mod)
+    // so linkTickoniCodec adds C sources only to this binary's root module.
+    const thesis_codec_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/codec/thesis_codec.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "c_abi", .module = c_abi_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, thesis_codec_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(thesis_codec_test).step);
 
     // thesis.zig: fresh root module (not the shared thesis_mod) so that
     // linkTickoniCodec adds C sources only to this binary's root module.
@@ -1345,15 +1372,15 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
     step.root_module.linkSystemLibrary("stdc++", .{});
 }
 
+/// Links shim/ballet.c (Firedancer siphash/protobuf/JSON primitives). Audit
+/// and thesis/basket/trade-ticket/paper-order codec logic is Zig; see
+/// audit_codec.zig and thesis_codec.zig.
 fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
     step.root_module.addCSourceFiles(.{
         .files = &.{
             "src/tickoni/c_abi/shim/ballet.c",
-            "src/tickoni/codec/audit_pb.c",
-            "src/tickoni/codec/audit_json.c",
-            "src/tickoni/codec/thesis_hash.c",
         },
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
     });
