@@ -337,9 +337,9 @@ pub const Supervisor = struct {
 
     /// Process-mode equivalent of tiles_mod.MetricSnapshot: every tile
     /// publishes its own local counters into its cnc app-region (see
-    /// c_abi/cnc.zig's appCounter{Read,Write} and
-    /// src/app/tickoni/process_stage.zig's per-tile counter layout);
-    /// this reads them back across the process boundary. Must be called
+    /// runtime/cnc_counters.zig's appCounter{Read,Write} and
+    /// src/tickoni/tiles/payment_pipeline/process.zig's per-tile counter
+    /// layout); this reads them back across the process boundary. Must be called
     /// before stopProcess, which leaves every cnc join and detaches the
     /// workspace.
     pub const ProcessMetricSnapshot = struct {

@@ -111,8 +111,9 @@ test "process_topology_integration: SIGKILL on one tile is reported by identity 
         .tile_exe_path = "zig-out/bin/tickoni-supervisor",
     });
 
-    // tkrepl (index 5) has no pipeline role (see process_stage.zig's scope
-    // doc comment) — it is purely an observer heartbeating in its idle
+    // tkrepl (index 5) has no pipeline role (see
+    // tiles/payment_pipeline/process.zig's scope doc comment) — it is
+    // purely an observer heartbeating in its idle
     // loop, so killing it cannot itself corrupt the tkings..tkaudt
     // pipeline that is running concurrently in sibling processes.
     const tkrepl_idx = 5;

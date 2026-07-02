@@ -24,16 +24,17 @@
 const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
-const tiles = @import("tiles");
+const payment_runtime = @import("runtime.zig");
+const audit_sink = @import("audit_sink.zig");
 
-const PaymentMessage = tiles.PaymentMessage;
+const PaymentMessage = payment_runtime.PaymentMessage;
 const msg_size = @sizeOf(PaymentMessage);
 
 fn halted(cnc: *c_abi.cnc.Cnc) bool {
     return c_abi.cnc.signalQuery(cnc) == c_abi.cnc.signal_halt;
 }
 
-fn pipelineConfig(spec: *const rt.launch_spec.LaunchSpec) tiles.PaymentPipelineConfig {
+fn pipelineConfig(spec: *const rt.launch_spec.LaunchSpec) payment_runtime.PaymentPipelineConfig {
     return .{
         .event_count = spec.event_count,
         .policy_limit_cents = spec.policy_limit_cents,
@@ -51,7 +52,7 @@ pub fn runIngestProcess(spec: *const rt.launch_spec.LaunchSpec, output: *rt.shm_
     var offset: u64 = 0;
     while (offset < spec.event_count) : (offset += 1) {
         if (halted(cnc)) break;
-        const raw = tiles.syntheticPayment(cfg, offset);
+        const raw = payment_runtime.syntheticPayment(cfg, offset);
         const msg = PaymentMessage{ .raw = raw, .pipeline_hops = 1 };
         output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag) catch break;
         produced += 1;
@@ -72,8 +73,8 @@ pub fn runNormalizeProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.sh
         _ = input.consume(&buf, &stop_flag) orelse break;
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
         msg.pipeline_hops += 1;
-        msg.event_hash = tiles.stableEventHash(msg.raw);
-        if (!tiles.validFraming(msg.raw)) {
+        msg.event_hash = payment_runtime.stableEventHash(msg.raw);
+        if (!payment_runtime.validFraming(msg.raw)) {
             msg.decision = .malformed_drop;
             invalid += 1;
         } else {
@@ -159,7 +160,7 @@ pub fn runAuditProcess(
     spec: *const rt.launch_spec.LaunchSpec,
     input: *rt.shm_link.Consumer,
     cnc: *c_abi.cnc.Cnc,
-    audit_log: *tiles.audit_sink.AuditLog,
+    audit_log: *audit_sink.AuditLog,
 ) void {
     var stop_flag = std.atomic.Value(bool).init(false);
     var buf: [msg_size]u8 = undefined;

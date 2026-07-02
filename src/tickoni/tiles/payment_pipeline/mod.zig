@@ -1,6 +1,7 @@
 const runtime = @import("runtime.zig");
 
 pub const audit_sink = @import("audit_sink.zig");
+pub const process = @import("process.zig");
 pub const PolicyDecision = runtime.PolicyDecision;
 pub const PaymentPipelineConfig = runtime.PaymentPipelineConfig;
 pub const RawPayment = runtime.RawPayment;
@@ -22,4 +23,5 @@ pub const validFraming = runtime.validFraming;
 
 test {
     _ = @import("runtime.zig");
+    _ = @import("process.zig");
 }

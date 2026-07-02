@@ -225,6 +225,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "audit_tile", .module = audit_tile_mod },
+            .{ .name = "runtime", .module = runtime_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
         },
     });
 
@@ -298,6 +300,8 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
                 .imports = &.{
                     .{ .name = "audit_tile", .module = audit_tile_mod },
+                    .{ .name = "runtime", .module = runtime_mod },
+                    .{ .name = "c_abi", .module = c_abi_mod },
                 },
             })
         else
@@ -1256,6 +1260,8 @@ pub fn build(b: *std.Build) void {
                     .optimize = optimize,
                     .imports = &.{
                         .{ .name = "audit_tile", .module = audit_tile_mod },
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
                     },
                 })
             else if (std.mem.eql(u8, entry[1], "src/tickoni/runtime/cnc_counters.zig"))

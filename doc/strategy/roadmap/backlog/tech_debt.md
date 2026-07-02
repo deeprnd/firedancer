@@ -9,7 +9,7 @@ pub const SandboxConfig = struct {
     dumpable: bool = false,
     rlimit_file_cnt: u64 = 64,
     rlimit_address_space: u64 = 1 << 30, // 1 GiB !!!!into constatns
-    rlimit_data: u64 = 1 << 28, // 256 MiB  !!!!into constatns
+    rlimit_data: u64 = 1 << 28, // 256 MiB  !!!!into constatns for 32mb/64/128/256/512/1gb/2gb/4gb
 
 topology.zig
 pub const TileDescriptor = struct {
@@ -32,6 +32,22 @@ test "TileId equality" {
     try std.testing.expect(!a.eql(c));
 }
 
+topology.zig
+test "SandboxConfig rlimit_address_space is at least 256 MiB" {
+    const cfg = SandboxConfig{};
+    try std.testing.expect(cfg.rlimit_address_space >= 1 << 28); !!! constants
+}
+
+shm_link.zig
+    /// Blocks until the next frag is available or `stop` is signalled.
+    /// Returns the payload length copied into `out_buf`, or null on stop.
+    pub fn consume(self: *Consumer, out_buf: []u8, stop: *const std.atomic.Value(bool)) ?usize {
+        while (true) {
+            if (self.tryConsume(out_buf)) |sz| return sz;
+            if (stop.load(.acquire)) return null;
+            process.sleepNanos(100_000);  !!! why we use sleep? does firedancer does sleep - this looks like scalability bottleneck
+        }
+    }
 
 wksp.zig
 pub const shmem_normal_page_sz: usize = 4096;  !!! can we use firedancer values given it's the same memory topology
