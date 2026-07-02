@@ -140,7 +140,7 @@ fn cmdStartProcess(init: std.process.Init, topo: rt.topology.Topology, run_dir: 
     var poll: u32 = 0;
     while (poll < max_polls) : (poll += 1) {
         if (sup.snapshotProcessMetrics().audited >= process_config.event_count) break;
-        c_abi.process.sleepNanos(poll_interval_ns);
+        rt.process.sleepNanos(poll_interval_ns);
     }
 
     const metrics = sup.snapshotProcessMetrics();

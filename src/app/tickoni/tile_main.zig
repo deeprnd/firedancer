@@ -23,7 +23,7 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
         return 1;
     };
 
-    c_abi.boot.bootWithSyntheticArgv(spec.shmemPath()) catch |err| {
+    rt.boot.bootWithSyntheticArgv(spec.shmemPath()) catch |err| {
         std.debug.print("tile_main: bootWithSyntheticArgv failed for tile {d}: {t}\n", .{ spec.tile_idx, err });
         return 1;
     };
@@ -51,7 +51,7 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
     };
     defer _ = c_abi.cnc.cncLeave(cnc);
 
-    c_abi.cnc.heartbeat(cnc, c_abi.process.monotonicNanos());
+    c_abi.cnc.heartbeat(cnc, rt.process.monotonicNanos());
     // Unconditional BOOT->RUN transition: if the supervisor's stopProcess
     // writes HALT to this cnc before this line runs (a tile caught mid-boot),
     // this write silently clobbers it back to RUN and the halt request is
@@ -79,8 +79,8 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
             return 1;
         }
 
-        c_abi.process.sleepNanos(spec.heartbeat_interval_ns);
-        c_abi.cnc.heartbeat(cnc, c_abi.process.monotonicNanos());
+        rt.process.sleepNanos(spec.heartbeat_interval_ns);
+        c_abi.cnc.heartbeat(cnc, rt.process.monotonicNanos());
     }
 
     c_abi.cnc.signal(cnc, c_abi.cnc.signal_boot);

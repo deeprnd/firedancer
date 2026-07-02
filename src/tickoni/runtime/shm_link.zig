@@ -10,6 +10,7 @@
 /// join pre-formatted objects; they never format memory.
 const std = @import("std");
 const c_abi = @import("c_abi");
+const process = @import("process.zig");
 
 /// Fixed-size, POD handle set embeddable directly in
 /// src/tickoni/runtime/launch_spec.zig's LaunchSpec.
@@ -117,7 +118,7 @@ pub const Producer = struct {
             if (lag < self.depth) break;
             _ = backpressure_waits.fetchAdd(1, .release);
             if (stop.load(.acquire)) return error.Stopped;
-            c_abi.process.sleepNanos(100_000);
+            process.sleepNanos(100_000);
         }
 
         const chunk = try self.writeSlot(payload);
@@ -168,7 +169,7 @@ pub const Consumer = struct {
         while (true) {
             if (self.tryConsume(out_buf)) |sz| return sz;
             if (stop.load(.acquire)) return null;
-            c_abi.process.sleepNanos(100_000);
+            process.sleepNanos(100_000);
         }
     }
 

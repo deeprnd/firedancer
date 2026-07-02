@@ -13,7 +13,7 @@
 /// supervisor/diagnostics visibility (V1.14.S1.T14: shared-core placement
 /// must stay explicit, not an implicit auto-layout).
 const std = @import("std");
-const c_abi = @import("c_abi");
+const process = @import("process.zig");
 const topology = @import("topology.zig");
 
 pub const Topology = topology.Topology;
@@ -36,7 +36,7 @@ pub const PlacementReport = struct {
 /// stand-in for "exists on this host" without requiring root or a
 /// separate host-topology query). Returns a PlacementReport once
 /// validation passes; spawns nothing itself.
-pub fn validate(topo: Topology, available_cpus: *const c_abi.process.CpuSet) !PlacementReport {
+pub fn validate(topo: Topology, available_cpus: *const process.CpuSet) !PlacementReport {
     try topo.validate();
 
     var report = PlacementReport{};
@@ -75,7 +75,7 @@ pub fn validate(topo: Topology, available_cpus: *const c_abi.process.CpuSet) !Pl
     return report;
 }
 
-/// c_abi.process.isSet asserts its cpu argument is in range — appropriate
+/// process.isSet asserts its cpu argument is in range — appropriate
 /// for call sites that already validated the value themselves, but a
 /// declared tile CPU id is external/config data (a plain u16 from
 /// topology.zig's CpuPlacement union), not an internal invariant. This is
@@ -83,14 +83,14 @@ pub fn validate(topo: Topology, available_cpus: *const c_abi.process.CpuSet) !Pl
 /// ("CPU placement fails closed for malformed or unavailable CPU ids"):
 /// out-of-range ids are malformed, in-range-but-absent ids are
 /// unavailable, and neither should reach an `unreachable`-backed assert.
-fn requireAvailable(available_cpus: *const c_abi.process.CpuSet, cpu: u16) !void {
-    if (cpu >= c_abi.process.cpu_set_bytes * 8) return error.CpuIdMalformed;
-    if (!c_abi.process.isSet(available_cpus, cpu)) return error.CpuUnavailable;
+fn requireAvailable(available_cpus: *const process.CpuSet, cpu: u16) !void {
+    if (cpu >= process.cpu_set_bytes * 8) return error.CpuIdMalformed;
+    if (!process.isSet(available_cpus, cpu)) return error.CpuUnavailable;
 }
 
 // ---------------------------------------------------------------------------
 // Tests — pure logic against synthetic CpuSet values; no real host
-// affinity queried (matches c_abi/process.zig's own test style).
+// affinity queried (matches process.zig's own test style).
 // ---------------------------------------------------------------------------
 
 const TileId = topology.TileId;
@@ -100,9 +100,9 @@ fn tile(id: []const u8, placement: topology.CpuPlacement) topology.TileDescripto
 }
 
 test "validate rejects an out-of-range exclusive cpu id as malformed, not an assert" {
-    var cpus: c_abi.process.CpuSet = undefined;
-    c_abi.process.zero(&cpus);
-    c_abi.process.set(&cpus, 0);
+    var cpus: process.CpuSet = undefined;
+    process.zero(&cpus);
+    process.set(&cpus, 0);
 
     const topo = Topology{
         .tiles = &.{tile("tkfoo", .{ .exclusive = 65000 })},
@@ -112,9 +112,9 @@ test "validate rejects an out-of-range exclusive cpu id as malformed, not an ass
 }
 
 test "validate rejects an exclusive cpu id not in available_cpus" {
-    var cpus: c_abi.process.CpuSet = undefined;
-    c_abi.process.zero(&cpus);
-    c_abi.process.set(&cpus, 0);
+    var cpus: process.CpuSet = undefined;
+    process.zero(&cpus);
+    process.set(&cpus, 0);
 
     const topo = Topology{
         .tiles = &.{tile("tkfoo", .{ .exclusive = 1 })},
@@ -124,9 +124,9 @@ test "validate rejects an exclusive cpu id not in available_cpus" {
 }
 
 test "validate rejects a shared cpu id not in available_cpus" {
-    var cpus: c_abi.process.CpuSet = undefined;
-    c_abi.process.zero(&cpus);
-    c_abi.process.set(&cpus, 0);
+    var cpus: process.CpuSet = undefined;
+    process.zero(&cpus);
+    process.set(&cpus, 0);
 
     const topo = Topology{
         .tiles = &.{tile("tkfoo", .{ .shared = 5 })},
@@ -136,9 +136,9 @@ test "validate rejects a shared cpu id not in available_cpus" {
 }
 
 test "validate propagates topo.validate()'s structural checks (duplicate exclusive)" {
-    var cpus: c_abi.process.CpuSet = undefined;
-    c_abi.process.zero(&cpus);
-    c_abi.process.set(&cpus, 0);
+    var cpus: process.CpuSet = undefined;
+    process.zero(&cpus);
+    process.set(&cpus, 0);
 
     const topo = Topology{
         .tiles = &.{
@@ -151,9 +151,9 @@ test "validate propagates topo.validate()'s structural checks (duplicate exclusi
 }
 
 test "validate reports floating-only topology with shared_core false" {
-    var cpus: c_abi.process.CpuSet = undefined;
-    c_abi.process.zero(&cpus);
-    c_abi.process.set(&cpus, 0);
+    var cpus: process.CpuSet = undefined;
+    process.zero(&cpus);
+    process.set(&cpus, 0);
 
     const topo = Topology{
         .tiles = &.{ tile("tkfoo", .floating), tile("tkbar", .floating) },
@@ -167,9 +167,9 @@ test "validate reports floating-only topology with shared_core false" {
 }
 
 test "validate reports shared_core true when two tiles share a cpu id" {
-    var cpus: c_abi.process.CpuSet = undefined;
-    c_abi.process.zero(&cpus);
-    c_abi.process.set(&cpus, 0);
+    var cpus: process.CpuSet = undefined;
+    process.zero(&cpus);
+    process.set(&cpus, 0);
 
     const topo = Topology{
         .tiles = &.{
@@ -186,10 +186,10 @@ test "validate reports shared_core true when two tiles share a cpu id" {
 }
 
 test "validate reports shared_core false for distinct exclusive cpu ids" {
-    var cpus: c_abi.process.CpuSet = undefined;
-    c_abi.process.zero(&cpus);
-    c_abi.process.set(&cpus, 0);
-    c_abi.process.set(&cpus, 1);
+    var cpus: process.CpuSet = undefined;
+    process.zero(&cpus);
+    process.set(&cpus, 0);
+    process.set(&cpus, 1);
 
     const topo = Topology{
         .tiles = &.{

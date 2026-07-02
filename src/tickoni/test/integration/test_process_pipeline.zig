@@ -46,7 +46,7 @@ test "process_pipeline_integration: process-mode payment pipeline matches expect
     var poll: u32 = 0;
     while (poll < max_polls) : (poll += 1) {
         if (sup.snapshotProcessMetrics().audited >= event_count) break;
-        c_abi.process.sleepNanos(5 * std.time.ns_per_ms);
+        rt.process.sleepNanos(5 * std.time.ns_per_ms);
     }
 
     const metrics = sup.snapshotProcessMetrics();

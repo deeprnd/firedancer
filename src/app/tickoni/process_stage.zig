@@ -56,7 +56,7 @@ pub fn runIngestProcess(spec: *const rt.launch_spec.LaunchSpec, output: *rt.shm_
         output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag) catch break;
         produced += 1;
     }
-    c_abi.cnc.appCounterWrite(cnc, 0, produced);
+    rt.cnc_counters.appCounterWrite(cnc, 0, produced);
 }
 
 pub fn runNormalizeProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.shm_link.Consumer, output: *rt.shm_link.Producer, cnc: *c_abi.cnc.Cnc) void {
@@ -81,8 +81,8 @@ pub fn runNormalizeProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.sh
         }
         output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag) catch break;
     }
-    c_abi.cnc.appCounterWrite(cnc, 0, normalized);
-    c_abi.cnc.appCounterWrite(cnc, 1, invalid);
+    rt.cnc_counters.appCounterWrite(cnc, 0, normalized);
+    rt.cnc_counters.appCounterWrite(cnc, 1, invalid);
 }
 
 pub fn runDedupeProcess(
@@ -111,7 +111,7 @@ pub fn runDedupeProcess(
         }
         output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag) catch break;
     }
-    c_abi.cnc.appCounterWrite(cnc, 0, duplicates);
+    rt.cnc_counters.appCounterWrite(cnc, 0, duplicates);
 }
 
 fn seenOrRemember(seen_keys: []u64, seen_hashes: []u64, seen_count: *usize, msg: PaymentMessage) bool {
@@ -151,8 +151,8 @@ pub fn runPolicyProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.shm_l
         }
         output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag) catch break;
     }
-    c_abi.cnc.appCounterWrite(cnc, 0, allowed);
-    c_abi.cnc.appCounterWrite(cnc, 1, denied);
+    rt.cnc_counters.appCounterWrite(cnc, 0, allowed);
+    rt.cnc_counters.appCounterWrite(cnc, 1, denied);
 }
 
 pub fn runAuditProcess(
@@ -177,5 +177,5 @@ pub fn runAuditProcess(
         }) catch break;
         audited += 1;
     }
-    c_abi.cnc.appCounterWrite(cnc, 0, audited);
+    rt.cnc_counters.appCounterWrite(cnc, 0, audited);
 }

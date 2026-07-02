@@ -153,11 +153,11 @@ pub const Supervisor = struct {
         // before. Also runs topo.validate()'s structural checks (duplicate
         // exclusive ids, channel/depth/MTU shape) and reports the
         // resulting layout for diagnostics visibility (V1.14.S1.T14).
-        var available_cpus: c_abi.process.CpuSet = undefined;
-        try c_abi.process.getAffinity(0, &available_cpus);
+        var available_cpus: rt.process.CpuSet = undefined;
+        try rt.process.getAffinity(0, &available_cpus);
         const placement_report = try rt.cpu_placement.validate(self.topo, &available_cpus);
 
-        try c_abi.boot.bootWithSyntheticArgv(config.run_dir);
+        try rt.boot.bootWithSyntheticArgv(config.run_dir);
 
 
         const workspace_name_slice = self.topo.channels[0].workspace_name.slice();
@@ -218,7 +218,7 @@ pub const Supervisor = struct {
             const gaddr = c_abi.wksp.wkspAlloc(wksp, c_abi.cnc.cnc_align, footprint, 1);
             if (gaddr == 0) return error.CncAllocFailed;
             const laddr = c_abi.wksp.wkspLaddr(wksp, gaddr) orelse return error.CncLaddrFailed;
-            _ = c_abi.cnc.cncNew(laddr, 64, @intCast(i), c_abi.process.monotonicNanos()) orelse return error.CncNewFailed;
+            _ = c_abi.cnc.cncNew(laddr, 64, @intCast(i), rt.process.monotonicNanos()) orelse return error.CncNewFailed;
             state.cnc_gaddrs[i] = gaddr;
             state.cncs[i] = c_abi.cnc.cncJoin(laddr) orelse return error.CncJoinFailed;
         }
@@ -235,7 +235,7 @@ pub const Supervisor = struct {
         }
 
         var self_exe_path_buf: [std.fs.max_path_bytes]u8 = undefined;
-        const self_exe_path = config.tile_exe_path orelse try c_abi.process.selfExePath(&self_exe_path_buf);
+        const self_exe_path = config.tile_exe_path orelse try rt.process.selfExePath(&self_exe_path_buf);
 
         for (self.handles, 0..) |*h, i| {
             const tile = self.topo.tiles[i];
@@ -269,7 +269,7 @@ pub const Supervisor = struct {
 
             // Minimal explicit child environment: the tile reads its
             // shmem path from the launch spec via --shmem-path (see
-            // c_abi/boot.zig), not from an inherited environment,
+            // runtime/boot.zig), not from an inherited environment,
             // matching the least-privilege posture used elsewhere in the
             // runtime (no inherited PATH, secrets, or parent env state).
             var env = std.process.Environ.Map.init(self.allocator);
@@ -287,10 +287,10 @@ pub const Supervisor = struct {
 
             switch (tile.cpu_placement) {
                 .exclusive, .shared => |cpu| {
-                    var cpu_set: c_abi.process.CpuSet = undefined;
-                    c_abi.process.zero(&cpu_set);
-                    c_abi.process.set(&cpu_set, cpu);
-                    try c_abi.process.setAffinity(@intCast(child.id.?), &cpu_set);
+                    var cpu_set: rt.process.CpuSet = undefined;
+                    rt.process.zero(&cpu_set);
+                    rt.process.set(&cpu_set, cpu);
+                    try rt.process.setAffinity(@intCast(child.id.?), &cpu_set);
                 },
                 .floating => {},
             }
@@ -366,17 +366,17 @@ pub const Supervisor = struct {
             const cnc = state.cncs[i] orelse continue;
             const id = tile.id.slice();
             if (std.mem.eql(u8, id, "tkings")) {
-                snap.produced = c_abi.cnc.appCounterRead(cnc, 0);
+                snap.produced = rt.cnc_counters.appCounterRead(cnc, 0);
             } else if (std.mem.eql(u8, id, "tknorm")) {
-                snap.normalized = c_abi.cnc.appCounterRead(cnc, 0);
-                snap.invalid = c_abi.cnc.appCounterRead(cnc, 1);
+                snap.normalized = rt.cnc_counters.appCounterRead(cnc, 0);
+                snap.invalid = rt.cnc_counters.appCounterRead(cnc, 1);
             } else if (std.mem.eql(u8, id, "tkdedu")) {
-                snap.duplicates = c_abi.cnc.appCounterRead(cnc, 0);
+                snap.duplicates = rt.cnc_counters.appCounterRead(cnc, 0);
             } else if (std.mem.eql(u8, id, "tkpoly")) {
-                snap.allowed = c_abi.cnc.appCounterRead(cnc, 0);
-                snap.denied = c_abi.cnc.appCounterRead(cnc, 1);
+                snap.allowed = rt.cnc_counters.appCounterRead(cnc, 0);
+                snap.denied = rt.cnc_counters.appCounterRead(cnc, 1);
             } else if (std.mem.eql(u8, id, "tkaudt")) {
-                snap.audited = c_abi.cnc.appCounterRead(cnc, 0);
+                snap.audited = rt.cnc_counters.appCounterRead(cnc, 0);
             }
         }
         return snap;

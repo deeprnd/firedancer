@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const audit_codec_mod = b.addModule("audit_codec", .{
-        .root_source_file = b.path("src/tickoni/codec/audit_codec.zig"),
+        .root_source_file = b.path("src/tickoni/codec/audit.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -56,7 +56,7 @@ pub fn build(b: *std.Build) void {
         },
     });
     const thesis_codec_mod = b.addModule("thesis_codec", .{
-        .root_source_file = b.path("src/tickoni/codec/thesis_codec.zig"),
+        .root_source_file = b.path("src/tickoni/codec/thesis.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -241,6 +241,8 @@ pub fn build(b: *std.Build) void {
     for ([_][]const u8{
         "src/tickoni/runtime/topology.zig",
         "src/tickoni/runtime/tile.zig",
+        "src/tickoni/runtime/process.zig",
+        "src/tickoni/runtime/sandbox.zig",
         "src/tickoni/c_abi/ballet.zig",
         "src/tickoni/c_abi/queue.zig",
         "src/tickoni/c_abi/sandbox.zig",
@@ -248,7 +250,6 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/c_abi/fseq.zig",
         "src/tickoni/c_abi/cnc.zig",
         "src/tickoni/c_abi/wksp.zig",
-        "src/tickoni/c_abi/process.zig",
         "src/tickoni/c_abi/boot.zig",
         "src/tickoni/tiles/audit/mod.zig",
         "src/tickoni/tiles/payment_pipeline/mod.zig",
@@ -304,11 +305,12 @@ pub fn build(b: *std.Build) void {
         test_step.dependOn(&t_run.step);
     }
 
-    // thesis_codec.zig: fresh root module (not the shared thesis_codec_mod)
-    // so linkTickoniCodec adds C sources only to this binary's root module.
+    // src/tickoni/codec/thesis.zig: fresh root module (not the shared
+    // thesis_codec_mod) so linkTickoniCodec adds C sources only to this
+    // binary's root module.
     const thesis_codec_test = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/codec/thesis_codec.zig"),
+            .root_source_file = b.path("src/tickoni/codec/thesis.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -407,10 +409,20 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(shm_link_test).step);
 
-    // cpu_placement.zig imports c_abi for the live-CPU-set check.
+    // cpu_placement.zig imports sibling process.zig for the live-CPU-set check.
     const cpu_placement_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/runtime/cpu_placement.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(cpu_placement_test).step);
+
+    // boot.zig imports c_abi for the raw fd_boot bridge call.
+    const boot_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/boot.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -418,7 +430,22 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    test_step.dependOn(&b.addRunArtifact(cpu_placement_test).step);
+    test_step.dependOn(&b.addRunArtifact(boot_test).step);
+
+    // cnc_counters.zig imports c_abi and calls the real tk_cnc_app_laddr
+    // shim (via c_abi.cnc.appLaddr) in its round-trip test.
+    const cnc_counters_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/cnc_counters.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "c_abi", .module = c_abi_mod },
+            },
+        }),
+    });
+    linkTickoniFiredancer(b, cnc_counters_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(cnc_counters_test).step);
 
     // launch_spec.zig embeds shm_link.LinkHandles, which imports c_abi.
     const launch_spec_test = b.addTest(.{
@@ -1142,7 +1169,9 @@ pub fn build(b: *std.Build) void {
         .{ "test-fseq", "src/tickoni/c_abi/fseq.zig" },
         .{ "test-cnc", "src/tickoni/c_abi/cnc.zig" },
         .{ "test-wksp", "src/tickoni/c_abi/wksp.zig" },
-        .{ "test-process", "src/tickoni/c_abi/process.zig" },
+        .{ "test-process", "src/tickoni/runtime/process.zig" },
+        .{ "test-sandbox-config", "src/tickoni/runtime/sandbox.zig" },
+        .{ "test-cnc-counters", "src/tickoni/runtime/cnc_counters.zig" },
         .{ "test-audit", "src/tickoni/tiles/audit/mod.zig" },
         .{ "test-payment-pipeline", "src/tickoni/tiles/payment_pipeline/mod.zig" },
         .{ "test-case", "src/tickoni/tiles/case/mod.zig" },
@@ -1169,6 +1198,15 @@ pub fn build(b: *std.Build) void {
                         .{ .name = "audit_tile", .module = audit_tile_mod },
                     },
                 })
+            else if (std.mem.eql(u8, entry[1], "src/tickoni/runtime/cnc_counters.zig"))
+                b.createModule(.{
+                    .root_source_file = b.path(entry[1]),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                    },
+                })
             else
                 b.createModule(.{
                     .root_source_file = b.path(entry[1]),
@@ -1184,7 +1222,8 @@ pub fn build(b: *std.Build) void {
         if (std.mem.eql(u8, entry[1], "src/tickoni/c_abi/queue.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/dcache.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/fseq.zig") or
-            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/cnc.zig"))
+            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/cnc.zig") or
+            std.mem.eql(u8, entry[1], "src/tickoni/runtime/cnc_counters.zig"))
         {
             linkTickoniFiredancer(b, t, fd_lib_dir);
         }
@@ -1374,7 +1413,7 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
 
 /// Links shim/ballet.c (Firedancer siphash/protobuf/JSON primitives). Audit
 /// and thesis/basket/trade-ticket/paper-order codec logic is Zig; see
-/// audit_codec.zig and thesis_codec.zig.
+/// src/tickoni/codec/audit.zig and src/tickoni/codec/thesis.zig.
 fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));

@@ -1,6 +1,7 @@
-/// Narrow Zig bindings for CPU affinity, used by Tickoni's own
-/// exclusive/shared/floating CPU placement policy
-/// (src/tickoni/runtime/cpu_placement.zig).
+/// Zig bindings for CPU affinity, the monotonic clock, and process
+/// primitives used by Tickoni's V1.14 process-mode tile supervisor and
+/// tiles (src/tickoni/runtime/cpu_placement.zig, src/app/tickoni/*). These
+/// are Tickoni's own runtime utilities, not a Firedancer bridge.
 ///
 /// Firedancer has an internal fd_cpuset_t affinity wrapper
 /// (src/util/tile/fd_tile_private.h), but that header documents itself as
