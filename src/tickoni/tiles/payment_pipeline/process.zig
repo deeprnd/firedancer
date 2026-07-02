@@ -1,6 +1,6 @@
 /// V1.14.S1 process-mode payment pipeline stage orchestration: runs inside
 /// each tile's own process (dispatched from tile_main.zig), reading/writing
-/// Tango shared-memory links (src/tickoni/runtime/shm_link.zig) instead of
+/// Tango shared-memory links (src/tickoni/runtime/link.zig) instead of
 /// the thread-mode heap ring
 /// (src/tickoni/tiles/payment_pipeline/queue.zig's BoundedQueue). The pure
 /// decision logic — hashing, framing validation, dedup comparison, policy
@@ -43,7 +43,7 @@ fn pipelineConfig(spec: *const rt.launch_spec.LaunchSpec) payment_runtime.Paymen
     };
 }
 
-pub fn runIngestProcess(spec: *const rt.launch_spec.LaunchSpec, output: *rt.shm_link.Producer, cnc: *c_abi.cnc.Cnc) void {
+pub fn runIngestProcess(spec: *const rt.launch_spec.LaunchSpec, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
     var stop_flag = std.atomic.Value(bool).init(false);
     var backpressure_waits = std.atomic.Value(u64).init(0);
     const cfg = pipelineConfig(spec);
@@ -60,7 +60,7 @@ pub fn runIngestProcess(spec: *const rt.launch_spec.LaunchSpec, output: *rt.shm_
     rt.cnc_counters.appCounterWrite(cnc, 0, produced);
 }
 
-pub fn runNormalizeProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.shm_link.Consumer, output: *rt.shm_link.Producer, cnc: *c_abi.cnc.Cnc) void {
+pub fn runNormalizeProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.link.Consumer, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
     var stop_flag = std.atomic.Value(bool).init(false);
     var backpressure_waits = std.atomic.Value(u64).init(0);
     var buf: [msg_size]u8 = undefined;
@@ -88,8 +88,8 @@ pub fn runNormalizeProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.sh
 
 pub fn runDedupeProcess(
     spec: *const rt.launch_spec.LaunchSpec,
-    input: *rt.shm_link.Consumer,
-    output: *rt.shm_link.Producer,
+    input: *rt.link.Consumer,
+    output: *rt.link.Producer,
     cnc: *c_abi.cnc.Cnc,
     seen_keys: []u64,
     seen_hashes: []u64,
@@ -125,7 +125,7 @@ fn seenOrRemember(seen_keys: []u64, seen_hashes: []u64, seen_count: *usize, msg:
     return false;
 }
 
-pub fn runPolicyProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.shm_link.Consumer, output: *rt.shm_link.Producer, cnc: *c_abi.cnc.Cnc) void {
+pub fn runPolicyProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.link.Consumer, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
     var stop_flag = std.atomic.Value(bool).init(false);
     var backpressure_waits = std.atomic.Value(u64).init(0);
     var buf: [msg_size]u8 = undefined;
@@ -158,7 +158,7 @@ pub fn runPolicyProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.shm_l
 
 pub fn runAuditProcess(
     spec: *const rt.launch_spec.LaunchSpec,
-    input: *rt.shm_link.Consumer,
+    input: *rt.link.Consumer,
     cnc: *c_abi.cnc.Cnc,
     audit_log: *audit_sink.AuditLog,
 ) void {

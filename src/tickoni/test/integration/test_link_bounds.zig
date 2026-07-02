@@ -1,4 +1,4 @@
-/// V1.14.S1 M6 fail-closed matrix (T14): shm_link's dcache bounds check and
+/// V1.14.S1 M6 fail-closed matrix (T14): runtime link dcache bounds check and
 /// backpressure visibility, exercised directly against a real Tango
 /// workspace (single process — no tile spawn needed, since these are
 /// producer/consumer-local behaviors, not process-isolation behaviors).
@@ -25,7 +25,7 @@ fn attachScratchWksp(io: std.Io, run_dir: []const u8, name: [*:0]const u8) !*c_a
     return c_abi.wksp.wkspAttach(name) orelse error.WkspAttachFailed;
 }
 
-test "shm_link_bounds: publish larger than the link's mtu fails closed instead of overrunning the dcache slot" {
+test "link_bounds: publish larger than the link's mtu fails closed instead of overrunning the dcache slot" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
     var path_buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -39,8 +39,8 @@ test "shm_link_bounds: publish larger than the link's mtu fails closed instead o
         c_abi.boot.halt();
     }
 
-    const handles = try rt.shm_link.create(wksp, 4, 8);
-    var producer = try rt.shm_link.Producer.join(wksp, handles);
+    const handles = try rt.link.create(wksp, 4, 8);
+    var producer = try rt.link.Producer.join(wksp, handles);
     defer producer.leave();
 
     var stop_flag = std.atomic.Value(bool).init(false);
@@ -53,7 +53,7 @@ test "shm_link_bounds: publish larger than the link's mtu fails closed instead o
     );
 }
 
-test "shm_link_bounds: joining a zeroed (missing) link handle set fails closed" {
+test "link_bounds: joining a zeroed (missing) link handle set fails closed" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
     var path_buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -70,12 +70,12 @@ test "shm_link_bounds: joining a zeroed (missing) link handle set fails closed" 
     // A never-created LinkHandles set (all gaddrs 0) simulates a missing
     // mcache/dcache/fseq object — joining must fail closed, not dereference
     // an invalid workspace address.
-    const missing = rt.shm_link.LinkHandles{};
-    try std.testing.expectError(error.McacheLaddrFailed, rt.shm_link.Producer.join(wksp, missing));
-    try std.testing.expectError(error.McacheLaddrFailed, rt.shm_link.Consumer.join(wksp, missing));
+    const missing = rt.link.LinkHandles{};
+    try std.testing.expectError(error.McacheLaddrFailed, rt.link.Producer.join(wksp, missing));
+    try std.testing.expectError(error.McacheLaddrFailed, rt.link.Consumer.join(wksp, missing));
 }
 
-test "shm_link_bounds: producer backpressures and counts waits when the consumer does not advance" {
+test "link_bounds: producer backpressures and counts waits when the consumer does not advance" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
     var path_buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -91,8 +91,8 @@ test "shm_link_bounds: producer backpressures and counts waits when the consumer
 
     // Depth 2: the 3rd publish must block on backpressure since no consumer
     // ever advances the fseq in this test.
-    const handles = try rt.shm_link.create(wksp, 2, 8);
-    var producer = try rt.shm_link.Producer.join(wksp, handles);
+    const handles = try rt.link.create(wksp, 2, 8);
+    var producer = try rt.link.Producer.join(wksp, handles);
     defer producer.leave();
 
     var stop_flag = std.atomic.Value(bool).init(false);

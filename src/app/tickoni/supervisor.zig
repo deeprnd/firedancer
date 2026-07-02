@@ -161,7 +161,6 @@ pub const Supervisor = struct {
 
         try rt.boot.bootWithSyntheticArgv(config.run_dir);
 
-
         const workspace_name_slice = self.topo.channels[0].workspace_name.slice();
         if (workspace_name_slice.len == 0) return error.MissingWorkspaceName;
         for (self.topo.channels) |ch| {
@@ -229,11 +228,11 @@ pub const Supervisor = struct {
         // supervisor is the sole creator; producer/consumer tiles only
         // join. Bounded by the topology's fixed channel count (currently
         // always 4 for paymentPipelineProcess()).
-        var link_handles_buf: [8]rt.shm_link.LinkHandles = undefined;
+        var link_handles_buf: [8]rt.link.LinkHandles = undefined;
         std.debug.assert(self.topo.channels.len <= link_handles_buf.len);
         const link_handles = link_handles_buf[0..self.topo.channels.len];
         for (self.topo.channels, 0..) |ch, i| {
-            link_handles[i] = try rt.shm_link.create(wksp, ch.depth, ch.mtu);
+            link_handles[i] = try rt.link.create(wksp, ch.depth, ch.mtu);
         }
 
         var self_exe_path_buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -242,8 +241,8 @@ pub const Supervisor = struct {
         for (self.handles, 0..) |*h, i| {
             const tile = self.topo.tiles[i];
 
-            var input_link: ?rt.shm_link.LinkHandles = null;
-            var output_link: ?rt.shm_link.LinkHandles = null;
+            var input_link: ?rt.link.LinkHandles = null;
+            var output_link: ?rt.link.LinkHandles = null;
             for (self.topo.channels, 0..) |ch, ci| {
                 if (ch.dst_idx == i) input_link = link_handles[ci];
                 if (ch.src_idx == i) output_link = link_handles[ci];

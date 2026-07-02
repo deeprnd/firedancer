@@ -33,21 +33,21 @@ fn runPipelineStage(wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec.LaunchSp
 
     if (std.mem.eql(u8, id, "tkings")) {
         if (!spec.has_output_link) return error.MissingOutputLink;
-        var output = try rt.shm_link.Producer.join(wksp, spec.output_link);
+        var output = try rt.link.Producer.join(wksp, spec.output_link);
         defer output.leave();
         process_stage.runIngestProcess(spec, &output, cnc);
     } else if (std.mem.eql(u8, id, "tknorm")) {
         if (!spec.has_input_link or !spec.has_output_link) return error.MissingLink;
-        var input = try rt.shm_link.Consumer.join(wksp, spec.input_link);
+        var input = try rt.link.Consumer.join(wksp, spec.input_link);
         defer input.leave();
-        var output = try rt.shm_link.Producer.join(wksp, spec.output_link);
+        var output = try rt.link.Producer.join(wksp, spec.output_link);
         defer output.leave();
         process_stage.runNormalizeProcess(spec, &input, &output, cnc);
     } else if (std.mem.eql(u8, id, "tkdedu")) {
         if (!spec.has_input_link or !spec.has_output_link) return error.MissingLink;
-        var input = try rt.shm_link.Consumer.join(wksp, spec.input_link);
+        var input = try rt.link.Consumer.join(wksp, spec.input_link);
         defer input.leave();
-        var output = try rt.shm_link.Producer.join(wksp, spec.output_link);
+        var output = try rt.link.Producer.join(wksp, spec.output_link);
         defer output.leave();
         const cap: usize = @intCast(spec.event_count);
         const seen_keys = try allocator.alloc(u64, cap);
@@ -57,14 +57,14 @@ fn runPipelineStage(wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec.LaunchSp
         process_stage.runDedupeProcess(spec, &input, &output, cnc, seen_keys, seen_hashes);
     } else if (std.mem.eql(u8, id, "tkpoly")) {
         if (!spec.has_input_link or !spec.has_output_link) return error.MissingLink;
-        var input = try rt.shm_link.Consumer.join(wksp, spec.input_link);
+        var input = try rt.link.Consumer.join(wksp, spec.input_link);
         defer input.leave();
-        var output = try rt.shm_link.Producer.join(wksp, spec.output_link);
+        var output = try rt.link.Producer.join(wksp, spec.output_link);
         defer output.leave();
         process_stage.runPolicyProcess(spec, &input, &output, cnc);
     } else if (std.mem.eql(u8, id, "tkaudt")) {
         if (!spec.has_input_link) return error.MissingInputLink;
-        var input = try rt.shm_link.Consumer.join(wksp, spec.input_link);
+        var input = try rt.link.Consumer.join(wksp, spec.input_link);
         defer input.leave();
         const cap: usize = @intCast(spec.event_count);
         var audit_log = try tiles.audit_sink.AuditLog.init(allocator, cap);

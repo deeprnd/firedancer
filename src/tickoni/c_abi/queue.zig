@@ -41,7 +41,7 @@ pub const mcache_block: usize = 1;
 // fd_mcache_join returns fd_frag_meta_t* (a directly indexable [0,depth)
 // array), not an opaque handle — confirmed against fd_mcache.h; the
 // earlier opaque Mcache type here did not match the real ABI and was
-// never exercised until src/tickoni/runtime/shm_link.zig needed it.
+// never exercised until the runtime link producer/consumer path needed it.
 // ---------------------------------------------------------------------------
 
 extern fn tk_mcache_align() usize;

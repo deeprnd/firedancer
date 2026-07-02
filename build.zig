@@ -33,7 +33,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const runtime_mod = b.addModule("runtime", .{
-        .root_source_file = b.path("src/tickoni/runtime/runtime.zig"),
+        .root_source_file = b.path("src/tickoni/runtime/mod.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -424,20 +424,25 @@ pub fn build(b: *std.Build) void {
     const model_messages_test = b.addTest(.{ .root_module = model_messages_mod });
     test_step.dependOn(&b.addRunArtifact(model_messages_test).step);
 
-    // shm_link.zig imports c_abi; layout/shape tests only (no real
-    // fd_wksp/fd_tango calls in the offline unit lane).
-    const shm_link_test = b.addTest(.{
+    // link handle/type roots keep their own unit tests independent of the
+    // aggregate runtime module.
+    const link_handles_test = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/runtime/shm_link.zig"),
+            .root_source_file = b.path("src/tickoni/runtime/link/handles.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{
-                .{ .name = "c_abi", .module = c_abi_mod },
-                .{ .name = "util", .module = util_mod },
-            },
         }),
     });
-    test_step.dependOn(&b.addRunArtifact(shm_link_test).step);
+    test_step.dependOn(&b.addRunArtifact(link_handles_test).step);
+
+    const link_types_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/link/types.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(link_types_test).step);
 
     // boot.zig imports c_abi for the raw fd_boot bridge call.
     const boot_test = b.addTest(.{
@@ -481,7 +486,7 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(cpu_placement_test).step);
 
-    // launch_spec.zig embeds shm_link.LinkHandles, which imports c_abi.
+    // launch_spec.zig embeds link.LinkHandles, which imports c_abi.
     const launch_spec_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/runtime/launch_spec.zig"),
@@ -1022,12 +1027,12 @@ pub fn build(b: *std.Build) void {
     run_process_demo_parity_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_demo_parity_test.step);
 
-    // V1.14.S1 M6: shm_link fail-closed matrix (dcache bounds, missing link
+    // V1.14.S1 M6: runtime link fail-closed matrix (dcache bounds, missing link
     // objects) and backpressure visibility. Single-process — no tile spawn,
     // so no stdio-inheritance hang risk — uses the normal test-runner path.
-    const shm_link_bounds_test = b.addTest(.{
+    const link_bounds_test = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/tickoni/test/integration/test_shm_link_bounds.zig"),
+            .root_source_file = b.path("src/tickoni/test/integration/test_link_bounds.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -1037,9 +1042,9 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    linkTickoniCodec(b, shm_link_bounds_test, fd_lib_dir);
-    linkTickoniFiredancer(b, shm_link_bounds_test, fd_lib_dir);
-    integration_step.dependOn(&b.addRunArtifact(shm_link_bounds_test).step);
+    linkTickoniCodec(b, link_bounds_test, fd_lib_dir);
+    linkTickoniFiredancer(b, link_bounds_test, fd_lib_dir);
+    integration_step.dependOn(&b.addRunArtifact(link_bounds_test).step);
 
     // Mock HTTP servers (test/mocks): self-tests of the mock
     // infrastructure itself, no tile schema imports required. Wired to
