@@ -1,16 +1,16 @@
 /// Concrete Tickoni product topologies: which tiles run, their phases, and
 /// channel wiring for the payment pipeline and investment workflow. Layered
-/// on the generic topology schema in src/tickoni/runtime/topology.zig,
-/// which owns tile/channel shape and structural validation only and has no
-/// knowledge of Tickoni's actual current tile plan.
+/// on the generic topology graph in src/tickoni/runtime/topology.zig, which
+/// composes tile/link descriptor types from the runtime owners and validates
+/// only graph structure, not the product tile plan itself.
 const std = @import("std");
 const rt = @import("runtime");
 
-const TileId = rt.topology.TileId;
-const TileDescriptor = rt.topology.TileDescriptor;
-const Channel = rt.topology.Channel;
+const TileId = rt.tile.TileId;
+const TileDescriptor = rt.tile.TileDescriptor;
+const Channel = rt.link.Channel;
 const Topology = rt.topology.Topology;
-const WorkspaceName = rt.topology.WorkspaceName;
+const WorkspaceName = rt.link.WorkspaceName;
 
 // Static backing arrays for paymentPipeline — avoids returning pointers to
 // stack-allocated data.
@@ -173,8 +173,8 @@ test "paymentPipelineProcess has 8 tiles, 4 tango_shm channels, and passes valid
     try std.testing.expectEqual(@as(usize, 8), topo.tiles.len);
     try std.testing.expectEqual(@as(usize, 4), topo.channels.len);
     for (topo.channels) |ch| {
-        try std.testing.expectEqual(rt.topology.LinkBacking.tango_shm, ch.backing);
-        try std.testing.expectEqual(rt.topology.LinkReliability.reliable, ch.reliability);
+        try std.testing.expectEqual(rt.link.LinkBacking.tango_shm, ch.backing);
+        try std.testing.expectEqual(rt.link.LinkReliability.reliable, ch.reliability);
         try std.testing.expectEqualStrings("tkpay0", ch.workspace_name.slice());
     }
 }

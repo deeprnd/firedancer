@@ -1,5 +1,38 @@
 const std = @import("std");
-const topology = @import("topology.zig");
+const cpu_placement = @import("cpu_placement.zig");
+
+/// Six-character runtime ID for a tile (matches the fd_topo char name[7] constraint).
+pub const TileId = struct {
+    bytes: [6]u8 = [_]u8{0} ** 6,
+
+    pub fn parse(s: []const u8) error{TileIdTooLong}!TileId {
+        if (s.len > 6) return error.TileIdTooLong;
+        var id = TileId{};
+        @memcpy(id.bytes[0..s.len], s);
+        return id;
+    }
+
+    pub fn slice(self: *const TileId) []const u8 {
+        const end = std.mem.indexOfScalar(u8, &self.bytes, 0) orelse 6;
+        return self.bytes[0..end];
+    }
+
+    pub fn eql(self: TileId, other: TileId) bool {
+        return std.mem.eql(u8, &self.bytes, &other.bytes);
+    }
+};
+
+/// Static description of one tile in a topology.
+pub const TileDescriptor = struct {
+    id: TileId,
+    /// Human-readable name used in logs and diagnostics.
+    name: []const u8,
+    /// Phase from the tile plan: 0=core, 1=case, 2=agent, 3=api, 4=exec.
+    phase: u8,
+    /// Defaults to floating: existing thread-mode topologies do not pin
+    /// CPUs. Process-mode topologies set this explicitly.
+    cpu_placement: cpu_placement.CpuPlacement = .floating,
+};
 
 pub const TileState = enum {
     stopped,
@@ -39,7 +72,7 @@ pub const TileHandle = struct {
     pid: ?std.process.Child.Id = null,
     /// Effective CPU placement for this tile, copied from the topology at
     /// start time so diagnostics do not need to re-consult the topology.
-    cpu_placement: topology.CpuPlacement = .floating,
+    cpu_placement: cpu_placement.CpuPlacement = .floating,
     /// Meaningful only when state == .crashed.
     crashed_because: CrashReason = .none,
 
@@ -54,6 +87,28 @@ pub const TileHandle = struct {
         };
     }
 };
+
+test "TileId parse valid 6-char name" {
+    const id = try TileId.parse("tkings");
+    try std.testing.expectEqualStrings("tkings", id.slice());
+}
+
+test "TileId parse short name" {
+    const id = try TileId.parse("tk");
+    try std.testing.expectEqualStrings("tk", id.slice());
+}
+
+test "TileId parse rejects names longer than 6 chars" {
+    try std.testing.expectError(error.TileIdTooLong, TileId.parse("toolong7"));
+}
+
+test "TileId equality" {
+    const a = try TileId.parse("tknorm");
+    const b = try TileId.parse("tknorm");
+    const c = try TileId.parse("tkdedu");
+    try std.testing.expect(a.eql(b));
+    try std.testing.expect(!a.eql(c));
+}
 
 test "TileHandle initialises in stopped state" {
     const h = TileHandle.init(0);

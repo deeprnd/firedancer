@@ -8,8 +8,9 @@
 /// The magic/version/length checks below exist to fail closed on a stray,
 /// truncated, or foreign file rather than to support format evolution.
 const std = @import("std");
-const topology = @import("topology.zig");
-const shm_link = @import("shm_link.zig");
+const tile = @import("tile.zig");
+const cpu_placement = @import("cpu_placement.zig");
+const link = @import("link.zig");
 
 pub const magic: u32 = 0x544b5350; // "TKSP"
 pub const version: u16 = 1;
@@ -20,9 +21,9 @@ pub const LaunchSpec = struct {
     magic_field: u32 = magic,
     version_field: u16 = version,
     tile_idx: u32,
-    tile_id: topology.TileId,
-    cpu_placement: topology.CpuPlacement,
-    workspace_name: topology.WorkspaceName,
+    tile_id: tile.TileId,
+    cpu_placement: cpu_placement.CpuPlacement,
+    workspace_name: link.WorkspaceName,
     /// Global address of this tile's pre-formatted cnc object inside
     /// workspace_name, as returned by fd_wksp_gaddr in the supervisor.
     cnc_gaddr: usize,
@@ -30,9 +31,9 @@ pub const LaunchSpec = struct {
     /// correctness link, e.g. tkings has no input and tkaudt has no
     /// output in the current 5-stage core chain.
     has_input_link: bool = false,
-    input_link: shm_link.LinkHandles = .{},
+    input_link: link.LinkHandles = .{},
     has_output_link: bool = false,
-    output_link: shm_link.LinkHandles = .{},
+    output_link: link.LinkHandles = .{},
     shmem_path_buf: [shmem_path_cap]u8 = [_]u8{0} ** shmem_path_cap,
     shmem_path_len: u16,
     heartbeat_interval_ns: u64,
@@ -50,15 +51,15 @@ pub const LaunchSpec = struct {
 
     pub fn init(fields: struct {
         tile_idx: u32,
-        tile_id: topology.TileId,
-        cpu_placement: topology.CpuPlacement,
-        workspace_name: topology.WorkspaceName,
+        tile_id: tile.TileId,
+        cpu_placement: cpu_placement.CpuPlacement,
+        workspace_name: link.WorkspaceName,
         cnc_gaddr: usize,
         shmem_path: []const u8,
         heartbeat_interval_ns: u64,
         crash_after_heartbeats: u32 = 0,
-        input_link: ?shm_link.LinkHandles = null,
-        output_link: ?shm_link.LinkHandles = null,
+        input_link: ?link.LinkHandles = null,
+        output_link: ?link.LinkHandles = null,
         event_count: u64 = 0,
         policy_limit_cents: i64 = 0,
         inject_duplicate: bool = false,
@@ -121,9 +122,9 @@ test "LaunchSpec round-trips through a file" {
 
     const spec = try LaunchSpec.init(.{
         .tile_idx = 3,
-        .tile_id = try topology.TileId.parse("tkpoly"),
+        .tile_id = try tile.TileId.parse("tkpoly"),
         .cpu_placement = .{ .exclusive = 2 },
-        .workspace_name = try topology.WorkspaceName.parse("tkpay0"),
+        .workspace_name = try link.WorkspaceName.parse("tkpay0"),
         .cnc_gaddr = 4096,
         .shmem_path = "/tmp/tickoni-run",
         .heartbeat_interval_ns = 50_000_000,
@@ -134,7 +135,7 @@ test "LaunchSpec round-trips through a file" {
     const read_back = try LaunchSpec.readFromFile(std.testing.io, tmp.dir, "tile.spec");
     try std.testing.expectEqual(@as(u32, 3), read_back.tile_idx);
     try std.testing.expectEqualStrings("tkpoly", read_back.tile_id.slice());
-    try std.testing.expectEqual(topology.CpuPlacement{ .exclusive = 2 }, read_back.cpu_placement);
+    try std.testing.expectEqual(cpu_placement.CpuPlacement{ .exclusive = 2 }, read_back.cpu_placement);
     try std.testing.expectEqualStrings("tkpay0", read_back.workspace_name.slice());
     try std.testing.expectEqual(@as(usize, 4096), read_back.cnc_gaddr);
     try std.testing.expectEqualStrings("/tmp/tickoni-run", read_back.shmemPath());
@@ -159,9 +160,9 @@ test "LaunchSpec readFromFile rejects a bad magic" {
 
     var spec = try LaunchSpec.init(.{
         .tile_idx = 0,
-        .tile_id = try topology.TileId.parse("tkings"),
+        .tile_id = try tile.TileId.parse("tkings"),
         .cpu_placement = .floating,
-        .workspace_name = try topology.WorkspaceName.parse("tkpay0"),
+        .workspace_name = try link.WorkspaceName.parse("tkpay0"),
         .cnc_gaddr = 0,
         .shmem_path = "/tmp",
         .heartbeat_interval_ns = 1,
@@ -176,9 +177,9 @@ test "LaunchSpec init rejects an over-long shmem path" {
     const too_long = [_]u8{'a'} ** (shmem_path_cap + 1);
     try std.testing.expectError(error.ShmemPathTooLong, LaunchSpec.init(.{
         .tile_idx = 0,
-        .tile_id = try topology.TileId.parse("tkings"),
+        .tile_id = try tile.TileId.parse("tkings"),
         .cpu_placement = .floating,
-        .workspace_name = try topology.WorkspaceName.parse("tkpay0"),
+        .workspace_name = try link.WorkspaceName.parse("tkpay0"),
         .cnc_gaddr = 0,
         .shmem_path = &too_long,
         .heartbeat_interval_ns = 1,

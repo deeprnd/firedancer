@@ -15,10 +15,20 @@
 /// supervisor/diagnostics visibility (V1.14.S1.T14: shared-core placement
 /// must stay explicit, not an implicit auto-layout).
 const std = @import("std");
-const cpu = @import("util").cpu;
-const topology = @import("topology.zig");
 
-pub const Topology = topology.Topology;
+/// Matches util.cpu.CpuSet's layout so supervisor code can pass a live
+/// affinity mask without this module depending on the util build module.
+pub const cpu_set_bytes: usize = 128;
+pub const CpuSet = [cpu_set_bytes]u8;
+
+/// CPU placement policy for a tile process. Tickoni-owned; not a Firedancer
+/// validator auto-layout field. `exclusive`/`shared` carry the pinned CPU id.
+/// `shared` is the only mode where two tiles may declare the same CPU id.
+pub const CpuPlacement = union(enum) {
+    exclusive: u16,
+    shared: u16,
+    floating,
+};
 
 /// Per-tile placement counts and whether the layout uses shared-core
 /// placement, for supervisor/CLI/diagnostics visibility.
@@ -38,7 +48,7 @@ pub const PlacementReport = struct {
 /// stand-in for "exists on this host" without requiring root or a
 /// separate host-topology query). Returns a PlacementReport once
 /// validation passes; spawns nothing itself.
-pub fn validate(topo: Topology, available_cpus: *const cpu.CpuSet) !PlacementReport {
+pub fn validate(topo: anytype, available_cpus: *const CpuSet) !PlacementReport {
     try topo.validate();
 
     var report = PlacementReport{};
@@ -77,6 +87,30 @@ pub fn validate(topo: Topology, available_cpus: *const cpu.CpuSet) !PlacementRep
     return report;
 }
 
+/// Rejects two tiles pinned to the same CPU id unless both declare `shared`.
+/// Available-CPU-id and oversubscription-against-the-live-host checks belong
+/// to validate(), which has runtime CPU-set information.
+pub fn validateStatic(tiles: anytype) !void {
+    for (tiles, 0..) |a, i| {
+        const a_cpu = switch (a.cpu_placement) {
+            .exclusive => |cpu_id| cpu_id,
+            .shared => |cpu_id| cpu_id,
+            .floating => continue,
+        };
+        const a_shared = a.cpu_placement == .shared;
+        for (tiles[i + 1 ..]) |b| {
+            const b_cpu = switch (b.cpu_placement) {
+                .exclusive => |cpu_id| cpu_id,
+                .shared => |cpu_id| cpu_id,
+                .floating => continue,
+            };
+            if (a_cpu != b_cpu) continue;
+            const b_shared = b.cpu_placement == .shared;
+            if (!a_shared or !b_shared) return error.CpuPlacementConflict;
+        }
+    }
+}
+
 /// cpu.isSet() asserts its cpu argument is in range — appropriate for call
 /// sites that already validated the value themselves, but a declared tile
 /// CPU id is external/config data (a plain u16 from topology.zig's
@@ -85,9 +119,23 @@ pub fn validate(topo: Topology, available_cpus: *const cpu.CpuSet) !PlacementRep
 /// placement fails closed for malformed or unavailable CPU ids"):
 /// out-of-range ids are malformed, in-range-but-absent ids are
 /// unavailable, and neither should reach an `unreachable`-backed assert.
-fn requireAvailable(available_cpus: *const cpu.CpuSet, cpu_id: u16) !void {
-    if (cpu_id >= cpu.cpu_set_bytes * 8) return error.CpuIdMalformed;
-    if (!cpu.isSet(available_cpus, cpu_id)) return error.CpuUnavailable;
+fn requireAvailable(available_cpus: *const CpuSet, cpu_id: u16) !void {
+    if (cpu_id >= cpu_set_bytes * 8) return error.CpuIdMalformed;
+    if (!isSet(available_cpus, cpu_id)) return error.CpuUnavailable;
+}
+
+fn zero(cpu_set: *CpuSet) void {
+    @memset(cpu_set, 0);
+}
+
+fn set(cpu_set: *CpuSet, cpu_id: usize) void {
+    std.debug.assert(cpu_id < cpu_set_bytes * 8);
+    cpu_set[cpu_id / 8] |= @as(u8, 1) << @intCast(cpu_id % 8);
+}
+
+fn isSet(cpu_set: *const CpuSet, cpu_id: usize) bool {
+    std.debug.assert(cpu_id < cpu_set_bytes * 8);
+    return (cpu_set[cpu_id / 8] & (@as(u8, 1) << @intCast(cpu_id % 8))) != 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,72 +143,76 @@ fn requireAvailable(available_cpus: *const cpu.CpuSet, cpu_id: u16) !void {
 // affinity queried (matches util/cpu.zig's own test style).
 // ---------------------------------------------------------------------------
 
-const TileId = topology.TileId;
+const tile_mod = @import("tile.zig");
+const TileId = tile_mod.TileId;
+
+const TestTopology = struct {
+    tiles: []const tile_mod.TileDescriptor,
+
+    pub fn validate(self: @This()) !void {
+        try validateStatic(self.tiles);
+    }
+};
 
 /// Builds a minimal TileDescriptor for placement-validation tests below.
-fn tile(id: []const u8, placement: topology.CpuPlacement) topology.TileDescriptor {
+fn tile(id: []const u8, placement: CpuPlacement) tile_mod.TileDescriptor {
     return .{ .id = TileId.parse(id) catch unreachable, .name = id, .phase = 0, .cpu_placement = placement };
 }
 
 test "validate rejects an out-of-range exclusive cpu id as malformed, not an assert" {
-    var cpus: cpu.CpuSet = undefined;
-    cpu.zero(&cpus);
-    cpu.set(&cpus, 0);
+    var cpus: CpuSet = undefined;
+    zero(&cpus);
+    set(&cpus, 0);
 
-    const topo = Topology{
+    const topo = TestTopology{
         .tiles = &.{tile("tkfoo", .{ .exclusive = 65000 })},
-        .channels = &.{},
     };
     try std.testing.expectError(error.CpuIdMalformed, validate(topo, &cpus));
 }
 
 test "validate rejects an exclusive cpu id not in available_cpus" {
-    var cpus: cpu.CpuSet = undefined;
-    cpu.zero(&cpus);
-    cpu.set(&cpus, 0);
+    var cpus: CpuSet = undefined;
+    zero(&cpus);
+    set(&cpus, 0);
 
-    const topo = Topology{
+    const topo = TestTopology{
         .tiles = &.{tile("tkfoo", .{ .exclusive = 1 })},
-        .channels = &.{},
     };
     try std.testing.expectError(error.CpuUnavailable, validate(topo, &cpus));
 }
 
 test "validate rejects a shared cpu id not in available_cpus" {
-    var cpus: cpu.CpuSet = undefined;
-    cpu.zero(&cpus);
-    cpu.set(&cpus, 0);
+    var cpus: CpuSet = undefined;
+    zero(&cpus);
+    set(&cpus, 0);
 
-    const topo = Topology{
+    const topo = TestTopology{
         .tiles = &.{tile("tkfoo", .{ .shared = 5 })},
-        .channels = &.{},
     };
     try std.testing.expectError(error.CpuUnavailable, validate(topo, &cpus));
 }
 
 test "validate propagates topo.validate()'s structural checks (duplicate exclusive)" {
-    var cpus: cpu.CpuSet = undefined;
-    cpu.zero(&cpus);
-    cpu.set(&cpus, 0);
+    var cpus: CpuSet = undefined;
+    zero(&cpus);
+    set(&cpus, 0);
 
-    const topo = Topology{
+    const topo = TestTopology{
         .tiles = &.{
             tile("tkfoo", .{ .exclusive = 0 }),
             tile("tkbar", .{ .exclusive = 0 }),
         },
-        .channels = &.{},
     };
     try std.testing.expectError(error.CpuPlacementConflict, validate(topo, &cpus));
 }
 
 test "validate reports floating-only topology with shared_core false" {
-    var cpus: cpu.CpuSet = undefined;
-    cpu.zero(&cpus);
-    cpu.set(&cpus, 0);
+    var cpus: CpuSet = undefined;
+    zero(&cpus);
+    set(&cpus, 0);
 
-    const topo = Topology{
+    const topo = TestTopology{
         .tiles = &.{ tile("tkfoo", .floating), tile("tkbar", .floating) },
-        .channels = &.{},
     };
     const report = try validate(topo, &cpus);
     try std.testing.expectEqual(@as(usize, 0), report.exclusive_count);
@@ -170,17 +222,16 @@ test "validate reports floating-only topology with shared_core false" {
 }
 
 test "validate reports shared_core true when two tiles share a cpu id" {
-    var cpus: cpu.CpuSet = undefined;
-    cpu.zero(&cpus);
-    cpu.set(&cpus, 0);
+    var cpus: CpuSet = undefined;
+    zero(&cpus);
+    set(&cpus, 0);
 
-    const topo = Topology{
+    const topo = TestTopology{
         .tiles = &.{
             tile("tkfoo", .{ .shared = 0 }),
             tile("tkbar", .{ .shared = 0 }),
             tile("tkbaz", .floating),
         },
-        .channels = &.{},
     };
     const report = try validate(topo, &cpus);
     try std.testing.expectEqual(@as(usize, 2), report.shared_count);
@@ -189,17 +240,16 @@ test "validate reports shared_core true when two tiles share a cpu id" {
 }
 
 test "validate reports shared_core false for distinct exclusive cpu ids" {
-    var cpus: cpu.CpuSet = undefined;
-    cpu.zero(&cpus);
-    cpu.set(&cpus, 0);
-    cpu.set(&cpus, 1);
+    var cpus: CpuSet = undefined;
+    zero(&cpus);
+    set(&cpus, 0);
+    set(&cpus, 1);
 
-    const topo = Topology{
+    const topo = TestTopology{
         .tiles = &.{
             tile("tkfoo", .{ .exclusive = 0 }),
             tile("tkbar", .{ .exclusive = 1 }),
         },
-        .channels = &.{},
     };
     const report = try validate(topo, &cpus);
     try std.testing.expectEqual(@as(usize, 2), report.exclusive_count);
