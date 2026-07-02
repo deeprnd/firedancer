@@ -111,17 +111,143 @@ generic process supervisor.
   table.
 - Payment-specific metrics/config are moved out of generic supervisor types.
 
+## 8. Make `tile_process` own live heartbeat and halt handling
 
-# To process
+**Files:** `src/tickoni/runtime/tile_process.zig`, `src/app/tickoni/tile_main.zig`, `src/tickoni/tiles/payment_pipeline/process.zig`
 
-High: [tile_process.zig](/home/vicgenin/work/git/tickoni/src/tickoni/runtime/tile_process.zig:69) does not actually own the live tile lifecycle during work. It heartbeats once, signals `RUN`, runs `work` synchronously, then only heartbeats after `work` returns. Long-running or blocked tile work will look non-heartbeating even though the tile is alive, and halt handling is delegated into tile-specific code instead of the generic process lifecycle.
+**Task:** Refactor process-mode tile work so the generic lifecycle keeps
+heartbeating and checking for HALT while tile work is still running. The
+current `run()` path heartbeats once, signals `RUN`, calls `work`
+synchronously, and only heartbeats again after `work` returns. That makes a
+long-running or blocked tile look dead even when it is alive, and pushes halt
+responsiveness into tile-specific loops instead of the generic process
+lifecycle.
 
-- High: [tile_process.zig](/home/vicgenin/work/git/tickoni/src/tickoni/runtime/tile_process.zig:70) documents a real stop race instead of fixing it. A supervisor HALT sent during boot can be clobbered by the child’s unconditional `RUN` signal at line 78. That makes shutdown correctness depend on caller timing, which is the opposite of clear lifecycle ownership.
+**Done when:**
 
-- Medium: CPU placement ownership is split across modules. [topology.zig](/home/vicgenin/work/git/tickoni/src/tickoni/runtime/topology.zig:28) defines `CpuPlacement`, [topology.zig](/home/vicgenin/work/git/tickoni/src/tickoni/runtime/topology.zig:116) validates placement conflicts, [cpu_placement.zig](/home/vicgenin/work/git/tickoni/src/tickoni/runtime/cpu_placement.zig:41) re-validates topology plus host availability, and [tile.zig](/home/vicgenin/work/git/tickoni/src/tickoni/runtime/tile.zig:42) imports topology just to store effective placement. This makes `Topology.validate()` look sufficient even though malformed/unavailable CPU IDs only fail through `cpu_placement.validate()`.
+- [ ] A process-mode tile continues to advance CNC heartbeats while its work is
+      still in progress.
+- [ ] HALT handling for normal tile execution is owned by the generic
+      `tile_process` lifecycle instead of requiring each tile implementation to
+      poll for it independently.
+- [ ] Tests cover a long-running or multi-step tile work path and prove the
+      tile remains heartbeating until it halts or finishes.
 
-- Medium: `Topology` allows a general graph, but process launch currently supports only one input and one output link per tile. [topology.zig](/home/vicgenin/work/git/tickoni/src/tickoni/runtime/topology.zig:80) models channels generally, while `LaunchSpec` has single `input_link`/`output_link` slots and supervisor selection is effectively last-match-wins. That is fragile for anything beyond the current linear payment chain.
+## 9. Make the BOOT-to-RUN transition halt-safe
 
-- Medium: [topology.zig](/home/vicgenin/work/git/tickoni/src/tickoni/runtime/topology.zig:63) embeds product roadmap phase semantics as a raw `u8` in the generic runtime schema. It is already easy to drift: product topology definitions assign phases by integer elsewhere, with no enum or validation tying them to documented tile ownership.
+**Files:** `src/tickoni/runtime/tile_process.zig`, `src/app/tickoni/supervisor.zig`, `src/tickoni/test/integration/test_process_topology.zig`
 
-- Low: [tile.zig](/home/vicgenin/work/git/tickoni/src/tickoni/runtime/tile.zig:15) declares `CrashReason.cnc_fail`, but the current supervisor path only records exit/signal style failures. The status model promises CNC heartbeat failure classification that is not implemented, so diagnostics ownership is aspirational.
+**Task:** Remove the documented boot-time stop race in process mode. Today a
+supervisor HALT sent during child boot can be clobbered by the child's
+unconditional `RUN` signal. The lifecycle should preserve a supervisor stop
+request sent during boot instead of relying on caller timing to avoid the race.
+
+**Done when:**
+
+- [ ] `tile_process.run()` no longer blindly overwrites a pre-existing HALT
+      with `RUN`.
+- [ ] A boot-time supervisor stop request causes the child to exit cleanly
+      instead of entering normal work and waiting on upstream progress.
+- [ ] Process-mode test coverage reproduces the race and proves it is fixed.
+
+## 10. Make CPU placement validation ownership explicit
+
+**Files:** `src/tickoni/runtime/topology.zig`, `src/tickoni/runtime/cpu_placement.zig`, `src/tickoni/runtime/tile.zig`, `src/tickoni/test/integration/test_process_cpu_placement.zig`
+
+**Task:** Consolidate CPU placement validation behind one explicit runtime
+boundary. Static placement conflicts, host-aware availability checks, and
+effective placement storage are split across different modules with overlapping
+ownership. Refactor the API so callers can tell whether they are performing
+structural-only validation or full fail-closed runtime validation.
+
+**Done when:**
+
+- [ ] The public API makes the difference between structural placement
+      validation and host-aware placement validation explicit.
+- [ ] Malformed and unavailable CPU ids fail through the documented owner path,
+      not by call-order convention.
+- [ ] Tests cover duplicate placement conflicts, malformed ids, and
+      unavailable ids through the intended validation entrypoints.
+
+## 11. Fail closed on unsupported multi-link process topologies
+
+**Files:** `src/tickoni/runtime/launch_spec.zig`, `src/app/tickoni/supervisor.zig`, `src/app/tickoni/tile_main.zig`, `src/tickoni/test/integration/test_process_topology.zig`
+
+**Task:** Align the process-mode launch contract with the generic topology
+graph. `Topology` allows arbitrary channel graphs, but `LaunchSpec` currently
+has only one `input_link` and one `output_link`, and supervisor selection is
+effectively last-match-wins. Replace that silent truncation with explicit
+validation for the supported cardinality, or deliberately extend the launch
+contract if process mode must support fan-in or fan-out now.
+
+**Done when:**
+
+- [ ] Process-mode startup does not silently discard extra input or output
+      links for a tile.
+- [ ] Unsupported fan-in or fan-out fails with a clear error before any child
+      process is spawned, unless the launch contract is deliberately extended
+      to represent multiple links.
+- [ ] Tests cover at least one multi-input or multi-output topology and assert
+      the chosen behavior.
+
+## 12. Type tile-plan phases end to end
+
+**Files:** `src/tickoni/runtime/tile.zig`, `src/tickoni/runtime/topology.zig`, `src/app/tickoni/topologies.zig`, `src/tickoni/test/integration/test_process_cpu_placement.zig`, `src/tickoni/test/integration/test_process_demo_parity.zig`
+
+**Task:** Replace raw integer phase values in the generic runtime descriptor
+and product topology definitions with a dedicated enum for the documented tile
+plan phases (`core`, `case`, `agent`, `api`, `exec`). This removes the current
+integer drift risk between topology declarations and the documented tile plan.
+
+**Done when:**
+
+- [ ] `TileDescriptor.phase` is a named enum rather than a raw `u8`.
+- [ ] Product topology definitions and related tests assign named phases
+      instead of raw integers.
+- [ ] Validation or tests fail if a topology attempts to encode an unknown
+      phase value.
+
+## 13. Align crash-reason reporting with implemented supervisor checks
+
+**Files:** `src/tickoni/runtime/tile.zig`, `src/app/tickoni/supervisor.zig`, `src/tickoni/test/integration/test_process_topology.zig`
+
+**Task:** Align the generic crash taxonomy with the supervisor behavior that
+actually exists. `CrashReason.cnc_fail` is part of the public runtime status
+model, but the current process-mode supervisor only classifies exit-code and
+signal-style failures. Either wire CNC signal or heartbeat failure into the
+implemented monitoring path, or remove/de-scope the unused crash reason until
+that detection exists.
+
+**Done when:**
+
+- [ ] Every retained `CrashReason` value can be produced by an implemented
+      supervisor path.
+- [ ] The code clearly documents whether CNC signal or heartbeat failure is
+      classified today or intentionally deferred.
+- [ ] Tests cover each retained crash classification that process mode can
+      emit.
+
+## 14. Define one runtime hash-boundary contract
+
+**Files:** `src/tickoni/tiles/case/mod.zig`, `src/tickoni/schema/consumer_money/drift.zig`, `src/tickoni/tiles/replay/mod.zig`, `src/tickoni/tiles/model/backend.zig`, `src/tickoni/tiles/model/run.zig`, `src/tickoni/tiles/payment_pipeline/runtime.zig`, `src/tickoni/schema/consumer_money/thesis.zig`, `src/tickoni/schema/consumer_money/basket.zig`, `src/tickoni/codec/audit/hash.zig`
+
+**Task:** Define and apply an explicit hash-boundary rule for runtime-facing
+stable identifiers, replay lookup keys, proposal/result hashes, and local-only
+lightweight hashes. The codebase currently mixes Firedancer-backed SipHash,
+Wyhash, and ad hoc byte mixing without a clear contract for when each is
+allowed. Move stable runtime identifiers to the shared boundary unless a
+different primitive is explicitly justified.
+
+**Done when:**
+
+- [ ] Runtime-facing hash sites either use the shared Firedancer-backed hash
+      boundary or clearly justify a different primitive for that use case in
+      code comments or module docs.
+- [ ] The codebase has one obvious source of truth for canonical hashes,
+      replay lookup hashes, proposal/result hashes, and lightweight local/test
+      hashes.
+- [ ] `deriveSyntheticRunId()` and any retained stable runtime hash helper use
+      explicit domain/version constants instead of unexplained local hash
+      choices.
+- [ ] Tests prove the chosen runtime hash derivations stay deterministic and
+      change only when the intended inputs change.

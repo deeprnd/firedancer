@@ -284,6 +284,59 @@ test "parseBinary rejects truncated record" {
     try std.testing.expectError(error.UnexpectedEof, codec.parseBinary(binary[0 .. binary.len - 1]));
 }
 
+test "parseBinary rejects unknown policy outcome enum" {
+    const event = makeFixtures()[2];
+    var binary_buf: [codec.max_binary_len]u8 = undefined;
+    var binary = try codec.formatBinary(&binary_buf, event);
+    const outcome_idx = try findPolicyDecisionOutcome(binary, 2);
+    binary[outcome_idx] = 7;
+    try std.testing.expectError(error.UnknownEnumValue, codec.parseBinary(binary));
+}
+
+test "parseBinary rejects oversized policy outcome varint" {
+    const event = makeFixtures()[2];
+    var binary_buf: [codec.max_binary_len]u8 = undefined;
+    const binary = try codec.formatBinary(&binary_buf, event);
+    var mutated_buf: [codec.max_binary_len + 1]u8 = undefined;
+    const mutated = try expandPolicyDecisionOutcomeVarint(binary, &mutated_buf);
+    try std.testing.expectError(error.InvalidBinaryRecord, codec.parseBinary(mutated));
+}
+
+fn findPolicyDecisionOutcome(binary: []const u8, expected: u8) !usize {
+    var idx: usize = @sizeOf(u32);
+    while (idx + 8 < binary.len) : (idx += 1) {
+        if (binary[idx] == 0x72 and
+            binary[idx + 1] == 0x9D and
+            binary[idx + 2] == 0x80 and
+            binary[idx + 3] == 0x80 and
+            binary[idx + 4] == 0x80 and
+            binary[idx + 5] == 0x00 and
+            binary[idx + 6] == 0x08 and
+            binary[idx + 7] == expected and
+            binary[idx + 8] == 0x10)
+        {
+            return idx + 7;
+        }
+    }
+    return error.PatternNotFound;
+}
+
+fn expandPolicyDecisionOutcomeVarint(binary: []const u8, out: []u8) ![]u8 {
+    if (out.len < binary.len + 1) return error.NoSpaceLeft;
+    const outcome_idx = try findPolicyDecisionOutcome(binary, 2);
+    const payload_tag_idx = outcome_idx - 7;
+
+    @memcpy(out[0..outcome_idx], binary[0..outcome_idx]);
+    out[outcome_idx] = 0x80;
+    out[outcome_idx + 1] = 0x02;
+    @memcpy(out[outcome_idx + 2 .. binary.len + 1], binary[outcome_idx + 1 ..]);
+
+    out[payload_tag_idx + 1] = binary[payload_tag_idx + 1] + 1;
+    const body_len = std.mem.readInt(u32, binary[0..@sizeOf(u32)], .little);
+    std.mem.writeInt(u32, out[0..@sizeOf(u32)], body_len + 1, .little);
+    return out[0 .. binary.len + 1];
+}
+
 /// Prints computed hash and wire bytes for every fixture event to stderr.
 /// Run with: just gen-audit-fixtures
 /// Use the output to understand or snapshot the current encoding after intentional changes.

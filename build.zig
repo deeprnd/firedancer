@@ -55,12 +55,18 @@ pub fn build(b: *std.Build) void {
             .{ .name = "runtime", .module = runtime_mod },
         },
     });
+    const audit_schema_mod = b.addModule("audit_schema", .{
+        .root_source_file = b.path("src/tickoni/schema/audit/audit.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const audit_codec_mod = b.addModule("audit_codec", .{
         .root_source_file = b.path("src/tickoni/codec/audit.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "audit_schema", .module = audit_schema_mod },
         },
     });
     const fixture_audit_gen_mod = b.createModule(.{
@@ -74,18 +80,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "audit_codec", .module = audit_codec_mod },
+            .{ .name = "audit_schema", .module = audit_schema_mod },
             .{ .name = "fixture_audit_gen", .module = fixture_audit_gen_mod },
         },
     });
-    const thesis_codec_mod = b.addModule("thesis_codec", .{
-        .root_source_file = b.path("src/tickoni/codec/thesis.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "c_abi", .module = c_abi_mod },
-        },
-    });
-
     // ---------------------------------------------------------------------------
     // Shared schema modules — single instances used across all test lanes.
     // All cross-module imports use named imports (@import("name")) so each
@@ -102,8 +100,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "thesis_codec", .module = thesis_codec_mod },
             .{ .name = "classification", .module = classification_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
         },
     });
     const catalog_mod = b.addModule("catalog", .{
@@ -119,9 +117,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
-            .{ .name = "thesis_codec", .module = thesis_codec_mod },
             .{ .name = "thesis", .module = thesis_mod },
             .{ .name = "catalog", .module = catalog_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
         },
     });
     const portfolio_mod = b.addModule("portfolio", .{
@@ -290,6 +288,7 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
                 .imports = &.{
                     .{ .name = "audit_codec", .module = audit_codec_mod },
+                    .{ .name = "audit_schema", .module = audit_schema_mod },
                     .{ .name = "fixture_audit_gen", .module = fixture_audit_gen_mod },
                 },
             })
@@ -334,32 +333,32 @@ pub fn build(b: *std.Build) void {
         test_step.dependOn(&t_run.step);
     }
 
-    // src/tickoni/codec/thesis.zig: fresh root module (not the shared
-    // thesis_codec_mod) so linkTickoniCodec adds C sources only to this
-    // binary's root module.
+    // src/tickoni/codec/thesis.zig: dedicated wrapper tests over the canonical
+    // consumer-money schema hash APIs.
     const thesis_codec_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/codec/thesis.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "thesis", .module = thesis_mod },
+                .{ .name = "basket", .module = basket_mod },
             },
         }),
     });
     linkTickoniCodec(b, thesis_codec_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(thesis_codec_test).step);
 
-    // thesis.zig: fresh root module (not the shared thesis_mod) so that
-    // linkTickoniCodec adds C sources only to this binary's root module.
+    // thesis.zig: fresh root module so linkTickoniCodec adds C sources only to
+    // this binary's root module.
     const thesis_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/schema/consumer_money/thesis.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "thesis_codec", .module = thesis_codec_mod },
                 .{ .name = "classification", .module = classification_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
             },
         }),
     });
@@ -385,9 +384,9 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "thesis_codec", .module = thesis_codec_mod },
                 .{ .name = "thesis", .module = thesis_mod },
                 .{ .name = "catalog", .module = catalog_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
             },
         }),
     });
@@ -1255,6 +1254,7 @@ pub fn build(b: *std.Build) void {
                     .optimize = optimize,
                     .imports = &.{
                         .{ .name = "audit_codec", .module = audit_codec_mod },
+                        .{ .name = "audit_schema", .module = audit_schema_mod },
                         .{ .name = "fixture_audit_gen", .module = fixture_audit_gen_mod },
                     },
                 })
@@ -1319,8 +1319,8 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "thesis_codec", .module = thesis_codec_mod },
                 .{ .name = "classification", .module = classification_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
             },
         }),
     });
@@ -1421,9 +1421,9 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .imports = &.{
-                .{ .name = "thesis_codec", .module = thesis_codec_mod },
                 .{ .name = "thesis", .module = thesis_mod },
                 .{ .name = "catalog", .module = catalog_mod },
+                .{ .name = "c_abi", .module = c_abi_mod },
             },
         }),
     });
@@ -1509,7 +1509,7 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
 }
 
 /// Links shim/ballet.c (Firedancer siphash/protobuf/JSON primitives). Audit
-/// and thesis/basket/trade-ticket/paper-order codec logic is Zig; see
+/// and canonical consumer-money hash codec logic is Zig; see
 /// src/tickoni/codec/audit.zig and src/tickoni/codec/thesis.zig.
 fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;

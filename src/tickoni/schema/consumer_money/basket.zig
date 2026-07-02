@@ -15,9 +15,9 @@
 /// src/tickoni/schema/proto/consumer_money/basket.proto; breaking changes are enforced by buf
 /// in CI (quality-check-proto / proto_check.yml).
 const std = @import("std");
+const c_abi = @import("c_abi");
 const thesis = @import("thesis");
 const cat = @import("catalog");
-const thesis_codec = @import("thesis_codec");
 const basket_proto_path = "src/tickoni/schema/proto/consumer_money/basket.proto";
 
 pub const catalog = cat;
@@ -210,7 +210,6 @@ pub fn failedScopeDimension(rejected_candidates: []const RejectedCandidate) Reje
 
 /// Compute a stable content hash over a basket's composition via fd_siphash13.
 ///
-/// Uses tk_basket_hash() from src/tickoni/codec/thesis.zig.
 /// Covers basket_schema_version, thesis_id, catalog_schema_version,
 /// instrument_count, and per-instrument ticker, weight_bp, and allocation_cents.
 /// The hash is stable across process restarts; it changes when any instrument,
@@ -226,14 +225,22 @@ pub fn computeBasketHash(basket: *const Basket) u64 {
         weight_bps_arr[i] = basket.instruments[i].weight_bp;
         alloc_cents_arr[i] = basket.instruments[i].allocation_cents;
     }
-    return thesis_codec.tk_basket_hash(
-        basket.thesis_id,
-        basket.catalog_schema_version,
-        basket.instrument_count,
-        &ticker_data,
-        &weight_bps_arr,
-        &alloc_cents_arr,
-    );
+    var sip: c_abi.ballet.Siphash13 = .{};
+    c_abi.ballet.siphashInit(&sip, 0x00005454534B424B, basket_schema_version); // "TKBSKT\0\0" LE
+
+    const ver: u16 = basket_schema_version;
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&ver));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&basket.thesis_id));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&basket.catalog_schema_version));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&basket.instrument_count));
+    for (0..basket.instrument_count) |i| {
+        const off = i * cat.max_ticker_len;
+        c_abi.ballet.siphashAppend(&sip, ticker_data[off .. off + cat.max_ticker_len]);
+        c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&weight_bps_arr[i]));
+        c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&alloc_cents_arr[i]));
+    }
+
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,8 +252,8 @@ pub fn computeBasketHash(basket: *const Basket) u64 {
 /// Governed runtime flows call tkpoly first, then pass the allowed
 /// candidates and rejected set here for deterministic allocation.  basket_id:
 /// content hash of the source ThesisInput; callers use
-/// computeThesisInputHash() from thesis.zig.  Passed as a parameter so
-/// basket.zig does not need to import thesis_codec.
+/// computeThesisInputHash() from thesis.zig. Passed as a parameter so
+/// basket.zig does not need any extra hash dependency.
 ///
 /// Allocation (T4):
 ///   - Equal-weight baseline; ETF preference (1.5x stock base weight) when

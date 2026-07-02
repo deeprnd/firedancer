@@ -17,8 +17,8 @@
 /// src/tickoni/schema/proto/consumer_money/thesis.proto; breaking changes are enforced by buf
 /// in CI (quality-check-proto / proto_check.yml).
 const std = @import("std");
+const c_abi = @import("c_abi");
 const cls = @import("classification");
-const thesis_codec = @import("thesis_codec");
 const thesis_proto_path = "src/tickoni/schema/proto/consumer_money/thesis.proto";
 
 pub const classification = cls;
@@ -41,19 +41,18 @@ pub const themeIdList = cls.themeIdList;
 pub const classificationRefList = cls.classificationRefList;
 pub const validateCanonicalId = cls.validateCanonicalId;
 
-/// Schema version. Must match thesis_schema_version in src/tickoni/codec/thesis.zig.
-/// Incrementing this value changes the hash key and invalidates existing hashes.
+/// Schema version. Incrementing this value changes the hash key and invalidates
+/// existing hashes.
 pub const thesis_schema_version: u16 = 3;
 
 /// Maximum bytes stored in the user_text field.
 pub const max_user_text_len: usize = 512;
 
 /// Byte width of each ticker slot in requested_tickers.
-/// Must match thesis_max_ticker_len in src/tickoni/codec/thesis.zig and max_ticker_len in catalog.zig.
+/// Must match max_ticker_len in catalog.zig.
 pub const max_ticker_len: usize = 8;
 
 /// Maximum number of explicitly requested tickers in one ThesisInput.
-/// Must match thesis_max_requested_tickers in src/tickoni/codec/thesis.zig.
 pub const max_requested_tickers: usize = 8;
 
 /// Minimum allowed target notional: USD 1.00 = 100 cents.
@@ -64,7 +63,6 @@ pub const max_target_notional_cents: i64 = 1_000_000_000_000;
 
 /// Packed byte stride for one ClassificationRef in the hash flat buffers.
 /// Layout: taxonomy_id (max_canonical_id_len bytes) + taxonomy_version (2 bytes LE) + code (max_canonical_id_len bytes).
-/// Must match thesis_classification_ref_stride in src/tickoni/codec/thesis.zig.
 pub const classification_ref_stride: usize = cls.max_canonical_id_len + 2 + cls.max_canonical_id_len;
 
 comptime {
@@ -302,8 +300,6 @@ pub fn normalize(input: ThesisInput) ThesisError!InvestorIntent {
 
 /// Compute a stable content hash over a ThesisInput via fd_siphash13.
 ///
-/// Uses tk_thesis_input_hash() from src/tickoni/codec/thesis.zig.
-///
 /// Returns 0 when user_text_len > max_user_text_len to fail closed without
 /// reading out of bounds. Callers building ThesisDenialPayload should record
 /// 0 in that case and set error_code to user_text_too_long.
@@ -329,31 +325,54 @@ pub fn computeThesisInputHash(input: ThesisInput) u64 {
     const sorted_industries = sortedClassificationRefs(input.industry_filters);
     const industry_flat = packClassificationRefs(sorted_industries);
 
-    return thesis_codec.tk_thesis_input_hash(
-        input.user_text_len,
-        &input.user_text,
-        input.target_notional_cents,
-        input.account_id,
-        @intFromEnum(input.market_scope),
-        input.asset_class_prefs.count,
-        asset_class_prefs,
-        input.instrument_type_prefs.count,
-        instrument_type_prefs,
-        sorted_themes.count,
-        &themes_flat,
-        @intFromEnum(input.risk_preference),
-        input.max_single_name_pct,
-        input.asset_class_exclusions.count,
-        asset_class_exclusions,
-        input.instrument_type_exclusions.count,
-        instrument_type_exclusions,
-        sorted_sectors.count,
-        &sector_flat,
-        sorted_industries.count,
-        &industry_flat,
-        input.requested_ticker_count,
-        tickers_flat,
-    );
+    var sip: c_abi.ballet.Siphash13 = .{};
+    c_abi.ballet.siphashInit(&sip, 0x0000535348544B54, thesis_schema_version); // "TKTHSS\0\0" LE
+
+    const ver: u16 = thesis_schema_version;
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&ver));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.account_id));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.target_notional_cents));
+    const market_scope: u8 = @intFromEnum(input.market_scope);
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&market_scope));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.asset_class_prefs.count));
+    for (0..input.asset_class_prefs.count) |i| c_abi.ballet.siphashAppend(&sip, asset_class_prefs[i .. i + 1]);
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.instrument_type_prefs.count));
+    for (0..input.instrument_type_prefs.count) |i| c_abi.ballet.siphashAppend(&sip, instrument_type_prefs[i .. i + 1]);
+
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&sorted_themes.count));
+    for (0..sorted_themes.count) |i| {
+        const off = i * cls.max_canonical_id_len;
+        c_abi.ballet.siphashAppend(&sip, themes_flat[off .. off + cls.max_canonical_id_len]);
+    }
+    const risk_preference: u8 = @intFromEnum(input.risk_preference);
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&risk_preference));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.max_single_name_pct));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.asset_class_exclusions.count));
+    for (0..input.asset_class_exclusions.count) |i| c_abi.ballet.siphashAppend(&sip, asset_class_exclusions[i .. i + 1]);
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.instrument_type_exclusions.count));
+    for (0..input.instrument_type_exclusions.count) |i| c_abi.ballet.siphashAppend(&sip, instrument_type_exclusions[i .. i + 1]);
+
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&sorted_sectors.count));
+    for (0..sorted_sectors.count) |i| {
+        const off = i * classification_ref_stride;
+        c_abi.ballet.siphashAppend(&sip, sector_flat[off .. off + classification_ref_stride]);
+    }
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&sorted_industries.count));
+    for (0..sorted_industries.count) |i| {
+        const off = i * classification_ref_stride;
+        c_abi.ballet.siphashAppend(&sip, industry_flat[off .. off + classification_ref_stride]);
+    }
+
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.requested_ticker_count));
+    for (0..input.requested_ticker_count) |i| {
+        const off = i * max_ticker_len;
+        c_abi.ballet.siphashAppend(&sip, tickers_flat[off .. off + max_ticker_len]);
+    }
+
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.user_text_len));
+    c_abi.ballet.siphashAppend(&sip, input.user_text[0..input.user_text_len]);
+
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 // ---------------------------------------------------------------------------
