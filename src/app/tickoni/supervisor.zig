@@ -68,6 +68,7 @@ const ProcessState = struct {
             if (maybe_cnc.*) |cnc| _ = c_abi.cnc.cncLeave(cnc);
         }
         _ = c_abi.wksp.wkspDetach(self.wksp);
+        c_abi.boot.halt();
         allocator.free(self.workspace_name);
         allocator.free(self.run_dir);
     }
@@ -169,6 +170,8 @@ pub const Supervisor = struct {
         const placement_report = try rt.cpu_placement.validate(self.topo, &available_cpus);
 
         try rt.boot.bootWithSyntheticArgv(config.run_dir);
+        var boot_needs_halt = true;
+        errdefer if (boot_needs_halt) c_abi.boot.halt();
 
         const workspace_name_slice = self.topo.channels[0].workspace_name.slice();
         if (workspace_name_slice.len == 0) return error.MissingWorkspaceName;
@@ -191,7 +194,9 @@ pub const Supervisor = struct {
         // Best-effort cleanup of a stale workspace left behind by a prior
         // crashed or killed supervisor; fd_wksp_new_named uses O_EXCL and
         // would otherwise fail closed forever on the same run_dir/name.
-        _ = c_abi.wksp.wkspDeleteNamed(workspace_name_z);
+        if (c_abi.wksp.wkspExistsNamed(workspace_name_z)) {
+            _ = c_abi.wksp.wkspDeleteNamed(workspace_name_z);
+        }
 
         // 8 MiB and an explicit partition count: covers 8 cncs plus 4
         // mcache+dcache+fseq triplets (20 allocations) with headroom; the
@@ -203,6 +208,7 @@ pub const Supervisor = struct {
         const rc = c_abi.wksp.wkspNewNamed(workspace_name_z, c_abi.wksp.shmem_normal_page_sz, 1, &sub_page_cnt, &sub_cpu_idx, 0o600, 1, 64);
         if (rc != 0) return error.WkspCreateFailed;
         const wksp = c_abi.wksp.wkspAttach(workspace_name_z) orelse return error.WkspAttachFailed;
+        errdefer _ = c_abi.wksp.wkspDetach(wksp);
 
         const state = try self.allocator.create(ProcessState);
         state.* = .{
@@ -215,6 +221,7 @@ pub const Supervisor = struct {
             .placement_report = placement_report,
         };
         self.process_state = state;
+        boot_needs_halt = false;
         errdefer {
             state.deinit(io, self.allocator);
             self.allocator.destroy(state);

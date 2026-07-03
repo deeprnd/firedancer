@@ -17,7 +17,9 @@ fn attachScratchWksp(io: std.Io, run_dir: []const u8, name: [*:0]const u8) !*c_a
     var normal_dir_handle = try std.Io.Dir.cwd().createDirPathOpen(io, normal_dir, .{});
     normal_dir_handle.close(io);
 
-    _ = c_abi.wksp.wkspDeleteNamed(name);
+    if (c_abi.wksp.wkspExistsNamed(name)) {
+        _ = c_abi.wksp.wkspDeleteNamed(name);
+    }
     var sub_page_cnt = [_]usize{256};
     var sub_cpu_idx = [_]usize{0};
     const rc = c_abi.wksp.wkspNewNamed(name, c_abi.wksp.shmem_normal_page_sz, 1, &sub_page_cnt, &sub_cpu_idx, 0o600, 1, 32);

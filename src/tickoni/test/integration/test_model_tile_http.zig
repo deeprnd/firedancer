@@ -56,12 +56,18 @@ fn makeAiInfraRequest(model_id: []const u8) model.ProviderRequest {
     };
 }
 
+fn requireMockServerOrSkip(io: std.Io) !void {
+    var probe = openai_mock.Server.init(io, .{}) catch return error.SkipZigTest;
+    probe.listener.deinit(io);
+}
+
 fn withMockBackend(
     allocator: std.mem.Allocator,
     test_fn: fn (allocator: std.mem.Allocator, backend: *model.Backend, server: *openai_mock.Server) anyerror!void,
 ) !void {
     var runtime = http_support.TestRuntime.init();
     defer runtime.deinit();
+    try requireMockServerOrSkip(runtime.io());
 
     var server = try openai_mock.Server.init(runtime.io(), .{
         .model_id = mock_model_id,
@@ -182,6 +188,7 @@ test "model tile http: wrong endpoint fails closed with HttpStatusError" {
     const allocator = std.testing.allocator;
     var runtime = http_support.TestRuntime.init();
     defer runtime.deinit();
+    try requireMockServerOrSkip(runtime.io());
 
     var server = try openai_mock.Server.init(runtime.io(), .{
         .model_id = mock_model_id,

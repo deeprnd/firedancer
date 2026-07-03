@@ -53,6 +53,7 @@ extern fn tk_wksp_alloc(wksp: *Wksp, alignment: usize, sz: usize, tag: usize) us
 extern fn tk_wksp_free(wksp: *Wksp, gaddr: usize) void;
 extern fn tk_wksp_laddr(wksp: *const Wksp, gaddr: usize) ?*anyopaque;
 extern fn tk_wksp_gaddr(wksp: *const Wksp, laddr: *const anyopaque) usize;
+extern fn tk_wksp_exists_named(name: [*:0]const u8) c_int;
 
 pub fn wkspNewNamed(
     name: [*:0]const u8,
@@ -99,6 +100,10 @@ pub fn wkspLaddr(wksp: *const Wksp, gaddr: usize) ?*anyopaque {
 
 pub fn wkspGaddr(wksp: *const Wksp, laddr: *const anyopaque) usize {
     return tk_wksp_gaddr(wksp, laddr);
+}
+
+pub fn wkspExistsNamed(name: [*:0]const u8) bool {
+    return tk_wksp_exists_named(name) != 0;
 }
 
 // ---------------------------------------------------------------------------
