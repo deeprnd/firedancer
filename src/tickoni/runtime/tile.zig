@@ -22,28 +22,11 @@ pub const TileId = struct {
     }
 };
 
-/// Tile plan phase, matching the Phase 0-4 rollout in
-/// doc/execution/contribution/tickoni.md.
-pub const TilePhase = enum(u8) {
-    /// Phase 0: tkings, tknorm, tkdedu, tkpoly, tkaudt, tkrepl, tkmetr, tkdiag.
-    core = 0,
-    /// Phase 1: tkcase, tkevid.
-    case = 1,
-    /// Phase 2: tkdisp, tkagnt, tkmodl, tktool, tkadpt.
-    agent = 2,
-    /// Phase 3: tkapi.
-    api = 3,
-    /// Phase 4: tkexec.
-    exec = 4,
-};
-
 /// Static description of one tile in a topology.
 pub const TileDescriptor = struct {
     id: TileId,
     /// Human-readable name used in logs and diagnostics.
     name: []const u8,
-    /// Phase from the tile plan.
-    phase: TilePhase,
     /// Defaults to floating: existing thread-mode topologies do not pin
     /// CPUs. Process-mode topologies set this explicitly.
     cpu_placement: cpu_placement.CpuPlacement = .floating,

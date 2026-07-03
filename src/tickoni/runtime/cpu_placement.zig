@@ -156,7 +156,7 @@ const TestTopology = struct {
 
 /// Builds a minimal TileDescriptor for placement-validation tests below.
 fn tile(id: []const u8, placement: CpuPlacement) tile_mod.TileDescriptor {
-    return .{ .id = TileId.parse(id) catch unreachable, .name = id, .phase = .core, .cpu_placement = placement };
+    return .{ .id = TileId.parse(id) catch unreachable, .name = id, .cpu_placement = placement };
 }
 
 test "validate rejects an out-of-range exclusive cpu id as malformed, not an assert" {
