@@ -544,6 +544,21 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(launch_spec_test).step);
 
+    // topo_run.zig (V1.14.S8.T3): fd_topo_run_tile adapter. No test {}
+    // blocks yet (Topo/TopoTile are opaque and nothing builds a real one
+    // until V1.14.S8.T4) — this target's only job is to prove the shim
+    // compiles and links against the real Firedancer archives.
+    const topo_run_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/c_abi/topo_run.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    linkTickoniFiredancer(b, topo_run_test, fd_lib_dir);
+    linkTickoniTopoRun(b, topo_run_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(topo_run_test).step);
+
     // model tile: unit tests are mock/fixture-backed and must not start servers.
     const model_test_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
@@ -1623,6 +1638,25 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
     step.root_module.linkSystemLibrary("fd_tango", .{});
     step.root_module.linkSystemLibrary("fd_util", .{});
     step.root_module.linkSystemLibrary("stdc++", .{});
+}
+
+/// Links shim/topo_run.c (the fd_topo_run_tile adapter, V1.14.S8.T3).
+/// Callers must also call linkTickoniFiredancer (tango/util) — this only
+/// adds the additional disco/ballet/waltz link surface fd_topo_run.c and
+/// its callees (fd_metrics, fd_event_report, both compiled into fd_disco)
+/// need, following the same link set as src/disco/topo/Local.mk's own
+/// test_topob unit test.
+fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
+    step.root_module.link_libc = true;
+    step.root_module.addIncludePath(b.path("src"));
+    step.root_module.addCSourceFiles(.{
+        .files = &.{"src/tickoni/c_abi/shim/topo_run.c"},
+        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+    });
+    step.root_module.addLibraryPath(b.path(fd_lib_dir));
+    step.root_module.linkSystemLibrary("fd_disco", .{});
+    step.root_module.linkSystemLibrary("fd_ballet", .{});
+    step.root_module.linkSystemLibrary("fd_waltz", .{});
 }
 
 /// Links shim/ballet.c (Firedancer siphash/protobuf/JSON primitives). Audit
