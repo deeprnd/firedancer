@@ -373,6 +373,16 @@ tk_topo_wksp_part_max( void * topo, ulong wksp_idx ) {
   return ((fd_topo_t *)topo)->workspaces[ wksp_idx ].part_max;
 }
 
+/* V1.14.S8.T4: fd_topob_tile() never sets allow_shutdown (defaults to 0
+   via fd_topob_new's zero-init). fd_topo_run_tile treats a clean run()
+   return as a fatal error unless it's 1 — Tickoni tiles do exit
+   gracefully after their bounded work, unlike a Solana validator tile
+   that runs forever, so the caller must set this explicitly. */
+void
+tk_topo_tile_set_allow_shutdown( void * topo, ulong tile_id, int allow ) {
+  ((fd_topo_t *)topo)->tiles[ tile_id ].allow_shutdown = allow;
+}
+
 void *
 tk_topo_tile_ptr( void * topo, ulong tile_id ) {
   return &((fd_topo_t *)topo)->tiles[ tile_id ];

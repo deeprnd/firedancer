@@ -264,6 +264,7 @@ pub fn build(b: *std.Build) void {
     linkTickoniCodec(b, exe, fd_lib_dir);
     linkTickoniFiredancer(b, exe, fd_lib_dir);
     linkTickoniTopoRun(b, exe, fd_lib_dir);
+    linkTickoniTileRun(b, exe, fd_lib_dir);
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -544,6 +545,20 @@ pub fn build(b: *std.Build) void {
         }),
     });
     test_step.dependOn(&b.addRunArtifact(launch_spec_test).step);
+
+    // topology_spec.zig (V1.14.S8.T4): small tiles+channels round-trip,
+    // same import needs as launch_spec.zig.
+    const topology_spec_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/topology_spec.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "c_abi", .module = c_abi_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(topology_spec_test).step);
 
     // topo_run.zig (V1.14.S8.T3): fd_topo_run_tile adapter. No test {}
     // blocks yet (Topo/TopoTile are opaque and nothing builds a real one
@@ -1692,6 +1707,29 @@ fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: 
     step.root_module.addIncludePath(b.path("src"));
     step.root_module.addCSourceFiles(.{
         .files = &.{ "src/tickoni/c_abi/shim/topo_run.c", "src/tickoni/c_abi/shim/topob.c" },
+        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+    });
+    step.root_module.addLibraryPath(b.path(fd_lib_dir));
+    step.root_module.linkSystemLibrary("fd_disco", .{});
+    step.root_module.linkSystemLibrary("fd_ballet", .{});
+    step.root_module.linkSystemLibrary("fd_waltz", .{});
+}
+
+/// Links shim/tile_run.c (V1.14.S8.T4's fd_topo_run_tile_t wiring).
+/// Deliberately separate from linkTickoniTopoRun: this file's static
+/// TK_TILE_RUN struct references tk_tile_privileged_init/tk_tile_run,
+/// Zig `export fn`s defined only in runtime/tile_process.zig, so only
+/// call this for targets that also link tile_process.zig (the exe and
+/// the process-mode integration tests) — never for topo_run.c/topob.c's
+/// own standalone adapter unit tests, which don't include
+/// tile_process.zig and would fail to link if this were folded into
+/// linkTickoniTopoRun instead. Callers must also call
+/// linkTickoniFiredancer and linkTickoniTopoRun.
+fn linkTickoniTileRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
+    step.root_module.link_libc = true;
+    step.root_module.addIncludePath(b.path("src"));
+    step.root_module.addCSourceFiles(.{
+        .files = &.{"src/tickoni/c_abi/shim/tile_run.c"},
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
     });
     step.root_module.addLibraryPath(b.path(fd_lib_dir));

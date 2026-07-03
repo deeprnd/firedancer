@@ -204,12 +204,22 @@ pub const Supervisor = struct {
         // hard-require huge/gigantic pages, which V1.14.S1 rejected for
         // Tickoni; see topob.zig's topoWkspSetPtr doc comment ("finding
         // 3") for the reused-layout-math/own-memory hybrid this drives.
-        var built_topo = try rt.topo_build.build(self.allocator, self.topo, "tickoni", workspace_name_slice);
+        var built_topo = try rt.topo_build.build(self.allocator, self.topo, workspace_name_slice);
         var built_topo_owned_by_state = false;
         errdefer if (!built_topo_owned_by_state) built_topo.deinit(self.allocator);
 
+        // V1.14.S8.T4: the actual shmem region name must match exactly
+        // what fd_topo_join_workspace (called inside fd_topo_run_tile,
+        // automatically, before any Tickoni callback runs) constructs and
+        // looks up — Firedancer's own "%s_%s.wksp" app_name/wksp-name
+        // convention (fd_topo.c's fd_topo_join_workspace) — even though
+        // Tickoni creates it via its own normal-page wkspNewNamed rather
+        // than fd_topo_create_workspace (finding 3). fd_wksp_new_named
+        // passes this name straight to fd_shmem_create_multi/fd_shmem_join
+        // with no prefix/suffix of its own, so both sides resolve to the
+        // same named region as long as the string matches.
         var workspace_name_z_buf: [64]u8 = undefined;
-        const workspace_name_z = try std.fmt.bufPrintZ(&workspace_name_z_buf, "{s}", .{workspace_name_slice});
+        const workspace_name_z = try std.fmt.bufPrintZ(&workspace_name_z_buf, "{s}_{s}.wksp", .{ rt.topo_build.app_name, workspace_name_slice });
         // Best-effort cleanup of a stale workspace left behind by a prior
         // crashed or killed supervisor; fd_wksp_new_named uses O_EXCL and
         // would otherwise fail closed forever on the same run_dir/name.
@@ -305,6 +315,17 @@ pub const Supervisor = struct {
             .inject_duplicate = config.inject_duplicate,
             .inject_malformed = config.inject_malformed,
         }, io, std.Io.Dir.cwd(), payment_config_path);
+
+        // V1.14.S8.T4: every self-exec'd child rebuilds this same topology
+        // (topo_build.build) to get a real fd_topo_t to hand to
+        // fd_topo_run_tile — it needs the exact Topology value this run
+        // used (e.g. a test's custom CPU placement), not a hardcoded
+        // default, so it's written once here alongside the payment
+        // config (see topology_spec.zig's module doc, "finding 5").
+        const topology_spec_path = try std.fmt.allocPrint(self.allocator, "{s}/topology.spec", .{config.run_dir});
+        defer self.allocator.free(topology_spec_path);
+        const topology_spec = try rt.topology_spec.TopologySpec.fromTopology(self.topo);
+        try topology_spec.writeToFile(io, std.Io.Dir.cwd(), topology_spec_path);
 
         for (self.handles, 0..) |*h, i| {
             const tile = self.topo.tiles[i];

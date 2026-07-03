@@ -21,6 +21,12 @@ const cpu_placement = @import("cpu_placement.zig");
 
 const Topo = c_abi.topob.Topo;
 
+/// Shared app_name for every build() call across the parent and every
+/// child (must be identical for fd_topo_join_workspace's "%s_%s.wksp"
+/// naming — see supervisor.zig's workspace_name_z construction — to find
+/// the same region both sides look up).
+pub const app_name: []const u8 = "tickoni";
+
 /// fd_topo_t's real alignment isn't knowable from Zig (opaque type) but is
 /// small in practice (char-array/ulong/union-of-ulongs fields only) — 128
 /// is a safe, generous bound matching this codebase's existing Tango
@@ -82,7 +88,6 @@ fn tileCpuIdx(placement: cpu_placement.CpuPlacement) usize {
 pub fn build(
     allocator: std.mem.Allocator,
     topo_desc: topology.Topology,
-    app_name: []const u8,
     workspace_name: []const u8,
 ) !BuiltTopo {
     std.debug.assert(c_abi.topob.topoAlignof() <= topo_alloc_align.toByteUnits());
@@ -178,7 +183,7 @@ test "build produces a topology for the linear Phase 0 chain" {
     };
     const topo_desc = topology.Topology{ .tiles = &tiles, .channels = &channels };
 
-    var built = try build(std.testing.allocator, topo_desc, "tickoni", "tkpay0");
+    var built = try build(std.testing.allocator, topo_desc, "tkpay0");
     defer built.deinit(std.testing.allocator);
 
     try std.testing.expectEqual(@as(usize, 5), built.cnc_obj_id.len);

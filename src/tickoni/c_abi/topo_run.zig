@@ -43,6 +43,15 @@ extern fn tk_topo_run_tile(
     tile_run: *anyopaque,
 ) void;
 
+/// V1.14.S8.T4: simplified entry point wired to Tickoni's own
+/// fd_topo_run_tile_t (built entirely inside shim/topo_run.c from three
+/// Zig `export fn` callbacks — see tile_process.zig's
+/// tk_tile_privileged_init/tk_tile_unprivileged_init/tk_tile_run).
+/// sandbox=0, current process's own uid/gid, regular core dumps — see
+/// shim/topo_run.c's TK_TILE_RUN doc comment for what's still a
+/// placeholder pending V1.14.S8.T5.
+extern fn tk_topo_run_tile_simple(topo: *Topo, tile: *TopoTile) void;
+
 // ---------------------------------------------------------------------------
 // Public Zig wrappers.
 // ---------------------------------------------------------------------------
@@ -77,4 +86,8 @@ pub fn topoRunTile(
         allow_fd,
         tile_run,
     );
+}
+
+pub fn runTileSimple(topo: *Topo, tile: *TopoTile) void {
+    tk_topo_run_tile_simple(topo, tile);
 }

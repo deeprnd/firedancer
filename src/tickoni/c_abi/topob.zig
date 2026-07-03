@@ -58,6 +58,7 @@ extern fn tk_topo_tile_ptr(topo: *Topo, tile_id: usize) *TopoTile;
 extern fn tk_topo_link_mcache_obj_id(topo: *Topo, link_id: usize) usize;
 extern fn tk_topo_link_dcache_obj_id(topo: *Topo, link_id: usize) usize;
 extern fn tk_topo_wksp_ptr(topo: *Topo, wksp_idx: usize) ?*wksp_mod.Wksp;
+extern fn tk_topo_tile_set_allow_shutdown(topo: *Topo, tile_id: usize, allow: c_int) void;
 extern fn tk_topo_wksp_set_ptr(topo: *Topo, wksp_idx: usize, wksp_ptr: *wksp_mod.Wksp) void;
 extern fn tk_topo_wksp_footprint(topo: *Topo, wksp_idx: usize) usize;
 extern fn tk_topo_wksp_part_max(topo: *Topo, wksp_idx: usize) usize;
@@ -149,6 +150,14 @@ pub fn topoObjLaddr(topo: *Topo, obj_id: usize) *anyopaque {
 
 pub fn topoTilePtr(topo: *Topo, tile_id: usize) *TopoTile {
     return tk_topo_tile_ptr(topo, tile_id);
+}
+
+/// fd_topob_tile() never sets this (defaults to 0); fd_topo_run_tile
+/// treats a clean run() return as fatal unless it's set. Tickoni tiles
+/// exit gracefully after their bounded work, so callers must set this
+/// explicitly before calling topoRunTile/runTileSimple.
+pub fn topoTileSetAllowShutdown(topo: *Topo, tile_id: usize, allow: bool) void {
+    tk_topo_tile_set_allow_shutdown(topo, tile_id, @intFromBool(allow));
 }
 
 pub fn topoLinkMcacheObjId(topo: *Topo, link_id: usize) usize {
