@@ -73,10 +73,10 @@ message ModelCallPayload {
 }
 
 message FinancialAdapterCallPayload {
-  bytes  adapter_id    = 1;
-  uint64 request_hash  = 2;
-  uint64 response_hash = 3;
-  uint32 fixture_id    = 4;
+  bytes  adapter_id             = 1;
+  uint64 request_hash           = 2;
+  uint64 response_hash          = 3;
+  uint32 replay_substitution_id = 4;
 }
 
 message ProposalPayload {

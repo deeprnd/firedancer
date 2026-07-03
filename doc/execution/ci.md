@@ -86,7 +86,7 @@ Static quality checks run as a matrix so they report independently and do not fa
 | Format Check  | `just quality-format-check-all`| `zig fmt`, C formatting, whitespace rules   |
 | Lint Check    | `just quality-lint-check-all`  | include guards, shellcheck, pre-commit hooks|
 
-Both jobs build the shared Firedancer/Tickoni library set via `.github/actions/build-fd-tk-libs` before running checks. The `detect-changes` step creates a local `main` branch so diff-based quality scripts have a comparison ref.
+Both jobs build the shared Firedancer/Tickoni library set via `.github/actions/build-fd-tk-libs`, which delegates to `just build-fd-tk-libs`, before running checks. The `detect-changes` step creates a local `main` branch so diff-based quality scripts have a comparison ref.
 
 ---
 

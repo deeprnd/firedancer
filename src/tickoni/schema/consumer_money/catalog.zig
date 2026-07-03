@@ -1,8 +1,12 @@
-/// Instrument catalog fixture and lookup functions
+/// Instrument catalog fixture and lookup functions.
 ///
-/// InstrumentEntry: static record per instrument (ticker, name, economic
-/// asset class, instrument type, market, venue, sector/industry classifications,
-/// theme identifiers, risk tier, expense ratio, restriction).
+/// The versioned record contract (InstrumentEntry, RestrictionReason,
+/// catalog_schema_version, CatalogValidationError) lives in
+/// catalog_schema.zig and is re-exported below unchanged, so existing
+/// `@import("catalog")` call sites keep working; this file owns only the
+/// concrete fixture data and the functions that operate on it — see finding
+/// 29 in doc/strategy/roadmap/backlog/audits/tech_debt.md.
+///
 /// catalog: compile-time array of all fixture instruments (24 entries).
 /// Lookup functions: filterByTheme, filterBySector, filterByIndustry,
 /// filterByAssetClass, filterByInstrumentType, filterByVenue, lookupByTicker.
@@ -12,108 +16,39 @@
 /// replay can detect classification drift.
 const std = @import("std");
 const thesis = @import("thesis");
+const cls = @import("classification");
+const schema = @import("catalog_schema");
 
-pub const AssetClass = thesis.AssetClass;
-pub const InstrumentType = thesis.InstrumentType;
-pub const Market = thesis.Market;
-pub const Venue = thesis.Venue;
-pub const RiskPreference = thesis.RiskPreference;
-pub const CanonicalId = thesis.CanonicalId;
-pub const ClassificationRef = thesis.ClassificationRef;
-pub const ClassificationRefList = thesis.ClassificationRefList;
-pub const ThemeIdList = thesis.ThemeIdList;
+pub const AssetClass = schema.AssetClass;
+pub const InstrumentType = schema.InstrumentType;
+pub const Market = schema.Market;
+pub const Venue = schema.Venue;
+pub const RiskPreference = schema.RiskPreference;
+pub const CanonicalId = schema.CanonicalId;
+pub const ClassificationRef = schema.ClassificationRef;
+pub const ClassificationRefList = schema.ClassificationRefList;
+pub const ThemeIdList = schema.ThemeIdList;
 
-pub const catalog_schema_version: u16 = 2;
+pub const catalog_schema_version = schema.catalog_schema_version;
 
-pub const max_ticker_len: usize = 8;
-pub const max_name_len: usize = 48;
+pub const max_ticker_len = schema.max_ticker_len;
+pub const max_name_len = schema.max_name_len;
 
-pub const sector_taxonomy_version: u16 = 2025;
-pub const industry_taxonomy_version: u16 = 2025;
+pub const sector_taxonomy_version = cls.sector_taxonomy_version;
+pub const industry_taxonomy_version = cls.industry_taxonomy_version;
 
-pub const RestrictionReason = enum(u8) {
-    none = 0,
-    leveraged_etf = 1,
-    inverse_etf = 2,
-    options_contract = 3,
-    futures_contract = 4,
-    non_us_venue = 5,
-    manual_denylist = 6,
-};
+pub const RestrictionReason = schema.RestrictionReason;
+pub const InstrumentEntry = schema.InstrumentEntry;
+pub const CatalogValidationError = schema.CatalogValidationError;
 
-pub const InstrumentEntry = struct {
-    ticker: [max_ticker_len]u8,
-    ticker_len: u8,
-    name: [max_name_len]u8,
-    name_len: u8,
-    asset_class: AssetClass,
-    instrument_type: InstrumentType,
-    market: Market,
-    venue: Venue,
-    sectors: ClassificationRefList,
-    industries: ClassificationRefList,
-    themes: ThemeIdList,
-    risk_tier: RiskPreference,
-    expense_ratio_bps: u16,
-    restricted: bool,
-    restriction_reason: RestrictionReason,
-
-    pub fn tickerSlice(self: *const InstrumentEntry) []const u8 {
-        return self.ticker[0..self.ticker_len];
-    }
-
-    pub fn nameSlice(self: *const InstrumentEntry) []const u8 {
-        return self.name[0..self.name_len];
-    }
-};
-
-pub const CatalogValidationError = error{
-    InvalidTicker,
-    InvalidName,
-    InvalidClassification,
-    DuplicateTicker,
-};
-
-pub const sector_taxonomy_id = thesis.canonicalId("gics_sector");
-pub const industry_taxonomy_id = thesis.canonicalId("gics_industry");
-
-const known_theme_ids = [_]CanonicalId{
-    thesis.canonicalId("ai_infrastructure"),
-    thesis.canonicalId("semiconductors"),
-    thesis.canonicalId("cloud"),
-    thesis.canonicalId("cyber_security"),
-    thesis.canonicalId("broad_market"),
-    thesis.canonicalId("dividends"),
-    thesis.canonicalId("cash_like"),
-    thesis.canonicalId("chemicals"),
-    thesis.canonicalId("gold"),
-    thesis.canonicalId("solana"),
-    thesis.canonicalId("memecoins"),
-};
-
-const known_sector_codes = [_]CanonicalId{
-    thesis.canonicalId("information_technology"),
-    thesis.canonicalId("industrials"),
-    thesis.canonicalId("consumer_discretionary"),
-    thesis.canonicalId("financials"),
-    thesis.canonicalId("health_care"),
-    thesis.canonicalId("consumer_staples"),
-    thesis.canonicalId("utilities"),
-    thesis.canonicalId("materials"),
-};
-
-const known_industry_codes = [_]CanonicalId{
-    thesis.canonicalId("semiconductors"),
-    thesis.canonicalId("systems_software"),
-    thesis.canonicalId("robotics_and_ai"),
-    thesis.canonicalId("internet_retail"),
-    thesis.canonicalId("cloud_platforms"),
-    thesis.canonicalId("cloud_software"),
-    thesis.canonicalId("cybersecurity"),
-    thesis.canonicalId("sovereign_debt"),
-    thesis.canonicalId("chemicals"),
-    thesis.canonicalId("gold"),
-};
+// Known theme/sector/industry taxonomy values live in classification.zig
+// (the single source of truth shared with thesis.zig — see finding 30 in
+// doc/strategy/roadmap/backlog/audits/tech_debt.md).
+pub const sector_taxonomy_id = cls.sector_taxonomy_id;
+pub const industry_taxonomy_id = cls.industry_taxonomy_id;
+const known_theme_ids = cls.known_theme_ids;
+const known_sector_codes = cls.known_sector_codes;
+const known_industry_codes = cls.known_industry_codes;
 
 fn tickerBuf(comptime s: []const u8) [max_ticker_len]u8 {
     if (s.len > max_ticker_len) @compileError("ticker exceeds max_ticker_len");
@@ -261,26 +196,19 @@ fn validateEntry(entry: InstrumentEntry) CatalogValidationError!void {
 }
 
 fn isKnownThemeId(theme_id: CanonicalId) bool {
-    return hasCanonicalId(&known_theme_ids, theme_id);
+    return cls.hasCanonicalId(&known_theme_ids, theme_id);
 }
 
 fn isKnownSectorRef(ref: ClassificationRef) bool {
     if (!ref.taxonomy_id.eql(sector_taxonomy_id)) return false;
     if (ref.taxonomy_version != sector_taxonomy_version) return false;
-    return hasCanonicalId(&known_sector_codes, ref.code);
+    return cls.hasCanonicalId(&known_sector_codes, ref.code);
 }
 
 fn isKnownIndustryRef(ref: ClassificationRef) bool {
     if (!ref.taxonomy_id.eql(industry_taxonomy_id)) return false;
     if (ref.taxonomy_version != industry_taxonomy_version) return false;
-    return hasCanonicalId(&known_industry_codes, ref.code);
-}
-
-fn hasCanonicalId(known_values: []const CanonicalId, value: CanonicalId) bool {
-    for (known_values) |known| {
-        if (known.eql(value)) return true;
-    }
-    return false;
+    return cls.hasCanonicalId(&known_industry_codes, ref.code);
 }
 
 pub fn filterByTheme(theme: CanonicalId, out: []*const InstrumentEntry) usize {

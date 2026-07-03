@@ -14,7 +14,11 @@ pub const AdapterRequest = struct {
     account_id: u32 = 0,
     tickers: [basket.max_basket_instruments][portfolio.max_ticker_len]u8 = std.mem.zeroes([basket.max_basket_instruments][portfolio.max_ticker_len]u8),
     ticker_count: u8 = 0,
-    ticket: ?*const trade_ticket.TradeTicket = null,
+    /// Owned by value, not borrowed: AdapterRequest crosses the tktool/tkadpt
+    /// boundary, and TradeTicket is already a fixed-size, pointer-free
+    /// struct, so there is no reason for this to carry a caller-owned
+    /// pointer that would dangle across a process/shared-memory boundary.
+    ticket: ?trade_ticket.TradeTicket = null,
 };
 
 pub const AdapterResult = union(AdapterOperation) {

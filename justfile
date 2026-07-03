@@ -33,6 +33,9 @@ python-dev-install-all:
 build-tk:
   ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build
 
+build-fd-tk-libs:
+  @just _build-fd-tk-libs ""
+
 build-fd:
   {{make}} -j"$(nproc)" firedancer
 
@@ -55,7 +58,7 @@ build-all:
 # ── macOS: run any recipe in the Linux dev container ─────────────────────────
 # Firedancer/Tickoni build natively only on Linux. The `dock` recipe mounts the
 # repo into an ubuntu:24.04 arm64 container (native on Apple Silicon), builds the
-# fd_util/fd_ballet libs first (mirroring .github/actions/build-fd-tk-libs), then
+# fd_tango/fd_util/fd_ballet libs first (mirroring .github/actions/build-fd-tk-libs), then
 # runs the requested recipe. On Linux it runs the recipe natively (no container).
 #
 # Run any recipe inside the Linux dev container, e.g. `just dock test-unit-tk`.
@@ -76,9 +79,24 @@ dock +recipe:
   {{container}} run --rm \
     -v "{{justfile_directory()}}":/work -w /work \
     {{dev_image}} \
-    bash -lc 'make -j"$(nproc)" EXTRAS=tk-arm build/native/gcc/lib/libfd_util.a build/native/gcc/lib/libfd_ballet.a && just {{recipe}}'
+    bash -lc 'just _build-fd-tk-libs tk-arm && just {{recipe}}'
 
 # Build the Linux dev image once (just + Zig 0.16.0 + build toolchain). Idempotent.
+[private]
+_build-fd-tk-libs extras="":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cmd=({{make}} -j"$(nproc)")
+  if [ -n "{{extras}}" ]; then
+    cmd+=("EXTRAS={{extras}}")
+  fi
+  cmd+=(
+    build/native/gcc/lib/libfd_tango.a
+    build/native/gcc/lib/libfd_util.a
+    build/native/gcc/lib/libfd_ballet.a
+  )
+  "${cmd[@]}"
+
 [private]
 _dev-image:
   #!/usr/bin/env bash
@@ -225,7 +243,7 @@ test-cov-fd:
   python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd
 
 test-cov-tk:
-  python3 contrib/readme/run-badged-command.py cov-tk bash contrib/test/coverage.sh coverage-tk
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache python3 contrib/readme/run-badged-command.py cov-tk bash contrib/test/coverage.sh coverage-tk
 
 test-cov-all:
   @just test-cov-fd

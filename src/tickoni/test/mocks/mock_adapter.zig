@@ -10,7 +10,7 @@ pub const MockBackend = struct {
         quote_snapshot_calls: usize = 0,
         paper_order_calls: usize = 0,
         last_account_id: u32 = 0,
-        last_ticket: ?*const trade_ticket.TradeTicket = null,
+        last_ticket: ?trade_ticket.TradeTicket = null,
     };
 
     portfolio_snapshot: ?portfolio.BrokerageAccount = null,
@@ -39,6 +39,15 @@ pub const MockBackend = struct {
                 .paper_order = self.paper_order orelse return error.MissingMockResponse,
             },
         };
+    }
+
+    /// Builds `BackendType` (production tiles' adapter.Backend vtable
+    /// interface) from this mock, via BackendType's own `from()`
+    /// constructor. Generic over BackendType instead of importing adapter's
+    /// Backend type directly, so this test double never pulls a specific
+    /// production module instance into its own module graph.
+    pub fn asBackend(comptime BackendType: type, self: *MockBackend) BackendType {
+        return BackendType.from(MockBackend, true, self);
     }
 };
 

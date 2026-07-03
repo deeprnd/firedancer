@@ -125,6 +125,35 @@ Tickoni change:
 
 If those answers are vague, do not add the code yet.
 
+### Process Mode And CPU Placement
+
+For runtime hardening work, process isolation means separate OS processes, not
+just separate Zig or pthread threads in one address space. Thread-backed mode is
+allowed only as a fast dev/test compatibility lane unless the story explicitly
+says otherwise.
+
+When a change claims process-mode tile isolation, it must expose enough
+evidence to identify:
+
+- the supervisor PID;
+- one child PID or equivalent thread-group/process id per configured tile;
+- tile id, kind/index, configured CPU placement mode, and assigned CPU when
+  pinned;
+- the parent/child launch record that ties tile processes to the supervisor;
+- whether the tile is `exclusive`, `shared`, or `floating`.
+
+Tickoni owns CPU placement policy. Do not change Firedancer validator
+auto-layout semantics or add Tickoni product fields to `fd_topo_t` to support
+shared-core placement. Valid placement modes are:
+
+- `exclusive`: one tile process pinned to one CPU;
+- `shared`: multiple explicitly declared tile processes may reuse one CPU;
+- `floating`: no fixed CPU pinning.
+
+Undeclared oversubscription, malformed CPU ids, and unavailable CPU ids must
+fail closed. Shared-core placement is a lower-throughput mode and must be
+visible in supervisor output, metrics, diagnostics, or test evidence.
+
 ## Separation Rules
 
 Keep these boundaries hard.
@@ -192,6 +221,10 @@ Rules:
 
 - keep `src/tickoni/c_abi` narrow: Zig `extern` declarations, layout checks,
   and small wrappers that preserve C ownership semantics
+- for process-mode tile links, prefer real Firedancer substrate:
+  `src/tango/mcache`, `src/tango/dcache`, `src/tango/fseq` or
+  `src/tango/fctl`, `src/tango/cnc`, workspace/shared-memory mechanics,
+  `src/disco/topo` process/workspace patterns, and `src/util/sandbox`
 - put Tickoni-owned schema, codec, export, and domain logic in Tickoni-owned
   modules such as `src/tickoni/codec`, not under `src/tickoni/c_abi`
 - use `src/tickoni/c_abi/queue.zig` and `src/tickoni/c_abi/sandbox.zig` as
@@ -220,11 +253,36 @@ cannot be explained in one sentence, stop and move the logic back into a
 Tickoni-owned module. The goal is to reuse Firedancer substrate faithfully,
 not to hide new product code behind the ABI membrane.
 
-### Firedancer Utility Reuse
+### Runtime Boundary Tests
 
-Default to Firedancer. When a Firedancer utility covers a need, call it through
-a C extern even at FFI cost. Do not write Tickoni-owned helpers that duplicate
-what Firedancer already provides.
+Runtime process/shared-memory work needs negative tests as well as happy-path
+flow tests. Include fail-closed tests for:
+
+- malformed, missing, stale, or duplicate workspace identifiers;
+- wrong workspace join modes, such as a consumer requesting write access or a
+  producer missing required write access;
+- missing `mcache`, `dcache`, `fseq` or `fctl`, or `cnc` objects;
+- dcache chunk or fragment bounds errors;
+- link depth, MTU, burst, or fragment-size mismatches;
+- reliable consumer progress not advancing and producer backpressure engaging;
+- production process mode accidentally selecting heap-backed correctness
+  queues;
+- forced tile crash with shared-memory state still readable for diagnostics or
+  deterministic shutdown.
+
+Do not expand a focused runtime story into arbitrary kernel-memory attack
+testing, whole-Firedancer workspace fuzzing, cross-platform portable queue
+substitutes, or production throughput saturation unless the story explicitly
+owns that scope.
+
+### Firedancer Boundary And Utility Reuse
+
+Default to Firedancer substrate where it is generic, but do not call Firedancer
+or vendored C APIs directly from Tickoni code. Every Firedancer dependency
+crosses a Tickoni-owned C shim under `src/tickoni/c_abi/shim/**` with a `tk_*`
+symbol, then a Zig wrapper in `src/tickoni/c_abi/*.zig` when Zig needs access.
+The build may still link `fd_*` libraries because the shim object files need
+those symbols; the source-level call boundary is the shim.
 
 The reuse boundary is wide. Everything outside Solana validator semantics is
 in scope:
@@ -236,15 +294,18 @@ in scope:
   string handling and number formatting
 - `src/util/math` and `src/util/hist` — fixed-point arithmetic, statistics
 - `src/util/io` and `src/util/log` — structured IO and the `fd_log_*` family
-- `src/ballet/siphash13` — `fd_siphash13` for streaming hash (current audit
-  hash function)
+- `src/ballet/siphash13` — `fd_siphash13` behind `tk_siphash13_*` for
+  streaming hash (current audit hash function)
 - `src/ballet/sha256`, `src/ballet/sha512`, `src/ballet/keccak` — for
   content-addressed audit evidence and any future crypto needs
-- `src/ballet/pb` — `fd_pb_encoder` and `fd_pb_tokenize` for protobuf
-  encoding and decoding
+- `src/ballet/pb` — protobuf encoding and decoding behind `tk_pb_*`
+- `src/ballet/json/cJSON` — vendored JSON behind `tk_json_*`
 - `src/waltz/http` — `fd_http_server` for the `tkapi` tile HTTP/WebSocket
   surface
-- `src/tango` — mcache, dcache, and workspace queue substrate
+- `src/tango` — mcache, dcache, fseq, cnc, and queue substrate behind
+  `tk_*`
+- `src/util/wksp`, `src/util/sandbox`, and `src/util/fd_util` — workspace,
+  sandbox, boot, and halt behavior behind `tk_*`
 
 The only exclusion is Solana-specific substrate: consensus, gossip, RPC wire
 formats, account/slot/epoch/leader-schedule structs, vote program logic, SVM
@@ -254,16 +315,17 @@ that do not belong in Tickoni financial event processing.
 When evaluating whether to write a helper:
 
 1. Check `src/util` and `src/ballet` first. If the function exists there, use
-   it via C extern, even if the Zig stdlib has an equivalent.
+   it via a `src/tickoni/c_abi/shim/**` `tk_*` symbol, even if the Zig stdlib
+   has an equivalent.
 2. If the operation belongs to codec framing, encoding, or parsing, implement
    it in the owning C codec file alongside the format and parse functions that
    share the same frame boundary knowledge. Then call it from Zig as an extern.
 3. Write a Tickoni-owned helper only when the need is genuinely Tickoni-
    specific and nothing in Firedancer covers it. Add a comment naming the
    Firedancer function checked and why it does not apply.
-4. Do not wrap a Firedancer function in a Zig function that adds no behavior.
-   Call the extern directly, or inline the `@bitCast` / `std.mem.readInt` at
-   the call site if it truly requires no C at all.
+4. Do not expose a Firedancer symbol directly to Tickoni Zig or codec code.
+   Add the narrow `tk_*` shim first, then expose a lower-camel Zig wrapper only
+   where Zig needs the primitive.
 
 ### Zig To C Action Diagram
 
@@ -284,15 +346,15 @@ sequenceDiagram
   Sup->>Topo: validate tile IDs, links, depth, MTU
   Topo-->>Sup: fixed topology snapshot
   Sup->>ABI: request align/footprint(depth, mtu)
-  ABI->>C: fd_align / fd_footprint
+  ABI->>C: tk_* shim calls Firedancer align/footprint
   C-->>ABI: size and alignment
   ABI-->>Sup: primitive layout requirements
   Sup->>ABI: allocate or join workspace through retained substrate
-  ABI->>C: fd_wksp / shmem setup calls
+  ABI->>C: tk_* shim calls workspace/shmem setup
   C-->>ABI: workspace/object memory
   ABI-->>Sup: workspace handle with explicit ownership
   Sup->>ABI: new/join queue object
-  ABI->>C: fd_mcache_new / fd_mcache_join
+  ABI->>C: tk_* shim calls mcache new/join
   C->>Q: format queue metadata and payload storage
   C-->>ABI: opaque queue handle
   ABI-->>Topo: typed narrow Zig handle
@@ -303,7 +365,7 @@ sequenceDiagram
   ABI-->>Tile: explicit status or typed error
   Tile->>Topo: update local counters and output link
   Tile->>ABI: leave/delete during shutdown
-  ABI->>C: fd_leave / fd_delete
+  ABI->>C: tk_* shim calls leave/delete
   C-->>ABI: released substrate object
   ABI-->>Sup: shutdown complete
 ```

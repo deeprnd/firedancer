@@ -89,6 +89,17 @@ tile lifecycle, sandboxing, low-overhead metric and diagnostic paths,
 and crash-only behavior. Tickoni should reuse or wrap Firedancer infra tiles
 and primitives where they are generic.
 
+Tickoni application, runtime, tile, schema, codec, and business logic is Zig.
+Firedancer and vendored C code are reachable only through one explicit bridge:
+Zig code calls narrow Zig wrappers in `src/tickoni/c_abi/*.zig`; those wrappers
+declare private `extern fn tk_*` symbols; the `tk_*` symbols are implemented by
+Tickoni-owned C shims under `src/tickoni/c_abi/shim/**`; only those shim files
+include Firedancer or vendored C headers. This applies to Tango, Util,
+Workspace, Sandbox, Ballet protobuf/hash primitives, and vendored JSON. C code
+outside `src/tickoni/c_abi/shim/**` is not part of the canonical Tickoni
+architecture and should be treated as boundary debt to remove, not as a pattern
+to extend.
+
 Tickoni reuses generic Firedancer tiles and infrastructure primitives, but Solana validator tiles and Solana schemas are not Tickoni framework concepts. That generic Firedancer reuse is what lets Tickoni position itself as an ultra-TPS financial event harness instead of a normal web backend with agents attached.
 
 The **Tickoni AI-harness tiles** own financial correctness. Financial events
@@ -200,6 +211,114 @@ The current implementation uses heap-backed in-process bounded queues. The
 next runtime hardening step is to replace those spike rings with the selected
 shared-memory backing while keeping the same tile identities and link answers.
 
+That hardening step must use real Firedancer-style substrate, not just Zig
+workers named as tiles. In Linux full-runtime process mode:
+
+- each configured tile runs as a supervisor-managed OS process with its own
+  address space; a thread-only topology may remain for fast dev/unit tests but
+  does not satisfy process-isolation acceptance;
+- correctness-bearing links use Firedancer Tango `mcache`/`dcache` shared
+  memory, with `fseq` or `fctl` progress/flow-control state so reliable links
+  backpressure instead of dropping;
+- tile lifecycle exposes boot, heartbeat, halt, and fail state through
+  `src/tango/cnc` or a narrow Tickoni wrapper around the same control model;
+- workspaces, objects, join modes, and process-start behavior follow
+  Firedancer `src/disco/topo` patterns through Tickoni-owned wrappers;
+- seccomp, Landlock, file-descriptor discipline, and process isolation reuse
+  `src/util/sandbox` where the Linux full-runtime tier can support them.
+
+CPU placement is Tickoni-owned policy. Tickoni may support `exclusive`,
+`shared`, and `floating` placement modes; it must not inherit a hard Firedancer
+validator assumption that every tile owns an exclusive CPU core. Shared-core
+placement means multiple tile processes intentionally reuse a CPU, not that
+tiles share a process or address space. Undeclared CPU oversubscription,
+malformed CPU ids, and unavailable CPU ids fail closed.
+
+Do not add Tickoni product fields or financial semantics to upstream-hot
+Firedancer topology structs. Keep Tickoni tile IDs, placement policy, financial
+contracts, and product schema in `src/tickoni/**`, with narrow C ABI wrappers
+under `src/tickoni/c_abi/` for reused Firedancer substrate.
+
+### How Firedancer Reuse Actually Works
+
+`src/tickoni/c_abi/` is composition over Firedancer, not a parallel
+reimplementation. Each Zig wrapper file (`queue.zig`, `dcache.zig`,
+`fseq.zig`, `cnc.zig`, `wksp.zig`, `process.zig`, ...) exposes lower-camel Zig
+functions to the rest of Tickoni and keeps its `extern fn tk_*` declarations
+private. Those `tk_*` symbols resolve to Tickoni-owned C shims in
+`src/tickoni/c_abi/shim/**`. The shims call real Firedancer C implementation
+for object lifecycle, footprint/alignment math, workspace setup, sandboxing,
+command-and-control state, protobuf/tokenizer helpers, hashing, and vendored
+JSON. The build links upstream `libfd_tango.a`, `libfd_util.a`,
+`libfd_ballet.a`, or related libraries only so the shim object files can
+resolve their upstream calls; Tickoni source must not call or bind `fd_*`
+symbols directly.
+
+A small number of hot-path functions have no exported symbol to bind at all.
+Firedancer declares these as `static inline` in their headers (`fd_mcache.h`,
+`fd_fseq.h`), and C's `static inline` has no exported symbol in the compiled
+`.a` — there is nothing for an `extern fn` to bind to. Confirmed empirically
+with `nm` against the built `libfd_tango.a` and `libfd_disco.a`: zero matches
+for `mcache_publish`, `fseq_query`, `line_idx`, or Firedancer's own
+higher-level `fd_stem_publish`/`fd_stem_advance`.
+
+The standing approach is a thin, non-inline Tickoni-owned shim under
+`src/tickoni/c_abi/shim/**` that calls the real Firedancer function and does
+nothing else. The current split is `tango.c`, `util.c`, `wksp.c`,
+`sandbox.c`, and `ballet.c`; `firedancer.h` exposes only Tickoni-owned `tk_*`
+types and declarations to Tickoni-owned C shim consumers. Zig code still goes
+through `src/tickoni/c_abi/*.zig`, not through this header. `queue.zig`'s
+`mcacheLineIdx`, `mcachePublish`, and `fragMetaSeqQuery`, and
+`shm_link.zig`'s `fseq` query/update helpers, bind to `tk_*` symbols via
+private `extern fn` declarations rather than reimplementing the logic natively
+in Zig. No Firedancer file is edited; the shim files are compiled and linked
+alongside upstream libraries via `linkTickoniFiredancer` in `build.zig`.
+
+This also explains why `src/disco/stem` (Firedancer's tile polling/
+backpressure framework) is not linked directly, even though it looks like
+exactly the abstraction process-mode links need. `fd_stem_publish` itself
+just calls the same inline `fd_mcache_publish` underneath, so linking it
+would not add real reuse — it would only add `fd_stem`'s "credit"/burst
+accounting, which is tied to `fd_topo_t`'s full validator tile-housekeeping
+model. Tile-topology.md's [Reuse Boundary](tile-topology.md#reuse-boundary)
+already rules that model out for Tickoni (no Tickoni fields on
+`fd_topo.h`, no `fd_topo_run_tile` validator lifecycle). `fd_stem` stays a
+design reference for the bounded-polling/backpressure pattern, not a linked
+dependency.
+
+The working rule: default to a real Firedancer primitive behind a `tk_*` shim
+even at FFI cost. Whether the upstream function is exported, `static inline`,
+or macro-like does not change the Tickoni boundary: Tickoni Zig calls a Zig
+wrapper, the Zig wrapper calls `tk_*`, and the C shim calls Firedancer.
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ Tickoni Zig logic                                                    │
+│ app, runtime, tiles, schema, codec, policy, audit, replay            │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ lower-camel Zig calls
+                               v
+┌─────────────────────────────────────────────────────────────────────┐
+│ src/tickoni/c_abi/*.zig                                              │
+│ narrow Zig wrappers with private extern fn tk_* declarations         │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ tk_* symbols only
+                               v
+┌─────────────────────────────────────────────────────────────────────┐
+│ src/tickoni/c_abi/shim/**                                            │
+│ Tickoni-owned C shim; only layer that includes Firedancer/vendored C │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ fd_* / cJSON_* calls contained here
+                               v
+┌─────────────────────────────────────────────────────────────────────┐
+│ Firedancer and vendored C substrate                                  │
+│ Tango, Util, Workspace, Sandbox, Ballet, protobuf, hash, JSON        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+See [rant/static-inline-and-ffi.md](rant/static-inline-and-ffi.md) for why
+this is the standing default over the alternatives.
+
 ## Runtime Model
 
 Tickoni follows Firedancer's topology discipline: tiles, links, workspaces,
@@ -216,6 +335,16 @@ link can answer:
 For the Phase 0 pipeline, the default ownership model is one producer per link
 and one owning tile for every mutable state object. Consumers read from bounded
 links and publish their own progress counters.
+
+Process-mode validation should include negative runtime-boundary tests:
+malformed or stale workspace identifiers, wrong workspace join modes, missing
+queue/control objects, dcache bounds errors, link depth/MTU/burst mismatches,
+non-advancing reliable consumers, accidental heap-backed correctness queues in
+process mode, and forced tile crashes that leave shared-memory state readable
+for diagnostics or deterministic shutdown. Arbitrary kernel-memory attack
+resistance, full Firedancer workspace fuzzing, cross-platform queue
+substitutes, and production throughput saturation are separate security,
+platform, fuzzing, or performance stories.
 
 ### Phase 0 Tiles
 

@@ -1,13 +1,9 @@
 const std = @import("std");
+const c_abi = @import("c_abi");
 const schema = @import("model_messages");
-const mock_model = @import("mock_model");
 
 pub const ProviderRequest = schema.ProviderRequest;
 pub const ModelResponse = schema.ModelResponse;
-
-// MockBackend is a pure test double; its definition lives in
-// src/tickoni/test/mocks/mock_model.zig, not in this tile.
-const MockBackend = mock_model.MockBackend;
 
 const fixture_model_id_max: usize = 128;
 const fixture_content_max: usize = 2048;
@@ -90,6 +86,10 @@ pub const FixtureBackend = struct {
             .latency_ms = self.latency_ms,
         };
     }
+
+    pub fn asBackend(self: *FixtureBackend) Backend {
+        return Backend.from(FixtureBackend, true, self);
+    }
 };
 
 // Strip thinking-channel prefix emitted by some models (e.g. Gemma-4):
@@ -130,16 +130,36 @@ const replay_model_id_max: usize = 128;
 const replay_content_max: usize = 2048;
 const replay_finish_reason_max: usize = 32;
 
+/// Firedancer-backed SipHash13 domain for model request/response hashes
+/// (replay table lookup keys, response content hashes). One shared runtime
+/// hash boundary per CLAUDE.md's hash-boundary contract, instead of a
+/// separate ad hoc std.hash.Wyhash mix per call site.
+const model_hash_k0: u64 = 0x0000_4c44_4f4d_4b54; // "TKMODL\0\0" LE
+const model_hash_k1: u64 = 1; // model hash boundary version
+
+fn initModelSip() c_abi.ballet.Siphash13 {
+    var sip: c_abi.ballet.Siphash13 = .{};
+    c_abi.ballet.siphashInit(&sip, model_hash_k0, model_hash_k1);
+    return sip;
+}
+
 // Hash a ProviderRequest to a stable u64 key for replay table lookup.
 pub fn hashProviderRequest(req: ProviderRequest) u64 {
-    var h = std.hash.Wyhash.init(0);
-    h.update(req.model_id);
+    var sip = initModelSip();
+    c_abi.ballet.siphashAppend(&sip, req.model_id);
     for (req.messages) |msg| {
-        h.update(msg.role);
-        h.update(msg.content);
+        c_abi.ballet.siphashAppend(&sip, msg.role);
+        c_abi.ballet.siphashAppend(&sip, msg.content);
     }
-    h.update(std.mem.asBytes(&req.sampling));
-    return h.final();
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&req.sampling));
+    return c_abi.ballet.siphashFini(&sip);
+}
+
+// Hash a ModelResponse's content, for TkModlResult.response_hash.
+pub fn hashResponseContent(content: []const u8) u64 {
+    var sip = initModelSip();
+    c_abi.ballet.siphashAppend(&sip, content);
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 pub const ReplayEntry = struct {
@@ -190,6 +210,10 @@ pub const ReplayBackend = struct {
             if (entry.request_hash == req_hash) return entry.toModelResponse(allocator);
         }
         return error.ReplaySubstitutionMissing;
+    }
+
+    pub fn asBackend(self: *ReplayBackend) Backend {
+        return Backend.from(ReplayBackend, true, self);
     }
 };
 
@@ -301,40 +325,68 @@ pub const HttpBackend = struct {
             .latency_ms = 0,
         };
     }
+
+    pub fn asBackend(self: *HttpBackend) Backend {
+        return Backend.from(HttpBackend, false, self);
+    }
 };
 
-// Backend dispatches between mock, fixture, http, and replay implementations.
-pub const Backend = union(enum) {
-    mock: MockBackend,
-    fixture: FixtureBackend,
-    http: HttpBackend,
-    replay: ReplayBackend,
+/// Type-erased model backend interface (Zig's standard vtable-interface
+/// idiom, matching std.mem.Allocator/std.Io.Writer). Production backend
+/// kinds (FixtureBackend, HttpBackend, ReplayBackend) each expose an
+/// `asBackend()` constructor built on `Backend.from()`. Test doubles inject
+/// through the same `Backend.from()` entrypoint (see
+/// src/tickoni/test/mocks/mock_model.zig's asBackend helper) so this module
+/// never names a test-only type.
+pub const Backend = struct {
+    ptr: *anyopaque,
+    vtable: *const VTable,
 
-    pub fn call(self: *Backend, allocator: std.mem.Allocator, req: ProviderRequest) anyerror!ModelResponse {
-        return switch (self.*) {
-            .mock => |m| m.call(allocator, req),
-            .fixture => |f| f.call(allocator, req),
-            .http => |h| h.call(allocator, req),
-            .replay => |r| r.call(allocator, req),
+    pub const VTable = struct {
+        call: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, req: ProviderRequest) anyerror!ModelResponse,
+        callById: *const fn (ptr: *anyopaque, allocator: std.mem.Allocator, substitution_id: u64) anyerror!ModelResponse,
+        /// True when no live network calls can occur. Replay must only run
+        /// with effect-free backends.
+        effect_free: bool,
+    };
+
+    /// Builds a Backend from any type T exposing
+    /// `pub fn call(self: T, allocator, req) !ModelResponse`, and optionally
+    /// `pub fn callById(self: T, allocator, substitution_id) !ModelResponse`
+    /// (types without callById fail closed with error.ReplayBackendRequired).
+    /// self must outlive the returned Backend.
+    pub fn from(comptime T: type, comptime effect_free: bool, self: *T) Backend {
+        const Impl = struct {
+            fn callImpl(ptr: *anyopaque, allocator: std.mem.Allocator, req: ProviderRequest) anyerror!ModelResponse {
+                const s: *T = @ptrCast(@alignCast(ptr));
+                return s.call(allocator, req);
+            }
+            fn callByIdImpl(ptr: *anyopaque, allocator: std.mem.Allocator, substitution_id: u64) anyerror!ModelResponse {
+                if (comptime @hasDecl(T, "callById")) {
+                    const s: *T = @ptrCast(@alignCast(ptr));
+                    return s.callById(allocator, substitution_id);
+                } else {
+                    return error.ReplayBackendRequired;
+                }
+            }
+            const vtable = VTable{ .call = callImpl, .callById = callByIdImpl, .effect_free = effect_free };
         };
+        return .{ .ptr = self, .vtable = &Impl.vtable };
+    }
+
+    pub fn call(self: Backend, allocator: std.mem.Allocator, req: ProviderRequest) anyerror!ModelResponse {
+        return self.vtable.call(self.ptr, allocator, req);
     }
 
     /// Returns true when no live network calls can occur.
-    /// Replay must only run with effect-free backends.
     pub fn isEffectFree(self: Backend) bool {
-        return switch (self) {
-            .mock, .fixture, .replay => true,
-            .http => false,
-        };
+        return self.vtable.effect_free;
     }
 
     /// Replay-path dispatch: looks up a captured response by substitution_id.
-    /// Returns error.ReplayBackendRequired when the backend variant is not .replay.
-    pub fn callById(self: Backend, allocator: std.mem.Allocator, substitution_id: u64) !ModelResponse {
-        return switch (self) {
-            .replay => |r| r.callById(allocator, substitution_id),
-            else => error.ReplayBackendRequired,
-        };
+    /// Returns error.ReplayBackendRequired when the backend has no callById.
+    pub fn callById(self: Backend, allocator: std.mem.Allocator, substitution_id: u64) anyerror!ModelResponse {
+        return self.vtable.callById(self.ptr, allocator, substitution_id);
     }
 };
 
@@ -364,59 +416,16 @@ test "normalizeModelContent strips thinking channel plain text" {
     try std.testing.expectEqualStrings("hello", normalizeModelContent(input));
 }
 
-test "MockBackend returns canned response" {
+test "Backend dispatches through the vtable to whatever implementation is plugged in" {
     const allocator = std.testing.allocator;
-    const mock = MockBackend{
-        .canned_content = "test response",
-        .canned_model_id = "mock-v1",
-    };
-    const req = ProviderRequest{ .model_id = "any", .messages = &.{} };
-    const resp = try mock.call(allocator, req);
-    defer resp.deinit(allocator);
-
-    try std.testing.expectEqualStrings("test response", resp.content);
-    try std.testing.expectEqualStrings("mock-v1", resp.model_id);
-    try std.testing.expectEqualStrings("stop", resp.finish_reason);
-    try std.testing.expectEqual(@as(u64, 0), resp.latency_ms);
-    try std.testing.expectEqual(@as(u32, 0), resp.token_usage.total_tokens);
-}
-
-test "MockBackend default model_id and finish_reason" {
-    const allocator = std.testing.allocator;
-    const mock = MockBackend{ .canned_content = "hello" };
-    const req = ProviderRequest{ .model_id = "any", .messages = &.{} };
-    const resp = try mock.call(allocator, req);
-    defer resp.deinit(allocator);
-
-    try std.testing.expectEqualStrings("mock", resp.model_id);
-    try std.testing.expectEqualStrings("stop", resp.finish_reason);
-}
-
-test "MockBackend is deterministic across calls" {
-    const allocator = std.testing.allocator;
-    const mock = MockBackend{ .canned_content = "deterministic output" };
-    const req = ProviderRequest{ .model_id = "x", .messages = &.{} };
-
-    const r1 = try mock.call(allocator, req);
-    defer r1.deinit(allocator);
-    const r2 = try mock.call(allocator, req);
-    defer r2.deinit(allocator);
-
-    try std.testing.expectEqualStrings(r1.content, r2.content);
-    try std.testing.expectEqualStrings(r1.model_id, r2.model_id);
-    try std.testing.expectEqualStrings(r1.finish_reason, r2.finish_reason);
-    try std.testing.expectEqual(r1.token_usage.total_tokens, r2.token_usage.total_tokens);
-}
-
-test "Backend union dispatches to mock" {
-    const allocator = std.testing.allocator;
-    var backend = Backend{ .mock = .{ .canned_content = "from mock backend" } };
+    var fixture = FixtureBackend{};
+    var backend = fixture.asBackend();
     const req = ProviderRequest{ .model_id = "any", .messages = &.{} };
 
     const resp = try backend.call(allocator, req);
     defer resp.deinit(allocator);
 
-    try std.testing.expectEqualStrings("from mock backend", resp.content);
+    try std.testing.expect(std.mem.indexOf(u8, resp.content, "NVDA") != null);
 }
 
 test "FixtureBackend returns deterministic response" {
@@ -529,65 +538,12 @@ test "FixtureBackend response JSON matches expected tickers and excludes restric
     }
 }
 
-test "MockBackend ignores request model_id and messages" {
-    const allocator = std.testing.allocator;
-    const mock = MockBackend{ .canned_content = "fixed" };
-    const messages = [_]schema.Message{
-        .{ .role = "user", .content = "hello" },
-    };
-    const req = ProviderRequest{
-        .model_id = "gpt-999",
-        .messages = &messages,
-        .sampling = .{ .temperature = 0.8, .max_output_tokens = 1024 },
-    };
-    const resp = try mock.call(allocator, req);
-    defer resp.deinit(allocator);
-
-    try std.testing.expectEqualStrings("fixed", resp.content);
-}
-
-test "MockBackend traces the model request scope fields" {
-    const allocator = std.testing.allocator;
-    var trace = MockBackend.CallTrace{};
-    const mock = MockBackend{
-        .canned_content = "fixed",
-        .trace = &trace,
-    };
-    const req = ProviderRequest{
-        .model_id = "fixture.ai_infra",
-        .messages = &.{},
-        .budget_id = "budget.demo_paper",
-        .policy_version = "v1",
-        .capability_envelope_id = "capenv.trading_order.propose.demo",
-    };
-    const resp = try mock.call(allocator, req);
-    defer resp.deinit(allocator);
-
-    try std.testing.expectEqual(@as(usize, 1), trace.call_count);
-    try std.testing.expectEqualStrings("fixture.ai_infra", trace.last_model_id);
-    try std.testing.expectEqualStrings("budget.demo_paper", trace.last_budget_id);
-    try std.testing.expectEqualStrings("v1", trace.last_policy_version);
-    try std.testing.expectEqualStrings("capenv.trading_order.propose.demo", trace.last_capability_envelope_id);
-}
-
-test "ModelResponse token_usage fields accessible" {
-    const allocator = std.testing.allocator;
-    const mock = MockBackend{ .canned_content = "x" };
-    const req = ProviderRequest{ .model_id = "any", .messages = &.{} };
-    const resp = try mock.call(allocator, req);
-    defer resp.deinit(allocator);
-
-    try std.testing.expectEqual(@as(u32, 0), resp.token_usage.prompt_tokens);
-    try std.testing.expectEqual(@as(u32, 0), resp.token_usage.completion_tokens);
-    try std.testing.expectEqual(@as(u32, 0), resp.token_usage.total_tokens);
-}
-
 test "Backend.isEffectFree tracks live network boundaries" {
-    const mock = Backend{ .mock = .{ .canned_content = "mock" } };
-    const fixture = Backend{ .fixture = .{} };
-    const http = Backend{ .http = .{ .endpoint = "http://127.0.0.1:65535/v1", .io = std.testing.io } };
+    var fixture_backend = FixtureBackend{};
+    var http_backend = HttpBackend{ .endpoint = "http://127.0.0.1:65535/v1", .io = std.testing.io };
+    const fixture = fixture_backend.asBackend();
+    const http = http_backend.asBackend();
 
-    try std.testing.expect(mock.isEffectFree());
     try std.testing.expect(fixture.isEffectFree());
     try std.testing.expect(!http.isEffectFree());
 }
@@ -673,7 +629,8 @@ test "ReplayBackend.call fails closed on empty table" {
 }
 
 test "Backend.isEffectFree is true for replay variant" {
-    const b = Backend{ .replay = .{} };
+    var rb = ReplayBackend{};
+    const b = rb.asBackend();
     try std.testing.expect(b.isEffectFree());
 }
 
@@ -683,7 +640,7 @@ test "Backend.call dispatches to ReplayBackend by request hash" {
     rb.entries[0] = makeReplayEntry(0, hashProviderRequest(req), "{\"ok\":true}");
     rb.entry_count = 1;
 
-    var b = Backend{ .replay = rb };
+    var b = rb.asBackend();
     const resp = try b.call(std.testing.allocator, req);
     defer resp.deinit(std.testing.allocator);
 

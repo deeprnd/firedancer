@@ -5,6 +5,7 @@ pub const AuditAppendInput = struct {
     source_offset: u64,
     event_hash: u64,
     decision: Decision,
+    tile_id: [6]u8,
 };
 
 pub const Decision = enum(u8) {
@@ -16,7 +17,12 @@ pub const Decision = enum(u8) {
 
 pub const audit_seed: u64 = 0xcbf29ce484222325;
 
-const tkpoly_tile_id: [6]u8 = "tkpoly".*;
+/// Producer tile ids for the payment pipeline's own audit records. The
+/// pipeline stage that actually finalizes a message's decision stamps its
+/// own id here (tknorm for malformed_drop, tkpoly for allow/deny/
+/// duplicate_drop) instead of every record being attributed to tkpoly.
+pub const tile_id_tknorm: [6]u8 = "tknorm".*;
+pub const tile_id_tkpoly: [6]u8 = "tkpoly".*;
 
 pub const AuditLog = struct {
     records: []audit.AuditEvent,
@@ -38,6 +44,7 @@ pub const AuditLog = struct {
             msg.source_offset,
             msg.event_hash,
             msg.decision,
+            msg.tile_id,
             self.prev_hash,
         );
         self.records[self.count] = event;
@@ -51,6 +58,7 @@ pub fn buildPolicyDecisionEvent(
     source_offset: u64,
     event_hash: u64,
     decision: Decision,
+    tile_id: [6]u8,
     prev_hash: u64,
 ) audit.AuditEvent {
     const outcome: audit.PolicyOutcome = switch (decision) {
@@ -64,7 +72,7 @@ pub fn buildPolicyDecisionEvent(
         .run_id = 0,
         .seq = seq,
         .source_offset = source_offset,
-        .tile_id = tkpoly_tile_id,
+        .tile_id = tile_id,
         .logical_actor_id = 0,
         .policy_version = [_]u8{0} ** 32,
         .capability_envelope_id = 0,

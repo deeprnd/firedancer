@@ -15,17 +15,20 @@ pub const ToolName = enum {
     }
 };
 
+/// Owned by value, not borrowed: ToolArgs is the tktool dispatch boundary,
+/// and Basket/TradeTicket are already fixed-size, pointer-free structs, so
+/// there is no reason for this to carry a caller-owned pointer.
 pub const ToolArgs = union(ToolName) {
     portfolio_read: u32,
-    quote_read: *const basket.Basket,
-    paper_order: *const trade_ticket.TradeTicket,
+    quote_read: basket.Basket,
+    paper_order: trade_ticket.TradeTicket,
 };
 
 pub fn dispatch(args: ToolArgs) adapter.AdapterRequest {
     return switch (args) {
         .portfolio_read => |account_id| normalizePortfolioRead(account_id),
-        .quote_read => |b| normalizeQuoteRead(b),
-        .paper_order => |t| normalizePaperOrder(t),
+        .quote_read => |*b| normalizeQuoteRead(b),
+        .paper_order => |*t| normalizePaperOrder(t),
     };
 }
 
@@ -52,7 +55,7 @@ pub fn normalizePaperOrder(ticket: *const trade_ticket.TradeTicket) adapter.Adap
     return .{
         .operation = .paper_order,
         .account_id = ticket.account_id,
-        .ticket = ticket,
+        .ticket = ticket.*,
     };
 }
 
@@ -79,7 +82,7 @@ test "normalizeQuoteRead copies basket tickers and account scope" {
     try std.testing.expectEqualStrings("SOXX", std.mem.sliceTo(&req.tickers[1], 0));
 }
 
-test "normalizePaperOrder preserves account and ticket pointer" {
+test "normalizePaperOrder preserves account and ticket contents" {
     var ticket: trade_ticket.TradeTicket = std.mem.zeroes(trade_ticket.TradeTicket);
     ticket.account_id = fixture_portfolio.fixtures.cash_rich.account_id;
     ticket.ticket_id_len = 9;
@@ -88,7 +91,7 @@ test "normalizePaperOrder preserves account and ticket pointer" {
     const req = normalizePaperOrder(&ticket);
     try std.testing.expectEqual(adapter.AdapterOperation.paper_order, req.operation);
     try std.testing.expectEqual(ticket.account_id, req.account_id);
-    try std.testing.expect(req.ticket == &ticket);
+    try std.testing.expect(std.meta.eql(req.ticket.?, ticket));
 }
 
 test "dispatch routes quote and paper-order tool names to adapter requests" {
@@ -101,12 +104,12 @@ test "dispatch routes quote and paper-order tool names to adapter requests" {
     var ticket: trade_ticket.TradeTicket = std.mem.zeroes(trade_ticket.TradeTicket);
     ticket.account_id = proposed_basket.account_id;
 
-    const quote_req = dispatch(.{ .quote_read = &proposed_basket });
-    const paper_req = dispatch(.{ .paper_order = &ticket });
+    const quote_req = dispatch(.{ .quote_read = proposed_basket });
+    const paper_req = dispatch(.{ .paper_order = ticket });
 
     try std.testing.expectEqual(adapter.AdapterOperation.quote_snapshot, quote_req.operation);
     try std.testing.expectEqual(adapter.AdapterOperation.paper_order, paper_req.operation);
-    try std.testing.expect(paper_req.ticket == &ticket);
+    try std.testing.expect(std.meta.eql(paper_req.ticket.?, ticket));
 }
 
 test "ToolName.fromString accepts known tools" {

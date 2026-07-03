@@ -2,6 +2,7 @@ const std = @import("std");
 const schema = @import("model_messages");
 const validator = @import("validator.zig");
 const backend_mod = @import("backend.zig");
+const mock_model = @import("mock_model");
 
 pub const TkModlResult = struct {
     outcome: schema.TkModlDecision,
@@ -61,7 +62,7 @@ pub fn runTkModlRequest(
             return .{
                 .outcome = .allow_live,
                 .request_hash = request_hash,
-                .response_hash = std.hash.Wyhash.hash(0, response.content),
+                .response_hash = backend_mod.hashResponseContent(response.content),
                 .replay_substitution_id = 0,
                 .retry_count = attempt,
                 .latency_ms = response.latency_ms,
@@ -74,7 +75,7 @@ pub fn runTkModlRequest(
             return .{
                 .outcome = .allow_replay,
                 .request_hash = 0,
-                .response_hash = std.hash.Wyhash.hash(0, response.content),
+                .response_hash = backend_mod.hashResponseContent(response.content),
                 .replay_substitution_id = req.replay_substitution_id,
                 .retry_count = 0,
                 .latency_ms = response.latency_ms,
@@ -123,7 +124,8 @@ fn baseLiveReq() schema.TkModlRequest {
 
 test "runTkModlRequest allow_live: mock backend returns populated result" {
     const allocator = std.testing.allocator;
-    var backend = backend_mod.Backend{ .mock = .{ .canned_content = "{\"ok\":true}", .canned_model_id = "test-model" } };
+    var mock = mock_model.MockBackend{ .canned_content = "{\"ok\":true}", .canned_model_id = "test-model" };
+    var backend = mock_model.MockBackend.asBackend(backend_mod.Backend, &mock);
 
     const result = try runTkModlRequest(allocator, baseConfig(), &backend, baseLiveReq());
     defer result.deinit(allocator);
@@ -139,7 +141,8 @@ test "runTkModlRequest allow_live: mock backend returns populated result" {
 
 test "runTkModlRequest deny: governance failure returns deny result with no response" {
     const allocator = std.testing.allocator;
-    var backend = backend_mod.Backend{ .mock = .{ .canned_content = "x" } };
+    var mock = mock_model.MockBackend{ .canned_content = "x" };
+    var backend = mock_model.MockBackend.asBackend(backend_mod.Backend, &mock);
 
     var req = baseLiveReq();
     req.model_id = "unknown-model"; // not on allowlist
@@ -155,7 +158,8 @@ test "runTkModlRequest deny: governance failure returns deny result with no resp
 
 test "runTkModlRequest deny_missing_scope: empty budget_id" {
     const allocator = std.testing.allocator;
-    var backend = backend_mod.Backend{ .mock = .{ .canned_content = "x" } };
+    var mock = mock_model.MockBackend{ .canned_content = "x" };
+    var backend = mock_model.MockBackend.asBackend(backend_mod.Backend, &mock);
 
     var req = baseLiveReq();
     req.budget_id = "";
@@ -189,7 +193,7 @@ test "runTkModlRequest allow_replay: calls ReplayBackend.callById" {
     };
     rb.entry_count = 1;
 
-    var backend = backend_mod.Backend{ .replay = rb };
+    var backend = rb.asBackend();
 
     var req = baseLiveReq();
     req.replay_mode = .replay;
@@ -208,7 +212,8 @@ test "runTkModlRequest allow_replay: calls ReplayBackend.callById" {
 
 test "runTkModlRequest replay: wrong backend returns ReplayBackendRequired" {
     const allocator = std.testing.allocator;
-    var backend = backend_mod.Backend{ .mock = .{ .canned_content = "x" } };
+    var mock = mock_model.MockBackend{ .canned_content = "x" };
+    var backend = mock_model.MockBackend.asBackend(backend_mod.Backend, &mock);
 
     var req = baseLiveReq();
     req.replay_mode = .replay;
@@ -219,7 +224,8 @@ test "runTkModlRequest replay: wrong backend returns ReplayBackendRequired" {
 
 test "runTkModlRequest allow_live: response_hash is deterministic" {
     const allocator = std.testing.allocator;
-    var backend = backend_mod.Backend{ .mock = .{ .canned_content = "same content" } };
+    var mock = mock_model.MockBackend{ .canned_content = "same content" };
+    var backend = mock_model.MockBackend.asBackend(backend_mod.Backend, &mock);
 
     const r1 = try runTkModlRequest(allocator, baseConfig(), &backend, baseLiveReq());
     defer r1.deinit(allocator);
@@ -236,6 +242,7 @@ test "TkModlResult.deinit: deny result with null response is safe" {
 }
 
 test "Backend.callById: non-replay backend returns ReplayBackendRequired" {
-    const mock = backend_mod.Backend{ .mock = .{ .canned_content = "x" } };
-    try std.testing.expectError(error.ReplayBackendRequired, mock.callById(std.testing.allocator, 1));
+    var mock_backend = mock_model.MockBackend{ .canned_content = "x" };
+    const backend = mock_model.MockBackend.asBackend(backend_mod.Backend, &mock_backend);
+    try std.testing.expectError(error.ReplayBackendRequired, backend.callById(std.testing.allocator, 1));
 }

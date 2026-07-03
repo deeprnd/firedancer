@@ -184,7 +184,7 @@ Use `fd_util_base.h` types instead of `stdint.h` integer types.
 
 FAQ: Why not `stdint.h`? For more information, see
 - [`fd_util_base.h`](./src/util/fd_util_base.h)
-- [Kevin's rant](./doc/rant/integer-types.md)
+- [Kevin's rant](./doc/knowledge/rant/integer-types.md)
 
 **Mapping**
 

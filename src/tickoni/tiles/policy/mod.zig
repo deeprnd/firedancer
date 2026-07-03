@@ -53,6 +53,10 @@ pub fn evaluateTradeGuardrails(
     return decision;
 }
 
+/// Applies this tile's guardrail decision directly to the ticket's policy
+/// fields. tkpoly is the policy authority: it decides and mutates outcome
+/// state itself rather than asking trade_ticket (a schema module) to apply
+/// a policy decision on its behalf.
 pub fn applyTradeGuardrails(
     ticket: *trade_ticket.TradeTicket,
     affordability: portfolio.AffordabilityResult,
@@ -63,12 +67,13 @@ pub fn applyTradeGuardrails(
         affordability,
         policy_max_notional_per_order_cents,
     );
-    trade_ticket.applyPolicyDecision(
-        ticket,
-        decision.policy_outcome,
-        decision.blocked_reasons[0..decision.blocked_reason_count],
-        decision.effective_max_paper_trade_cents,
-    );
+    ticket.policy_outcome = decision.policy_outcome;
+    ticket.blocked_reasons = std.mem.zeroes([trade_ticket.max_blocked_reasons]trade_ticket.BlockedReason);
+    for (decision.blocked_reasons[0..decision.blocked_reason_count], 0..) |reason, i| {
+        ticket.blocked_reasons[i] = reason;
+    }
+    ticket.blocked_reason_count = decision.blocked_reason_count;
+    ticket.affordability_result.effective_max_paper_trade_cents = decision.effective_max_paper_trade_cents;
 }
 
 fn deriveBlockedReason(

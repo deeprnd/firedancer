@@ -4,7 +4,7 @@
   "capsule_id": "replay_capsule_ai_infra_oversized_25000",
   "run_id": "run_ai_infra_demo_oversized_25000",
   "expected_basket_id": 37245803745511443,
-  "expected_proposal_hash": 15423733414829260079,
+  "expected_proposal_hash": 9842822358122554107,
   "schema_version": 1,
   "policy_version": "v1",
   "catalog_schema_version": 2,
@@ -18,7 +18,7 @@
   "model_substitutions": [
     {
       "request_hash": 15762600351696426601,
-      "response_hash": 12340958204495727724,
+      "response_hash": 15458815352652251377,
       "fixture_file": "fixture_model_response_gemma4.json"
     }
   ],
@@ -27,14 +27,14 @@
       "adapter_id": "paper_broker_demo",
       "operation": "quote_snapshot",
       "request_hash": 37245803745511443,
-      "response_hash": 3837264155678659392,
+      "response_hash": 860111845445016088,
       "fixture_file": "fixture_quotes.json"
     },
     {
       "adapter_id": "paper_broker_demo",
       "operation": "portfolio_snapshot",
-      "request_hash": 11880919757726111843,
-      "response_hash": 11722998568291785962,
+      "request_hash": 4926100256168663183,
+      "response_hash": 15002678780511482513,
       "fixture_file": "fixture_account_ops.json"
     }
   ],

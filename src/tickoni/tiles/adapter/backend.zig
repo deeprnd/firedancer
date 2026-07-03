@@ -4,11 +4,6 @@ const portfolio = @import("portfolio");
 const fixture_portfolio = @import("fixture_portfolio");
 const trade_ticket = @import("trade_ticket");
 const schema = @import("adapter_messages");
-const mock_module = @import("mock_adapter");
-
-// MockBackend is a pure test double; its definition lives in
-// src/tickoni/test/mocks/mock_adapter.zig, not in this tile.
-const MockBackend = mock_module.MockBackend;
 
 fn tickerBuf(comptime s: []const u8) [portfolio.max_ticker_len]u8 {
     var buf = [_]u8{0} ** portfolio.max_ticker_len;
@@ -316,25 +311,50 @@ pub const FixtureBackend = struct {
             },
         };
     }
+
+    pub fn asBackend(self: *FixtureBackend) Backend {
+        return Backend.from(FixtureBackend, true, self);
+    }
 };
 
-pub const Backend = union(enum) {
-    mock: MockBackend,
-    fixture: FixtureBackend,
+/// Type-erased adapter backend interface (Zig's standard vtable-interface
+/// idiom, matching model.Backend in src/tickoni/tiles/model/backend.zig).
+/// FixtureBackend exposes `asBackend()` built on `Backend.from()`. Test
+/// doubles inject through the same entrypoint (see
+/// src/tickoni/test/mocks/mock_adapter.zig's asBackend helper) so this
+/// module never names a test-only type.
+pub const Backend = struct {
+    ptr: *anyopaque,
+    vtable: *const VTable,
 
-    pub fn call(self: *Backend, req: schema.AdapterRequest) anyerror!schema.AdapterResult {
-        return switch (self.*) {
-            .mock => |m| m.call(req),
-            .fixture => |f| f.call(req),
+    pub const VTable = struct {
+        call: *const fn (ptr: *anyopaque, req: schema.AdapterRequest) anyerror!schema.AdapterResult,
+        /// True when no live network calls can occur. Replay must only run
+        /// with effect-free backends.
+        effect_free: bool,
+    };
+
+    /// Builds a Backend from any type T exposing
+    /// `pub fn call(self: T, req) !AdapterResult`. self must outlive the
+    /// returned Backend.
+    pub fn from(comptime T: type, comptime effect_free: bool, self: *T) Backend {
+        const Impl = struct {
+            fn callImpl(ptr: *anyopaque, req: schema.AdapterRequest) anyerror!schema.AdapterResult {
+                const s: *T = @ptrCast(@alignCast(ptr));
+                return s.call(req);
+            }
+            const vtable = VTable{ .call = callImpl, .effect_free = effect_free };
         };
+        return .{ .ptr = self, .vtable = &Impl.vtable };
+    }
+
+    pub fn call(self: Backend, req: schema.AdapterRequest) anyerror!schema.AdapterResult {
+        return self.vtable.call(self.ptr, req);
     }
 
     /// Returns true when no live network calls can occur.
-    /// Replay must only run with effect-free backends.
     pub fn isEffectFree(self: Backend) bool {
-        return switch (self) {
-            .mock, .fixture => true,
-        };
+        return self.vtable.effect_free;
     }
 };
 
@@ -366,8 +386,9 @@ test "FixtureBackend builds quote snapshot from loader" {
     try std.testing.expectEqualStrings("AMD", snapshot.quotes[1].tickerSlice());
 }
 
-test "Backend union dispatches to fixture backend" {
-    var backend = Backend{ .fixture = .{} };
+test "Backend dispatches through the vtable to fixture backend" {
+    var fixture_backend = FixtureBackend{};
+    const backend = fixture_backend.asBackend();
     const result = try backend.call(.{
         .operation = .portfolio_snapshot,
         .account_id = fixture_portfolio.fixtures.cash_rich.account_id,
@@ -413,7 +434,7 @@ test "FixtureBackend rejects policy blocked ticket for paper order" {
     try std.testing.expectError(error.PolicyBlocked, (FixtureBackend{}).call(.{
         .operation = .paper_order,
         .account_id = ticket.account_id,
-        .ticket = &ticket,
+        .ticket = ticket,
     }));
 }
 
@@ -487,9 +508,8 @@ test "FixtureBackend.initFromDir data matches hardcoded defaults" {
 }
 
 test "Backend.isEffectFree stays true for offline adapter backends" {
-    const mock = Backend{ .mock = .{} };
-    const fixture = Backend{ .fixture = .{} };
+    var fixture_backend = FixtureBackend{};
+    const fixture = fixture_backend.asBackend();
 
-    try std.testing.expect(mock.isEffectFree());
     try std.testing.expect(fixture.isEffectFree());
 }

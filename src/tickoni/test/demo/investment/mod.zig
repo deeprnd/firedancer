@@ -339,10 +339,11 @@ pub fn runLiveModel(
         .replay_mode = .live,
     };
 
-    var live_model_backend = model.Backend{ .http = .{
+    var live_model_backend_impl = model.HttpBackend{
         .endpoint = live_config.endpoint,
         .io = io,
-    } };
+    };
+    var live_model_backend = live_model_backend_impl.asBackend();
     var tkmodl_result = try model.runTkModlRequest(
         allocator,
         makeLiveConfig(live_config.model_id),
@@ -401,7 +402,8 @@ pub fn runFixtureModel(
         .replay_mode = .live,
     };
 
-    var fixture_backend = model.Backend{ .fixture = .{} };
+    var fixture_backend_impl = model.FixtureBackend{};
+    var fixture_backend = fixture_backend_impl.asBackend();
     var tkmodl_result = try model.runTkModlRequest(
         allocator,
         makeLiveConfig(default_model_id),
@@ -437,7 +439,8 @@ pub fn runAllowedTradeScenario(
     if (!support.basketRejects(&basket, "SOXL")) return error.MissingRestrictedLeverageGuardrail;
     if (!support.basketRejects(&basket, "BULZ")) return error.MissingRestrictedLeverageGuardrail;
 
-    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var adapter_backend_impl = adapter.FixtureBackend{};
+    var adapter_backend = adapter_backend_impl.asBackend();
     const portfolio_result = try adapter_backend.call(tool.normalizePortfolioRead(input.account_id));
     const account = switch (portfolio_result) {
         .portfolio_snapshot => |snapshot| snapshot,
@@ -475,8 +478,10 @@ pub fn runAllowedTradeScenario(
         &execution,
     );
 
-    var replay_model_backend = model.Backend{ .fixture = .{} };
-    var replay_adapter_backend = adapter.Backend{ .fixture = .{} };
+    var replay_model_backend_impl = model.FixtureBackend{};
+    var replay_model_backend = replay_model_backend_impl.asBackend();
+    var replay_adapter_backend_impl = adapter.FixtureBackend{};
+    var replay_adapter_backend = replay_adapter_backend_impl.asBackend();
     const replay_result = try replay.verifyAllowedTrade(
         allocator,
         io,
@@ -512,7 +517,8 @@ pub fn runOversizedTradeScenario(
     const intent = try thesis.normalize(input);
     const basket = try tkpoly.buildBasket(intent, thesis_id);
 
-    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var adapter_backend_impl = adapter.FixtureBackend{};
+    var adapter_backend = adapter_backend_impl.asBackend();
     const portfolio_result = try adapter_backend.call(tool.normalizePortfolioRead(input.account_id));
     const account = switch (portfolio_result) {
         .portfolio_snapshot => |snapshot| snapshot,
@@ -540,8 +546,10 @@ pub fn runOversizedTradeScenario(
         return error.UnexpectedEffectiveMaxTrade;
     }
 
-    var replay_model_backend = model.Backend{ .fixture = .{} };
-    var replay_adapter_backend = adapter.Backend{ .fixture = .{} };
+    var replay_model_backend_impl = model.FixtureBackend{};
+    var replay_model_backend = replay_model_backend_impl.asBackend();
+    var replay_adapter_backend_impl = adapter.FixtureBackend{};
+    var replay_adapter_backend = replay_adapter_backend_impl.asBackend();
     const replay_result = try replay.verifyOversizedTradeBlock(
         allocator,
         io,
