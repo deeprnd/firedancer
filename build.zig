@@ -790,7 +790,31 @@ pub fn build(b: *std.Build) void {
     });
     const sup_test = b.addTest(.{ .root_module = sup_mod });
     linkTickoniCodec(b, sup_test, fd_lib_dir);
+    // supervisor.zig now calls into tile_registry.zig's `entries` array
+    // (V1.14.S8.T1), which embeds every tile's process-mode function
+    // pointer (including tiles.process/rt.link/c_abi callers) as static
+    // data even for tests that only exercise thread mode — needs the same
+    // Firedancer link set as the process-mode integration tests.
+    linkTickoniFiredancer(b, sup_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(sup_test).step);
+
+    // tile_registry.zig (V1.14.S8.T1): single source of truth for tile id
+    // -> behavior, imported by supervisor.zig and tile_main.zig. Same
+    // import set as sup_mod since it needs the same tile-identity types.
+    const tile_registry_mod = b.createModule(.{
+        .root_source_file = b.path("src/app/tickoni/tile_registry.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "runtime", .module = runtime_mod },
+            .{ .name = "tiles", .module = tiles_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
+        },
+    });
+    const tile_registry_test = b.addTest(.{ .root_module = tile_registry_mod });
+    linkTickoniCodec(b, tile_registry_test, fd_lib_dir);
+    linkTickoniFiredancer(b, tile_registry_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(tile_registry_test).step);
 
     // topologies.zig: fresh root module (not the shared topologies_named_mod)
     // so it gets its own dedicated test run, since named-import module

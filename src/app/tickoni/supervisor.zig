@@ -8,6 +8,7 @@ const tiles_mod = @import("tiles");
 const c_abi = @import("c_abi");
 const util = @import("util");
 const topologies = @import("topologies");
+const tile_registry = @import("tile_registry.zig");
 
 const Topology = rt.topology.Topology;
 const TileHandle = rt.tile.TileHandle;
@@ -74,6 +75,12 @@ const ProcessState = struct {
     }
 };
 
+/// Bridges a tile_registry.RunFn resolved at runtime into std.Thread.spawn,
+/// whose function argument must be comptime-known.
+fn threadTrampoline(state: *PaymentPipelineState, run_fn: tile_registry.RunFn) void {
+    run_fn(state);
+}
+
 pub const Supervisor = struct {
     allocator: std.mem.Allocator,
     topo: Topology,
@@ -93,6 +100,7 @@ pub const Supervisor = struct {
     /// pins CPUs, so it has no live affinity mask to check against here.
     pub fn init(allocator: std.mem.Allocator, topo: Topology) !Supervisor {
         try topo.validate();
+        try tile_registry.validate(topo);
         const handles = try allocator.alloc(TileHandle, topo.tiles.len);
         for (handles, 0..) |*h, i| h.* = TileHandle.init(@intCast(i));
         return .{
@@ -132,22 +140,16 @@ pub const Supervisor = struct {
 
         // Dev/test lifecycle only.  The supervisor owns these thread starts;
         // tile modules must not spawn background execution owners themselves.
-        self.handles[0].thread = try std.Thread.spawn(.{}, tiles_mod.runIngest, .{state});
-        self.handles[0].state = .running;
-        self.handles[1].thread = try std.Thread.spawn(.{}, tiles_mod.runNormalize, .{state});
-        self.handles[1].state = .running;
-        self.handles[2].thread = try std.Thread.spawn(.{}, tiles_mod.runDedupe, .{state});
-        self.handles[2].state = .running;
-        self.handles[3].thread = try std.Thread.spawn(.{}, tiles_mod.runPolicy, .{state});
-        self.handles[3].state = .running;
-        self.handles[4].thread = try std.Thread.spawn(.{}, tiles_mod.runAudit, .{state});
-        self.handles[4].state = .running;
-        self.handles[5].thread = try std.Thread.spawn(.{}, tiles_mod.runReplay, .{state});
-        self.handles[5].state = .running;
-        self.handles[6].thread = try std.Thread.spawn(.{}, tiles_mod.runMetric, .{state});
-        self.handles[6].state = .running;
-        self.handles[7].thread = try std.Thread.spawn(.{}, tiles_mod.runDiag, .{state});
-        self.handles[7].state = .running;
+        // Looked up by tile id (not position) through the tile registry
+        // (V1.14.S8.T1) — the single source of truth for tile id -> behavior.
+        // std.Thread.spawn's function argument must be comptime-known, so
+        // the runtime-resolved entry.run_fn is passed through a single
+        // comptime-known trampoline rather than directly.
+        for (self.handles, self.topo.tiles) |*h, tile| {
+            const entry = tile_registry.findById(tile.id) orelse return error.UnregisteredTile;
+            h.thread = try std.Thread.spawn(.{}, threadTrampoline, .{ state, entry.run_fn });
+            h.state = .running;
+        }
     }
 
     /// Start every tile in the topology as a separate OS process connected
@@ -381,19 +383,18 @@ pub const Supervisor = struct {
         var snap = ProcessMetricSnapshot{};
         for (self.topo.tiles, 0..) |tile, i| {
             const cnc = state.cncs[i] orelse continue;
-            const id = tile.id.slice();
-            if (std.mem.eql(u8, id, "tkings")) {
-                snap.produced = rt.cnc_counters.appCounterRead(cnc, 0);
-            } else if (std.mem.eql(u8, id, "tknorm")) {
-                snap.normalized = rt.cnc_counters.appCounterRead(cnc, 0);
-                snap.invalid = rt.cnc_counters.appCounterRead(cnc, 1);
-            } else if (std.mem.eql(u8, id, "tkdedu")) {
-                snap.duplicates = rt.cnc_counters.appCounterRead(cnc, 0);
-            } else if (std.mem.eql(u8, id, "tkpoly")) {
-                snap.allowed = rt.cnc_counters.appCounterRead(cnc, 0);
-                snap.denied = rt.cnc_counters.appCounterRead(cnc, 1);
-            } else if (std.mem.eql(u8, id, "tkaudt")) {
-                snap.audited = rt.cnc_counters.appCounterRead(cnc, 0);
+            const entry = tile_registry.findById(tile.id) orelse continue;
+            for (entry.counters) |c| {
+                const v = rt.cnc_counters.appCounterRead(cnc, c.idx);
+                switch (c.field) {
+                    .produced => snap.produced = v,
+                    .normalized => snap.normalized = v,
+                    .invalid => snap.invalid = v,
+                    .duplicates => snap.duplicates = v,
+                    .allowed => snap.allowed = v,
+                    .denied => snap.denied = v,
+                    .audited => snap.audited = v,
+                }
             }
         }
         return snap;

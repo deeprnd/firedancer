@@ -6,14 +6,13 @@
 /// tile rather than a family of small per-tile binaries.
 ///
 /// The generic single-tile boot/heartbeat/halt lifecycle lives in
-/// src/tickoni/runtime/tile_process.zig; this file owns only the
-/// payment-pipeline-specific dispatch (which decision-logic function to run
-/// for which tile id).
+/// src/tickoni/runtime/tile_process.zig; this file only looks up this
+/// tile's process-mode callback in tile_registry.zig (V1.14.S8.T1's single
+/// source of truth for tile id -> behavior) and runs it.
 const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
-const tiles = @import("tiles");
-const process_stage = tiles.process;
+const tile_registry = @import("tile_registry.zig");
 
 pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
     return rt.tile_process.run(io, allocator, spec_path, runPipelineStage);
@@ -27,48 +26,10 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
 ///
 /// tkrepl/tkmetr/tkdiag have no process-mode pipeline role yet — see the
 /// module doc comment in tiles/payment_pipeline/process.zig for the scope
-/// boundary.
+/// boundary; their tile_registry entry has process_fn == null and is a
+/// no-op here.
 fn runPipelineStage(wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec.LaunchSpec, cnc: *c_abi.cnc.Cnc, allocator: std.mem.Allocator) !void {
-    const id = spec.tile_id.slice();
-
-    if (std.mem.eql(u8, id, "tkings")) {
-        if (!spec.has_output_link) return error.MissingOutputLink;
-        var output = try rt.link.Producer.join(wksp, spec.output_link);
-        defer output.leave();
-        process_stage.runIngestProcess(spec, &output, cnc);
-    } else if (std.mem.eql(u8, id, "tknorm")) {
-        if (!spec.has_input_link or !spec.has_output_link) return error.MissingLink;
-        var input = try rt.link.Consumer.join(wksp, spec.input_link);
-        defer input.leave();
-        var output = try rt.link.Producer.join(wksp, spec.output_link);
-        defer output.leave();
-        process_stage.runNormalizeProcess(spec, &input, &output, cnc);
-    } else if (std.mem.eql(u8, id, "tkdedu")) {
-        if (!spec.has_input_link or !spec.has_output_link) return error.MissingLink;
-        var input = try rt.link.Consumer.join(wksp, spec.input_link);
-        defer input.leave();
-        var output = try rt.link.Producer.join(wksp, spec.output_link);
-        defer output.leave();
-        const cap: usize = @intCast(spec.event_count);
-        const seen_keys = try allocator.alloc(u64, cap);
-        defer allocator.free(seen_keys);
-        const seen_hashes = try allocator.alloc(u64, cap);
-        defer allocator.free(seen_hashes);
-        process_stage.runDedupeProcess(spec, &input, &output, cnc, seen_keys, seen_hashes);
-    } else if (std.mem.eql(u8, id, "tkpoly")) {
-        if (!spec.has_input_link or !spec.has_output_link) return error.MissingLink;
-        var input = try rt.link.Consumer.join(wksp, spec.input_link);
-        defer input.leave();
-        var output = try rt.link.Producer.join(wksp, spec.output_link);
-        defer output.leave();
-        process_stage.runPolicyProcess(spec, &input, &output, cnc);
-    } else if (std.mem.eql(u8, id, "tkaudt")) {
-        if (!spec.has_input_link) return error.MissingInputLink;
-        var input = try rt.link.Consumer.join(wksp, spec.input_link);
-        defer input.leave();
-        const cap: usize = @intCast(spec.event_count);
-        var audit_log = try tiles.audit_sink.AuditLog.init(allocator, cap);
-        defer audit_log.deinit(allocator);
-        process_stage.runAuditProcess(spec, &input, cnc, &audit_log);
-    }
+    const entry = tile_registry.findById(spec.tile_id) orelse return error.UnregisteredTile;
+    const process_fn = entry.process_fn orelse return;
+    try process_fn(wksp, spec, cnc, allocator);
 }
