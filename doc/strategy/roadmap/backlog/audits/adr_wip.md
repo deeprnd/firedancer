@@ -162,3 +162,77 @@ LAYER 3: Topology-Driven Link Model (Audit 11-23)
     3. Keep Tickoni's own orchestration (tile_process.zig runner, supervisor, self-exec model)
     
     This gives Tickoni Firedancer's defensive infrastructure without the Solana-shaped topology builder, stem loop, or supervisor coupling that the audits identified as blockers.
+
+
+    Looking at the actual Firedancer harness code (fd_topo_run.c), here's the reality:
+    
+    What Firedancer's harness actually does
+    
+    fd_topo_run_single_process() + fd_topo_run_tile() provide a complete tile orchestration pipeline:
+    
+    
+    loop over tiles → tile_run() callback → run_tile_thread() →
+      fd_topo_join_tile_workspaces() →
+      privileged_init() →
+      sandbox setup (seccomp, fds, rlimits) →
+      fd_sandbox_enter() →
+      fd_topo_fill_tile() →          // joins all mcache/dcache/fseq links
+      fd_metrics_register() →
+      unprivileged_init() →
+      tile_run->run(topo, tile) →     // your tile's work loop
+      check(allow_shutdown)
+    
+    
+    That's a complete lifecycle. Process sandboxing, workspace joining, link setup, metrics registration, shutdown enforcement, thread management.
+    
+    What we'd have to build vs. what's already there
+    
+    What the current plan wants us to build (over-engineered):
+    - Own topology struct (Layer 3)
+    - Own supervisor with execve model (replacing Firedancer's harness)
+    - Own tile registry (Layer 2)
+    - Own c_abi shims for tempo/fctl/metrics (Layer 4)
+    - Own stuck-tile defense (Phase 5)
+    - Own workspace initialization for topology
+    
+    What Firedancer already provides (Solana-free):
+    - fd_topo_run_single_process() - the orchestration loop itself
+    - fd_topo_run_tile() - sandbox → join → fill → run → shutdown enforcement
+    - fd_topo_fill_tile() - joins all in/out links from topology arrays
+    - fd_topo_run_tile_t struct - just callbacks (Solana-free!)
+    - fd_sandbox_*() - pure Linux security, no Solana semantics
+    - fd_topo_join_tile_workspaces() - joins shmem IPC objects
+    - Thread stack management, priority, CPU affinity
+    - The fd_topo_run_tile_t callback pattern (privileged_init, sandbox, unprivileged_init, run)
+    - allow_shutdown enforcement after run()
+    
+    What's actually Solana-shaped and not reusable:
+    - fd_topo_t struct - has Solana-specific fields (tile_kind, kind_id, is_agave)
+    - fd_topo_tile_t struct - same
+    - fd_topob.c topology builder - Solana pinning, kind enums
+    - fd_cfg_stage_* config stages - Solana-specific
+    
+    The honest assessment
+    
+    The adr_wip.md plan is way over-engineered. We're building a custom supervisor when Firedancer's harness IS the supervisor, and it's only the data structures that are Solana-shaped, not the orchestration logic.
+    
+    The right approach is dramatically simpler:
+    
+    
+    Tickoni topology struct  ──embeds──>  Firedancer fd_topo_t (minimal fields only)
+    Tickoni tile struct      ──embeds──>  Firedancer fd_topo_tile_t
+    Tickoni tile callback    ──returns──>  Firedancer fd_topo_run_tile_t (pure callbacks)
+    
+    Call: fd_topo_run_single_process(topo, ..., our_tile_run_callback)
+    
+    
+    We don't need 4 layers and 5 phases. We need:
+    
+    1. Tickoni topology struct - thin wrapper around fd_topo_t, drop Solana fields, keep link arrays
+    2. Tickoni tile struct - thin wrapper around fd_topo_tile_t, keep what fd_topo_fill_tile needs
+    3. Tile run callbacks - each tile returns fd_topo_run_tile_t with just our callbacks
+    4. Call fd_topo_run_single_process() - or our own lightweight wrapper that calls it
+    
+    That's it. No supervisor rewrite. No LaunchSpec. No tile registry rewrite. The TILES[] pattern IS the registry. fd_topo_fill_tile IS our link management.
+    
+    The plan should change from "build our own harness on top of Firedancer infrastructure" to "use Firedancer's harness directly, with thin Tickoni-shaped topology structs."
