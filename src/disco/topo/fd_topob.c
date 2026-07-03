@@ -377,6 +377,9 @@ static char const * FLOATING[] = {
   "bencho",
   "genesi", /* FIREDANCER ONLY */
   "ipecho", /* FIREDANCER ONLY */
+  "tkmetr", /* TICKONI */
+  "tkdiag", /* TICKONI */
+  "tkdisp", /* TICKONI */
   NULL
 };
 
@@ -435,6 +438,9 @@ static char const * ALWAYS[] = {
   "tower",  /* FIREDANCER only */
   "pktgen",
   "forkt",  /* FIREDANCER only */
+  "tkdedu", /* TICKONI */
+  "tkpoly", /* TICKONI */
+  "tkaudt", /* TICKONI */
   NULL
 };
 
@@ -445,6 +451,8 @@ static char const * CRITICAL_TILES[] = {
   "pohh",
   "gui",
   "guih",
+  "tkings", /* TICKONI */
+  "tknorm", /* TICKONI */
   NULL
 };
 
