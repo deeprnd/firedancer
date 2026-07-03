@@ -25,6 +25,15 @@ will reuse, define them once and reference them from `SandboxConfig` and tests.
 plan phases (`core`, `case`, `agent`, `api`, `exec`) so the topology is typed
 and self-explanatory.
 
+**Clarification:**
+- Keep roadmap phases in docs/backlog.
+- Remove `Phase 0/1/2/3/4` language from product structs.
+- Either:
+  1. remove `TileDescriptor.phase` entirely if it is only decorative; or
+  2. rename it to a stable product concept like `layer`, `domain`, `capability`, or `boundary`.
+
+The current enum names `.core`, `.case`, `.agent`, `.api`, `.exec` are closer to a product architecture concept, but the name `phase` and numeric mapping `0..4` make it smell like roadmap state leaking into runtime code.
+
 **Done when:**
 
 - `TileDescriptor.phase` is an enum, not a raw integer.

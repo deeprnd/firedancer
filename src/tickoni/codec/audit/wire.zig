@@ -383,3 +383,37 @@ fn parseEnumByValue(comptime T: type, value: anytype) error{ UnknownRecordType, 
 }
 
 const std = @import("std");
+
+// Mechanical sync check between the canonical Zig schema (audit.zig) and the
+// wire codec's extern-struct mirror of it, so adding/removing/renaming a
+// payload field in one without the other fails the build instead of silently
+// drifting — see finding 32 in
+// doc/strategy/roadmap/backlog/audits/tech_debt.md. Does not cover the
+// .proto file, hash.zig's SipHash coverage, or jsonl.zig's field list, since
+// those aren't reachable via Zig reflection; this is the prerequisite piece
+// finding 32 itself calls out ("mechanically-check the four representations
+// against one source of truth").
+test "schema and wire Payload variants stay field-name and order synchronized" {
+    comptime {
+        const schema_fields = std.meta.fields(schema.AuditEvent.Payload);
+        const wire_fields = std.meta.fields(Payload);
+        if (schema_fields.len != wire_fields.len) {
+            @compileError("schema.AuditEvent.Payload and wire.Payload have a different number of record-type variants");
+        }
+        for (schema_fields, wire_fields) |sf, wf| {
+            if (!std.mem.eql(u8, sf.name, wf.name)) {
+                @compileError("schema.AuditEvent.Payload and wire.Payload variant order/names diverge: " ++ sf.name ++ " vs " ++ wf.name);
+            }
+            const schema_variant_fields = std.meta.fields(sf.type);
+            const wire_variant_fields = std.meta.fields(wf.type);
+            if (schema_variant_fields.len != wire_variant_fields.len) {
+                @compileError("schema and wire payload field count diverges for variant " ++ sf.name);
+            }
+            for (schema_variant_fields, wire_variant_fields) |svf, wvf| {
+                if (!std.mem.eql(u8, svf.name, wvf.name)) {
+                    @compileError("schema and wire payload field name diverges for variant " ++ sf.name ++ ": " ++ svf.name ++ " vs " ++ wvf.name);
+                }
+            }
+        }
+    }
+}
