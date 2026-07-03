@@ -253,10 +253,29 @@ tk_topob_tile( void * topo, char const * tile_name, char const * tile_wksp, char
   return tile->id;
 }
 
-void
+/* Returns the fseq object id fd_topob_tile_in creates for this in-link
+   (the last entry of the tile's in_link_fseq_obj_id[] array right after
+   its in_cnt is incremented) — needed by the parent to resolve/gaddr the
+   fseq it must not create twice, and by anything that wants to read the
+   fseq's laddr directly (V1.14.S8.T12). */
+ulong
 tk_topob_tile_in( void * topo, char const * tile_name, ulong tile_kind_id, char const * fseq_wksp,
                   char const * link_name, ulong link_kind_id, int reliable, int polled ) {
-  fd_topob_tile_in( (fd_topo_t *)topo, tile_name, tile_kind_id, fseq_wksp, link_name, link_kind_id, reliable, polled );
+  fd_topo_t * t = (fd_topo_t *)topo;
+  ulong tile_id = fd_topo_find_tile( t, tile_name, tile_kind_id );
+  fd_topob_tile_in( t, tile_name, tile_kind_id, fseq_wksp, link_name, link_kind_id, reliable, polled );
+  fd_topo_tile_t * tile = &t->tiles[ tile_id ];
+  return tile->in_link_fseq_obj_id[ tile->in_cnt - 1UL ];
+}
+
+ulong
+tk_topo_link_mcache_obj_id( void * topo, ulong link_id ) {
+  return ((fd_topo_t *)topo)->links[ link_id ].mcache_obj_id;
+}
+
+ulong
+tk_topo_link_dcache_obj_id( void * topo, ulong link_id ) {
+  return ((fd_topo_t *)topo)->links[ link_id ].dcache_obj_id;
 }
 
 void
@@ -281,6 +300,21 @@ tk_topo_wksp_new( void * topo, ulong wksp_idx ) {
   fd_topo_wksp_new( t, &t->workspaces[ wksp_idx ], TK_CALLBACKS );
 }
 
+/* Maps every workspace in the topology into this process's address space
+   (parent-side: needed before fd_topo_obj_laddr-based object content can
+   be written by tk_topo_wksp_new, or read/written directly afterward).
+   Distinct from tk_topo_join_tile_workspaces in topo_run.c, which only
+   joins the subset of workspaces one tile needs. */
+void
+tk_topo_join_workspaces( void * topo, int mode, int core_dump_level ) {
+  fd_topo_join_workspaces( (fd_topo_t *)topo, mode, core_dump_level );
+}
+
+void
+tk_topo_leave_workspaces( void * topo ) {
+  fd_topo_leave_workspaces( (fd_topo_t *)topo );
+}
+
 ulong
 tk_topo_find_wksp( void * topo, char const * name ) {
   return fd_topo_find_wksp( (fd_topo_t *)topo, name );
@@ -299,6 +333,16 @@ tk_topo_find_link( void * topo, char const * name, ulong kind_id ) {
 void *
 tk_topo_obj_laddr( void * topo, ulong obj_id ) {
   return fd_topo_obj_laddr( (fd_topo_t *)topo, obj_id );
+}
+
+/* Returns the fd_wksp_t* backing a joined workspace, so callers can reuse
+   Tickoni's existing c_abi/wksp.zig gaddr/laddr helpers (wkspGaddr in
+   particular, to convert a fd_topo_obj_laddr result back into the gaddr
+   form LaunchSpec/LinkHandles already carry) instead of duplicating them
+   here. NULL if the workspace hasn't been joined yet. */
+void *
+tk_topo_wksp_ptr( void * topo, ulong wksp_idx ) {
+  return ((fd_topo_t *)topo)->workspaces[ wksp_idx ].wksp;
 }
 
 void *

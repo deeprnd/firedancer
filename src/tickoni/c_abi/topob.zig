@@ -17,12 +17,19 @@
 /// Link requirements: -lfd_disco -lfd_ballet -lfd_waltz -lfd_tango
 /// -lfd_util and shim/topob.c at link time.
 const topo_run = @import("topo_run.zig");
+const wksp_mod = @import("wksp.zig");
 
 pub const Topo = topo_run.Topo;
 pub const TopoTile = topo_run.TopoTile;
 
 pub const shmem_join_mode_read_only: c_int = 0;
 pub const shmem_join_mode_read_write: c_int = 1;
+
+pub const core_dump_level_disabled: i32 = 0;
+pub const core_dump_level_minimal: i32 = 1;
+pub const core_dump_level_regular: i32 = 2;
+pub const core_dump_level_full: i32 = 3;
+pub const core_dump_level_never: i32 = 4;
 
 // ---------------------------------------------------------------------------
 // Extern declarations.
@@ -36,16 +43,21 @@ extern fn tk_topob_obj(topo: *Topo, obj_type: [*:0]const u8, wksp_name: [*:0]con
 extern fn tk_topob_tile_uses(topo: *Topo, tile_id: usize, obj_id: usize, mode: c_int) void;
 extern fn tk_topob_link(topo: *Topo, link_name: [*:0]const u8, wksp_name: [*:0]const u8, depth: usize, mtu: usize, burst: usize) usize;
 extern fn tk_topob_tile(topo: *Topo, tile_name: [*:0]const u8, tile_wksp: [*:0]const u8, metrics_wksp: [*:0]const u8, cpu_idx: usize) usize;
-extern fn tk_topob_tile_in(topo: *Topo, tile_name: [*:0]const u8, tile_kind_id: usize, fseq_wksp: [*:0]const u8, link_name: [*:0]const u8, link_kind_id: usize, reliable: c_int, polled: c_int) void;
+extern fn tk_topob_tile_in(topo: *Topo, tile_name: [*:0]const u8, tile_kind_id: usize, fseq_wksp: [*:0]const u8, link_name: [*:0]const u8, link_kind_id: usize, reliable: c_int, polled: c_int) usize;
 extern fn tk_topob_tile_out(topo: *Topo, tile_name: [*:0]const u8, tile_kind_id: usize, link_name: [*:0]const u8, link_kind_id: usize) void;
 extern fn tk_topob_finish(topo: *Topo) void;
 extern fn tk_topo_create_workspace(topo: *Topo, wksp_idx: usize, update_existing: c_int) c_int;
 extern fn tk_topo_wksp_new(topo: *Topo, wksp_idx: usize) void;
+extern fn tk_topo_join_workspaces(topo: *Topo, mode: c_int, core_dump_level: c_int) void;
+extern fn tk_topo_leave_workspaces(topo: *Topo) void;
 extern fn tk_topo_find_wksp(topo: *Topo, name: [*:0]const u8) usize;
 extern fn tk_topo_find_tile(topo: *Topo, name: [*:0]const u8, kind_id: usize) usize;
 extern fn tk_topo_find_link(topo: *Topo, name: [*:0]const u8, kind_id: usize) usize;
 extern fn tk_topo_obj_laddr(topo: *Topo, obj_id: usize) *anyopaque;
 extern fn tk_topo_tile_ptr(topo: *Topo, tile_id: usize) *TopoTile;
+extern fn tk_topo_link_mcache_obj_id(topo: *Topo, link_id: usize) usize;
+extern fn tk_topo_link_dcache_obj_id(topo: *Topo, link_id: usize) usize;
+extern fn tk_topo_wksp_ptr(topo: *Topo, wksp_idx: usize) ?*wksp_mod.Wksp;
 
 // ---------------------------------------------------------------------------
 // Public Zig wrappers.
@@ -87,8 +99,9 @@ pub fn topobTile(topo: *Topo, tile_name: [*:0]const u8, tile_wksp: [*:0]const u8
     return tk_topob_tile(topo, tile_name, tile_wksp, metrics_wksp, cpu_idx);
 }
 
-pub fn topobTileIn(topo: *Topo, tile_name: [*:0]const u8, tile_kind_id: usize, fseq_wksp: [*:0]const u8, link_name: [*:0]const u8, link_kind_id: usize, reliable: bool, polled: bool) void {
-    tk_topob_tile_in(topo, tile_name, tile_kind_id, fseq_wksp, link_name, link_kind_id, @intFromBool(reliable), @intFromBool(polled));
+/// Returns the fseq object id created for this in-link.
+pub fn topobTileIn(topo: *Topo, tile_name: [*:0]const u8, tile_kind_id: usize, fseq_wksp: [*:0]const u8, link_name: [*:0]const u8, link_kind_id: usize, reliable: bool, polled: bool) usize {
+    return tk_topob_tile_in(topo, tile_name, tile_kind_id, fseq_wksp, link_name, link_kind_id, @intFromBool(reliable), @intFromBool(polled));
 }
 
 pub fn topobTileOut(topo: *Topo, tile_name: [*:0]const u8, tile_kind_id: usize, link_name: [*:0]const u8, link_kind_id: usize) void {
@@ -105,6 +118,14 @@ pub fn topoCreateWorkspace(topo: *Topo, wksp_idx: usize, update_existing: bool) 
 
 pub fn topoWkspNew(topo: *Topo, wksp_idx: usize) void {
     tk_topo_wksp_new(topo, wksp_idx);
+}
+
+pub fn topoJoinWorkspaces(topo: *Topo, read_write: bool, core_dump_level: i32) void {
+    tk_topo_join_workspaces(topo, if (read_write) shmem_join_mode_read_write else shmem_join_mode_read_only, core_dump_level);
+}
+
+pub fn topoLeaveWorkspaces(topo: *Topo) void {
+    tk_topo_leave_workspaces(topo);
 }
 
 pub fn topoFindWksp(topo: *Topo, name: [*:0]const u8) usize {
@@ -125,4 +146,17 @@ pub fn topoObjLaddr(topo: *Topo, obj_id: usize) *anyopaque {
 
 pub fn topoTilePtr(topo: *Topo, tile_id: usize) *TopoTile {
     return tk_topo_tile_ptr(topo, tile_id);
+}
+
+pub fn topoLinkMcacheObjId(topo: *Topo, link_id: usize) usize {
+    return tk_topo_link_mcache_obj_id(topo, link_id);
+}
+
+pub fn topoLinkDcacheObjId(topo: *Topo, link_id: usize) usize {
+    return tk_topo_link_dcache_obj_id(topo, link_id);
+}
+
+/// Null until the workspace has been joined (topoJoinWorkspaces).
+pub fn topoWkspPtr(topo: *Topo, wksp_idx: usize) ?*wksp_mod.Wksp {
+    return tk_topo_wksp_ptr(topo, wksp_idx);
 }

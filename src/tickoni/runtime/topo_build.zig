@@ -33,15 +33,28 @@ const topo_alloc_align: std.mem.Alignment = .fromByteUnits(128);
 /// src/disco/topo/fd_topo_run.c's `tile->cpu_idx<65535UL` floating check).
 const cpu_idx_floating: usize = std.math.maxInt(usize);
 
+/// mcache/dcache/fseq object ids for one channel — fseq is a per-(tile,
+/// in-link) object in fd_topob's model, not per-link, but Phase 0's
+/// linear chain has exactly one consumer per channel, so this is still a
+/// clean 1:1 mapping from Topology.channels' index.
+pub const LinkObjIds = struct {
+    mcache_obj_id: usize,
+    dcache_obj_id: usize,
+    fseq_obj_id: usize,
+};
+
 pub const BuiltTopo = struct {
     buf: []align(128) u8,
     topo: *Topo,
     wksp_idx: usize,
     /// Per-tile cnc object id, indexed the same as Topology.tiles.
     cnc_obj_id: []usize,
+    /// Per-channel object ids, indexed the same as Topology.channels.
+    link_obj_id: []LinkObjIds,
 
     pub fn deinit(self: *BuiltTopo, allocator: std.mem.Allocator) void {
         allocator.free(self.cnc_obj_id);
+        allocator.free(self.link_obj_id);
         allocator.free(self.buf);
     }
 };
@@ -89,9 +102,11 @@ pub fn build(
     // Links first, then tiles, then per-tile cnc objects, then wiring —
     // a fixed construction order so object ids stay deterministic across
     // parent/child rebuilds.
+    const link_ids = try allocator.alloc(usize, topo_desc.channels.len);
+    defer allocator.free(link_ids);
     for (topo_desc.channels, 0..) |ch, i| {
         var link_name_buf: [8]u8 = undefined;
-        _ = c_abi.topob.topobLink(topo, linkNameZ(&link_name_buf, i), wksp_name_z, ch.depth, ch.mtu, 1);
+        link_ids[i] = c_abi.topob.topobLink(topo, linkNameZ(&link_name_buf, i), wksp_name_z, ch.depth, ch.mtu, 1);
     }
 
     for (topo_desc.tiles) |t| {
@@ -107,6 +122,8 @@ pub fn build(
         cnc_obj_id[i] = obj_id;
     }
 
+    const link_obj_id = try allocator.alloc(LinkObjIds, topo_desc.channels.len);
+    errdefer allocator.free(link_obj_id);
     for (topo_desc.channels, 0..) |ch, i| {
         var src_name_buf: [8]u8 = undefined;
         var dst_name_buf: [8]u8 = undefined;
@@ -114,8 +131,13 @@ pub fn build(
         const src_name_z = toZ(&src_name_buf, topo_desc.tiles[ch.src_idx].id.slice());
         const dst_name_z = toZ(&dst_name_buf, topo_desc.tiles[ch.dst_idx].id.slice());
         const link_name_z = linkNameZ(&link_name_buf, i);
-        c_abi.topob.topobTileIn(topo, dst_name_z, 0, wksp_name_z, link_name_z, 0, true, true);
+        const fseq_obj_id = c_abi.topob.topobTileIn(topo, dst_name_z, 0, wksp_name_z, link_name_z, 0, true, true);
         c_abi.topob.topobTileOut(topo, src_name_z, 0, link_name_z, 0);
+        link_obj_id[i] = .{
+            .mcache_obj_id = c_abi.topob.topoLinkMcacheObjId(topo, link_ids[i]),
+            .dcache_obj_id = c_abi.topob.topoLinkDcacheObjId(topo, link_ids[i]),
+            .fseq_obj_id = fseq_obj_id,
+        };
     }
 
     c_abi.topob.topobFinish(topo);
@@ -125,6 +147,7 @@ pub fn build(
         .topo = topo,
         .wksp_idx = wksp_idx,
         .cnc_obj_id = cnc_obj_id,
+        .link_obj_id = link_obj_id,
     };
 }
 
