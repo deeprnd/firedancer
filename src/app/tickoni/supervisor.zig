@@ -256,15 +256,23 @@ pub const Supervisor = struct {
         var self_exe_path_buf: [std.fs.max_path_bytes]u8 = undefined;
         const self_exe_path = config.tile_exe_path orelse try util.process.selfExePath(&self_exe_path_buf);
 
+        // Payment-pipeline test config is identical for every tile in the
+        // run, so it's written once here rather than duplicated into each
+        // tile's own LaunchSpec (V1.14.S8.T2: keeps that generic bootstrap
+        // record free of payment-pipeline-specific fields). Tile processes
+        // read it back via tile_registry.zig's loadProcessConfig, which
+        // derives this same path from their LaunchSpec's shmemPath().
+        const payment_config_path = try std.fmt.allocPrint(self.allocator, "{s}/payment_pipeline.config", .{config.run_dir});
+        defer self.allocator.free(payment_config_path);
+        try tiles_mod.process.writeProcessConfig(.{
+            .event_count = config.event_count,
+            .policy_limit_cents = config.policy_limit_cents,
+            .inject_duplicate = config.inject_duplicate,
+            .inject_malformed = config.inject_malformed,
+        }, io, std.Io.Dir.cwd(), payment_config_path);
+
         for (self.handles, 0..) |*h, i| {
             const tile = self.topo.tiles[i];
-
-            var input_link: ?rt.link.LinkHandles = null;
-            var output_link: ?rt.link.LinkHandles = null;
-            for (self.topo.channels, 0..) |ch, ci| {
-                if (ch.dst_idx == i) input_link = link_handles[ci];
-                if (ch.src_idx == i) output_link = link_handles[ci];
-            }
 
             const spec = try rt.launch_spec.LaunchSpec.init(.{
                 .tile_idx = @intCast(i),
@@ -275,12 +283,8 @@ pub const Supervisor = struct {
                 .shmem_path = config.run_dir,
                 .heartbeat_interval_ns = config.heartbeat_interval_ns,
                 .crash_after_heartbeats = config.crash_after_heartbeats[i],
-                .input_link = input_link,
-                .output_link = output_link,
-                .event_count = config.event_count,
-                .policy_limit_cents = config.policy_limit_cents,
-                .inject_duplicate = config.inject_duplicate,
-                .inject_malformed = config.inject_malformed,
+                .channels = self.topo.channels,
+                .link_handles = link_handles,
             });
             const spec_path = try std.fmt.allocPrint(self.allocator, "{s}/tile_{d}.spec", .{ config.run_dir, i });
             defer self.allocator.free(spec_path);

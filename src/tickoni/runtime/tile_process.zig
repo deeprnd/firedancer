@@ -21,6 +21,7 @@ const launch_spec = @import("launch_spec.zig");
 const boot = @import("boot.zig");
 
 pub const WorkFn = *const fn (
+    io: std.Io,
     wksp: *c_abi.wksp.Wksp,
     spec: *const launch_spec.LaunchSpec,
     cnc: *c_abi.cnc.Cnc,
@@ -77,7 +78,7 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8, work
     // progress before calling stopProcess).
     c_abi.cnc.signal(cnc, c_abi.cnc.signal_run);
 
-    work(wksp, &spec, cnc, allocator) catch |err| {
+    work(io, wksp, &spec, cnc, allocator) catch |err| {
         std.debug.print("tile_process: work failed for tile {d} ({s}): {t}\n", .{ spec.tile_idx, spec.tile_id.slice(), err });
         return 1;
     };

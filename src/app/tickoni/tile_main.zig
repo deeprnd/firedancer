@@ -19,7 +19,8 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
 }
 
 /// Dispatches the deterministic payment pipeline stage for this tile's
-/// role and runs it to completion (bounded by spec.event_count). Runs
+/// role and runs it to completion (bounded by the shared payment-pipeline
+/// config's event_count — see tile_registry.zig's loadProcessConfig). Runs
 /// before the heartbeat/halt-wait loop above so the supervisor's stop
 /// sequence (signal every cnc to halt, wait for exit) stays uniform
 /// whether or not a tile has pipeline work.
@@ -28,8 +29,8 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
 /// module doc comment in tiles/payment_pipeline/process.zig for the scope
 /// boundary; their tile_registry entry has process_fn == null and is a
 /// no-op here.
-fn runPipelineStage(wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec.LaunchSpec, cnc: *c_abi.cnc.Cnc, allocator: std.mem.Allocator) !void {
+fn runPipelineStage(io: std.Io, wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec.LaunchSpec, cnc: *c_abi.cnc.Cnc, allocator: std.mem.Allocator) !void {
     const entry = tile_registry.findById(spec.tile_id) orelse return error.UnregisteredTile;
     const process_fn = entry.process_fn orelse return;
-    try process_fn(wksp, spec, cnc, allocator);
+    try process_fn(io, wksp, spec, cnc, allocator);
 }
