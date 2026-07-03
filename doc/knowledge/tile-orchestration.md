@@ -124,22 +124,111 @@ Tickoni reuses Firedancer infrastructure in two forms.
 
 ### Linux Full Runtime
 
-The Linux full-runtime tier should reuse Firedancer orchestration as deeply as
-the Tickoni boundary allows:
+The Linux full-runtime tier reuses Firedancer orchestration as deeply as the
+Tickoni boundary allows:
 
-- topology-driven link discovery
-- per-tile run descriptors and callbacks
-- workspace joining
+- topology construction via `fd_topob.c` (the real Firedancer topology builder)
+- workspace creation and join via `fd_wksp_*`
 - link filling for `mcache`, `dcache`, `fseq`, and related state
 - sandbox entry and allowed-fd/seccomp discipline where supported
 - metrics registration or equivalent per-tile health visibility
 - process/thread launch semantics where the selected Linux mode uses them
 - crash and shutdown semantics
 - stem-loop guard patterns for shutdown, housekeeping, credit, and heartbeat
+- per-tile CPU placement via `fd_topo_cpus_init()` +
+  `fd_topob_auto_layout_cpus()` with Tickoni name arrays in priority slots
 
 The adapter should follow Firedancer harness hooks, guards, ordering, and
 failure semantics. If Tickoni replaces one of those pieces, the replacement
 must preserve the same orchestration guarantee at the Tickoni boundary.
+
+### Topology Builder Adapter
+
+`fd_topob.c` is the real Firedancer topology builder — it is NOT Solana-shaped.
+Tickoni calls it directly rather than maintaining a parallel builder. The adapter
+pattern is:
+
+1. **Build the topology:** `fd_topob_new(topo, "tickoni")` — allocates and
+   `memset`-zeros the entire `fd_topo_t`, zeroing every field including Solana
+   union fields (xdp, sock, gossip, quic, etc.).
+
+2. **Create workspaces:** `fd_topob_wksp(topo, name, footprint, ...)` for each
+   workspace (tickoni_wksp, metrics_wksp, etc.).
+
+3. **Create links:** `fd_topob_link(topo, name, ...)` for each inter-tile link.
+
+4. **Create tiles:** `fd_topob_tile(topo, name, wksp, metrics_wksp, cpu_idx,
+   is_agave, uses_id_keyswitch, uses_av_keyswitch)` for each Tile — with
+   **`0` for all three Solana flags**:
+   - `is_agave=0` — Tickoni does not run in Agave/single-process mode
+   - `uses_id_keyswitch=0` — no validator identity key rotation
+   - `uses_av_keyswitch=0` — no validator authority key rotation
+
+5. **Wire links:** `fd_topob_tile_in(topo, tile_idx, link_idx, ...)` and
+   `fd_topob_tile_out()` to attach each link to its tile.
+
+6. **Validate:** `fd_topob_finish(topo)` runs structural validation (free check,
+   link connectivity, workspace coverage) — pure generic, no Solana dependency.
+
+7. **CPU placement:** `fd_topo_cpus_init()` → `fd_topob_auto_layout_cpus()`
+   assigns each tile to a CPU core using priority phase arrays. The 4 arrays
+   (`CRITICAL_TILES[]`, `ALWAYS[]`, `STARTUP[]`, `FLOATING[]`) are the only
+   Solana-specific part — they contain hardcoded tile name strings matched
+   against `fd_topo_tile_t.name` via `strcmp`. Tickoni replaces these arrays
+   with Tickoni tile names:
+
+   ```c
+   // Patched in fd_topob.c — CRITICAL (no HT sharing)
+   static char const * CRITICAL_TILES[] = {
+     "pack", "poh", "pohh", "gui", "guih",
+     "tkings", "tknorm",
+     NULL
+   };
+
+   // Patched — ALWAYS (continuous pipeline)
+   static char const * ALWAYS[] = {
+     "backt", "benchg", "net", "sock", "quic", "bundle",
+     "verify", "dedup", "pack", "sign", "shred", "pktgen",
+     "tkdedu", "tkpoly", "tkaudt",
+     NULL
+   };
+
+   // Patched — FLOATING (monitoring, kernel-scheduled)
+   static char const * FLOATING[] = {
+     "netlnk", "metric", "diag", "bencho",
+     "tkmetr", "tkdiag", "tkdisp",
+     NULL
+   };
+   ```
+
+   The algorithm (`fd_topo_cpus_init` → `auto_tile_cpu` → `auto_layout_cpus`)
+   is fully generic: NUMA-aware core scanning, hyperthread-pair exclusion for
+   latency-sensitive tiles, 4-phase priority ordering, and "floating" fallback
+   for unmatched tiles (logged as warning, left to kernel scheduler). Only the
+   name strings change.
+
+8. **Launch:** Pass `topo` and `topo->tiles[]` to `fd_topo_run_tile()` — the
+   harness joins workspaces, fills link pointers, enters sandbox, runs the tile,
+   and checks shutdown state.
+
+**Why `0` for Solana flags is safe:** `fd_topob_new()` does `memset(topo, 0)`,
+so all Solana union fields in `fd_topo_t` are already zero. The launch path
+(`fd_topo_run_tile` in `fd_topo_run.c` lines 49–140) reads only `name`,
+`kind_id`, `cpu_idx`, `allow_shutdown`, and `metrics` — none are Solana union
+fields. `fd_topo_run_single_process()` reads `is_agave` (lines 326, 335) but
+Tickoni uses per-process `execve` mode, not single-process mode.
+
+**Keyswitch objects (the 3 params):** Each keyswitch is a 128-byte shared memory
+object with a state machine: `SWITCH_PENDING` → tile reads new bytes →
+`COMPLETED` or `FAILED`. While Solana uses these for validator identity/authority
+key rotation, the mechanism is generic and can be repurposed for Tickoni:
+GCP/GCS OAuth tokens, AWS credential rotation, LLM provider API keys, or
+adapter secrets stored in `bytes[64]`. For Phase 0 tiles that need no runtime
+auth rotation, pass `0` and no keyswitch object is allocated.
+
+**What changes in upstream `fd_topob.c`:** Only the 4 name arrays get Tickoni
+tile names appended. No logic changes, no new functions, no struct modifications.
+The file set is tracked by `engine-check-changes` to catch any upstream drift.
 
 ### C ABI Substrate
 
