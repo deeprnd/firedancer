@@ -5,3 +5,6 @@
 /// Import as @import("util") in files that use the build module system.
 pub const cpu = @import("cpu.zig");
 pub const process = @import("process.zig");
+pub const linux_ids = @import("linux_ids.zig");
+pub const sizes = @import("sizes.zig");
+pub const sandbox_defaults = @import("sandbox_defaults.zig");

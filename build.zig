@@ -283,6 +283,9 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/runtime/tile.zig",
         "src/tickoni/util/cpu.zig",
         "src/tickoni/util/process.zig",
+        "src/tickoni/util/linux_ids.zig",
+        "src/tickoni/util/sizes.zig",
+        "src/tickoni/util/sandbox_defaults.zig",
         "src/tickoni/runtime/sandbox.zig",
         "src/tickoni/c_abi/ballet.zig",
         "src/tickoni/c_abi/queue.zig",
@@ -317,6 +320,15 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "audit_tile", .module = audit_tile_mod },
                     .{ .name = "runtime", .module = runtime_mod },
                     .{ .name = "c_abi", .module = c_abi_mod },
+                },
+            })
+        else if (std.mem.eql(u8, path, "src/tickoni/runtime/sandbox.zig"))
+            b.createModule(.{
+                .root_source_file = b.path(path),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "util", .module = util_mod },
                 },
             })
         else
