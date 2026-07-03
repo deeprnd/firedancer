@@ -17,8 +17,8 @@
 /// src/tickoni/schema/proto/consumer_money/thesis.proto; breaking changes are enforced by buf
 /// in CI (quality-check-proto / proto_check.yml).
 const std = @import("std");
+const c_abi = @import("c_abi");
 const cls = @import("classification");
-const thesis_codec = @import("thesis_codec");
 const thesis_proto_path = "src/tickoni/schema/proto/consumer_money/thesis.proto";
 
 pub const classification = cls;
@@ -41,19 +41,18 @@ pub const themeIdList = cls.themeIdList;
 pub const classificationRefList = cls.classificationRefList;
 pub const validateCanonicalId = cls.validateCanonicalId;
 
-/// Schema version. Must match TK_THESIS_SCHEMA_VERSION in thesis_codec.h.
-/// Incrementing this value changes the hash key and invalidates existing hashes.
+/// Schema version. Incrementing this value changes the hash key and invalidates
+/// existing hashes.
 pub const thesis_schema_version: u16 = 3;
 
 /// Maximum bytes stored in the user_text field.
 pub const max_user_text_len: usize = 512;
 
 /// Byte width of each ticker slot in requested_tickers.
-/// Must match TK_THESIS_MAX_TICKER_LEN in thesis_codec.h and max_ticker_len in catalog.zig.
+/// Must match max_ticker_len in catalog.zig.
 pub const max_ticker_len: usize = 8;
 
 /// Maximum number of explicitly requested tickers in one ThesisInput.
-/// Must match TK_THESIS_MAX_REQUESTED_TICKERS in thesis_codec.h.
 pub const max_requested_tickers: usize = 8;
 
 /// Minimum allowed target notional: USD 1.00 = 100 cents.
@@ -64,56 +63,30 @@ pub const max_target_notional_cents: i64 = 1_000_000_000_000;
 
 /// Packed byte stride for one ClassificationRef in the hash flat buffers.
 /// Layout: taxonomy_id (max_canonical_id_len bytes) + taxonomy_version (2 bytes LE) + code (max_canonical_id_len bytes).
-/// Must match TK_THESIS_CLASSIFICATION_REF_STRIDE in thesis_codec.h.
 pub const classification_ref_stride: usize = cls.max_canonical_id_len + 2 + cls.max_canonical_id_len;
 
 comptime {
     std.debug.assert(classification_ref_stride == 66);
 }
 
-const sector_taxonomy_id = cls.canonicalId("gics_sector");
-const industry_taxonomy_id = cls.canonicalId("gics_industry");
-const sector_taxonomy_version: u16 = 2025;
-const industry_taxonomy_version: u16 = 2025;
+// Known theme/sector/industry taxonomy values live in classification.zig
+// (the single source of truth shared with catalog.zig — see finding 30 in
+// doc/strategy/roadmap/backlog/audits/tech_debt.md); re-exported here under
+// the names normalize()'s local helpers already use.
+const sector_taxonomy_id = cls.sector_taxonomy_id;
+const industry_taxonomy_id = cls.industry_taxonomy_id;
+const sector_taxonomy_version = cls.sector_taxonomy_version;
+const industry_taxonomy_version = cls.industry_taxonomy_version;
+const known_theme_ids = cls.known_theme_ids;
+const known_sector_codes = cls.known_sector_codes;
+const known_industry_codes = cls.known_industry_codes;
 
-const known_theme_ids = [_]CanonicalId{
-    cls.canonicalId("ai_infrastructure"),
-    cls.canonicalId("semiconductors"),
-    cls.canonicalId("cloud"),
-    cls.canonicalId("cyber_security"),
-    cls.canonicalId("broad_market"),
-    cls.canonicalId("dividends"),
-    cls.canonicalId("cash_like"),
-    cls.canonicalId("chemicals"),
-    cls.canonicalId("gold"),
-    cls.canonicalId("solana"),
-    cls.canonicalId("memecoins"),
-};
-
-const known_sector_codes = [_]CanonicalId{
-    cls.canonicalId("information_technology"),
-    cls.canonicalId("industrials"),
-    cls.canonicalId("consumer_discretionary"),
-    cls.canonicalId("financials"),
-    cls.canonicalId("health_care"),
-    cls.canonicalId("consumer_staples"),
-    cls.canonicalId("utilities"),
-    cls.canonicalId("materials"),
-};
-
-const known_industry_codes = [_]CanonicalId{
-    cls.canonicalId("semiconductors"),
-    cls.canonicalId("systems_software"),
-    cls.canonicalId("robotics_and_ai"),
-    cls.canonicalId("internet_retail"),
-    cls.canonicalId("cloud_platforms"),
-    cls.canonicalId("cloud_software"),
-    cls.canonicalId("cybersecurity"),
-    cls.canonicalId("sovereign_debt"),
-    cls.canonicalId("chemicals"),
-    cls.canonicalId("gold"),
-};
-
+// Intentional exception to finding 30's taxonomy consolidation
+// (doc/strategy/roadmap/backlog/audits/tech_debt.md): this duplicates
+// catalog.zig's instrument tickers, but catalog.zig already imports thesis.zig
+// for its shared types, so thesis.zig importing catalog.zig back would cycle.
+// Removing this duplicate needs finding 29's catalog-provider injection point
+// (thesis validation would call the provider instead of a hardcoded list).
 const known_tickers = [_][]const u8{
     "NVDA", "AMD",  "AVGO", "MSFT", "BOTZ", "SOXX",
     "AMZN", "WCLD", "PANW", "CRWD", "HACK", "CIBR",
@@ -302,8 +275,6 @@ pub fn normalize(input: ThesisInput) ThesisError!InvestorIntent {
 
 /// Compute a stable content hash over a ThesisInput via fd_siphash13.
 ///
-/// Uses tk_thesis_input_hash() from src/tickoni/codec/thesis_hash.c.
-///
 /// Returns 0 when user_text_len > max_user_text_len to fail closed without
 /// reading out of bounds. Callers building ThesisDenialPayload should record
 /// 0 in that case and set error_code to user_text_too_long.
@@ -329,31 +300,54 @@ pub fn computeThesisInputHash(input: ThesisInput) u64 {
     const sorted_industries = sortedClassificationRefs(input.industry_filters);
     const industry_flat = packClassificationRefs(sorted_industries);
 
-    return thesis_codec.tk_thesis_input_hash(
-        input.user_text_len,
-        &input.user_text,
-        input.target_notional_cents,
-        input.account_id,
-        @intFromEnum(input.market_scope),
-        input.asset_class_prefs.count,
-        asset_class_prefs,
-        input.instrument_type_prefs.count,
-        instrument_type_prefs,
-        sorted_themes.count,
-        &themes_flat,
-        @intFromEnum(input.risk_preference),
-        input.max_single_name_pct,
-        input.asset_class_exclusions.count,
-        asset_class_exclusions,
-        input.instrument_type_exclusions.count,
-        instrument_type_exclusions,
-        sorted_sectors.count,
-        &sector_flat,
-        sorted_industries.count,
-        &industry_flat,
-        input.requested_ticker_count,
-        tickers_flat,
-    );
+    var sip: c_abi.ballet.Siphash13 = .{};
+    c_abi.ballet.siphashInit(&sip, 0x0000535348544B54, thesis_schema_version); // "TKTHSS\0\0" LE
+
+    const ver: u16 = thesis_schema_version;
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&ver));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.account_id));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.target_notional_cents));
+    const market_scope: u8 = @intFromEnum(input.market_scope);
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&market_scope));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.asset_class_prefs.count));
+    for (0..input.asset_class_prefs.count) |i| c_abi.ballet.siphashAppend(&sip, asset_class_prefs[i .. i + 1]);
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.instrument_type_prefs.count));
+    for (0..input.instrument_type_prefs.count) |i| c_abi.ballet.siphashAppend(&sip, instrument_type_prefs[i .. i + 1]);
+
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&sorted_themes.count));
+    for (0..sorted_themes.count) |i| {
+        const off = i * cls.max_canonical_id_len;
+        c_abi.ballet.siphashAppend(&sip, themes_flat[off .. off + cls.max_canonical_id_len]);
+    }
+    const risk_preference: u8 = @intFromEnum(input.risk_preference);
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&risk_preference));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.max_single_name_pct));
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.asset_class_exclusions.count));
+    for (0..input.asset_class_exclusions.count) |i| c_abi.ballet.siphashAppend(&sip, asset_class_exclusions[i .. i + 1]);
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.instrument_type_exclusions.count));
+    for (0..input.instrument_type_exclusions.count) |i| c_abi.ballet.siphashAppend(&sip, instrument_type_exclusions[i .. i + 1]);
+
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&sorted_sectors.count));
+    for (0..sorted_sectors.count) |i| {
+        const off = i * classification_ref_stride;
+        c_abi.ballet.siphashAppend(&sip, sector_flat[off .. off + classification_ref_stride]);
+    }
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&sorted_industries.count));
+    for (0..sorted_industries.count) |i| {
+        const off = i * classification_ref_stride;
+        c_abi.ballet.siphashAppend(&sip, industry_flat[off .. off + classification_ref_stride]);
+    }
+
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.requested_ticker_count));
+    for (0..input.requested_ticker_count) |i| {
+        const off = i * max_ticker_len;
+        c_abi.ballet.siphashAppend(&sip, tickers_flat[off .. off + max_ticker_len]);
+    }
+
+    c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&input.user_text_len));
+    c_abi.ballet.siphashAppend(&sip, input.user_text[0..input.user_text_len]);
+
+    return c_abi.ballet.siphashFini(&sip);
 }
 
 // ---------------------------------------------------------------------------
@@ -480,31 +474,24 @@ fn validateRequestedTickers(input: ThesisInput) !void {
 }
 
 fn isKnownThemeId(theme_id: CanonicalId) bool {
-    return hasCanonicalId(&known_theme_ids, theme_id);
+    return cls.hasCanonicalId(&known_theme_ids, theme_id);
 }
 
 fn isKnownSectorRef(ref: ClassificationRef) bool {
     if (!ref.taxonomy_id.eql(sector_taxonomy_id)) return false;
     if (ref.taxonomy_version != sector_taxonomy_version) return false;
-    return hasCanonicalId(&known_sector_codes, ref.code);
+    return cls.hasCanonicalId(&known_sector_codes, ref.code);
 }
 
 fn isKnownIndustryRef(ref: ClassificationRef) bool {
     if (!ref.taxonomy_id.eql(industry_taxonomy_id)) return false;
     if (ref.taxonomy_version != industry_taxonomy_version) return false;
-    return hasCanonicalId(&known_industry_codes, ref.code);
+    return cls.hasCanonicalId(&known_industry_codes, ref.code);
 }
 
 fn isKnownTicker(ticker: []const u8) bool {
     for (known_tickers) |known| {
         if (std.mem.eql(u8, known, ticker)) return true;
-    }
-    return false;
-}
-
-fn hasCanonicalId(known_values: []const CanonicalId, value: CanonicalId) bool {
-    for (known_values) |known| {
-        if (known.eql(value)) return true;
     }
     return false;
 }

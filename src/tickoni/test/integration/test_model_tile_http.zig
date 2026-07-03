@@ -56,12 +56,18 @@ fn makeAiInfraRequest(model_id: []const u8) model.ProviderRequest {
     };
 }
 
+fn requireMockServerOrSkip(io: std.Io) !void {
+    var probe = openai_mock.Server.init(io, .{}) catch return error.SkipZigTest;
+    probe.listener.deinit(io);
+}
+
 fn withMockBackend(
     allocator: std.mem.Allocator,
     test_fn: fn (allocator: std.mem.Allocator, backend: *model.Backend, server: *openai_mock.Server) anyerror!void,
 ) !void {
     var runtime = http_support.TestRuntime.init();
     defer runtime.deinit();
+    try requireMockServerOrSkip(runtime.io());
 
     var server = try openai_mock.Server.init(runtime.io(), .{
         .model_id = mock_model_id,
@@ -76,7 +82,8 @@ fn withMockBackend(
     const endpoint = try server.endpointAlloc(allocator);
     defer allocator.free(endpoint);
 
-    var backend = model.Backend{ .http = .{ .endpoint = endpoint, .io = runtime.io() } };
+    var http_backend = model.HttpBackend{ .endpoint = endpoint, .io = runtime.io() };
+    var backend = http_backend.asBackend();
     try test_fn(allocator, &backend, &server);
 }
 
@@ -181,6 +188,7 @@ test "model tile http: wrong endpoint fails closed with HttpStatusError" {
     const allocator = std.testing.allocator;
     var runtime = http_support.TestRuntime.init();
     defer runtime.deinit();
+    try requireMockServerOrSkip(runtime.io());
 
     var server = try openai_mock.Server.init(runtime.io(), .{
         .model_id = mock_model_id,
@@ -192,6 +200,7 @@ test "model tile http: wrong endpoint fails closed with HttpStatusError" {
     const wrong_endpoint = try std.fmt.allocPrint(allocator, "http://127.0.0.1:{d}", .{server.listener.socket.address.getPort()});
     defer allocator.free(wrong_endpoint);
 
-    var backend = model.Backend{ .http = .{ .endpoint = wrong_endpoint, .io = runtime.io() } };
+    var http_backend = model.HttpBackend{ .endpoint = wrong_endpoint, .io = runtime.io() };
+    var backend = http_backend.asBackend();
     try std.testing.expectError(error.HttpStatusError, backend.call(allocator, makeAiInfraRequest(mock_model_id)));
 }

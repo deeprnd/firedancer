@@ -7,6 +7,21 @@ The [Testing Firedancer](../testing.md) page is the Firedancer-style test
 guide. This file is intentionally separate for now so the current `justfile`
 command matrix can be documented without merging those two views.
 
+## Test-Driven Development
+
+Tickoni development should follow test-driven development. After planning a
+change and before implementing it, write the narrowest test that captures the
+new behavior, regression, or invariant. The implementation is complete only
+when that test passes in the correct lane and the relevant broader validation
+still passes.
+
+Do not rely on custom throwaway verification scripts as the only proof for new
+behavior. If a one-off script or ad hoc command is needed to prove a feature,
+that is a signal that a unit, integration, e2e, system, quality, or security
+test is missing. Add the test to the correct scope below and wire it through
+the existing `justfile`, `build.zig`, or Make-backed command path as
+appropriate.
+
 ## Test Layers
 
 The repository currently has:

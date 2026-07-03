@@ -1,12 +1,20 @@
-/// Phase 0 Tickoni payment pipeline.
+/// Phase 0 Tickoni payment pipeline: shared state and pure helpers.
 ///
 /// This is still a spike: tiles run as in-process threads so tests do not
 /// require hugetlbfs, tango workspaces, or sandbox privileges.  The behavior is
 /// intentionally product-shaped: bounded links, stable event hashes,
 /// append-only audit ordering, deterministic replay, metrics, diagnostics, and
 /// crash-only failure propagation.
+///
+/// Each tile's own run loop lives in its own file (ingest.zig, normalize.zig,
+/// dedupe.zig, policy.zig, audit_stage.zig, replay.zig, metric.zig,
+/// diag.zig) — see finding 25 in
+/// doc/strategy/roadmap/backlog/audits/tech_debt.md. This file owns the
+/// PaymentPipelineState every stage shares (queues, dedup table, audit log,
+/// atomics) plus config/message contracts and deterministic pure helpers
+/// (syntheticPayment/stableEventHash/validFraming) used by more than one
+/// stage.
 const std = @import("std");
-const audit = @import("audit_tile");
 const queue = @import("queue.zig");
 const audit_sink = @import("audit_sink.zig");
 
@@ -44,6 +52,10 @@ pub const PaymentMessage = struct {
     pipeline_hops: u8 = 0,
     duplicate: bool = false,
     decision: PolicyDecision = .allow,
+    /// Id of the tile stage that finalized `decision` (tknorm for
+    /// malformed_drop, tkpoly for allow/deny/duplicate_drop), so tkaudt can
+    /// attribute each record to its real producer instead of always tkpoly.
+    decided_by: [6]u8 = audit_sink.tile_id_tkpoly,
 };
 
 pub const MetricSnapshot = struct {
@@ -69,8 +81,7 @@ pub const DiagSnapshot = struct {
 
 const MessageQueue = queue.BoundedQueue(PaymentMessage);
 const AuditLog = audit_sink.AuditLog;
-const crash_none: i32 = -1;
-const tile_tkings: i32 = 0;
+pub const crash_none: i32 = -1;
 
 pub const PaymentPipelineState = struct {
     allocator: std.mem.Allocator,
@@ -210,7 +221,7 @@ pub const PaymentPipelineState = struct {
         };
     }
 
-    fn seenOrRemember(self: *PaymentPipelineState, msg: PaymentMessage) bool {
+    pub fn seenOrRemember(self: *PaymentPipelineState, msg: PaymentMessage) bool {
         for (self.seen_keys[0..self.seen_count], self.seen_hashes[0..self.seen_count]) |key, hash| {
             if (key == msg.raw.idempotency_key and hash == msg.event_hash) return true;
         }
@@ -220,140 +231,6 @@ pub const PaymentPipelineState = struct {
         return false;
     }
 };
-
-pub fn runIngest(state: *PaymentPipelineState) void {
-    defer state.q_ing_norm.close();
-
-    var offset: u64 = 0;
-    while (offset < state.config.event_count) : (offset += 1) {
-        if (state.stop.load(.acquire)) break;
-        if (state.config.sandbox_fail_at) |fail_at| {
-            if (offset == fail_at) {
-                _ = state.sandbox_failures.fetchAdd(1, .release);
-                state.crashed_tile.store(tile_tkings, .release);
-                state.requestStop();
-                break;
-            }
-        }
-
-        const raw = syntheticPayment(state.config, offset);
-        if (state.q_ing_norm.push(.{ .raw = raw, .pipeline_hops = 1 }, &state.stop)) |_| {
-            _ = state.produced.fetchAdd(1, .release);
-        } else |_| {
-            break;
-        }
-    }
-}
-
-pub fn runNormalize(state: *PaymentPipelineState) void {
-    defer state.q_norm_dedu.close();
-
-    while (state.q_ing_norm.pop(&state.stop)) |msg_in| {
-        var msg = msg_in;
-        if (!validFraming(msg.raw)) {
-            _ = state.invalid.fetchAdd(1, .release);
-            msg.pipeline_hops += 1;
-            msg.event_hash = stableEventHash(msg.raw);
-            msg.decision = .malformed_drop;
-            state.q_norm_dedu.push(msg, &state.stop) catch break;
-            continue;
-        }
-        msg.pipeline_hops += 1;
-        msg.event_hash = stableEventHash(msg.raw);
-        _ = state.normalized.fetchAdd(1, .release);
-        state.q_norm_dedu.push(msg, &state.stop) catch break;
-    }
-}
-
-pub fn runDedupe(state: *PaymentPipelineState) void {
-    defer state.q_dedu_poly.close();
-
-    while (state.q_norm_dedu.pop(&state.stop)) |msg_in| {
-        var msg = msg_in;
-        msg.pipeline_hops += 1;
-        if (msg.decision != .malformed_drop and state.seenOrRemember(msg)) {
-            msg.duplicate = true;
-            _ = state.duplicates.fetchAdd(1, .release);
-        }
-        state.q_dedu_poly.push(msg, &state.stop) catch break;
-    }
-}
-
-pub fn runPolicy(state: *PaymentPipelineState) void {
-    defer state.q_poly_audit.close();
-
-    while (state.q_dedu_poly.pop(&state.stop)) |msg_in| {
-        var msg = msg_in;
-        msg.pipeline_hops += 1;
-        if (msg.decision == .malformed_drop) {
-            // tknorm already made this rejection decision; preserve it for
-            // audit instead of silently dropping malformed source facts.
-        } else if (msg.duplicate) {
-            msg.decision = .duplicate_drop;
-        } else if (msg.raw.amount_cents > state.config.policy_limit_cents) {
-            msg.decision = .deny;
-            _ = state.denied.fetchAdd(1, .release);
-        } else {
-            msg.decision = .allow;
-            _ = state.allowed.fetchAdd(1, .release);
-        }
-        state.q_poly_audit.push(msg, &state.stop) catch break;
-    }
-}
-
-pub fn runAudit(state: *PaymentPipelineState) void {
-    while (state.q_poly_audit.pop(&state.stop)) |msg| {
-        queue.updateMaxU64(&state.max_latency_hops, @as(u64, msg.pipeline_hops) + 1);
-        state.audit.append(.{
-            .source_offset = msg.raw.source_offset,
-            .event_hash = msg.event_hash,
-            .decision = @enumFromInt(@intFromEnum(msg.decision)),
-        }) catch {
-            state.crashed_tile.store(4, .release);
-            state.requestStop();
-            break;
-        };
-        _ = state.audited.fetchAdd(1, .release);
-    }
-    state.audit_done.store(true, .release);
-}
-
-pub fn runReplay(state: *PaymentPipelineState) void {
-    while (!state.audit_done.load(.acquire)) {
-        if (state.stop.load(.acquire) and state.crashed_tile.load(.acquire) != crash_none) {
-            state.replay_checked.store(true, .release);
-            state.replay_match.store(false, .release);
-            return;
-        }
-        std.Thread.yield() catch {};
-    }
-
-    state.external_effects_disabled.store(true, .release);
-    const divergences = deterministicReplayDivergences(state);
-    state.replay_divergences.store(divergences, .release);
-    state.replay_match.store(divergences == 0, .release);
-    state.replay_checked.store(true, .release);
-}
-
-pub fn runMetric(state: *PaymentPipelineState) void {
-    while (!state.replay_checked.load(.acquire) and !state.stop.load(.acquire)) {
-        _ = state.snapshotMetrics();
-        _ = state.metric_snapshots.fetchAdd(1, .release);
-        std.Thread.yield() catch {};
-    }
-    _ = state.snapshotMetrics();
-    _ = state.metric_snapshots.fetchAdd(1, .release);
-}
-
-pub fn runDiag(state: *PaymentPipelineState) void {
-    while (!state.replay_checked.load(.acquire) and !state.stop.load(.acquire)) {
-        _ = state.snapshotDiag();
-        _ = state.diag_snapshots.fetchAdd(1, .release);
-        std.Thread.yield() catch {};
-    }
-    _ = state.snapshotDiag();
-    _ = state.diag_snapshots.fetchAdd(1, .release);
-}
 
 pub fn syntheticPayment(config: PaymentPipelineConfig, offset: u64) RawPayment {
     const canonical_offset: u64 = if (config.inject_duplicate and offset == 3) 1 else offset;
@@ -383,74 +260,10 @@ pub fn stableEventHash(raw: RawPayment) u64 {
     return h;
 }
 
-fn validFraming(raw: RawPayment) bool {
+pub fn validFraming(raw: RawPayment) bool {
     if (raw.malformed) return false;
     if (!std.mem.eql(u8, &raw.currency, "USD")) return false;
     return raw.amount_cents > 0;
-}
-
-fn deterministicReplayDivergences(state: *PaymentPipelineState) u64 {
-    var prev_hash = audit_sink.audit_seed;
-    var expected_seq: u64 = 0;
-    var divergences: u64 = 0;
-
-    var offset: u64 = 0;
-    while (offset < state.config.event_count) : (offset += 1) {
-        const raw = syntheticPayment(state.config, offset);
-        const event_hash = stableEventHash(raw);
-        const decision: PolicyDecision = if (!validFraming(raw)) .malformed_drop else blk: {
-            const duplicate = replayDuplicate(state.config, offset, raw.idempotency_key, event_hash);
-            break :blk if (duplicate)
-                .duplicate_drop
-            else if (raw.amount_cents > state.config.policy_limit_cents)
-                .deny
-            else
-                .allow;
-        };
-
-        const expected = buildReplayEvent(expected_seq, raw, event_hash, decision, prev_hash);
-        if (expected_seq >= state.audit.count) {
-            divergences += 1;
-        } else if (!audit.auditEventsEql(expected, state.audit.records[@intCast(expected_seq)])) {
-            divergences += 1;
-        }
-        prev_hash = expected.header.record_hash;
-        expected_seq += 1;
-    }
-
-    if (expected_seq != state.audit.count) {
-        divergences += if (expected_seq > state.audit.count)
-            expected_seq - state.audit.count
-        else
-            state.audit.count - expected_seq;
-    }
-    return divergences;
-}
-
-fn buildReplayEvent(
-    seq: u64,
-    raw: RawPayment,
-    event_hash: u64,
-    decision: PolicyDecision,
-    prev_hash: u64,
-) audit.AuditEvent {
-    return audit_sink.buildPolicyDecisionEvent(
-        seq,
-        raw.source_offset,
-        event_hash,
-        @enumFromInt(@intFromEnum(decision)),
-        prev_hash,
-    );
-}
-
-fn replayDuplicate(config: PaymentPipelineConfig, offset: u64, key: u64, hash: u64) bool {
-    var prior: u64 = 0;
-    while (prior < offset) : (prior += 1) {
-        const raw = syntheticPayment(config, prior);
-        if (!validFraming(raw)) continue;
-        if (raw.idempotency_key == key and stableEventHash(raw) == hash) return true;
-    }
-    return false;
 }
 
 fn hashU64(h: *u64, value: u64) void {
@@ -489,51 +302,4 @@ test "stableEventHash is deterministic and ignores source offset" {
     const b = syntheticPayment(cfg, 3);
     try std.testing.expectEqual(a.idempotency_key, b.idempotency_key);
     try std.testing.expectEqual(stableEventHash(a), stableEventHash(b));
-}
-
-test "payment tile stages audit and replay one valid payment sequentially" {
-    var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 1, .queue_depth = 1 });
-    defer state.deinit();
-
-    try runOneSequentialForTest(&state, syntheticPayment(state.config, 0));
-
-    const metrics = state.snapshotMetrics();
-    try std.testing.expectEqual(@as(u64, 1), metrics.normalized);
-    try std.testing.expectEqual(@as(u64, 1), metrics.audited);
-    try std.testing.expectEqual(@as(u64, 1), metrics.allowed);
-    try std.testing.expectEqual(@as(u64, 5), metrics.max_latency_hops);
-    try std.testing.expect(state.replay_checked.load(.seq_cst));
-    try std.testing.expect(state.replay_match.load(.seq_cst));
-    try std.testing.expect(state.external_effects_disabled.load(.seq_cst));
-}
-
-test "Phase 0 rejects malformed payment framing" {
-    var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 1, .queue_depth = 1, .inject_malformed = true });
-    defer state.deinit();
-    try runOneSequentialForTest(&state, syntheticPayment(state.config, 0));
-    try std.testing.expectEqual(@as(u64, 1), state.invalid.load(.seq_cst));
-    try std.testing.expectEqual(@as(u64, 0), state.normalized.load(.seq_cst));
-    try std.testing.expectEqual(@as(u64, 1), state.audited.load(.seq_cst));
-    try std.testing.expectEqual(audit.PolicyOutcome.malformed_drop, state.audit.records[0].payload.policy_decision.outcome);
-    try std.testing.expect(state.replay_match.load(.seq_cst));
-}
-
-test "sandbox failure records crash diagnostics and stops ingest" {
-    var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 10, .queue_depth = 2, .sandbox_fail_at = 2 });
-    defer state.deinit();
-    runIngest(&state);
-    const diag = state.snapshotDiag();
-    try std.testing.expectEqual(tile_tkings, diag.crashed_tile);
-    try std.testing.expectEqual(@as(u64, 1), diag.sandbox_failures);
-    try std.testing.expect(state.stop.load(.seq_cst));
-}
-
-fn runOneSequentialForTest(state: *PaymentPipelineState, raw: RawPayment) !void {
-    try state.q_ing_norm.push(.{ .raw = raw, .pipeline_hops = 1 }, &state.stop);
-    state.q_ing_norm.close();
-    runNormalize(state);
-    runDedupe(state);
-    runPolicy(state);
-    runAudit(state);
-    runReplay(state);
 }

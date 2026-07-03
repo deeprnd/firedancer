@@ -24,8 +24,10 @@ test "investment_replay_integration: succeeds with fixture substitutions and no 
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
 
-    var model_backend = model.Backend{ .fixture = .{} };
-    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var model_backend_impl = model.FixtureBackend{};
+    var model_backend = model_backend_impl.asBackend();
+    var adapter_backend_impl = adapter.FixtureBackend{};
+    var adapter_backend = adapter_backend_impl.asBackend();
     const agent_result = try tkagnt.runInvestmentAgent(
         allocator,
         work_item,
@@ -87,8 +89,10 @@ test "investment_replay_integration: allowed trade audit chain hashes are real a
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
 
-    var model_backend = model.Backend{ .fixture = .{} };
-    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var model_backend_impl = model.FixtureBackend{};
+    var model_backend = model_backend_impl.asBackend();
+    var adapter_backend_impl = adapter.FixtureBackend{};
+    var adapter_backend = adapter_backend_impl.asBackend();
     const agent_result = try tkagnt.runInvestmentAgent(
         allocator,
         work_item,
@@ -180,8 +184,10 @@ test "investment_replay_integration: tamper detection reports first divergent ha
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
 
-    var model_backend = model.Backend{ .fixture = .{} };
-    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var model_backend_impl = model.FixtureBackend{};
+    var model_backend = model_backend_impl.asBackend();
+    var adapter_backend_impl = adapter.FixtureBackend{};
+    var adapter_backend = adapter_backend_impl.asBackend();
     const agent_result = try tkagnt.runInvestmentAgent(
         allocator,
         work_item,
@@ -239,8 +245,10 @@ test "gen audit allowed trade jsonl" {
     const basket = try tkpoly.buildBasket(intent, thesis_id);
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
-    var model_backend = model.Backend{ .fixture = .{} };
-    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var model_backend_impl = model.FixtureBackend{};
+    var model_backend = model_backend_impl.asBackend();
+    var adapter_backend_impl = adapter.FixtureBackend{};
+    var adapter_backend = adapter_backend_impl.asBackend();
     const agent_result = try tkagnt.runInvestmentAgent(
         allocator,
         work_item,

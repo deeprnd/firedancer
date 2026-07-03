@@ -1,10 +1,11 @@
 /// Narrow Zig bindings over src/tango mcache/dcache primitives.
 ///
-/// Mirrors the public API in src/tango/mcache/fd_mcache.h.
-/// These declarations are not called during Step 1 tests; the C substrate
-/// is linked only when building the supervisor binary against Firedancer.
+/// Mirrors the public API in src/tango/mcache/fd_mcache.h. The
+/// mcacheLineIdx/mcachePublish/fragMetaSeqQuery wrappers bind to
+/// shim/tango.c. See doc/knowledge/architecture.md.
 ///
-/// Link requirements: -lfd_tango -lfd_util (built by GNUmakefile).
+/// Link requirements: -lfd_tango -lfd_util plus the runtime shim files, via
+/// linkTickoniFiredancer in build.zig.
 const std = @import("std");
 
 // ---------------------------------------------------------------------------
@@ -23,12 +24,6 @@ pub const FragMeta = extern struct {
     tspub: u32,
 };
 
-/// Message cache (mcache) opaque handle.
-pub const Mcache = opaque {};
-
-/// Data cache (dcache) opaque handle.
-pub const Dcache = opaque {};
-
 // ---------------------------------------------------------------------------
 // Constants (from fd_tango_base.h / fd_mcache.h)
 // ---------------------------------------------------------------------------
@@ -37,24 +32,115 @@ pub const frag_meta_sz: usize = 32;
 pub const frag_meta_align: usize = 32;
 pub const mcache_align: usize = 128;
 pub const mcache_seq_cnt: usize = 16;
+pub const mcache_lg_interleave: usize = 0;
+pub const mcache_block: usize = 1;
 
 // ---------------------------------------------------------------------------
 // Extern declarations — require -lfd_tango at link time
+//
+// fd_mcache_join returns fd_frag_meta_t* (a directly indexable [0,depth)
+// array), not an opaque handle — confirmed against fd_mcache.h; the
+// earlier opaque Mcache type here did not match the real ABI and was
+// never exercised until the runtime link producer/consumer path needed it.
 // ---------------------------------------------------------------------------
 
-pub extern fn fd_mcache_align() usize;
-pub extern fn fd_mcache_footprint(depth: usize, app_sz: usize) usize;
-pub extern fn fd_mcache_new(shmem: *anyopaque, depth: usize, app_sz: usize, seq0: u64) ?*anyopaque;
-pub extern fn fd_mcache_join(shcache: *anyopaque) ?*Mcache;
-pub extern fn fd_mcache_leave(mcache: *Mcache) ?*anyopaque;
-pub extern fn fd_mcache_delete(shcache: *anyopaque) ?*anyopaque;
-pub extern fn fd_mcache_depth(mcache: *const Mcache) usize;
-pub extern fn fd_mcache_seq0(mcache: *const Mcache) u64;
-pub extern fn fd_mcache_seq_laddr(mcache: *Mcache) [*]volatile u64;
-pub extern fn fd_mcache_seq_laddr_const(mcache: *const Mcache) [*]const volatile u64;
+extern fn tk_mcache_align() usize;
+extern fn tk_mcache_footprint(depth: usize, app_sz: usize) usize;
+extern fn tk_mcache_new(shmem: *anyopaque, depth: usize, app_sz: usize, seq0: u64) ?*anyopaque;
+extern fn tk_mcache_join(shcache: *anyopaque) ?[*]FragMeta;
+extern fn tk_mcache_leave(mcache: [*]const FragMeta) ?*anyopaque;
+extern fn tk_mcache_delete(shcache: *anyopaque) ?*anyopaque;
+extern fn tk_mcache_depth(mcache: [*]const FragMeta) usize;
+extern fn tk_mcache_seq0(mcache: [*]const FragMeta) u64;
+extern fn tk_mcache_seq_laddr(mcache: [*]FragMeta) [*]volatile u64;
+extern fn tk_mcache_seq_laddr_const(mcache: [*]const FragMeta) [*]const volatile u64;
+
+pub fn mcacheAlign() usize {
+    return tk_mcache_align();
+}
+
+pub fn mcacheFootprint(depth: usize, app_sz: usize) usize {
+    return tk_mcache_footprint(depth, app_sz);
+}
+
+pub fn mcacheNew(shmem: *anyopaque, depth: usize, app_sz: usize, seq0: u64) ?*anyopaque {
+    return tk_mcache_new(shmem, depth, app_sz, seq0);
+}
+
+pub fn mcacheJoin(shcache: *anyopaque) ?[*]FragMeta {
+    return tk_mcache_join(shcache);
+}
+
+pub fn mcacheLeave(mcache: [*]const FragMeta) ?*anyopaque {
+    return tk_mcache_leave(mcache);
+}
+
+pub fn mcacheDelete(shcache: *anyopaque) ?*anyopaque {
+    return tk_mcache_delete(shcache);
+}
+
+pub fn mcacheDepth(mcache: [*]const FragMeta) usize {
+    return tk_mcache_depth(mcache);
+}
+
+pub fn mcacheSeq0(mcache: [*]const FragMeta) u64 {
+    return tk_mcache_seq0(mcache);
+}
+
+pub fn mcacheSeqLaddr(mcache: [*]FragMeta) [*]volatile u64 {
+    return tk_mcache_seq_laddr(mcache);
+}
+
+pub fn mcacheSeqLaddrConst(mcache: [*]const FragMeta) [*]const volatile u64 {
+    return tk_mcache_seq_laddr_const(mcache);
+}
+
+/// Wraps the upstream mcache line-index helper for the non-interleaved
+/// build (the header's compiled-in default). Binds to shim/tango.c.
+extern fn tk_mcache_line_idx(seq: u64, depth: u64) u64;
+pub fn mcacheLineIdx(seq: u64, depth: usize) usize {
+    return @intCast(tk_mcache_line_idx(seq, depth));
+}
+
+/// Wraps the upstream mcache publish helper: writes frag metadata for `seq`
+/// into the ring, marking the line in-progress (seq-1) before the
+/// payload-adjacent fields are written and only publishing the real `seq`
+/// once they are, so a consumer never observes a torn frag. Binds to
+/// shim/tango.c.
+extern fn tk_mcache_publish(
+    mcache: [*]FragMeta,
+    depth: u64,
+    seq: u64,
+    sig: u64,
+    chunk: u64,
+    sz: u64,
+    ctl: u64,
+    tsorig: u64,
+    tspub: u64,
+) void;
+pub fn mcachePublish(
+    mcache: [*]FragMeta,
+    depth: usize,
+    seq: u64,
+    sig: u64,
+    chunk: u32,
+    sz: u16,
+    ctl: u16,
+    tsorig: u32,
+    tspub: u32,
+) void {
+    tk_mcache_publish(mcache, depth, seq, sig, chunk, sz, ctl, tsorig, tspub);
+}
+
+/// Wraps the upstream frag-meta sequence query helper. Binds to shim/tango.c.
+extern fn tk_frag_meta_seq_query(meta: *const volatile FragMeta) u64;
+pub fn fragMetaSeqQuery(meta: *const volatile FragMeta) u64 {
+    return tk_frag_meta_seq_query(meta);
+}
 
 // ---------------------------------------------------------------------------
-// Tests — layout only; no C linkage required
+// Tests — FragMeta layout and the mcache_align constant need no C linkage;
+// mcacheLineIdx/mcachePublish/fragMetaSeqQuery tests link shim/tango.c.
 // ---------------------------------------------------------------------------
 
 test "FragMeta is 32 bytes" {
@@ -73,4 +159,22 @@ test "FragMeta field offsets match C layout" {
 
 test "mcache alignment constant matches header" {
     try std.testing.expectEqual(@as(usize, 128), mcache_align);
+}
+
+test "mcacheLineIdx wraps modulo depth" {
+    try std.testing.expectEqual(@as(usize, 5), mcacheLineIdx(5, 8));
+    try std.testing.expectEqual(@as(usize, 5), mcacheLineIdx(13, 8));
+    try std.testing.expectEqual(@as(usize, 0), mcacheLineIdx(8, 8));
+}
+
+test "mcachePublish writes a frag readable via fragMetaSeqQuery" {
+    var ring: [8]FragMeta align(frag_meta_align) = undefined;
+    mcachePublish(&ring, 8, 5, 42, 3, 10, 0, 0, 0);
+
+    const line = mcacheLineIdx(5, 8);
+    const meta: *const volatile FragMeta = @ptrCast(&ring[line]);
+    try std.testing.expectEqual(@as(u64, 5), fragMetaSeqQuery(meta));
+    try std.testing.expectEqual(@as(u64, 42), ring[line].sig);
+    try std.testing.expectEqual(@as(u32, 3), ring[line].chunk);
+    try std.testing.expectEqual(@as(u16, 10), ring[line].sz);
 }

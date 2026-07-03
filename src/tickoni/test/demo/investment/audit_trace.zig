@@ -56,89 +56,15 @@ fn parseFixedAsciiBytes(comptime N: usize, value: []const u8) [N]u8 {
     return out;
 }
 
-fn updateValue(hasher: *std.hash.Wyhash, value: anytype) void {
-    var copy = value;
-    hasher.update(std.mem.asBytes(&copy));
-}
-
-fn hashBytes(bytes: []const u8) u64 {
-    return std.hash.Wyhash.hash(0, bytes);
-}
-
-fn hashQuoteSnapshot(snapshot: *const trade_ticket.QuoteSnapshot) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    updateValue(&hasher, snapshot.as_of_ns);
-    updateValue(&hasher, snapshot.quote_count);
-    for (snapshot.quotes[0..snapshot.quote_count]) |quote| {
-        hasher.update(quote.tickerSlice());
-        updateValue(&hasher, quote.venue);
-        updateValue(&hasher, quote.bid_cents);
-        updateValue(&hasher, quote.ask_cents);
-        updateValue(&hasher, quote.last_cents);
-    }
-    return hasher.final();
-}
-
-fn hashAffordability(result: portfolio.AffordabilityResult) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    updateValue(&hasher, result.outcome);
-    updateValue(&hasher, result.requested_notional_cents);
-    updateValue(&hasher, result.max_affordable_cents);
-    updateValue(&hasher, result.cash_available_cents);
-    updateValue(&hasher, result.buying_power_cents);
-    updateValue(&hasher, result.remaining_daily_notional_cents);
-    updateValue(&hasher, result.remaining_monthly_notional_cents);
-    return hasher.final();
-}
-
-fn hashTicket(ticket: *const trade_ticket.TradeTicket) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    hasher.update(ticket.ticketIdSlice());
-    updateValue(&hasher, ticket.account_id);
-    updateValue(&hasher, ticket.side);
-    updateValue(&hasher, ticket.order_type);
-    updateValue(&hasher, ticket.target_notional_cents);
-    updateValue(&hasher, ticket.estimated_cost_cents);
-    updateValue(&hasher, ticket.policy_outcome);
-    updateValue(&hasher, ticket.affordability_result.max_affordable_cents);
-    updateValue(&hasher, ticket.affordability_result.effective_max_paper_trade_cents);
-    updateValue(&hasher, ticket.line_item_count);
-    for (ticket.line_items[0..ticket.line_item_count]) |line| {
-        hasher.update(line.tickerSlice());
-        updateValue(&hasher, line.quantity_micros);
-        updateValue(&hasher, line.price_cents);
-        updateValue(&hasher, line.line_notional_cents);
-    }
-    updateValue(&hasher, ticket.blocked_reason_count);
-    for (ticket.blocked_reasons[0..ticket.blocked_reason_count]) |reason| {
-        updateValue(&hasher, reason.code);
-        updateValue(&hasher, reason.failed_scope_dim);
-        updateValue(&hasher, reason.requested_cents);
-        updateValue(&hasher, reason.limit_cents);
-    }
-    return hasher.final();
-}
-
-fn hashPaperResult(result: *const trade_ticket.PaperExecutionResult) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    hasher.update(result.paperOrderIdSlice());
-    hasher.update(result.ticketIdSlice());
-    updateValue(&hasher, result.account_id);
-    updateValue(&hasher, result.status);
-    updateValue(&hasher, result.total_filled_cents);
-    updateValue(&hasher, result.fill_count);
-    for (result.fills[0..result.fill_count]) |fill| {
-        hasher.update(fill.tickerSlice());
-        updateValue(&hasher, fill.quantity_micros);
-        updateValue(&hasher, fill.fill_price_cents);
-        updateValue(&hasher, fill.filled_notional_cents);
-    }
-    updateValue(&hasher, result.resulting_account_snapshot.cash_cents);
-    updateValue(&hasher, result.resulting_account_snapshot.buying_power_cents);
-    updateValue(&hasher, result.resulting_account_snapshot.day_notional_used_cents);
-    updateValue(&hasher, result.resulting_account_snapshot.month_notional_used_cents);
-    return hasher.final();
-}
+// Quote/affordability/ticket/paper-result hashing reuses replay's canonical
+// helpers (src/tickoni/tiles/replay/mod.zig) instead of reimplementing the
+// same field-by-field Wyhash mixing here, so demo audit traces and replay
+// checks can never silently diverge on what a proposal/result hash covers.
+const hashBytes = replay.hashBytes;
+const hashQuoteSnapshot = replay.hashQuoteSnapshot;
+const hashAffordability = replay.hashAffordability;
+const hashTicket = replay.hashTicket;
+const hashPaperResult = replay.hashPaperResult;
 
 fn capabilityEnvelopeId(thesis_input: *const thesis.ThesisInput, proposed_basket: *const basket.Basket) u128 {
     return (@as(u128, thesis.computeThesisInputHash(thesis_input.*)) << 64) | @as(u128, proposed_basket.basket_id);
@@ -264,7 +190,7 @@ pub fn buildAllowedTradeChain(
             .adapter_id = parseFixedAsciiBytes(16, "portfolio"),
             .request_hash = hashBytes("portfolio.read"),
             .response_hash = hashAffordability(affordability),
-            .fixture_id = 1,
+            .replay_substitution_id = 1,
         },
     });
     prev_hash = events[6].header.record_hash;
@@ -274,7 +200,7 @@ pub fn buildAllowedTradeChain(
             .adapter_id = parseFixedAsciiBytes(16, "quotes"),
             .request_hash = normalized_hash,
             .response_hash = quote_response_hash,
-            .fixture_id = 2,
+            .replay_substitution_id = 2,
         },
     });
     prev_hash = events[7].header.record_hash;
@@ -293,7 +219,7 @@ pub fn buildAllowedTradeChain(
             .adapter_id = parseFixedAsciiBytes(16, "paper_fill"),
             .request_hash = proposal_hash,
             .response_hash = paper_response_hash,
-            .fixture_id = 3,
+            .replay_substitution_id = 3,
         },
     });
     prev_hash = events[9].header.record_hash;
@@ -448,7 +374,7 @@ pub fn buildOversizedTradeBlockedChain(
             .adapter_id = parseFixedAsciiBytes(16, "portfolio"),
             .request_hash = hashBytes("portfolio.read"),
             .response_hash = hashAffordability(affordability),
-            .fixture_id = 1,
+            .replay_substitution_id = 1,
         },
     });
     prev_hash = events[6].header.record_hash;
@@ -458,7 +384,7 @@ pub fn buildOversizedTradeBlockedChain(
             .adapter_id = parseFixedAsciiBytes(16, "quotes"),
             .request_hash = normalized_hash,
             .response_hash = quote_response_hash,
-            .fixture_id = 2,
+            .replay_substitution_id = 2,
         },
     });
     prev_hash = events[7].header.record_hash;

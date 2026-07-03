@@ -22,8 +22,10 @@ test "investment_allowed_trade_integration: tkcase tkdisp tkagnt build the allow
     const run_id = tkcase.deriveSyntheticRunId(thesis_id);
     const work_item = tkdisp.dispatchInvestmentRun(run_id, input.account_id, input.target_notional_cents);
 
-    var model_backend = model.Backend{ .fixture = .{} };
-    var adapter_backend = adapter.Backend{ .fixture = .{} };
+    var model_backend_impl = model.FixtureBackend{};
+    var model_backend = model_backend_impl.asBackend();
+    var adapter_backend_impl = adapter.FixtureBackend{};
+    var adapter_backend = adapter_backend_impl.asBackend();
     const agent_result = try tkagnt.runInvestmentAgent(
         allocator,
         work_item,
