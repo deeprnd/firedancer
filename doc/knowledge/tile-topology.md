@@ -18,6 +18,18 @@ giving unrelated concepts the same tile identity.
 For delivery status, implementation facts, and remaining debt, see
 [`doc/execution/tile-delivery-status.md`](../execution/tile-delivery-status.md).
 
+## Document Ownership
+
+This document owns tile identity and topology: which Firedancer validator tiles
+exist in the repository, which ones Tickoni excludes or adapts, which Tickoni
+tile IDs exist, how product event flows are shaped, and which tile owns each
+financial runtime responsibility.
+
+It does not own tile launch lifecycle, Firedancer harness adapter semantics,
+runtime-tier implementation, heartbeat/staleness behavior, or process
+orchestration details. Those are owned by
+[`tile-orchestration.md`](tile-orchestration.md).
+
 ## Current Repository State
 
 The repository now has two Tickoni-relevant runtime paths:

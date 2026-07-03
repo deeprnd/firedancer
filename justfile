@@ -28,6 +28,14 @@ python-dev-install extras="dev":
 python-dev-install-all:
   @just python-dev-install "dev,protobuf,mathgen,sim,solana,agave-cluster"
 
+# ── All-in ──────────────────────────────────────────────────────────────────
+
+tests-all:
+  @just build-all
+  @just quality-check-all
+  @just security-check-all
+  @just test-all
+
 # ── Build ──────────────────────────────────────────────────────────────────
 
 build-tk:
@@ -248,12 +256,6 @@ test-cov-tk:
 test-cov-all:
   @just test-cov-fd
   @just test-cov-tk
-
-tests-all:
-  @just build-all
-  @just quality-check-all
-  @just security-check-all
-  @just test-all
 
 # ── Quality: Format ────────────────────────────────────────────────────────
 

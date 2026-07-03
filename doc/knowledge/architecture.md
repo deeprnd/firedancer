@@ -88,6 +88,8 @@ tile lifecycle, sandboxing, low-overhead metric and diagnostic paths,
 `fd_http_server` for tile-local HTTP/WebSocket service, bounded polling loops,
 and crash-only behavior. Tickoni should reuse or wrap Firedancer infra tiles
 and primitives where they are generic.
+For the detailed orchestration boundary, see
+[`tile-orchestration.md`](tile-orchestration.md).
 
 Tickoni application, runtime, tile, schema, codec, and business logic is Zig.
 Firedancer and vendored C code are reachable only through one explicit bridge:
