@@ -77,6 +77,7 @@ pub fn runNormalizeProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.li
         msg.event_hash = payment_runtime.stableEventHash(msg.raw);
         if (!payment_runtime.validFraming(msg.raw)) {
             msg.decision = .malformed_drop;
+            msg.decided_by = audit_sink.tile_id_tknorm;
             invalid += 1;
         } else {
             normalized += 1;
@@ -142,15 +143,19 @@ pub fn runPolicyProcess(spec: *const rt.launch_spec.LaunchSpec, input: *rt.link.
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
         msg.pipeline_hops += 1;
         if (msg.decision == .malformed_drop) {
-            // tknorm already made this rejection decision; preserve it for
-            // audit instead of silently dropping malformed source facts.
+            // tknorm already made this rejection decision; preserve it (and
+            // its decided_by) for audit instead of silently dropping
+            // malformed source facts.
         } else if (msg.duplicate) {
             msg.decision = .duplicate_drop;
+            msg.decided_by = audit_sink.tile_id_tkpoly;
         } else if (msg.raw.amount_cents > spec.policy_limit_cents) {
             msg.decision = .deny;
+            msg.decided_by = audit_sink.tile_id_tkpoly;
             denied += 1;
         } else {
             msg.decision = .allow;
+            msg.decided_by = audit_sink.tile_id_tkpoly;
             allowed += 1;
         }
         output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag) catch break;
@@ -179,6 +184,7 @@ pub fn runAuditProcess(
             .source_offset = msg.raw.source_offset,
             .event_hash = msg.event_hash,
             .decision = @enumFromInt(@intFromEnum(msg.decision)),
+            .tile_id = msg.decided_by,
         }) catch break;
         audited += 1;
     }

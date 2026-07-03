@@ -358,6 +358,69 @@ pub fn classificationRefList(comptime values: anytype) ClassificationRefList {
     return out;
 }
 
+// ---------------------------------------------------------------------------
+// Known taxonomy values
+//
+// Single source of truth for which theme/sector/industry canonical ids are
+// currently recognized, and which taxonomy (id + version) sector/industry
+// codes are checked against. thesis.zig's normalize() validates investor
+// input against these; catalog.zig's fixture instruments are drawn from
+// (and should stay a subset of) the same lists, so the two never drift
+// against each other silently.
+// ---------------------------------------------------------------------------
+
+pub const sector_taxonomy_id = canonicalId("gics_sector");
+pub const industry_taxonomy_id = canonicalId("gics_industry");
+pub const sector_taxonomy_version: u16 = 2025;
+pub const industry_taxonomy_version: u16 = 2025;
+
+pub const known_theme_ids = [_]CanonicalId{
+    canonicalId("ai_infrastructure"),
+    canonicalId("semiconductors"),
+    canonicalId("cloud"),
+    canonicalId("cyber_security"),
+    canonicalId("broad_market"),
+    canonicalId("dividends"),
+    canonicalId("cash_like"),
+    canonicalId("chemicals"),
+    canonicalId("gold"),
+    canonicalId("solana"),
+    canonicalId("memecoins"),
+};
+
+pub const known_sector_codes = [_]CanonicalId{
+    canonicalId("information_technology"),
+    canonicalId("industrials"),
+    canonicalId("consumer_discretionary"),
+    canonicalId("financials"),
+    canonicalId("health_care"),
+    canonicalId("consumer_staples"),
+    canonicalId("utilities"),
+    canonicalId("materials"),
+};
+
+pub const known_industry_codes = [_]CanonicalId{
+    canonicalId("semiconductors"),
+    canonicalId("systems_software"),
+    canonicalId("robotics_and_ai"),
+    canonicalId("internet_retail"),
+    canonicalId("cloud_platforms"),
+    canonicalId("cloud_software"),
+    canonicalId("cybersecurity"),
+    canonicalId("sovereign_debt"),
+    canonicalId("chemicals"),
+    canonicalId("gold"),
+};
+
+/// True when value is present in a plain []const CanonicalId list (linear
+/// scan — these lists are small and comptime-sized, not a hot path).
+pub fn hasCanonicalId(known_values: []const CanonicalId, value: CanonicalId) bool {
+    for (known_values) |known| {
+        if (known.eql(value)) return true;
+    }
+    return false;
+}
+
 pub fn validateCanonicalId(value: []const u8) CanonicalIdError!void {
     @setEvalBranchQuota(50_000);
     if (value.len == 0) return CanonicalIdError.Empty;

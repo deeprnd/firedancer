@@ -69,48 +69,17 @@ comptime {
     std.debug.assert(classification_ref_stride == 66);
 }
 
-const sector_taxonomy_id = cls.canonicalId("gics_sector");
-const industry_taxonomy_id = cls.canonicalId("gics_industry");
-const sector_taxonomy_version: u16 = 2025;
-const industry_taxonomy_version: u16 = 2025;
-
-const known_theme_ids = [_]CanonicalId{
-    cls.canonicalId("ai_infrastructure"),
-    cls.canonicalId("semiconductors"),
-    cls.canonicalId("cloud"),
-    cls.canonicalId("cyber_security"),
-    cls.canonicalId("broad_market"),
-    cls.canonicalId("dividends"),
-    cls.canonicalId("cash_like"),
-    cls.canonicalId("chemicals"),
-    cls.canonicalId("gold"),
-    cls.canonicalId("solana"),
-    cls.canonicalId("memecoins"),
-};
-
-const known_sector_codes = [_]CanonicalId{
-    cls.canonicalId("information_technology"),
-    cls.canonicalId("industrials"),
-    cls.canonicalId("consumer_discretionary"),
-    cls.canonicalId("financials"),
-    cls.canonicalId("health_care"),
-    cls.canonicalId("consumer_staples"),
-    cls.canonicalId("utilities"),
-    cls.canonicalId("materials"),
-};
-
-const known_industry_codes = [_]CanonicalId{
-    cls.canonicalId("semiconductors"),
-    cls.canonicalId("systems_software"),
-    cls.canonicalId("robotics_and_ai"),
-    cls.canonicalId("internet_retail"),
-    cls.canonicalId("cloud_platforms"),
-    cls.canonicalId("cloud_software"),
-    cls.canonicalId("cybersecurity"),
-    cls.canonicalId("sovereign_debt"),
-    cls.canonicalId("chemicals"),
-    cls.canonicalId("gold"),
-};
+// Known theme/sector/industry taxonomy values live in classification.zig
+// (the single source of truth shared with catalog.zig — see finding 30 in
+// doc/strategy/roadmap/backlog/audits/tech_debt.md); re-exported here under
+// the names normalize()'s local helpers already use.
+const sector_taxonomy_id = cls.sector_taxonomy_id;
+const industry_taxonomy_id = cls.industry_taxonomy_id;
+const sector_taxonomy_version = cls.sector_taxonomy_version;
+const industry_taxonomy_version = cls.industry_taxonomy_version;
+const known_theme_ids = cls.known_theme_ids;
+const known_sector_codes = cls.known_sector_codes;
+const known_industry_codes = cls.known_industry_codes;
 
 const known_tickers = [_][]const u8{
     "NVDA", "AMD",  "AVGO", "MSFT", "BOTZ", "SOXX",

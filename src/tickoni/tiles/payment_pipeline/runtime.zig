@@ -44,6 +44,10 @@ pub const PaymentMessage = struct {
     pipeline_hops: u8 = 0,
     duplicate: bool = false,
     decision: PolicyDecision = .allow,
+    /// Id of the tile stage that finalized `decision` (tknorm for
+    /// malformed_drop, tkpoly for allow/deny/duplicate_drop), so tkaudt can
+    /// attribute each record to its real producer instead of always tkpoly.
+    decided_by: [6]u8 = audit_sink.tile_id_tkpoly,
 };
 
 pub const MetricSnapshot = struct {
@@ -255,6 +259,7 @@ pub fn runNormalize(state: *PaymentPipelineState) void {
             msg.pipeline_hops += 1;
             msg.event_hash = stableEventHash(msg.raw);
             msg.decision = .malformed_drop;
+            msg.decided_by = audit_sink.tile_id_tknorm;
             state.q_norm_dedu.push(msg, &state.stop) catch break;
             continue;
         }
@@ -286,15 +291,19 @@ pub fn runPolicy(state: *PaymentPipelineState) void {
         var msg = msg_in;
         msg.pipeline_hops += 1;
         if (msg.decision == .malformed_drop) {
-            // tknorm already made this rejection decision; preserve it for
-            // audit instead of silently dropping malformed source facts.
+            // tknorm already made this rejection decision; preserve it (and
+            // its decided_by) for audit instead of silently dropping
+            // malformed source facts.
         } else if (msg.duplicate) {
             msg.decision = .duplicate_drop;
+            msg.decided_by = audit_sink.tile_id_tkpoly;
         } else if (msg.raw.amount_cents > state.config.policy_limit_cents) {
             msg.decision = .deny;
+            msg.decided_by = audit_sink.tile_id_tkpoly;
             _ = state.denied.fetchAdd(1, .release);
         } else {
             msg.decision = .allow;
+            msg.decided_by = audit_sink.tile_id_tkpoly;
             _ = state.allowed.fetchAdd(1, .release);
         }
         state.q_poly_audit.push(msg, &state.stop) catch break;
@@ -308,6 +317,7 @@ pub fn runAudit(state: *PaymentPipelineState) void {
             .source_offset = msg.raw.source_offset,
             .event_hash = msg.event_hash,
             .decision = @enumFromInt(@intFromEnum(msg.decision)),
+            .tile_id = msg.decided_by,
         }) catch {
             state.crashed_tile.store(4, .release);
             state.requestStop();
@@ -398,7 +408,8 @@ fn deterministicReplayDivergences(state: *PaymentPipelineState) u64 {
     while (offset < state.config.event_count) : (offset += 1) {
         const raw = syntheticPayment(state.config, offset);
         const event_hash = stableEventHash(raw);
-        const decision: PolicyDecision = if (!validFraming(raw)) .malformed_drop else blk: {
+        const malformed = !validFraming(raw);
+        const decision: PolicyDecision = if (malformed) .malformed_drop else blk: {
             const duplicate = replayDuplicate(state.config, offset, raw.idempotency_key, event_hash);
             break :blk if (duplicate)
                 .duplicate_drop
@@ -407,8 +418,9 @@ fn deterministicReplayDivergences(state: *PaymentPipelineState) u64 {
             else
                 .allow;
         };
+        const decided_by: [6]u8 = if (malformed) audit_sink.tile_id_tknorm else audit_sink.tile_id_tkpoly;
 
-        const expected = buildReplayEvent(expected_seq, raw, event_hash, decision, prev_hash);
+        const expected = buildReplayEvent(expected_seq, raw, event_hash, decision, decided_by, prev_hash);
         if (expected_seq >= state.audit.count) {
             divergences += 1;
         } else if (!audit.auditEventsEql(expected, state.audit.records[@intCast(expected_seq)])) {
@@ -432,6 +444,7 @@ fn buildReplayEvent(
     raw: RawPayment,
     event_hash: u64,
     decision: PolicyDecision,
+    decided_by: [6]u8,
     prev_hash: u64,
 ) audit.AuditEvent {
     return audit_sink.buildPolicyDecisionEvent(
@@ -439,6 +452,7 @@ fn buildReplayEvent(
         raw.source_offset,
         event_hash,
         @enumFromInt(@intFromEnum(decision)),
+        decided_by,
         prev_hash,
     );
 }
