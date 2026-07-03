@@ -345,6 +345,34 @@ tk_topo_wksp_ptr( void * topo, ulong wksp_idx ) {
   return ((fd_topo_t *)topo)->workspaces[ wksp_idx ].wksp;
 }
 
+/* V1.14.S8.T12 finding 3: fd_topo_create_workspace/fd_topo_join_workspace
+   hard-require huge/gigantic pages (fd_topob_finish computes page_sz from
+   topo->max_page_size and asserts it's FD_SHMEM_HUGE_PAGE_SZ or
+   FD_SHMEM_GIGANTIC_PAGE_SZ) — exactly the hugetlbfs/root requirement
+   Tickoni's V1.14.S1 deliberately avoided (see c_abi/wksp.zig's module
+   doc). fd_topob_finish's *offset/footprint* computation is otherwise
+   page-size-independent generic layout math, so Tickoni reuses that part
+   and backs the memory with its own normal-page wksp (wkspNewNamed) by
+   injecting the already-attached fd_wksp_t* here instead of calling
+   fd_topo_create_workspace/fd_topo_join_workspace at all.
+   tk_topo_wksp_footprint/part_max below let the caller size that
+   wkspNewNamed call off fd_topob_finish's real computed values instead
+   of a hand-picked constant. */
+void
+tk_topo_wksp_set_ptr( void * topo, ulong wksp_idx, void * wksp_ptr ) {
+  ((fd_topo_t *)topo)->workspaces[ wksp_idx ].wksp = (fd_wksp_t *)wksp_ptr;
+}
+
+ulong
+tk_topo_wksp_footprint( void * topo, ulong wksp_idx ) {
+  return ((fd_topo_t *)topo)->workspaces[ wksp_idx ].total_footprint;
+}
+
+ulong
+tk_topo_wksp_part_max( void * topo, ulong wksp_idx ) {
+  return ((fd_topo_t *)topo)->workspaces[ wksp_idx ].part_max;
+}
+
 void *
 tk_topo_tile_ptr( void * topo, ulong tile_id ) {
   return &((fd_topo_t *)topo)->tiles[ tile_id ];

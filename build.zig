@@ -263,6 +263,7 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, exe, fd_lib_dir);
     linkTickoniFiredancer(b, exe, fd_lib_dir);
+    linkTickoniTopoRun(b, exe, fd_lib_dir);
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -1092,6 +1093,7 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_pipeline_test, fd_lib_dir);
     linkTickoniFiredancer(b, process_pipeline_test, fd_lib_dir);
+    linkTickoniTopoRun(b, process_pipeline_test, fd_lib_dir);
     const run_process_pipeline_test = addPlainTestRun(b, process_pipeline_test);
     run_process_pipeline_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_pipeline_test.step);
@@ -1114,6 +1116,7 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_cpu_placement_test, fd_lib_dir);
     linkTickoniFiredancer(b, process_cpu_placement_test, fd_lib_dir);
+    linkTickoniTopoRun(b, process_cpu_placement_test, fd_lib_dir);
     const run_process_cpu_placement_test = addPlainTestRun(b, process_cpu_placement_test);
     run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_cpu_placement_test.step);
@@ -1138,6 +1141,7 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_topology_test, fd_lib_dir);
     linkTickoniFiredancer(b, process_topology_test, fd_lib_dir);
+    linkTickoniTopoRun(b, process_topology_test, fd_lib_dir);
     const run_process_topology_test = addPlainTestRun(b, process_topology_test);
     run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_topology_test.step);
@@ -1161,6 +1165,7 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_demo_parity_test, fd_lib_dir);
     linkTickoniFiredancer(b, process_demo_parity_test, fd_lib_dir);
+    linkTickoniTopoRun(b, process_demo_parity_test, fd_lib_dir);
     const run_process_demo_parity_test = addPlainTestRun(b, process_demo_parity_test);
     run_process_demo_parity_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_demo_parity_test.step);

@@ -58,6 +58,9 @@ extern fn tk_topo_tile_ptr(topo: *Topo, tile_id: usize) *TopoTile;
 extern fn tk_topo_link_mcache_obj_id(topo: *Topo, link_id: usize) usize;
 extern fn tk_topo_link_dcache_obj_id(topo: *Topo, link_id: usize) usize;
 extern fn tk_topo_wksp_ptr(topo: *Topo, wksp_idx: usize) ?*wksp_mod.Wksp;
+extern fn tk_topo_wksp_set_ptr(topo: *Topo, wksp_idx: usize, wksp_ptr: *wksp_mod.Wksp) void;
+extern fn tk_topo_wksp_footprint(topo: *Topo, wksp_idx: usize) usize;
+extern fn tk_topo_wksp_part_max(topo: *Topo, wksp_idx: usize) usize;
 
 // ---------------------------------------------------------------------------
 // Public Zig wrappers.
@@ -159,4 +162,29 @@ pub fn topoLinkDcacheObjId(topo: *Topo, link_id: usize) usize {
 /// Null until the workspace has been joined (topoJoinWorkspaces).
 pub fn topoWkspPtr(topo: *Topo, wksp_idx: usize) ?*wksp_mod.Wksp {
     return tk_topo_wksp_ptr(topo, wksp_idx);
+}
+
+/// V1.14.S8.T12 finding 3: fd_topo_create_workspace/fd_topo_join_workspace
+/// hard-require huge/gigantic pages (fd_topob_finish computes page_sz from
+/// topo->max_page_size and asserts HUGE or GIGANTIC) — the hugetlbfs/root
+/// requirement Tickoni's V1.14.S1 deliberately avoided. fd_topob_finish's
+/// offset/footprint layout math is otherwise page-size-independent, so
+/// Tickoni reuses that and backs the memory with its own normal-page
+/// wksp (wkspNewNamed/wkspAttach, sized off topoWkspFootprint below)
+/// instead of calling fd_topo_create_workspace/fd_topo_join_workspace at
+/// all — topoWkspNew's .new callbacks only need topoWkspPtr to be
+/// non-null; they don't inspect page_sz.
+pub fn topoWkspSetPtr(topo: *Topo, wksp_idx: usize, wksp_ptr: *wksp_mod.Wksp) void {
+    tk_topo_wksp_set_ptr(topo, wksp_idx, wksp_ptr);
+}
+
+/// fd_topob_finish's computed total byte footprint for this workspace —
+/// use this (not a hand-picked constant) to size the real normal-page
+/// wkspNewNamed allocation.
+pub fn topoWkspFootprint(topo: *Topo, wksp_idx: usize) usize {
+    return tk_topo_wksp_footprint(topo, wksp_idx);
+}
+
+pub fn topoWkspPartMax(topo: *Topo, wksp_idx: usize) usize {
+    return tk_topo_wksp_part_max(topo, wksp_idx);
 }
