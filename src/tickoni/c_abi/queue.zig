@@ -168,7 +168,7 @@ test "mcacheLineIdx wraps modulo depth" {
 }
 
 test "mcachePublish writes a frag readable via fragMetaSeqQuery" {
-    var ring: [8]FragMeta = undefined;
+    var ring: [8]FragMeta align(frag_meta_align) = undefined;
     mcachePublish(&ring, 8, 5, 42, 3, 10, 0, 0, 0);
 
     const line = mcacheLineIdx(5, 8);

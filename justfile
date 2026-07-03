@@ -243,7 +243,7 @@ test-cov-fd:
   python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd
 
 test-cov-tk:
-  python3 contrib/readme/run-badged-command.py cov-tk bash contrib/test/coverage.sh coverage-tk
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache python3 contrib/readme/run-badged-command.py cov-tk bash contrib/test/coverage.sh coverage-tk
 
 test-cov-all:
   @just test-cov-fd

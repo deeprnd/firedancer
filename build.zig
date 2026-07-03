@@ -1353,6 +1353,15 @@ pub fn build(b: *std.Build) void {
                         .{ .name = "util", .module = util_mod },
                     },
                 })
+            else if (std.mem.eql(u8, entry[1], "src/tickoni/runtime/sandbox.zig"))
+                b.createModule(.{
+                    .root_source_file = b.path(entry[1]),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "util", .module = util_mod },
+                    },
+                })
             else
                 b.createModule(.{
                     .root_source_file = b.path(entry[1]),
