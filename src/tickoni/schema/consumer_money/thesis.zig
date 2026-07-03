@@ -81,6 +81,12 @@ const known_theme_ids = cls.known_theme_ids;
 const known_sector_codes = cls.known_sector_codes;
 const known_industry_codes = cls.known_industry_codes;
 
+// Intentional exception to finding 30's taxonomy consolidation
+// (doc/strategy/roadmap/backlog/audits/tech_debt.md): this duplicates
+// catalog.zig's instrument tickers, but catalog.zig already imports thesis.zig
+// for its shared types, so thesis.zig importing catalog.zig back would cycle.
+// Removing this duplicate needs finding 29's catalog-provider injection point
+// (thesis validation would call the provider instead of a hardcoded list).
 const known_tickers = [_][]const u8{
     "NVDA", "AMD",  "AVGO", "MSFT", "BOTZ", "SOXX",
     "AMZN", "WCLD", "PANW", "CRWD", "HACK", "CIBR",
@@ -468,31 +474,24 @@ fn validateRequestedTickers(input: ThesisInput) !void {
 }
 
 fn isKnownThemeId(theme_id: CanonicalId) bool {
-    return hasCanonicalId(&known_theme_ids, theme_id);
+    return cls.hasCanonicalId(&known_theme_ids, theme_id);
 }
 
 fn isKnownSectorRef(ref: ClassificationRef) bool {
     if (!ref.taxonomy_id.eql(sector_taxonomy_id)) return false;
     if (ref.taxonomy_version != sector_taxonomy_version) return false;
-    return hasCanonicalId(&known_sector_codes, ref.code);
+    return cls.hasCanonicalId(&known_sector_codes, ref.code);
 }
 
 fn isKnownIndustryRef(ref: ClassificationRef) bool {
     if (!ref.taxonomy_id.eql(industry_taxonomy_id)) return false;
     if (ref.taxonomy_version != industry_taxonomy_version) return false;
-    return hasCanonicalId(&known_industry_codes, ref.code);
+    return cls.hasCanonicalId(&known_industry_codes, ref.code);
 }
 
 fn isKnownTicker(ticker: []const u8) bool {
     for (known_tickers) |known| {
         if (std.mem.eql(u8, known, ticker)) return true;
-    }
-    return false;
-}
-
-fn hasCanonicalId(known_values: []const CanonicalId, value: CanonicalId) bool {
-    for (known_values) |known| {
-        if (known.eql(value)) return true;
     }
     return false;
 }

@@ -109,12 +109,22 @@ pub fn build(b: *std.Build) void {
             .{ .name = "c_abi", .module = c_abi_mod },
         },
     });
+    const catalog_schema_mod = b.addModule("catalog_schema", .{
+        .root_source_file = b.path("src/tickoni/schema/consumer_money/catalog_schema.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "thesis", .module = thesis_mod },
+        },
+    });
     const catalog_mod = b.addModule("catalog", .{
         .root_source_file = b.path("src/tickoni/schema/consumer_money/catalog.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "thesis", .module = thesis_mod },
+            .{ .name = "classification", .module = classification_mod },
+            .{ .name = "catalog_schema", .module = catalog_schema_mod },
         },
     });
     const basket_mod = b.addModule("basket", .{
@@ -378,11 +388,26 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "thesis", .module = thesis_mod },
+                .{ .name = "classification", .module = classification_mod },
+                .{ .name = "catalog_schema", .module = catalog_schema_mod },
             },
         }),
     });
     linkTickoniCodec(b, catalog_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(catalog_test).step);
+
+    const catalog_schema_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/consumer_money/catalog_schema.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "thesis", .module = thesis_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, catalog_schema_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(catalog_schema_test).step);
 
     const basket_test = b.addTest(.{
         .root_module = b.createModule(.{
@@ -1366,11 +1391,29 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "thesis", .module = thesis_mod },
+                .{ .name = "classification", .module = classification_mod },
+                .{ .name = "catalog_schema", .module = catalog_schema_mod },
             },
         }),
     });
     linkTickoniCodec(b, catalog_cov_test, fd_lib_dir);
     cov_step.dependOn(&b.addInstallArtifact(catalog_cov_test, .{
+        .dest_dir = .{ .override = .{ .custom = "cov" } },
+    }).step);
+
+    const catalog_schema_cov_test = b.addTest(.{
+        .name = "test-catalog-schema",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/schema/consumer_money/catalog_schema.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "thesis", .module = thesis_mod },
+            },
+        }),
+    });
+    linkTickoniCodec(b, catalog_schema_cov_test, fd_lib_dir);
+    cov_step.dependOn(&b.addInstallArtifact(catalog_schema_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
 

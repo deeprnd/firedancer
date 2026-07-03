@@ -164,6 +164,65 @@ the shared module directly as a root). Given the mechanical size, this is
 better done as its own dedicated pass per tile rather than folded into
 unrelated work.
 
+## F.16: schema/domain-service split for thesis, basket, drift
+
+**Files:** `src/tickoni/schema/consumer_money/thesis.zig` (1312 lines),
+`src/tickoni/schema/consumer_money/basket.zig` (1102 lines),
+`src/tickoni/schema/consumer_money/drift.zig` (1870 lines)
+
+F.30 and F.29's schema-only splits (`catalog.zig`/`catalog_schema.zig`,
+`classification.zig`) worked cleanly because the contract type has zero
+dependency on its behavior functions, so the fixture/behavior file could
+import the pure-contract file one-way with no cycle, and the module's public
+name (`"catalog"`) kept pointing at the same file so every consumer's
+`@import("catalog")` surface stayed identical.
+
+thesis.zig doesn't have that property: `normalize()`,
+`computeThesisInputHash()`, and their private helpers (sort/pack/validate)
+are declared in the same file as `ThesisInput`/`InvestorIntent` and need
+those types. Pulling them into a separate `thesis_normalize.zig` that
+imports `thesis.zig` for the types, while `thesis.zig` re-exports
+`normalize`/`computeThesisInputHash` for existing callers, is a two-file
+cycle. Breaking it means either (a) flipping which file the build module
+name `"thesis"` points at — a thin aggregator re-exporting a contract file
++ a behavior file, the `payment_pipeline/mod.zig` pattern — or (b) accepting
+that callers needing `normalize()` import a differently-named module than
+callers needing `ThesisInput`. Same shape of problem for `basket.zig`
+(screening/allocation logic vs. `Basket`/`BasketScreening` contract types)
+and `drift.zig` (drift generation vs. `DriftContract`).
+
+**Why not attempted this pass:** whichever option is chosen ripples through
+`build.zig`, which currently wires `thesis_mod`/`basket_mod`/`drift_mod` as
+named imports at 61 separate call sites (tkpoly, demo/investment code, every
+basket/drift/trade_ticket test, etc.). That's real blast radius for what's
+meant to be a pure reorganization, and the aggregator-vs-split-naming choice
+is itself a decision, not just execution — same category as I/J below.
+
+## F.29 (partial): catalog provider injection
+
+**Files:** `src/tickoni/schema/consumer_money/basket.zig`,
+`src/tickoni/tiles/policy/mod.zig` (tkpoly.buildBasket)
+
+Finding 29's schema/fixture split is done: `catalog_schema.zig` now holds the
+versioned contract (`InstrumentEntry`, `RestrictionReason`,
+`catalog_schema_version`, `CatalogValidationError`), and `catalog.zig` holds
+only the 24-entry fixture array, lookup functions
+(`filterByTheme`/`lookupByTicker`/etc.), and fixture validation — re-exporting
+the schema types so every existing `@import("catalog")` call site (chiefly
+`basket.zig`, which uses `cat.InstrumentEntry`/`cat.filterByTheme`/
+`cat.lookupByTicker` extensively) kept working with zero call-site changes.
+
+**Not attempted:** the finding's other half — "basket construction receives a
+catalog provider or explicit catalog snapshot instead of importing fixture
+data directly." `basket.zig` still imports the concrete `catalog.zig` fixture
+module by name (`const cat = @import("catalog");`) rather than taking a
+catalog snapshot/provider as a parameter. Doing this for real means changing
+`buildBasket`'s signature (and every caller: `tkpoly.buildBasket`, demo code,
+every basket test) to thread a provider through, mirroring the `Backend.from()`
+vtable pattern used for finding 15/E's model/adapter backends. That's a
+second, separately-scoped change, not a file reorganization — deferred here
+for the same reason 25/22 are (mechanical size, ripples through every caller).
+
 ## K. Audit ownership/schema (findings 26, 27, 32)
 
 **Files:** `src/tickoni/tiles/payment_pipeline/audit_sink.zig`,
