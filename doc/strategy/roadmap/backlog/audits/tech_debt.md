@@ -2,6 +2,43 @@
 
 Readable backlog for small cleanup work in the Tickoni runtime and supervisor.
 
+## GitHub Issues Mapping
+
+| # | GitHub Issue | Title |
+|---|-------------|-------|
+| 1 | [#716](https://github.com/deeprnd/tickoni/issues/716) | Extract sandbox defaults into named constants |
+| 2 | [#717](https://github.com/deeprnd/tickoni/issues/717) | Replace numeric tile phases with an enum |
+| 3 | [#718](https://github.com/deeprnd/tickoni/issues/718) | Stop repeating raw tile-id strings in topology tests |
+| 4 | [#719](https://github.com/deeprnd/tickoni/issues/719) | Use shared constants for sandbox limit tests |
+| 5 | [#720](https://github.com/deeprnd/tickoni/issues/720) | Rework the busy-wait sleep in shared-memory consumer loops |
+| 6 | [#721](https://github.com/deeprnd/tickoni/issues/721) | Reuse Firedancer-backed workspace constants where appropriate |
+| 7 | [#722](https://github.com/deeprnd/tickoni/issues/722) | Remove payment-pipeline knowledge from the generic supervisor |
+| 8 | [#723](https://github.com/deeprnd/tickoni/issues/723) | Make tile_process own live heartbeat and halt handling |
+| 9 | [#724](https://github.com/deeprnd/tickoni/issues/724) | Make the BOOT-to-RUN transition halt-safe |
+| 10 | [#725](https://github.com/deeprnd/tickoni/issues/725) | Fail closed on unsupported multi-link process topologies |
+| 11 | [#726](https://github.com/deeprnd/tickoni/issues/726) | Type tile-plan phases end to end |
+| 12 | [#727](https://github.com/deeprnd/tickoni/issues/727) | Align crash-reason reporting with implemented supervisor checks |
+| 13 | [#728](https://github.com/deeprnd/tickoni/issues/728) | Define one runtime hash-boundary contract |
+| 14 | [#729](https://github.com/deeprnd/tickoni/issues/729) | Remove production dependencies on test fixtures and mocks |
+| 15 | [#730](https://github.com/deeprnd/tickoni/issues/730) | Split schema contracts from domain services |
+| 16 | [#731](https://github.com/deeprnd/tickoni/issues/731) | Make tkpoly the clear policy authority |
+| 17 | [#732](https://github.com/deeprnd/tickoni/issues/732) | Make tile messages serializable boundary contracts |
+| 18 | [#733](https://github.com/deeprnd/tickoni/issues/733) | Align declared product topologies with runnable entrypoints |
+| 19 | [#734](https://github.com/deeprnd/tickoni/issues/734) | Decouple the supervisor from one concrete topology shape |
+| 20 | [#735](https://github.com/deeprnd/tickoni/issues/735) | Normalize tile phase naming and values |
+| 21 | [#736](https://github.com/deeprnd/tickoni/issues/736) | Standardize tile module structure |
+| 22 | [#737](https://github.com/deeprnd/tickoni/issues/737) | Remove payment-domain fields from generic launch specs |
+| 23 | [#738](https://github.com/deeprnd/tickoni/issues/738) | Replace string-based child tile dispatch with a registry |
+| 24 | [#739](https://github.com/deeprnd/tickoni/issues/739) | Split the payment pipeline into tile-owned modules |
+| 25 | [#740](https://github.com/deeprnd/tickoni/issues/740) | Make tkaudt own audit record construction for the payment pipeline |
+| 26 | [#741](https://github.com/deeprnd/tickoni/issues/741) | Remove fixture vocabulary from canonical audit contracts |
+| 27 | [#742](https://github.com/deeprnd/tickoni/issues/742) | Centralize replay and proposal hash helpers |
+| 28 | [#743](https://github.com/deeprnd/tickoni/issues/743) | Move the instrument catalog out of schema fixture code |
+| 29 | [#744](https://github.com/deeprnd/tickoni/issues/744) | Define one source of truth for taxonomy and known values |
+| 30 | [#745](https://github.com/deeprnd/tickoni/issues/745) | Catalog finance-native capability constants |
+| 31 | [#746](https://github.com/deeprnd/tickoni/issues/746) | Generate or centralize audit schema/wire/proto definitions |
+| 32 | [#747](https://github.com/deeprnd/tickoni/issues/747) | Make CPU placement validation ownership explicit |
+
 ## 1. Extract sandbox defaults into named constants
 
 **Files:** `src/tickoni/runtime/sandbox.zig`
