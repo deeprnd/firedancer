@@ -201,8 +201,6 @@ test "investmentWorkflow includes tkmodl tktool tkadpt and passes validation" {
     try std.testing.expectEqualStrings("tkrepl", topo.tiles[11].id.slice());
 }
 
-
-
 test "paymentPipelineProcess has 8 tiles, 4 tango_shm channels, and passes validation" {
     const topo = paymentPipelineProcess();
     try topo.validate();
