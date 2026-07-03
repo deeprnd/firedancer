@@ -559,6 +559,40 @@ pub fn build(b: *std.Build) void {
     linkTickoniTopoRun(b, topo_run_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(topo_run_test).step);
 
+    // topob.zig (V1.14.S8.T12): fd_topob topology builder. Same
+    // no-test-blocks-yet rationale as topo_run_test above; proves the
+    // shim (including Tickoni's own object-callbacks array) compiles and
+    // links.
+    const topob_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/c_abi/topob.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    linkTickoniFiredancer(b, topob_test, fd_lib_dir);
+    linkTickoniTopoRun(b, topob_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(topob_test).step);
+
+    // topo_build.zig (V1.14.S8.T12): shared topology-builder, actually
+    // calls into topob.zig against a real 8-tile-shaped Topology, so
+    // needs the same c_abi + util imports as cpu_placement_test plus the
+    // Firedancer/topo-adapter link surface.
+    const topo_build_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/topo_build.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "util", .module = util_mod },
+            },
+        }),
+    });
+    linkTickoniFiredancer(b, topo_build_test, fd_lib_dir);
+    linkTickoniTopoRun(b, topo_build_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(topo_build_test).step);
+
     // model tile: unit tests are mock/fixture-backed and must not start servers.
     const model_test_mod = b.createModule(.{
         .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
@@ -1640,17 +1674,19 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
     step.root_module.linkSystemLibrary("stdc++", .{});
 }
 
-/// Links shim/topo_run.c (the fd_topo_run_tile adapter, V1.14.S8.T3).
+/// Links shim/topo_run.c (the fd_topo_run_tile adapter, V1.14.S8.T3) and
+/// shim/topob.c (the fd_topob topology builder, V1.14.S8.T12) — the two
+/// halves of Tickoni's Firedancer topology adapter, same link surface.
 /// Callers must also call linkTickoniFiredancer (tango/util) — this only
-/// adds the additional disco/ballet/waltz link surface fd_topo_run.c and
-/// its callees (fd_metrics, fd_event_report, both compiled into fd_disco)
-/// need, following the same link set as src/disco/topo/Local.mk's own
-/// test_topob unit test.
+/// adds the additional disco/ballet/waltz link surface these files and
+/// their callees (fd_metrics, fd_event_report, both compiled into
+/// fd_disco) need, following the same link set as
+/// src/disco/topo/Local.mk's own test_topob unit test.
 fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
     step.root_module.addCSourceFiles(.{
-        .files = &.{"src/tickoni/c_abi/shim/topo_run.c"},
+        .files = &.{ "src/tickoni/c_abi/shim/topo_run.c", "src/tickoni/c_abi/shim/topob.c" },
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
     });
     step.root_module.addLibraryPath(b.path(fd_lib_dir));

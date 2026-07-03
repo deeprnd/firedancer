@@ -8,3 +8,5 @@ pub const fseq = @import("fseq.zig");
 pub const cnc = @import("cnc.zig");
 pub const wksp = @import("wksp.zig");
 pub const boot = @import("boot.zig");
+pub const topo_run = @import("topo_run.zig");
+pub const topob = @import("topob.zig");
