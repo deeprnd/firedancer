@@ -65,7 +65,7 @@ fn id(comptime s: []const u8) rt.tile.TileId {
 /// this tile's own LaunchSpec file, derived from spec.shmemPath() rather
 /// than carried as a LaunchSpec field (V1.14.S8.T2 keeps that record
 /// payment-pipeline-agnostic).
-fn loadProcessConfig(io: std.Io, spec: *const rt.launch_spec.LaunchSpec) !tiles.PaymentPipelineConfig {
+fn loadProcessConfig(io: std.Io, spec: *const rt.launch_spec.LaunchSpec) !tiles.process.ProcessRuntimeConfig {
     var path_buf: [rt.launch_spec.shmem_path_cap + 32]u8 = undefined;
     const path = try std.fmt.bufPrint(&path_buf, "{s}/payment_pipeline.config", .{spec.shmemPath()});
     return tiles.process.readProcessConfig(io, std.Io.Dir.cwd(), path);
@@ -87,7 +87,7 @@ fn tkingsProcess(io: std.Io, wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec
     var output = try rt.link.Producer.join(wksp, spec.outLinks()[0]);
     defer output.leave();
     const cfg = try loadProcessConfig(io, spec);
-    tiles.process.runIngestProcess(cfg, &output, cnc);
+    tiles.process.runIngestProcess(cfg, spec.tile_idx, &output, cnc);
 }
 
 fn tknormProcess(io: std.Io, wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec.LaunchSpec, cnc: *c_abi.cnc.Cnc, allocator: std.mem.Allocator) anyerror!void {
@@ -98,7 +98,7 @@ fn tknormProcess(io: std.Io, wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec
     var output = try rt.link.Producer.join(wksp, spec.outLinks()[0]);
     defer output.leave();
     const cfg = try loadProcessConfig(io, spec);
-    tiles.process.runNormalizeProcess(cfg, &input, &output, cnc);
+    tiles.process.runNormalizeProcess(cfg, spec.tile_idx, &input, &output, cnc);
 }
 
 fn tkdeduProcess(io: std.Io, wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec.LaunchSpec, cnc: *c_abi.cnc.Cnc, allocator: std.mem.Allocator) anyerror!void {
@@ -108,12 +108,12 @@ fn tkdeduProcess(io: std.Io, wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec
     var output = try rt.link.Producer.join(wksp, spec.outLinks()[0]);
     defer output.leave();
     const cfg = try loadProcessConfig(io, spec);
-    const cap: usize = @intCast(cfg.event_count);
+    const cap: usize = @intCast(cfg.pipeline.event_count);
     const seen_keys = try allocator.alloc(u64, cap);
     defer allocator.free(seen_keys);
     const seen_hashes = try allocator.alloc(u64, cap);
     defer allocator.free(seen_hashes);
-    tiles.process.runDedupeProcess(cfg, &input, &output, cnc, seen_keys, seen_hashes);
+    tiles.process.runDedupeProcess(cfg, spec.tile_idx, &input, &output, cnc, seen_keys, seen_hashes);
 }
 
 fn tkpolyProcess(io: std.Io, wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec.LaunchSpec, cnc: *c_abi.cnc.Cnc, allocator: std.mem.Allocator) anyerror!void {
@@ -124,7 +124,7 @@ fn tkpolyProcess(io: std.Io, wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec
     var output = try rt.link.Producer.join(wksp, spec.outLinks()[0]);
     defer output.leave();
     const cfg = try loadProcessConfig(io, spec);
-    tiles.process.runPolicyProcess(cfg, &input, &output, cnc);
+    tiles.process.runPolicyProcess(cfg, spec.tile_idx, &input, &output, cnc);
 }
 
 fn tkaudtProcess(io: std.Io, wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec.LaunchSpec, cnc: *c_abi.cnc.Cnc, allocator: std.mem.Allocator) anyerror!void {
@@ -132,10 +132,10 @@ fn tkaudtProcess(io: std.Io, wksp: *c_abi.wksp.Wksp, spec: *const rt.launch_spec
     var input = try rt.link.Consumer.join(wksp, spec.inLinks()[0]);
     defer input.leave();
     const cfg = try loadProcessConfig(io, spec);
-    const cap: usize = @intCast(cfg.event_count);
+    const cap: usize = @intCast(cfg.pipeline.event_count);
     var audit_log = try tiles.audit_sink.AuditLog.init(allocator, cap);
     defer audit_log.deinit(allocator);
-    tiles.process.runAuditProcess(cfg, &input, cnc, &audit_log);
+    tiles.process.runAuditProcess(cfg, spec.tile_idx, &input, cnc, &audit_log);
 }
 
 // ---------------------------------------------------------------------------

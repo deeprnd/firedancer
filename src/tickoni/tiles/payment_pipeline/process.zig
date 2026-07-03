@@ -22,12 +22,6 @@
 /// per run (writeProcessConfig below); tile_registry.zig's process-mode
 /// wrappers read it (readProcessConfig) and pass the result in here.
 ///
-/// Known gap: the halt check only happens between iterations, so a stage
-/// blocked inside a single consume()/publish() wait will not observe a
-/// halt signalled mid-wait. This does not affect the natural-completion
-/// path (every stage always eventually receives its expected
-/// event_count messages), only an early-abort request mid-run; broader
-/// halt responsiveness is left to a follow-on story if needed.
 const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
@@ -51,20 +45,34 @@ fn halted(cnc: *c_abi.cnc.Cnc) bool {
 const process_config_magic: u32 = 0x544b5043; // "TKPC"
 const process_config_version: u16 = 1;
 
+pub const StuckTileHook = struct {
+    tile_idx: u32,
+    after_messages: u64 = 0,
+    sleep_ns: u64 = 60 * std.time.ns_per_s,
+};
+
+pub const ProcessRuntimeConfig = struct {
+    pipeline: payment_runtime.PaymentPipelineConfig = .{},
+    /// Test-only hook for supervisor heartbeat-staleness integration proofs:
+    /// after `after_messages` iterations, the selected tile sleeps forever
+    /// without emitting further heartbeats or observing HALT.
+    stuck_tile: ?StuckTileHook = null,
+};
+
 const ProcessConfigFile = struct {
     magic_field: u32 = process_config_magic,
     version_field: u16 = process_config_version,
-    cfg: payment_runtime.PaymentPipelineConfig = .{},
+    cfg: ProcessRuntimeConfig = .{},
 };
 
-pub fn writeProcessConfig(cfg: payment_runtime.PaymentPipelineConfig, io: std.Io, dir: std.Io.Dir, sub_path: []const u8) !void {
+pub fn writeProcessConfig(cfg: ProcessRuntimeConfig, io: std.Io, dir: std.Io.Dir, sub_path: []const u8) !void {
     const file_struct = ProcessConfigFile{ .cfg = cfg };
     var file = try dir.createFile(io, sub_path, .{});
     defer file.close(io);
     try file.writePositionalAll(io, std.mem.asBytes(&file_struct), 0);
 }
 
-pub fn readProcessConfig(io: std.Io, dir: std.Io.Dir, sub_path: []const u8) !payment_runtime.PaymentPipelineConfig {
+pub fn readProcessConfig(io: std.Io, dir: std.Io.Dir, sub_path: []const u8) !ProcessRuntimeConfig {
     var file = try dir.openFile(io, sub_path, .{});
     defer file.close(io);
     var file_struct: ProcessConfigFile = undefined;
@@ -76,17 +84,33 @@ pub fn readProcessConfig(io: std.Io, dir: std.Io.Dir, sub_path: []const u8) !pay
     return file_struct.cfg;
 }
 
+fn sleepNanos(ns: u64) void {
+    const req = std.os.linux.timespec{
+        .sec = @intCast(ns / std.time.ns_per_s),
+        .nsec = @intCast(ns % std.time.ns_per_s),
+    };
+    _ = std.os.linux.nanosleep(&req, null);
+}
+
+fn maybeBlockForTest(process_cfg: ProcessRuntimeConfig, tile_idx: u32, completed_messages: u64) void {
+    const hook = process_cfg.stuck_tile orelse return;
+    if (hook.tile_idx != tile_idx or completed_messages < hook.after_messages) return;
+    while (true) sleepNanos(hook.sleep_ns);
+}
+
 // ---------------------------------------------------------------------------
 // Pipeline stages.
 // ---------------------------------------------------------------------------
 
-pub fn runIngestProcess(cfg: payment_runtime.PaymentPipelineConfig, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
+pub fn runIngestProcess(process_cfg: ProcessRuntimeConfig, tile_idx: u32, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
+    const cfg = process_cfg.pipeline;
     var stop_flag = std.atomic.Value(bool).init(false);
     var backpressure_waits = std.atomic.Value(u64).init(0);
 
     var produced: u64 = 0;
     var offset: u64 = 0;
     while (offset < cfg.event_count) : (offset += 1) {
+        maybeBlockForTest(process_cfg, tile_idx, produced);
         if (halted(cnc)) break;
         const raw = payment_runtime.syntheticPayment(cfg, offset);
         const msg = PaymentMessage{ .raw = raw, .pipeline_hops = 1 };
@@ -96,7 +120,8 @@ pub fn runIngestProcess(cfg: payment_runtime.PaymentPipelineConfig, output: *rt.
     rt.cnc_counters.appCounterWrite(cnc, 0, produced);
 }
 
-pub fn runNormalizeProcess(cfg: payment_runtime.PaymentPipelineConfig, input: *rt.link.Consumer, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
+pub fn runNormalizeProcess(process_cfg: ProcessRuntimeConfig, tile_idx: u32, input: *rt.link.Consumer, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
+    const cfg = process_cfg.pipeline;
     var stop_flag = std.atomic.Value(bool).init(false);
     var backpressure_waits = std.atomic.Value(u64).init(0);
     var idle_polls = std.atomic.Value(u64).init(0);
@@ -106,6 +131,7 @@ pub fn runNormalizeProcess(cfg: payment_runtime.PaymentPipelineConfig, input: *r
     var invalid: u64 = 0;
     var i: u64 = 0;
     while (i < cfg.event_count) : (i += 1) {
+        maybeBlockForTest(process_cfg, tile_idx, i);
         if (halted(cnc)) break;
         _ = input.consume(&buf, &idle_polls, &stop_flag, cnc) orelse break;
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
@@ -125,13 +151,15 @@ pub fn runNormalizeProcess(cfg: payment_runtime.PaymentPipelineConfig, input: *r
 }
 
 pub fn runDedupeProcess(
-    cfg: payment_runtime.PaymentPipelineConfig,
+    process_cfg: ProcessRuntimeConfig,
+    tile_idx: u32,
     input: *rt.link.Consumer,
     output: *rt.link.Producer,
     cnc: *c_abi.cnc.Cnc,
     seen_keys: []u64,
     seen_hashes: []u64,
 ) void {
+    const cfg = process_cfg.pipeline;
     var stop_flag = std.atomic.Value(bool).init(false);
     var backpressure_waits = std.atomic.Value(u64).init(0);
     var idle_polls = std.atomic.Value(u64).init(0);
@@ -141,6 +169,7 @@ pub fn runDedupeProcess(
     var duplicates: u64 = 0;
     var i: u64 = 0;
     while (i < cfg.event_count) : (i += 1) {
+        maybeBlockForTest(process_cfg, tile_idx, i);
         if (halted(cnc)) break;
         _ = input.consume(&buf, &idle_polls, &stop_flag, cnc) orelse break;
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
@@ -164,7 +193,8 @@ fn seenOrRemember(seen_keys: []u64, seen_hashes: []u64, seen_count: *usize, msg:
     return false;
 }
 
-pub fn runPolicyProcess(cfg: payment_runtime.PaymentPipelineConfig, input: *rt.link.Consumer, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
+pub fn runPolicyProcess(process_cfg: ProcessRuntimeConfig, tile_idx: u32, input: *rt.link.Consumer, output: *rt.link.Producer, cnc: *c_abi.cnc.Cnc) void {
+    const cfg = process_cfg.pipeline;
     var stop_flag = std.atomic.Value(bool).init(false);
     var backpressure_waits = std.atomic.Value(u64).init(0);
     var idle_polls = std.atomic.Value(u64).init(0);
@@ -174,6 +204,7 @@ pub fn runPolicyProcess(cfg: payment_runtime.PaymentPipelineConfig, input: *rt.l
     var denied: u64 = 0;
     var i: u64 = 0;
     while (i < cfg.event_count) : (i += 1) {
+        maybeBlockForTest(process_cfg, tile_idx, i);
         if (halted(cnc)) break;
         _ = input.consume(&buf, &idle_polls, &stop_flag, cnc) orelse break;
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
@@ -201,11 +232,13 @@ pub fn runPolicyProcess(cfg: payment_runtime.PaymentPipelineConfig, input: *rt.l
 }
 
 pub fn runAuditProcess(
-    cfg: payment_runtime.PaymentPipelineConfig,
+    process_cfg: ProcessRuntimeConfig,
+    tile_idx: u32,
     input: *rt.link.Consumer,
     cnc: *c_abi.cnc.Cnc,
     audit_log: *audit_sink.AuditLog,
 ) void {
+    const cfg = process_cfg.pipeline;
     var stop_flag = std.atomic.Value(bool).init(false);
     var idle_polls = std.atomic.Value(u64).init(0);
     var buf: [msg_size]u8 = undefined;
@@ -213,6 +246,7 @@ pub fn runAuditProcess(
     var audited: u64 = 0;
     var i: u64 = 0;
     while (i < cfg.event_count) : (i += 1) {
+        maybeBlockForTest(process_cfg, tile_idx, i);
         if (halted(cnc)) break;
         _ = input.consume(&buf, &idle_polls, &stop_flag, cnc) orelse break;
         const msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
@@ -235,19 +269,24 @@ test "ProcessConfig round-trips through a file" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
 
-    const cfg = payment_runtime.PaymentPipelineConfig{
-        .event_count = 123,
-        .policy_limit_cents = 45_600,
-        .inject_duplicate = true,
-        .inject_malformed = true,
+    const cfg = ProcessRuntimeConfig{
+        .pipeline = .{
+            .event_count = 123,
+            .policy_limit_cents = 45_600,
+            .inject_duplicate = true,
+            .inject_malformed = true,
+        },
+        .stuck_tile = .{ .tile_idx = 2, .after_messages = 7, .sleep_ns = 1234 },
     };
     try writeProcessConfig(cfg, std.testing.io, tmp.dir, "payment_pipeline.config");
 
     const read_back = try readProcessConfig(std.testing.io, tmp.dir, "payment_pipeline.config");
-    try std.testing.expectEqual(@as(u64, 123), read_back.event_count);
-    try std.testing.expectEqual(@as(i64, 45_600), read_back.policy_limit_cents);
-    try std.testing.expect(read_back.inject_duplicate);
-    try std.testing.expect(read_back.inject_malformed);
+    try std.testing.expectEqual(@as(u64, 123), read_back.pipeline.event_count);
+    try std.testing.expectEqual(@as(i64, 45_600), read_back.pipeline.policy_limit_cents);
+    try std.testing.expect(read_back.pipeline.inject_duplicate);
+    try std.testing.expect(read_back.pipeline.inject_malformed);
+    try std.testing.expectEqual(@as(?u32, 2), if (read_back.stuck_tile) |hook| hook.tile_idx else null);
+    try std.testing.expectEqual(@as(?u64, 7), if (read_back.stuck_tile) |hook| hook.after_messages else null);
 }
 
 test "ProcessConfig readProcessConfig rejects a truncated file" {

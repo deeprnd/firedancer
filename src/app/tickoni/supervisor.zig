@@ -24,10 +24,18 @@ pub const ProcessPipelineConfig = struct {
     /// silent default, per the fail-closed environment-configuration rule.
     run_dir: []const u8,
     heartbeat_interval_ns: u64 = 20_000_000, // 20ms
+    /// Supervisor classifies a tile as stale when its cnc heartbeat has
+    /// not advanced for longer than this. 0 means derive a conservative
+    /// default from heartbeat_interval_ns.
+    heartbeat_stale_after_ns: u64 = 0,
     /// Test-only hook (V1.14.S1.T12 crash isolation): tile i self-exits(1)
     /// after this many heartbeats instead of waiting for a halt signal.
     /// 0 means run normally. Indexed by tile_idx.
     crash_after_heartbeats: [8]u32 = [_]u32{0} ** 8,
+    /// Test-only hook (V1.14.S8.T6 stale-heartbeat proof): the selected
+    /// tile blocks forever after stuck_after_messages loop iterations.
+    stuck_tile_idx: ?u32 = null,
+    stuck_after_messages: u64 = 0,
     /// Payment pipeline behavior, shared with thread-mode
     /// PaymentPipelineConfig so process-mode and thread-mode runs produce
     /// byte-identical decisions/metrics for the same input.
@@ -57,6 +65,7 @@ const ProcessState = struct {
     /// Parent-side cnc joins, used to send the halt signal during stop.
     cncs: [8]?*c_abi.cnc.Cnc,
     children: [8]?std.process.Child,
+    heartbeat_stale_after_ns: u64,
     /// V1.14.S1.T14 visibility: whether this run's layout is shared-core
     /// and how many tiles are exclusive/shared/floating.
     placement_report: rt.cpu_placement.PlacementReport,
@@ -78,6 +87,11 @@ const ProcessState = struct {
         allocator.free(self.run_dir);
     }
 };
+
+fn resolvedHeartbeatStaleAfterNs(config: ProcessPipelineConfig) u64 {
+    if (config.heartbeat_stale_after_ns != 0) return config.heartbeat_stale_after_ns;
+    return std.math.mul(u64, config.heartbeat_interval_ns, 5) catch std.math.maxInt(u64);
+}
 
 /// Bridges a tile_registry.RunFn resolved at runtime into std.Thread.spawn,
 /// whose function argument must be comptime-known.
@@ -256,6 +270,7 @@ pub const Supervisor = struct {
             .cnc_gaddrs = [_]usize{0} ** 8,
             .cncs = [_]?*c_abi.cnc.Cnc{null} ** 8,
             .children = [_]?std.process.Child{null} ** 8,
+            .heartbeat_stale_after_ns = resolvedHeartbeatStaleAfterNs(config),
             .placement_report = placement_report,
         };
         built_topo_owned_by_state = true;
@@ -310,10 +325,16 @@ pub const Supervisor = struct {
         const payment_config_path = try std.fmt.allocPrint(self.allocator, "{s}/payment_pipeline.config", .{config.run_dir});
         defer self.allocator.free(payment_config_path);
         try tiles_mod.process.writeProcessConfig(.{
-            .event_count = config.event_count,
-            .policy_limit_cents = config.policy_limit_cents,
-            .inject_duplicate = config.inject_duplicate,
-            .inject_malformed = config.inject_malformed,
+            .pipeline = .{
+                .event_count = config.event_count,
+                .policy_limit_cents = config.policy_limit_cents,
+                .inject_duplicate = config.inject_duplicate,
+                .inject_malformed = config.inject_malformed,
+            },
+            .stuck_tile = if (config.stuck_tile_idx) |idx| .{
+                .tile_idx = idx,
+                .after_messages = config.stuck_after_messages,
+            } else null,
         }, io, std.Io.Dir.cwd(), payment_config_path);
 
         // V1.14.S8.T4: every self-exec'd child rebuilds this same topology
@@ -391,7 +412,9 @@ pub const Supervisor = struct {
             };
             switch (term) {
                 .exited => |code| {
-                    if (code == 0) {
+                    if (self.handles[i].state == .stale) {
+                        self.handles[i].crashed_because = .stale;
+                    } else if (code == 0) {
                         self.handles[i].state = .stopped;
                     } else {
                         self.handles[i].state = .crashed;
@@ -400,15 +423,42 @@ pub const Supervisor = struct {
                     }
                 },
                 .signal => {
-                    self.handles[i].state = .crashed;
-                    self.handles[i].crashed_because = .signal;
+                    if (self.handles[i].state == .stale) {
+                        self.handles[i].crashed_because = .stale;
+                    } else {
+                        self.handles[i].state = .crashed;
+                        self.handles[i].crashed_because = .signal;
+                    }
                 },
                 .stopped, .unknown => {
-                    self.handles[i].state = .crashed;
-                    self.handles[i].crashed_because = .exit_code;
+                    if (self.handles[i].state == .stale) {
+                        self.handles[i].crashed_because = .stale;
+                    } else {
+                        self.handles[i].state = .crashed;
+                        self.handles[i].crashed_because = .exit_code;
+                    }
                 },
             }
             maybe_child.* = null;
+        }
+    }
+
+    pub fn refreshProcessHealth(self: *Supervisor) void {
+        const state = self.process_state orelse return;
+        const now = util.process.monotonicNanos();
+        if (now <= 0) return;
+        const now_ns: u64 = @intCast(now);
+        for (state.cncs, 0..) |maybe_cnc, i| {
+            const h = &self.handles[i];
+            if (h.state != .starting and h.state != .running) continue;
+            const cnc = maybe_cnc orelse continue;
+            const heartbeat = c_abi.cnc.heartbeatQuery(cnc);
+            if (heartbeat <= 0) continue;
+            const heartbeat_ns: u64 = @intCast(heartbeat);
+            if (now_ns > heartbeat_ns and now_ns - heartbeat_ns > state.heartbeat_stale_after_ns) {
+                h.state = .stale;
+                h.crashed_because = .stale;
+            }
         }
     }
 
@@ -467,8 +517,15 @@ pub const Supervisor = struct {
     /// stop of tiles that are still running.
     pub fn stopProcess(self: *Supervisor, io: std.Io) void {
         const state = self.process_state orelse return;
+        self.refreshProcessHealth();
         for (state.cncs) |maybe_cnc| {
             if (maybe_cnc) |cnc| c_abi.cnc.signal(cnc, c_abi.cnc.signal_halt);
+        }
+        for (self.handles, 0..) |h, i| {
+            const maybe_child = &state.children[i];
+            if (h.state != .stale) continue;
+            const child = maybe_child.* orelse continue;
+            _ = std.os.linux.kill(child.id.?, std.os.linux.SIG.KILL);
         }
         self.waitProcess(io);
         state.deinit(io, self.allocator);
