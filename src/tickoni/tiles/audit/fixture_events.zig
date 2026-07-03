@@ -90,7 +90,7 @@ pub fn makeFixtures() [12]schema.AuditEvent {
             .adapter_id = parseFixedAsciiBytes(16, "broker") catch unreachable,
             .request_hash = 9200,
             .response_hash = 9201,
-            .fixture_id = 7,
+            .replay_substitution_id = 7,
         } }),
         codec.buildEvent(headers[5], .{ .proposal = .{
             .proposal_type = parseFixedAsciiBytes(32, "trading_order.propose") catch unreachable,

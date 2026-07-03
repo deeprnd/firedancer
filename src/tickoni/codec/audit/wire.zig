@@ -59,7 +59,7 @@ pub const FinancialAdapterCallPayload = extern struct {
     adapter_id: [16]u8,
     request_hash: u64,
     response_hash: u64,
-    fixture_id: u32,
+    replay_substitution_id: u32,
 };
 
 pub const ProposalPayload = extern struct {
@@ -225,7 +225,7 @@ fn toWirePayload(payload: schema.AuditEvent.Payload) Payload {
             .adapter_id = p.adapter_id,
             .request_hash = p.request_hash,
             .response_hash = p.response_hash,
-            .fixture_id = p.fixture_id,
+            .replay_substitution_id = p.replay_substitution_id,
         } },
         .proposal => |p| .{ .proposal = .{
             .proposal_type = p.proposal_type,
@@ -316,7 +316,7 @@ fn fromWirePayload(record_type: schema.RecordType, payload: Payload) !schema.Aud
             .adapter_id = payload.financial_adapter_call.adapter_id,
             .request_hash = payload.financial_adapter_call.request_hash,
             .response_hash = payload.financial_adapter_call.response_hash,
-            .fixture_id = payload.financial_adapter_call.fixture_id,
+            .replay_substitution_id = payload.financial_adapter_call.replay_substitution_id,
         } },
         .proposal => .{ .proposal = .{
             .proposal_type = payload.proposal.proposal_type,

@@ -77,7 +77,7 @@ pub fn computeWireRecordHash(event: wire.Event) u64 {
             c_abi.ballet.siphashAppend(&sip, &p.adapter_id);
             c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&p.request_hash));
             c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&p.response_hash));
-            c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&p.fixture_id));
+            c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&p.replay_substitution_id));
         },
         5 => {
             const p = &event.payload.proposal;

@@ -67,7 +67,7 @@ fn writePayloadJson(payload: schema.AuditEvent.Payload, writer: anytype) !void {
             try writer.print("\"adapter_id\":\"{s}\",", .{std.mem.sliceTo(&p.adapter_id, 0)});
             try writer.print("\"request_hash\":{d},", .{p.request_hash});
             try writer.print("\"response_hash\":{d},", .{p.response_hash});
-            try writer.print("\"fixture_id\":{d}", .{p.fixture_id});
+            try writer.print("\"replay_substitution_id\":{d}", .{p.replay_substitution_id});
             try writer.writeAll("}");
         },
         .proposal => |p| {

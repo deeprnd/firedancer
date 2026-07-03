@@ -98,7 +98,7 @@ pub fn formatProtobuf(
             if (!c_abi.ballet.pbPushBytes(&enc, 1, p.adapter_id[0..adapter_len])) return wire.status_no_space;
             if (!c_abi.ballet.pbPushUint64(&enc, 2, p.request_hash)) return wire.status_no_space;
             if (!c_abi.ballet.pbPushUint64(&enc, 3, p.response_hash)) return wire.status_no_space;
-            if (!c_abi.ballet.pbPushUint32(&enc, 4, p.fixture_id)) return wire.status_no_space;
+            if (!c_abi.ballet.pbPushUint32(&enc, 4, p.replay_substitution_id)) return wire.status_no_space;
         },
         5 => {
             const p = &event.payload.proposal;
@@ -375,7 +375,7 @@ fn parsePayload(record_type: u32, inbuf: *c_abi.ballet.PbInbuf, payload: *wire.P
                 },
                 4 => {
                     if (tlv.wire_type != c_abi.ballet.pb_wire_type_varint) return wire.status_invalid_protobuf;
-                    payload.financial_adapter_call.fixture_id = truncateChecked(u32, tlv.varint) orelse return wire.status_invalid_protobuf;
+                    payload.financial_adapter_call.replay_substitution_id = truncateChecked(u32, tlv.varint) orelse return wire.status_invalid_protobuf;
                 },
                 else => if (tlv.wire_type == c_abi.ballet.pb_wire_type_len) skipBytes(inbuf, tlv.len()),
             },

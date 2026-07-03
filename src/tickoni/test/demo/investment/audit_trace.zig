@@ -190,7 +190,7 @@ pub fn buildAllowedTradeChain(
             .adapter_id = parseFixedAsciiBytes(16, "portfolio"),
             .request_hash = hashBytes("portfolio.read"),
             .response_hash = hashAffordability(affordability),
-            .fixture_id = 1,
+            .replay_substitution_id = 1,
         },
     });
     prev_hash = events[6].header.record_hash;
@@ -200,7 +200,7 @@ pub fn buildAllowedTradeChain(
             .adapter_id = parseFixedAsciiBytes(16, "quotes"),
             .request_hash = normalized_hash,
             .response_hash = quote_response_hash,
-            .fixture_id = 2,
+            .replay_substitution_id = 2,
         },
     });
     prev_hash = events[7].header.record_hash;
@@ -219,7 +219,7 @@ pub fn buildAllowedTradeChain(
             .adapter_id = parseFixedAsciiBytes(16, "paper_fill"),
             .request_hash = proposal_hash,
             .response_hash = paper_response_hash,
-            .fixture_id = 3,
+            .replay_substitution_id = 3,
         },
     });
     prev_hash = events[9].header.record_hash;
@@ -374,7 +374,7 @@ pub fn buildOversizedTradeBlockedChain(
             .adapter_id = parseFixedAsciiBytes(16, "portfolio"),
             .request_hash = hashBytes("portfolio.read"),
             .response_hash = hashAffordability(affordability),
-            .fixture_id = 1,
+            .replay_substitution_id = 1,
         },
     });
     prev_hash = events[6].header.record_hash;
@@ -384,7 +384,7 @@ pub fn buildOversizedTradeBlockedChain(
             .adapter_id = parseFixedAsciiBytes(16, "quotes"),
             .request_hash = normalized_hash,
             .response_hash = quote_response_hash,
-            .fixture_id = 2,
+            .replay_substitution_id = 2,
         },
     });
     prev_hash = events[7].header.record_hash;

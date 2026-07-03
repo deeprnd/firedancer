@@ -83,7 +83,11 @@ pub const FinancialAdapterCallPayload = struct {
     adapter_id: [16]u8,
     request_hash: u64,
     response_hash: u64,
-    fixture_id: u32,
+    // Replay-substitution reference for this adapter call's captured
+    // response. Kept u32 (unlike ModelCallPayload's u64 field of the same
+    // name) so this rename does not shift the record's SipHash byte layout
+    // and invalidate existing hash-chained audit fixtures.
+    replay_substitution_id: u32,
 };
 
 pub const ProposalPayload = struct {
