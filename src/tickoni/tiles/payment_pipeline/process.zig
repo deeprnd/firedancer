@@ -90,7 +90,7 @@ pub fn runIngestProcess(cfg: payment_runtime.PaymentPipelineConfig, output: *rt.
         if (halted(cnc)) break;
         const raw = payment_runtime.syntheticPayment(cfg, offset);
         const msg = PaymentMessage{ .raw = raw, .pipeline_hops = 1 };
-        output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag) catch break;
+        output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag, cnc) catch break;
         produced += 1;
     }
     rt.cnc_counters.appCounterWrite(cnc, 0, produced);
@@ -107,7 +107,7 @@ pub fn runNormalizeProcess(cfg: payment_runtime.PaymentPipelineConfig, input: *r
     var i: u64 = 0;
     while (i < cfg.event_count) : (i += 1) {
         if (halted(cnc)) break;
-        _ = input.consume(&buf, &idle_polls, &stop_flag) orelse break;
+        _ = input.consume(&buf, &idle_polls, &stop_flag, cnc) orelse break;
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
         msg.pipeline_hops += 1;
         msg.event_hash = payment_runtime.stableEventHash(msg.raw);
@@ -118,7 +118,7 @@ pub fn runNormalizeProcess(cfg: payment_runtime.PaymentPipelineConfig, input: *r
         } else {
             normalized += 1;
         }
-        output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag) catch break;
+        output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag, cnc) catch break;
     }
     rt.cnc_counters.appCounterWrite(cnc, 0, normalized);
     rt.cnc_counters.appCounterWrite(cnc, 1, invalid);
@@ -142,14 +142,14 @@ pub fn runDedupeProcess(
     var i: u64 = 0;
     while (i < cfg.event_count) : (i += 1) {
         if (halted(cnc)) break;
-        _ = input.consume(&buf, &idle_polls, &stop_flag) orelse break;
+        _ = input.consume(&buf, &idle_polls, &stop_flag, cnc) orelse break;
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
         msg.pipeline_hops += 1;
         if (msg.decision != .malformed_drop and seenOrRemember(seen_keys, seen_hashes, &seen_count, msg)) {
             msg.duplicate = true;
             duplicates += 1;
         }
-        output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag) catch break;
+        output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag, cnc) catch break;
     }
     rt.cnc_counters.appCounterWrite(cnc, 0, duplicates);
 }
@@ -175,7 +175,7 @@ pub fn runPolicyProcess(cfg: payment_runtime.PaymentPipelineConfig, input: *rt.l
     var i: u64 = 0;
     while (i < cfg.event_count) : (i += 1) {
         if (halted(cnc)) break;
-        _ = input.consume(&buf, &idle_polls, &stop_flag) orelse break;
+        _ = input.consume(&buf, &idle_polls, &stop_flag, cnc) orelse break;
         var msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
         msg.pipeline_hops += 1;
         if (msg.decision == .malformed_drop) {
@@ -194,7 +194,7 @@ pub fn runPolicyProcess(cfg: payment_runtime.PaymentPipelineConfig, input: *rt.l
             msg.decided_by = audit_sink.tile_id_tkpoly;
             allowed += 1;
         }
-        output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag) catch break;
+        output.publish(std.mem.asBytes(&msg), &backpressure_waits, &stop_flag, cnc) catch break;
     }
     rt.cnc_counters.appCounterWrite(cnc, 0, allowed);
     rt.cnc_counters.appCounterWrite(cnc, 1, denied);
@@ -214,7 +214,7 @@ pub fn runAuditProcess(
     var i: u64 = 0;
     while (i < cfg.event_count) : (i += 1) {
         if (halted(cnc)) break;
-        _ = input.consume(&buf, &idle_polls, &stop_flag) orelse break;
+        _ = input.consume(&buf, &idle_polls, &stop_flag, cnc) orelse break;
         const msg = std.mem.bytesToValue(PaymentMessage, buf[0..msg_size]);
         audit_log.append(.{
             .source_offset = msg.raw.source_offset,

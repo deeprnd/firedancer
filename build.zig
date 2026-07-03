@@ -294,7 +294,9 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/c_abi/sandbox.zig",
         "src/tickoni/c_abi/dcache.zig",
         "src/tickoni/c_abi/fseq.zig",
+        "src/tickoni/c_abi/fctl.zig",
         "src/tickoni/c_abi/cnc.zig",
+        "src/tickoni/c_abi/tempo.zig",
         "src/tickoni/c_abi/wksp.zig",
         "src/tickoni/c_abi/boot.zig",
         "src/tickoni/tiles/audit/mod.zig",
@@ -348,7 +350,9 @@ pub fn build(b: *std.Build) void {
         if (std.mem.eql(u8, path, "src/tickoni/c_abi/queue.zig") or
             std.mem.eql(u8, path, "src/tickoni/c_abi/dcache.zig") or
             std.mem.eql(u8, path, "src/tickoni/c_abi/fseq.zig") or
-            std.mem.eql(u8, path, "src/tickoni/c_abi/cnc.zig"))
+            std.mem.eql(u8, path, "src/tickoni/c_abi/fctl.zig") or
+            std.mem.eql(u8, path, "src/tickoni/c_abi/cnc.zig") or
+            std.mem.eql(u8, path, "src/tickoni/c_abi/tempo.zig"))
         {
             // These tests call real Firedancer substrate through the tk_ shim
             // layer, not native Zig mirrors or direct fd_* externs.
@@ -1392,7 +1396,9 @@ pub fn build(b: *std.Build) void {
         .{ "test-sandbox", "src/tickoni/c_abi/sandbox.zig" },
         .{ "test-dcache", "src/tickoni/c_abi/dcache.zig" },
         .{ "test-fseq", "src/tickoni/c_abi/fseq.zig" },
+        .{ "test-fctl", "src/tickoni/c_abi/fctl.zig" },
         .{ "test-cnc", "src/tickoni/c_abi/cnc.zig" },
+        .{ "test-tempo", "src/tickoni/c_abi/tempo.zig" },
         .{ "test-wksp", "src/tickoni/c_abi/wksp.zig" },
         .{ "test-cpu", "src/tickoni/util/cpu.zig" },
         .{ "test-cpu-placement", "src/tickoni/runtime/cpu_placement.zig" },
@@ -1470,7 +1476,9 @@ pub fn build(b: *std.Build) void {
         if (std.mem.eql(u8, entry[1], "src/tickoni/c_abi/queue.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/dcache.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/fseq.zig") or
+            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/fctl.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/cnc.zig") or
+            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/tempo.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/runtime/cnc_counters.zig"))
         {
             linkTickoniFiredancer(b, t, fd_lib_dir);

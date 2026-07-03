@@ -4,8 +4,13 @@
 #include "../../../tango/mcache/fd_mcache.h"
 #include "../../../tango/dcache/fd_dcache.h"
 #include "../../../tango/fseq/fd_fseq.h"
+#include "../../../tango/fctl/fd_fctl.h"
 #include "../../../tango/cnc/fd_cnc.h"
+#include "../../../tango/tempo/fd_tempo.h"
 #include "../../../util/fd_util.h"
+#include "../../../util/rng/fd_rng.h"
+
+#include <unistd.h>
 
 ulong tk_mcache_align( void ) { return fd_mcache_align(); }
 ulong tk_mcache_footprint( ulong depth, ulong app_sz ) { return fd_mcache_footprint( depth, app_sz ); }
@@ -73,6 +78,49 @@ tk_fseq_update( ulong * fseq,
                  ulong   seq ) {
   fd_fseq_update( fseq, seq );
 }
+
+void * tk_fctl_new( void * shmem, ulong rx_max ) { return fd_fctl_new( shmem, rx_max ); }
+fd_fctl_t * tk_fctl_join( void * shfctl ) { return fd_fctl_join( shfctl ); }
+void * tk_fctl_leave( fd_fctl_t * fctl ) { return fd_fctl_leave( fctl ); }
+void * tk_fctl_delete( void * shfctl ) { return fd_fctl_delete( shfctl ); }
+fd_fctl_t * tk_fctl_cfg_rx_add( fd_fctl_t * fctl, ulong cr_max, ulong const * seq_laddr, ulong * slow_laddr ) { return fd_fctl_cfg_rx_add( fctl, cr_max, seq_laddr, slow_laddr ); }
+fd_fctl_t * tk_fctl_cfg_done( fd_fctl_t * fctl, ulong cr_burst, ulong cr_max, ulong cr_resume, ulong cr_refill ) { return fd_fctl_cfg_done( fctl, cr_burst, cr_max, cr_resume, cr_refill ); }
+ulong tk_fctl_rx_cnt( fd_fctl_t const * fctl ) { return fd_fctl_rx_cnt( fctl ); }
+ulong tk_fctl_cr_burst( fd_fctl_t const * fctl ) { return fd_fctl_cr_burst( fctl ); }
+ulong tk_fctl_cr_max( fd_fctl_t const * fctl ) { return fd_fctl_cr_max( fctl ); }
+ulong tk_fctl_cr_resume( fd_fctl_t const * fctl ) { return fd_fctl_cr_resume( fctl ); }
+ulong tk_fctl_cr_refill( fd_fctl_t const * fctl ) { return fd_fctl_cr_refill( fctl ); }
+ulong tk_fctl_rx_cr_max( fd_fctl_t const * fctl, ulong rx_idx ) { return fd_fctl_rx_cr_max( fctl, rx_idx ); }
+
+ulong
+tk_fctl_cr_query( fd_fctl_t const * fctl,
+                  ulong             tx_seq,
+                  ulong *           rx_idx_slow ) {
+  ulong rx_idx_local = ULONG_MAX;
+  ulong cr = fd_fctl_cr_query( fctl, tx_seq, &rx_idx_local );
+  if( rx_idx_slow ) rx_idx_slow[0] = rx_idx_local;
+  return cr;
+}
+
+void
+tk_fctl_rx_cr_return( ulong * rx_seq_laddr,
+                      ulong   rx_seq ) {
+  fd_fctl_rx_cr_return( rx_seq_laddr, rx_seq );
+}
+
+static FD_TL fd_rng_t   tk_tempo_rng_mem[1];
+static FD_TL fd_rng_t * tk_tempo_rng = NULL;
+
+static fd_rng_t *
+tk_tempo_rng_tls( void ) {
+  if( FD_UNLIKELY( !tk_tempo_rng ) ) tk_tempo_rng = fd_rng_join( fd_rng_new( tk_tempo_rng_mem, (uint)getpid(), 0UL ) );
+  return tk_tempo_rng;
+}
+
+double tk_tempo_tick_per_ns( double * opt_sigma ) { return fd_tempo_tick_per_ns( opt_sigma ); }
+long tk_tempo_lazy_default( ulong cr_max ) { return fd_tempo_lazy_default( cr_max ); }
+ulong tk_tempo_async_min( long lazy, ulong event_cnt, float tick_per_ns ) { return fd_tempo_async_min( lazy, event_cnt, tick_per_ns ); }
+ulong tk_tempo_async_reload( ulong async_min ) { return fd_tempo_async_reload( tk_tempo_rng_tls(), async_min ); }
 
 ulong tk_cnc_align( void ) { return fd_cnc_align(); }
 ulong tk_cnc_footprint( ulong app_sz ) { return fd_cnc_footprint( app_sz ); }
