@@ -235,6 +235,9 @@ test-integration-all:
 engine-check-changes:
   python3 contrib/engine/engine_check_changes.py
 
+infra-check-orchestration-security:
+  python3 contrib/engine/security_orchestration_check.py
+
 # ── Test: Coverage ─────────────────────────────────────────────────────────
 
 test-cov-fd:
