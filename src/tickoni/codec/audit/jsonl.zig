@@ -1,5 +1,6 @@
 const std = @import("std");
 const schema = @import("audit_schema");
+const hash = @import("hash.zig");
 
 pub fn formatJsonLine(event: schema.AuditEvent, writer: anytype) !void {
     const h = event.header;
@@ -138,4 +139,99 @@ fn writePayloadJson(payload: schema.AuditEvent.Payload, writer: anytype) !void {
             try writer.writeAll("}");
         },
     }
+}
+
+// ---------------------------------------------------------------------------
+// Tests — T10.9: audit JSONL sample capture from S8 lifecycle path.
+// Validates formatJsonLine produces valid JSON with correct hash-chain fields.
+// ---------------------------------------------------------------------------
+test "jsonl formatJsonLine produces valid JSON with hash-chain fields" {
+    const allocator = std.testing.allocator;
+    const run_id: u64 = 0xDEADBEEF;
+
+    var event = schema.AuditEvent{
+        .header = .{
+            .schema_version = schema.audit_schema_version,
+            .run_id = run_id,
+            .seq = 0,
+            .source_offset = 42,
+            .tile_id = "tkings",
+            .logical_actor_id = 1,
+            .policy_version = "v1",
+            .capability_envelope_id = 7,
+            .timestamp_ns = 1_000_000_000,
+            .prev_hash = 0,
+            .record_hash = 0xDEADBEEF,
+        },
+        .payload = .{
+            .source_event = .{
+                .source_system = "ops_feed",
+                .event_type = "trading_order.propose",
+                .raw_hash = 0x12345678,
+            },
+        },
+    };
+    event.header.record_hash = hash.computeRecordHash(event);
+
+    var buf: [4096]u8 = undefined;
+    var w = std.Io.Writer.fixed(&buf);
+    try formatJsonLine(event, &w);
+
+    const json_line = w.buffered();
+    const parsed = try std.json.parseFromSlice(
+        std.json.Value,
+        allocator,
+        json_line[0 .. json_line.len - 1], // strip trailing newline
+        .{ .ignore_unknown_fields = true },
+    );
+    defer parsed.deinit();
+
+    const obj = parsed.value.object;
+    try std.testing.expectEqual(run_id, try obj.get("run_id").?.number());
+    try std.testing.expectEqual(0, try obj.get("prev_hash").?.number());
+    try std.testing.expectEqual(event.header.record_hash, try obj.get("record_hash").?.number());
+    try std.testing.expectEqual(0, try obj.get("seq").?.number());
+    try std.testing.expectEqual(@as(u16, schema.audit_schema_version), @intCast(try obj.get("schema_version").?.number()));
+}
+
+test "jsonl formatJsonLine produces consistent hash for same event" {
+    const run_id: u64 = 0xCAFEBABE;
+
+    var event = schema.AuditEvent{
+        .header = .{
+            .schema_version = schema.audit_schema_version,
+            .run_id = run_id,
+            .seq = 1,
+            .source_offset = 1,
+            .tile_id = "tkings",
+            .logical_actor_id = 0,
+            .policy_version = "v1",
+            .capability_envelope_id = 0,
+            .timestamp_ns = 0,
+            .prev_hash = 0,
+            .record_hash = 0,
+        },
+        .payload = .{
+            .source_event = .{
+                .source_system = "test",
+                .event_type = "payment_initiate",
+                .raw_hash = 0xAABBCCDD,
+            },
+        },
+    };
+    const expected_hash = hash.computeRecordHash(event);
+    event.header.record_hash = expected_hash;
+
+    var buf1: [4096]u8 = undefined;
+    var w1 = std.Io.Writer.fixed(&buf1);
+    try formatJsonLine(event, &w1);
+
+    var buf2: [4096]u8 = undefined;
+    var w2 = std.Io.Writer.fixed(&buf2);
+    try formatJsonLine(event, &w2);
+
+    const j1 = w1.buffered();
+    const j2 = w2.buffered();
+    try std.testing.expectEqual(j1.len, j2.len);
+    try std.testing.expectEqualSlices(u8, j1[0 .. j1.len - 1], j2[0 .. j2.len - 1]);
 }

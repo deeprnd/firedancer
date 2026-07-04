@@ -34,6 +34,7 @@ tests-all:
   @just build-all
   @just quality-check-all
   @just security-check-all
+  @just security-engine-check-changes
   @just test-all
 
 # ── Build ──────────────────────────────────────────────────────────────────
