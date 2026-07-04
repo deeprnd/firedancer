@@ -31,6 +31,7 @@ python-dev-install-all:
 # ── All-in ──────────────────────────────────────────────────────────────────
 
 tests-all:
+  @just engine-check-changes
   @just build-all
   @just quality-check-all
   @just security-check-all
@@ -123,6 +124,13 @@ _dev-image:
   {{container}} build --platform linux/arm64 -t {{dev_image}} "$ctx"
 
 # ── Test ───────────────────────────────────────────────────────────────────
+
+test-all:
+  @just test-unit-all
+  @just test-integration-all
+  @just test-cov-all
+  @just test-system-all
+  @just test-e2e-all
 
 test-unit-fd:
   #!/usr/bin/env bash
@@ -224,11 +232,8 @@ infra-run-llamacpp:
 test-integration-all:
   python3 contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"
 
-test-all:
-  @just test-unit-all
-  @just test-integration-all
-  @just test-system-all
-  @just test-e2e-all
+engine-check-changes:
+  python3 contrib/engine/engine_check_changes.py
 
 # ── Test: Coverage ─────────────────────────────────────────────────────────
 
