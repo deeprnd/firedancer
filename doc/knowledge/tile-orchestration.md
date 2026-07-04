@@ -118,6 +118,154 @@ The Linux full-runtime adapter must preserve the ordering, guard intent, and
 failure behavior of these steps unless an explicit Tickoni substitute is
 documented and tested.
 
+## Non-Blocking I/O Discipline
+
+**All tile receive paths must use bounded polling. No tile may perform
+blocking I/O (OS-level sleep, wait, futex, condition variable, or synchronous
+read on a file/pipe/socket) in its hot loop.**
+
+This is the fundamental constraint that makes the entire tile lifecycle
+correct: heartbeat, halt, shutdown, and health checks interleave with data
+processing because the hot loop is always returning to the stem's top-level
+iteration and can observe external signals at every iteration boundary.
+
+### The Pattern (Firedancer `FD_MCACHE_WAIT`)
+
+Firedancer's `FD_MCACHE_WAIT` macro is the canonical example:
+
+```c
+for(;;) {
+    seq_found = mline->seq;     // atomic read from shared memory
+    *meta     = *mline;         // copy metadata if stable
+    if (stable && not_behind) break;
+    FD_SPIN_PAUSE();            // CPU hint, NOT a syscall
+    --poll_max;
+    if (!poll_max) return;      // bounded: timed out, not blocked
+}
+```
+
+Key properties:
+
+- **No syscalls in the spin loop.** `FD_SPIN_PAUSE()` is a compiler hint
+  (typically `pause` x86 instruction or equivalent), not a wait or sleep.
+- **Bounded.** `poll_max` caps iterations. When it reaches zero, the macro
+  returns and the caller decides what to do next. The tile is never stuck
+  inside `FD_MCACHE_WAIT` for more than a fraction of a second.
+- **Spin, don't sleep.** On a hit (data available), the macro exits immediately.
+  On a miss (no data yet), it retries in a tight loop that yields CPU to
+  sibling threads via `pause` but never yields the core to the OS.
+- **Overrun-safe.** If the consumer falls more than `depth` behind the producer,
+  `seq_diff > 0` and the caller knows the expected metadata has been evicted.
+  The macro does not retry forever.
+
+### Stem Loop Structure
+
+The stem loop (`fd_stem.c` `stem_run1`) interleaves the following every iteration:
+
+1. **Shutdown check** — `STEM_CALLBACK_SHOULD_SHUTDOWN(ctx)` at the top of
+   every loop iteration. Returns immediately when shutdown is set.
+2. **Housekeeping** — periodic health/metric publishing, credit replenishment,
+   input flow-control updates, event-map randomization. Driven by a lazy
+   timer (`STEM_LAZY`) that fires every ~50-100ms.
+3. **Credit/backpressure check** — if downstream has no credits, `continue`
+   to next iteration to recheck credits. Never blocks waiting.
+4. **Input polling** — for each input link, check if a new fragment is
+   available via `FD_MCACHE_WAIT` with a short poll budget. If no data,
+   advance to the next input or recheck credits.
+5. **Fragment processing** — `BEFORE_FRAG` → `DURING_FRAG` → `AFTER_FRAG`
+   callbacks. These are the only place tile-specific logic executes.
+6. **Output publication** — publish to downstream via `fd_stem_publish`.
+
+Every iteration boundary is an interleaving point for shutdown, health, and
+backpressure. A tile cannot get stuck because there is no blocking point
+between iterations.
+
+### Tickoni Application
+
+Tickoni Phase 0 tiles (`tkings`, `tknorm`, `tkdedu`, `tkpoly`, `tkaudt`,
+`tkmetr`, `tkdiag`) already follow this pattern: they process bounded event
+counts, have no network/file I/O in the hot path, and use `fd_topo_run_tile`
+or equivalent harness loops that interleave heartbeat with work.
+
+Future tiles (`tkcase`, `tkrepl`, `tkmodl`, `tktool`, `tkadpt`, `tkapi`) must
+adhere to the same discipline:
+
+- **Model access (`tkmodl`):** Use bounded polling on shared memory or a
+  non-blocking queue from the LLM server proxy. Never have the model thread
+  block waiting for a response. Responses arrive via shared memory or a
+  pre-allocated ring buffer.
+- **Adapter access (`tktool`, `tkadpt`):** Read and write through bounded
+  shared-memory queues or a proxy tile that does the I/O and publishes
+  results asynchronously. The consumer tile polls, never blocks.
+- **API/transport (`tkapi`):** Use Firedancer's `fd_http_server` infrastructure
+  or a non-blocking event loop. Never have a handler block the tile's
+  heartbeat/halt loop.
+- **Replay (`tkrepl`):** Substitutes external effects with captured data.
+  The replay loop is inherently bounded because it processes a fixed capsule.
+- **CaseOps (`tkcase`, `tkdisp`):** All processing is in-memory against
+  Tickoni-owned shared memory. No file or network I/O in the hot path.
+
+### Deviation: Bounded Sleep Instead of Pure Spin
+
+Firedancer tiles are pinned to dedicated, isolated cores. `FD_MCACHE_WAIT`
+spins for the entire `poll_max` budget on that core and then returns. The
+cost is one core per idle tile — acceptable because a validator node has
+many cores and each tile is latency-critical on its own pinned core.
+
+Tickoni runs on targeted consumer hardware with limited cores. We cannot
+guarantee tile-to-core exclusivity: multiple tiles share cores as threads.
+If each tile spins for the full poll budget when genuinely idle, `N` idle
+links burn `N` entire cores even though no work is being done.
+
+The link primitives (`consumer.zig`, `producer.zig`) use a **hybrid pattern**:
+
+```
+1. Spin `spin_poll_max` (4096) iterations via spinPause()
+2. Check stop/halt and update heartbeat via cnc
+3. sleepNanos(idle_sleep_ns) — 100μs on Linux
+4. Loop back to step 1
+```
+
+This trades ~100μs of added idle latency for a single core shared across
+many tiles. The sleep is **bounded and interruptible** — the stop and halt
+checks run on every iteration (after each sleep returns), so a shutdown
+signal cannot be missed. The 100μs sleep is the housekeeping and stop-check
+point, replacing Firedancer's per-tile-housekeeping on a dedicated core.
+
+Firedancer's `FD_MCACHE_WAIT` achieves its "no sleep" guarantee by running
+on a pinned core where spinning is a resource cost the system has already
+paid. Tickoni's shared-core model cannot make that trade — it must sleep
+during idle to keep the total tile-to-core ratio manageable. This is a
+conscious architectural relaxation, not an oversight: it is documented in
+`wait.zig` and enforced in the link primitives.
+
+### Anti-Patterns (What to Avoid)
+
+- `sleep()`, `nanosleep()`, `usleep()` — OS-level sleep, blocks the entire
+  tile thread and prevents shutdown/heartbeat from interleaving.
+- `pthread_cond_wait()` or `futex()` — blocks the tile thread. The stem loop
+  cannot observe shutdown or health changes while the thread is waiting.
+- `read()` on a blocking socket or pipe — blocks on EOF or no-data. Use
+  `FD_MCACHE_WAIT` on a shared-memory ring buffer instead.
+- Synchronous file I/O in the hot path — disk latency varies wildly and can
+  block the tile for seconds. Buffer to memory and flush asynchronously.
+- Any `select()`/`poll()`/`epoll_wait()` with `timeout == -1` — the entire
+  purpose of the polling discipline is to eliminate indefinite waits.
+
+### Enforcement
+
+This discipline is non-negotiable for any tile that participates in the
+Firedancer-backed or Tickoni-own harness. If a tile must interact with a
+blocking external system (LLM server, trading API, file system), the pattern
+is:
+
+1. The tile writes a request to a bounded shared-memory queue.
+2. A proxy tile (or Firedancer `fd_http_server` worker) reads the request,
+   performs the blocking I/O, and writes the response back to shared memory.
+3. The original tile polls the response queue with `FD_MCACHE_WAIT`.
+4. If the queue is empty, the tile continues to the next input or rechecks
+   health/shutdown. It never blocks.
+
 ## What Tickoni Reuses
 
 Tickoni reuses Firedancer infrastructure in two forms.
