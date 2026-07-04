@@ -6,9 +6,7 @@ tested at every applicable layer, documented, and safe to mark `Done`.
 
 It is the single source of truth for what
 [`story_template.md`](../strategy/templates/story_template.md) calls "Evidence
-and quality gate tasks" and what
-[`task_template.md`](../strategy/templates/task_template.md) calls the
-`evidence` / `quality` task labels. Those templates say a gate task is
+and quality gate tasks". Those templates say a gate task is
 required; this document says what the gate task must actually check. Do not
 duplicate this checklist into a story or task issue body — link here and mark
 each line applicable or `N/A - reason`.
@@ -224,6 +222,5 @@ mark `N/A - reason`) each line before moving status to `Done`:
 - [Telemetry](telemetry.md)
 - [CI](ci.md)
 - [Story Template](../strategy/templates/story_template.md)
-- [Task Template](../strategy/templates/task_template.md)
 - [Status Template](../strategy/templates/status_template.md)
 - [Roadmap Stories README](../strategy/roadmap/stories/README.md)
