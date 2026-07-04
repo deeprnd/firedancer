@@ -407,22 +407,26 @@ this with `tile_process.zig` through the c_abi bridge:
 │  Tickoni tile_process.zig (our harness)         │
 │  - self-exec supervisor                         │
 │  - join wksp → privileged_init → sandbox        │
-│  - join mcache/dcache/cnc/fseq                  │
+│  - join mcache/dcache/cnc/fseq/fctl/tempo       │
 │  - unprivileged_init → work loop                │
 │  - heartbeat/halt loop                          │
 └─────────────────────────────────────────────────┘
                           │ calls through c_abi bridge
 ┌─────────────────────────────────────────────────┐
 │  c_abi bridge (src/tickoni/c_abi/)              │
-│  - wksp.zig + shim/wksp.c  → fd_wksp_*         │
-│  - dcache.zig + shim/tango.c → fd_dcache_*      │
-│  - fseq.zig  + shim/tango.c → fd_fseq_*         │
-│  - cnc.zig   + shim/tango.c → fd_cnc_*          │
-│  - sandbox.zig + shim/sandbox.c → fd_sandbox    │
+│  - wksp.zig    + shim/wksp.c      → fd_wksp_*  │
+│  - dcache.zig  + shim/tango.c     → fd_dcache_*│
+│  - fseq.zig    + shim/tango.c     → fd_fseq_*  │
+│  - fctl.zig    + shim/tango.c     → fd_fctl_*  │
+│  - tempo.zig   + shim/util.c      → fd_tempo_* │
+│  - cnc.zig     + shim/tango.c     → fd_cnc_*   │
+│  - queue.zig                                         │
+│  - boot.zig      + shim/ballet.c  → fd_boot/     │
+│  - sandbox.zig   + shim/sandbox.c → fd_sandbox   │
+│  - topo_run.zig  (fd_topo_run_tile)                │
+│  - topob.zig     (fd_topob_* topology builder)    │
 │                                                 │
 │  NEW additions needed:                          │
-│  - fctl.zig    + shim/tango.c → fd_fctl_*       │
-│  - tempo.zig   + shim/util.c  → fd_tempo_*      │
 │  - metrics.zig + shim/tango.c → fd_metrics_*    │
 └─────────────────────────────────────────────────┘
                           │ links against
@@ -434,9 +438,36 @@ this with `tile_process.zig` through the c_abi bridge:
 └─────────────────────────────────────────────────┘
 ```
 
-The diagram shows that Tickoni only needs to add 3 Zig wrappers + shims
-(`fctl`, `tempo`, `metrics`) to cover the full Firedancer substrate used by the
-harness. No structural changes to Firedancer are required.
+The diagram shows that Tickoni only needs to add 1 Zig wrapper + shim
+(`metrics`) to cover the full Firedancer substrate used by the harness.
+No structural changes to Firedancer are required.
+
+The c_abi bridge also includes `topo_build.zig` and `topology_spec.zig`,
+which are not adapter modules themselves but core orchestration components:
+
+- **`topo_build.zig`** (`src/tickoni/runtime/topo_build.zig`): builds a real
+  Firedancer `fd_topo_t` from Tickoni's own `Topology` by calling through
+  `c_abi.topob`'s `fd_topob_*` wrappers. Called identically by the supervisor
+  (parent) and each self-exec'd tile process (child) to rebuild an identical
+  topology — the "topology handoff" pattern (V1.14.S8.T12). Returns
+  `BuiltTopo` with allocated `buf`, opaque `topo`, workspace index, per-tile
+  `cnc_obj_id[]`, and per-channel `link_obj_id[]` (mcache/dcache/fseq).
+  Does not create the workspace or instantiate object content — that is the
+  caller's job via `topobCreateWorkspace`/`topoWkspNew` (parent-only, once).
+
+- **`topology_spec.zig`** (`src/tickoni/runtime/topology_spec.zig`): small
+  serialized wire format (magic `0x544b5453` / "TKST", version 1) for
+  passing topology between parent and child processes. `TopologySpec`
+  carries tile ids, CPU placements, channel src/dst/depth/mtu, and workspace
+  name. `fromTopology()` converts a runtime `Topology` into the wire format;
+  `toTopology()` reconstructs it. File I/O includes magic/version validation
+  and fail-closed on truncation. Parent writes once; each child reads,
+  rebuilds an identical `fd_topo_t`, and finds its own tile index in it.
+
+- **`cpu_placement.zig`** (`src/tickoni/runtime/cpu_placement.zig`): implements
+  the Tickoni CPU placement model with `CpuPlacement` enum variants
+  `exclusive`, `shared`, and `floating`, plus `validateStatic()` that enforces
+  exclusive collision detection and shared/exclusive co-existence rules.
 
 #### 11-Item Reuse Categorization (from audit 8.md)
 
@@ -464,9 +495,18 @@ require deliberate Tickoni implementation or are explicitly not reused:
    surface.
 
 5. **Tile registry** — `fd_topo_run_tile_t` serves as a per-tile registry. Tickoni
-   adds a product-facing registry in `topology.zig` keyed by tile ID, mapping to
-   logical names, thread/process callbacks, link cardinality, and metric schemas.
-   No supervisor or process dispatcher should recreate these mappings.
+   implements this in `src/app/tickoni/tile_registry.zig` (not `topology.zig`).
+   The registry is keyed by tile ID and owns: thread-mode run callback
+   (`RunFn`), process-mode run callback (`ProcessFn`), counter schema
+   (`CounterSchemaEntry`), expected link cardinality (`in_cnt`/`out_cnt`),
+   and diagnostics naming. Beyond lookup and cardinality, the registry also
+   owns **process-mode dispatch wiring** (link-joining shape per tile — each
+   process-mode entry function joins the correct consumer/producer links and
+   calls into the pipeline stage) and **topology-bijection validation**
+   (`validate()` checks that every topology tile is registered, every
+   registered tile appears in the topology, and per-tile channel counts match
+   the registry). No supervisor, process dispatcher, metrics reader, or test
+   harness should recreate these mappings.
 
 6. **Heartbeat semantics** — `cnc_update` / `FD_CNC_HEARTBEAT` — the pattern is
    proven; Tickoni's `tile_process.zig` already implements heartbeat during work.
