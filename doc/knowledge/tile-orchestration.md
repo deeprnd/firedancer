@@ -305,12 +305,13 @@ pattern is:
 
 3. **Create links:** `fd_topob_link(topo, name, ...)` for each inter-tile link.
 
-4. **Create tiles:** `fd_topob_tile(topo, name, wksp, metrics_wksp, cpu_idx,
-   is_agave, uses_id_keyswitch, uses_av_keyswitch)` for each Tile — with
-   **`0` for all three Solana flags**:
-   - `is_agave=0` — Tickoni does not run in Agave/single-process mode
-   - `uses_id_keyswitch=0` — no validator identity key rotation
-   - `uses_av_keyswitch=0` — no validator authority key rotation
+4. **Create tiles:** `fd_topob_tile(topo, name, wksp, metrics_wksp, cpu_idx)`
+   for each Tile — the Zig wrapper exposes a 5-param signature. The C shim
+   (`tk_topob_tile` in `shim/topob.c`) forwards to the upstream 8-param
+   `fd_topob_tile` with the 3 Solana flags hardcoded as `0`
+   (`is_agave`, `uses_id_keyswitch`, `uses_av_keyswitch`). This is
+   transparent to Zig callers — they only pass 5 args. The shim is the
+   single point where Tickoni's contract diverges from upstream.
 
 5. **Wire links:** `fd_topob_tile_in(topo, tile_idx, link_idx, ...)` and
    `fd_topob_tile_out()` to attach each link to its tile.
