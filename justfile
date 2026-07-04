@@ -31,7 +31,6 @@ python-dev-install-all:
 # ── All-in ──────────────────────────────────────────────────────────────────
 
 tests-all:
-  @just engine-check-changes
   @just build-all
   @just quality-check-all
   @just security-check-all
@@ -232,12 +231,6 @@ infra-run-llamacpp:
 test-integration-all:
   python3 contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"
 
-engine-check-changes:
-  python3 contrib/engine/engine_check_changes.py
-
-infra-check-orchestration-security:
-  python3 contrib/engine/security_orchestration_check.py
-
 # ── Test: Coverage ─────────────────────────────────────────────────────────
 
 test-cov-fd:
@@ -379,8 +372,20 @@ security-sanitize-check-all:
 
 # ── Security: All ──────────────────────────────────────────────────────────
 
+security-engine-check-all:
+     @just security-engine-check-changes
+     @just security-engine-check-orchestration
+
+security-engine-check-changes:
+  python3 contrib/engine/engine_check_changes.py
+
+security-engine-check-orchestration:
+  python3 contrib/engine/linter.py contrib/engine/checks/ --root {{justfile_directory()}} --severity ERROR
+
+# ── Security: All ──────────────────────────────────────────────────────────
+
 security-check-all:
-  python3 contrib/readme/run-badged-command.py security bash -c "just security-codeql-check-all && just security-gitleaks-check-all && just security-seccomp-check-all && just security-proof-check-all && just security-sanitize-check-all"
+  python3 contrib/readme/run-badged-command.py security bash -c "just security-engine-check-all && just security-codeql-check-all && just security-gitleaks-check-all && just security-seccomp-check-all && just security-proof-check-all && just security-sanitize-check-all"
 
 # ── Memory (hugepages) ─────────────────────────────────────────────────────
 
