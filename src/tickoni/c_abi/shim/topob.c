@@ -34,6 +34,27 @@
 #include "../../../tango/fseq/fd_fseq.h"
 
 /* ---------------------------------------------------------------------
+   tk_topob_auto_layout — Tickoni CPU placement.
+   ---------------------------------------------------------------------
+
+   Called after all tiles are added. Iterates topo->tiles[] and sets each
+   tile->cpu_idx from the cpu_idx[] array passed by the harness.
+
+   This mirrors the Firedancer harness pattern:
+     fd_topob_auto_layout(topo, 0);   // Firedancer assigns CPUs from priority arrays
+   vs.
+     tk_topob_auto_layout(topo, cpu_idx_arr); // Tickoni assigns CPUs from harness array
+   Both are called after tile/link wiring and before topob_finish. */
+
+void
+tk_topob_auto_layout( void * topo, ulong const * cpu_idx_arr ) {
+  fd_topo_t * t = (fd_topo_t *)topo;
+  for( ulong i = 0UL; i < t->tile_cnt; i++ ) {
+    t->tiles[ i ].cpu_idx = cpu_idx_arr[ i ];
+  }
+}
+
+/* ---------------------------------------------------------------------
    Tickoni-owned object callbacks.
    --------------------------------------------------------------------- */
 

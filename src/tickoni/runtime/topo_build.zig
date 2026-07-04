@@ -114,10 +114,17 @@ pub fn build(
         link_ids[i] = c_abi.topob.topobLink(topo, linkNameZ(&link_name_buf, i), wksp_name_z, ch.depth, ch.mtu, 1);
     }
 
-    for (topo_desc.tiles) |t| {
+    const cpu_idx_arr = try allocator.alloc(usize, topo_desc.tiles.len);
+    errdefer allocator.free(cpu_idx_arr);
+    for (topo_desc.tiles, 0..) |t, i| {
         var tile_name_buf: [8]u8 = undefined;
-        _ = c_abi.topob.topobTile(topo, toZ(&tile_name_buf, t.id.slice()), wksp_name_z, wksp_name_z, tileCpuIdx(t.cpu_placement));
+        const tile_id = c_abi.topob.topobTile(topo, toZ(&tile_name_buf, t.id.slice()), wksp_name_z, wksp_name_z, 0);
+        _ = tile_id;
+        cpu_idx_arr[i] = tileCpuIdx(t.cpu_placement);
     }
+
+    c_abi.topob.topobAutoLayout(topo, @as([*]const usize, cpu_idx_arr.ptr));
+    allocator.free(cpu_idx_arr);
 
     const cnc_obj_id = try allocator.alloc(usize, topo_desc.tiles.len);
     errdefer allocator.free(cnc_obj_id);
