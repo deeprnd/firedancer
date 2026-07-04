@@ -270,6 +270,87 @@ These tests prove Tickoni's boundary around reused Firedancer substrate. They
 do not require fuzzing every Firedancer workspace internal, proving arbitrary
 kernel memory-attack resistance, or claiming production throughput saturation.
 
+### Registry Design Options (from 7-20-24.md audit)
+
+Three approaches were evaluated for how the supervisor discovers which tile
+processes to launch and how it knows their expected link cardinality:
+
+1. **Option A — Tile registry (single source of truth).** A Zig table maps
+   tile ID to logical name, process/thread callback, link cardinality, and
+   metric schema. The supervisor reads from this table exclusively. This is the
+   recommended approach because it eliminates duplicate mappings and keeps
+   launch logic generic.
+
+2. **Option B — LaunchSpec from topology config.** Launch decisions come from a
+   serialized config that lists tiles and their links. Risk: the config is
+   separate from the topology source of truth, creating a second copy of the
+   link graph that can drift. Requires extra validation to prevent silent
+   truncation.
+
+3. **Option C — Manual dispatch (current pain point).** `if/else` chains in
+   `tile_main.zig` and `supervisor.zig` dispatch by raw tile-id string. This
+   is brittle, repeats tile IDs as strings, and makes it impossible to reason
+   about supported tile counts.
+
+Option A is the chosen approach. No supervisor, process dispatcher, metrics
+reader, or test harness should recreate tile identity mappings independently.
+The tile registry in `topology.zig` owns that mapping.
+
+### Firedancer TILES[] Pattern (from 7-20-24.md audit)
+
+Firedancer's topology builder uses a `TILES[]` array of `fd_topo_run_tile_t`
+pointers, populated in each binary's `main.c`. Each entry has a `name` for
+string lookup, footprint/alignment functions, seccomp/FD lists, and
+`privileged_init`/`unprivileged_init`/`run` callbacks. The dispatcher
+(`fdctl_tile_run()`) does one linear string comparison at boot time and
+returns the struct.
+
+Firedancer has exactly one canonical lookup (fdctl_tile_run) that all
+consumers call. Tickoni currently has three consumers each writing their own
+`if/else` chain on raw tile-id strings — this is the problem the registry
+fixes.
+
+Firedancer's metrics are position-indexed (`topo->tiles[idx].metrics`), not
+string-matched. Tickoni's `snapshotProcessMetrics` does string comparison AND
+maps to payment-specific field names — the registry owns the counter schema so
+`snapshotProcessMetrics` iterates the schema instead of matching strings.
+
+### Multi-Link Pattern and Launch Spec (from 11-23.md audit)
+
+Firedancer supports fan-in and fan-out through fixed-size arrays in
+`fd_topo_tile_t`: `in_cnt`, `in_link_id[FD_TOPO_MAX_TILE_IN_LINKS]` (128),
+`out_cnt`, `out_link_id[FD_TOPO_MAX_TILE_OUT_LINKS]` (32). The stem loop
+(`fd_stem.c`) is a multi-input callback multiplexer that polls all inputs in
+randomized round-robin order.
+
+Firedancer has 3 layers of defense against link truncation:
+
+1. **Topology declares it:** `fd_topo_tile_t` has `in_cnt` + arrays, not single
+   fields.
+2. **Stem handles it:** the run loop explicitly iterates `in_cnt` inputs.
+3. **No silent truncation:** if a tile declares 3 inputs, stem reads all 3.
+
+Tickoni's approach mirrors this at the topology level — `fd_topo_tile_t`
+supports `in_cnt`/`out_cnt` arrays and the topology builder (`fd_topob`)
+creates them. But in **process mode**, `LaunchSpec` currently has only one
+`input_link` and one `output_link`. This means:
+
+- A tile with multiple inputs or outputs cannot be launched in process mode
+- The supervisor silently truncates multi-link topologies (last-match-wins)
+- This is latent because the Phase 0 payment topology is a linear chain
+
+**Decision:** process mode must fail closed when the `LaunchSpec` cannot
+represent the tile's link cardinality from the topology. Explicit validation
+must prevent silent truncation. Either extend `LaunchSpec` to support
+per-tile link arrays, or deliberately restrict process mode to single-link
+tiles and validate accordingly.
+
+The Firedancer comparison is instructive: `fd_stem.c` handles arbitrary fan-in
+at the callback level. Tickoni should not replicate that complexity in process
+mode — single-link per tile is the correct initial contract. If fan-in is
+needed, use tile aggregation patterns (dedupe before policy) rather than
+multi-input process tiles.
+
 ## Canonical Tickoni Source Tree
 
 Tickoni application, runtime, tile, schema, codec, connector, and business

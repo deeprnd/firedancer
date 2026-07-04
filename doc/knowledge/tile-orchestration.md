@@ -248,6 +248,171 @@ Current and expected substrate categories include:
 The C ABI is not a place for financial policy, product topology, capability
 rules, adapter authority, or audit/replay semantics.
 
+#### Harness Architecture (from audit 8.md)
+
+The Firedancer harness `src/disco/topo/fd_topo_run.c` exposes a single entry
+(`fd_topo_run_tile`) that implements a 3-layer tile lifecycle. Tickoni mirrors
+this with `tile_process.zig` through the c_abi bridge:
+
+```text
+┌─────────────────────────────────────────────────┐
+│  Tickoni tile_process.zig (our harness)         │
+│  - self-exec supervisor                         │
+│  - join wksp → privileged_init → sandbox        │
+│  - join mcache/dcache/cnc/fseq                  │
+│  - unprivileged_init → work loop                │
+│  - heartbeat/halt loop                          │
+└─────────────────────────────────────────────────┘
+                          │ calls through c_abi bridge
+┌─────────────────────────────────────────────────┐
+│  c_abi bridge (src/tickoni/c_abi/)              │
+│  - wksp.zig + shim/wksp.c  → fd_wksp_*         │
+│  - dcache.zig + shim/tango.c → fd_dcache_*      │
+│  - fseq.zig  + shim/tango.c → fd_fseq_*         │
+│  - cnc.zig   + shim/tango.c → fd_cnc_*          │
+│  - sandbox.zig + shim/sandbox.c → fd_sandbox    │
+│                                                 │
+│  NEW additions needed:                          │
+│  - fctl.zig    + shim/tango.c → fd_fctl_*       │
+│  - tempo.zig   + shim/util.c  → fd_tempo_*      │
+│  - metrics.zig + shim/tango.c → fd_metrics_*    │
+└─────────────────────────────────────────────────┘
+                          │ links against
+┌─────────────────────────────────────────────────┐
+│  Firedancer infrastructure (unchanged)          │
+│  src/tango/{mcache,dcache,fseq,cnc,fctl,tempo}  │
+│  src/util/{sandbox,util}                        │
+│  src/disco/metrics                              │
+└─────────────────────────────────────────────────┘
+```
+
+The diagram shows that Tickoni only needs to add 3 Zig wrappers + shims
+(`fctl`, `tempo`, `metrics`) to cover the full Firedancer substrate used by the
+harness. No structural changes to Firedancer are required.
+
+#### 11-Item Reuse Categorization (from audit 8.md)
+
+Firedancer infrastructure decomposes into 11 reuse categories. The first 4
+require only `tk_*` shims (already covered or trivial). The remaining 7
+require deliberate Tickoni implementation or are explicitly not reused:
+
+1. **`fd_topo_run_tile` harness** — reuse the Firedancer lifecycle (harness)
+   by wiring a minimal `fd_topo_run_tile_t` through the adapter. The `tile_process.zig`
+   path is equivalent and may be used instead when harness reuse proves too
+   expensive.
+
+2. **Topology arrays** — `fd_topo_tile_t[32]`, `fd_topo_link_t[256]`,
+   `fd_topo_wksp_t[4]` — the array-based topology is a direct match for Tickoni's
+   link-array model. The harness reads `name`, `kind_id`, `cpu_idx`,
+   `allow_shutdown`, `metrics` — no Solana union fields touched.
+
+3. **`fd_topo_run_single_process`** — single-process mode for testing, not for
+   Linux full-runtime. Use when testing topology without process launch.
+
+4. **`generate_filters.py`** — Firedancer's CPU placement script. **Resolved: the
+   script is topology-independent.** It reads `topology_name`, `topology_path`,
+   `tile_name`, `cpu_layout_file`, and `output_file`. It does not import
+   Firedancer types. It can be used as-is and is not part of the Firedancer API
+   surface.
+
+5. **Tile registry** — `fd_topo_run_tile_t` serves as a per-tile registry. Tickoni
+   adds a product-facing registry in `topology.zig` keyed by tile ID, mapping to
+   logical names, thread/process callbacks, link cardinality, and metric schemas.
+   No supervisor or process dispatcher should recreate these mappings.
+
+6. **Heartbeat semantics** — `cnc_update` / `FD_CNC_HEARTBEAT` — the pattern is
+   proven; Tickoni's `tile_process.zig` already implements heartbeat during work.
+
+7. **Shutdown semantics** — `cnc` shutdown flag checked inside tile work loop,
+   not only outside — preserved in Tickoni.
+
+8. **Crash-only lifecycle** — crash teardown follows Firedancer semantics via
+   `fd_stem` teardown, but Tickoni implements this in `tile_process.zig`, not
+   through `fd_stem`. The crash teardown pattern is preserved.
+
+9. **Stem loop (multi-input multiplexer)** — **NOT REUSED.** `fd_stem.c` is a
+   multi-input callback multiplexer with credit/burst accounting tied to Solana
+   validator tile semantics. Tickoni implements its own single-input bounded
+   polling per tile.
+
+10. **Supervisor (fork+exec + wait4)** — **NOT REUSED.** `run.c`/`run1.c` manage
+    PID namespaces, seccomp, and process lifecycle. Tickoni's `supervisor.zig`
+    owns this independently.
+
+11. **Metrics (fd_metrics_*)** — reuse Firedancer metrics primitives through a
+    new `metrics.zig` wrapper + shim, similar to the queue wrappers. The
+    infrastructure is clean (Firedancer-owned, no Solana semantics).
+
+#### fd_topo_run.c Audits (from v1.14.s8-wip.md)
+
+The following concrete findings were verified during audit S8:
+
+- **fd_topo_run_tile has zero fd_topob references:** confirmed via `nm`
+  inspection of `libfd_disco.a` — no `fd_topob_*` symbols are called from the
+  harness. The harness is standalone with respect to the topology builder.
+- **fd_topo_run_single_process is the only fdctl coupling:** it is the single
+  file in `src/disco/topo/` that includes `src/app/shared/commands/run/run1.c`.
+  This is the only cross-boundary dependency between the harness and fdctl.
+  Mitigated by Tickoni's per-process execve model (not single-process mode).
+- **generate_filters.py is topology-independent:** it takes
+  `topology_name`, `topology_path`, `tile_name`, `cpu_layout_file`,
+  `output_file` as CLI arguments. No Firedancer types are imported. It can be
+  used as-is.
+- **fd_topo_run_tile can be called without fd_topob.c:** the harness does not
+  depend on the topology builder. Topology can be constructed independently and
+  passed to `fd_topo_run_tile`.
+- **Key switch uses 128B union fields:** confirmed from header inspection.
+  Solana union fields are zeroed by memset, which is safe for Tickoni.
+- **fd_topo_run.c has zero fd_topob calls:** confirmed via grep. The harness
+  uses `fd_topo_cnc_fseq_init` from `fd_topo.c`, but this is the shared
+  infrastructure file — not the builder.
+
+#### fd_topob.c Usability (from v1.14.s8-wip.md)
+
+`fd_topob.c` is a generic topology builder that is usable for Tickoni:
+
+- **fd_topob_new()** — memset to zero, sets app_name. **No Solana.**
+- **fd_topob_wksp()** — generic workspace declaration. **No Solana.**
+- **fd_topob_link()** — creates link entry, mcache/dcache objects. **No Solana.**
+- **fd_topob_tile()** — creates tile entry. Takes `is_agave`, `uses_id_keyswitch`,
+  `uses_av_keyswitch` as int params. Pass `0` for all three. **Only Solana touch:
+  3 trivial int params.**
+- **fd_topob_tile_in()/fd_topob_tile_out()** — generic link wiring. **No Solana.**
+- **fd_topob_finish()** — structural validation (workspace uniqueness, link
+  reachability, no duplicates, no self-loops). **No Solana.**
+- **fd_topob_auto_layout()** — hardcodes Solana tile name arrays (`FLOATING[]`,
+  `STARTUP[]`, `ALWAYS[]`, `CRITICAL_TILES[]`). **Solana names only.** The
+  algorithm (NUMA scanning, HT-pair exclusion, 4-phase priority ordering) is
+  generic and should be reused with Tickoni tile groups.
+
+**Verdict:** Use fd_topob.c with 3 params set to 0, 2 functions reimplemented
+with Tickoni names. Extract and reuse the CPU placement algorithm as-is. No
+Solana semantics leak into Tickoni product code.
+
+#### Structural Resolutions (from v1.14.s8-wip.md)
+
+The following structural tensions were identified during S8 planning and have
+been resolved:
+
+1. **Scope too large for one story:** S8's 10 tasks span registry, links, c_abi
+   bridge, lifecycle migration, sandbox/seccomp, stuck-tile detection, parent-path
+   investigation, and engine drift guard. Resolved by splitting: S8 handles the
+   core tasks, T11 handles tempo/fctl shims.
+
+2. **tile_process.zig stays as product code:** The tension was whether to replace
+   tile_process.zig's hand-rolled loop with fd_topo_run_tile. Resolution: keep
+   tile_process.zig as the product-level self-exec boot/heartbeat/halt loop.
+   The adapter layer (in the Linux full-runtime adapter) may optionally call
+   fd_topo_run_tile, but tile_process.zig itself remains a product tile
+   lifecycle implementation, not the adapter.
+
+3. **tempo/fctl shims explicitly scoped:** Audit 8's plan requires them for
+   proper stuck-tile defense. Resolved as V1.14.S8.T11.
+
+4. **Seccomp policy generation risk resolved:** generate_filters.py is
+   completely topology-independent. Input is a flat .seccomppolicy text file;
+   output is a standalone C header. No topology context needed.
+
 ### Patterns
 
 Tickoni also reuses Firedancer orchestration patterns even where the exact C
