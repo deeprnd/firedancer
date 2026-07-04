@@ -375,6 +375,52 @@ GCP/GCS OAuth tokens, AWS credential rotation, LLM provider API keys, or
 adapter secrets stored in `bytes[64]`. For Phase 0 tiles that need no runtime
 auth rotation, pass `0` and no keyswitch object is allocated.
 
+### Interface Symmetry Between Harnesses
+
+The Tickoni topology harness (`src/tickoni/runtime/topo_build.zig`) intentionally
+mirrors the Firedancer harness call sequence **1:1** — same methods, same order,
+same placeholder convention — so that side-by-side code review and comparison
+are trivial. When Firedancer upstream introduces an improvement to its topology
+harness, the Tickoni harness maps directly to it without needing to understand
+the divergence.
+
+This deliberate redundancy is a maintainability investment, not a flaw. The
+goal is that a developer reading both harness files can follow the same
+narrative line: create topology → create workspaces → create links → create
+tiles → wire links → set CPU placement → finish → validate. The only
+difference is **how** each harness determines cpu_idx for each tile:
+
+| Step | Firedancer harness (`topology.c`) | Tickoni harness (`topo_build.zig`) |
+|------|----------------------------------|------------------------------------|
+| Build | `fd_topob_new(topo, name)` | `topobNew(buf.ptr, app_name)` |
+| Workspace | `fd_topob_wksp(topo, name)` | `topobWksp(topo, name)` |
+| Links | `fd_topob_link(topo, name, ...)` | `topobLink(topo, name, ...)` |
+| Tiles | `fd_topob_tile(topo, name, wksp, metrics, 0, 0, 0, 0)` | `topobTile(topo, name, wksp, wksp, 0)` |
+| CPU layout | `fd_topob_auto_layout(topo, 0)` | `topobAutoLayout(topo, cpu_idx_arr)` |
+| Finish | `fd_topob_finish(topo, callbacks)` | `topobFinish(topo)` |
+
+The `0` passed to `fd_topob_tile()` and `topobTile()` is a placeholder — not
+the final cpu assignment. The Firedancer harness overwrites `tile->cpu_idx`
+later in `fd_topob_auto_layout()` from its hardcoded priority arrays. The
+Tickoni harness overwrites it in `tk_topob_auto_layout()` from the
+`cpu_idx_arr` that the harness computed from `CpuPlacement` enum values
+(`exclusive = N`, `shared = N`, `floating`). The placement source differs,
+but the **harness contract is identical**: create with placeholder → lay out
+CPUs → finish.
+
+The shim's `tk_topob_auto_layout(topo, cpu_idx_arr)` iterates `topo->tiles[]`
+and writes `tile->cpu_idx = cpu_idx_arr[i]` for each tile. This mirrors
+Firedancer's `fd_topob_auto_layout(topo, 0)` which iterates tiles and assigns
+from priority arrays. The internal data source is different (harness-provided
+array vs. hardcoded C arrays), but the **interface shape is identical**:
+a single `auto_layout` call after tile creation, before `finish`.
+
+This matters for porting: when Firedancer changes `fd_topob_auto_layout()` to
+support NUMA-aware groupings or dynamic CPU allocation, the Tickoni harness
+already calls an identically-named wrapper at the identically-positioned
+harness step. The shim absorbs the implementation difference; the harness does
+not need to change.
+
 **What changes in upstream `fd_topob.c`:** Only the 4 name arrays get Tickoni
 tile names appended. No logic changes, no new functions, no struct modifications.
 The file set is tracked by `engine-check-changes` to catch any upstream drift.

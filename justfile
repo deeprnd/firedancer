@@ -103,6 +103,8 @@ _build-fd-tk-libs extras="":
     build/native/gcc/lib/libfd_tango.a
     build/native/gcc/lib/libfd_util.a
     build/native/gcc/lib/libfd_ballet.a
+    build/native/gcc/lib/libfd_disco.a
+    build/native/gcc/lib/libfd_waltz.a
   )
   "${cmd[@]}"
 
