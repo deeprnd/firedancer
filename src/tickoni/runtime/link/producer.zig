@@ -12,26 +12,43 @@ pub const Producer = struct {
     mcache: [*]c_abi.queue.FragMeta,
     dcache_base: [*]u8,
     fseq: [*]volatile u64,
+    fctl_mem: [c_abi.fctl.single_rx_footprint]u8 align(c_abi.fctl.fctl_align),
+    slow_count: u64 = 0,
+    cr_avail: usize,
     depth: usize,
     mtu: usize,
     next_seq: u64 = 0,
 
     pub fn join(wksp: *c_abi.wksp.Wksp, handles: LinkHandles) !Producer {
         const joined = try join_mod.joinTriplet(wksp, handles);
-        return .{
+        var producer: Producer = .{
             .wksp = wksp,
             .mcache = joined.mcache,
             .dcache_base = joined.dcache_base,
             .fseq = joined.fseq,
+            .fctl_mem = undefined,
+            .cr_avail = 0,
             .depth = handles.depth,
             .mtu = handles.mtu,
         };
+        const shfctl = c_abi.fctl.new(&producer.fctl_mem, 1) orelse return error.FctlNewFailed;
+        const fctl_ptr = c_abi.fctl.join(shfctl) orelse return error.FctlJoinFailed;
+        _ = c_abi.fctl.cfgRxAdd(fctl_ptr, handles.depth, @volatileCast(joined.fseq), @ptrCast(&producer.slow_count)) orelse return error.FctlCfgRxAddFailed;
+        _ = c_abi.fctl.cfgDone(fctl_ptr, 1, 0, 0, 0) orelse return error.FctlCfgDoneFailed;
+        producer.cr_avail = c_abi.fctl.crMax(fctl_ptr);
+        return producer;
+    }
+
+    fn fctlPtr(self: *Producer) *c_abi.fctl.Fctl {
+        return c_abi.fctl.join(&self.fctl_mem) orelse unreachable;
     }
 
     pub fn leave(self: *Producer) void {
         _ = c_abi.queue.mcacheLeave(self.mcache);
         _ = c_abi.dcache.dcacheLeave(self.dcache_base);
         _ = c_abi.fseq.fseqLeave(@volatileCast(self.fseq));
+        _ = c_abi.fctl.leave(self.fctlPtr());
+        _ = c_abi.fctl.delete(&self.fctl_mem);
     }
 
     fn writeSlot(self: *Producer, payload: []const u8) !u32 {
@@ -48,28 +65,41 @@ pub const Producer = struct {
     /// bounded spin-pause budget before backing off to a bounded sleep; see
     /// runtime/link/wait.zig for why this deviates from Firedancer's
     /// non-sleeping hot transmit path.
+    ///
+    /// `cnc`, if non-null, gets a heartbeat and a halt-signal check on every
+    /// idle-backoff iteration (V1.14.S8.T6) — this is what makes a producer
+    /// blocked inside this wait still visible to supervisor-side
+    /// heartbeat-staleness detection and still responsive to a HALT that
+    /// arrives mid-wait, instead of only being checked between stage
+    /// iterations. Optional (not folded into `stop`) so link-primitive
+    /// tests can exercise backpressure/timeout behavior without a real cnc.
     pub fn publish(
         self: *Producer,
         payload: []const u8,
         backpressure_waits: *std.atomic.Value(u64),
         stop: *const std.atomic.Value(bool),
+        cnc: ?*c_abi.cnc.Cnc,
     ) error{ Stopped, PayloadTooLarge }!void {
+        const fctl_ptr = self.fctlPtr();
         ready: while (true) {
+            if (self.cr_avail >= c_abi.fctl.crBurst(fctl_ptr)) break :ready;
+            self.cr_avail = c_abi.fctl.crQuery(fctl_ptr, self.next_seq, null);
+            if (self.cr_avail >= c_abi.fctl.crBurst(fctl_ptr)) break :ready;
             var spins: u32 = 0;
-            while (spins < wait.spin_poll_max) : (spins += 1) {
-                const consumer_seq = c_abi.fseq.fseqQuery(self.fseq);
-                const lag = self.next_seq -% consumer_seq;
-                if (lag < self.depth) break :ready;
-                c_abi.boot.spinPause();
-            }
+            while (spins < wait.spin_poll_max) : (spins += 1) c_abi.boot.spinPause();
             _ = backpressure_waits.fetchAdd(1, .release);
             if (stop.load(.acquire)) return error.Stopped;
+            if (cnc) |c| {
+                c_abi.cnc.heartbeat(c, process.monotonicNanos());
+                if (c_abi.cnc.signalQuery(c) == c_abi.cnc.signal_halt) return error.Stopped;
+            }
             process.sleepNanos(wait.idle_sleep_ns);
         }
 
         const chunk = try self.writeSlot(payload);
         c_abi.queue.mcachePublish(self.mcache, self.depth, self.next_seq, 0, chunk, @intCast(payload.len), 0, 0, 0);
         self.next_seq += 1;
+        self.cr_avail -= 1;
     }
 
     pub fn publishLossy(self: *Producer, payload: []const u8, dropped: *std.atomic.Value(u64)) error{PayloadTooLarge}!void {

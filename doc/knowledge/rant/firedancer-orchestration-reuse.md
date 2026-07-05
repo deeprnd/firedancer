@@ -127,6 +127,43 @@ Finance-facing runtime code should continue to speak Tickoni tile ids,
 Tickoni topology descriptors, Tickoni link contracts, and Tickoni support
 tiers.
 
+For the Linux full-runtime adapter, "reuse Firedancer orchestration" means
+following the Firedancer harness semantics, not cherry-picking only the easy
+parts. The adapter should preserve the relevant lifecycle hooks, ordering,
+guards, and failure semantics from Firedancer's harness: workspace joining,
+privileged and unprivileged init phases, sandbox entry, link filling,
+metrics registration or equivalent visibility, run callback ownership,
+shutdown allowance checks, process/thread launch expectations, CPU placement
+behavior where used, and crash/exit handling. Any deliberate deviation from
+those semantics needs an explicit reason and a test proving the Tickoni
+substitute preserves the runtime guarantee being replaced.
+
+Because this decision depends on Firedancer harness behavior staying
+understood, Tickoni should add a `just engine-check-changes` gate and wire it
+into `just tests-all`. The gate should detect changes to the Firedancer
+harness file set relative to the previous commit and force a human review or
+explicit acknowledgement before broad validation passes. The exact mechanism
+is TBD, but the initial watched set should include:
+
+- `src/disco/topo/fd_topo_run.c`
+- `src/disco/topo/fd_topo.h`
+- `src/disco/topo/fd_topo.c`
+- `src/disco/stem/fd_stem.c`
+- `src/app/shared/commands/run/run.c`
+- `src/app/shared/commands/run/run1.c`
+- `src/app/shared/boot/fd_boot.c`
+- `src/util/sandbox/fd_sandbox.c`
+- `src/util/sandbox/fd_sandbox.h`
+- `src/util/sandbox/fd_sandbox_private.h`
+- `src/disco/metrics/fd_metrics.c`
+- `src/disco/metrics/fd_metrics.h`
+- `src/disco/metrics/fd_metrics_base.h`
+
+That file list is intentionally conservative and should be refined when the
+Linux adapter identifies its exact dependency surface. The point is not to
+freeze Firedancer, but to prevent silent drift in the orchestration contract
+Tickoni has chosen to rely on.
+
 The support-tier rule is part of the decision. Linux full-runtime mode may use
 Firedancer orchestration. macOS and Windows retail modes must not inherit
 Linux-only guarantees by implication. If a retail mode cannot provide process

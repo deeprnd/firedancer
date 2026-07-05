@@ -7,6 +7,21 @@
 /// fixed-size struct round-tripped through std.mem.asBytes is sufficient.
 /// The magic/version/length checks below exist to fail closed on a stray,
 /// truncated, or foreign file rather than to support format evolution.
+///
+/// V1.14.S8.T2: link fields are bounded per-tile arrays (in_links/out_links),
+/// not a single input/output pair — a topology where a tile has more than
+/// one inbound or outbound channel is representable here without losing any
+/// of them. `tile-orchestration.md` documents the eventual target shape as
+/// `in_link_id[]`/`out_link_id[]` — integer ids into a shared topology link
+/// table read from shmem at tile boot (the real Firedancer
+/// `fd_topo_tile_t` shape). That indirection does not exist yet; these
+/// arrays instead carry already-resolved `LinkHandles` (mcache/dcache/fseq
+/// gaddrs), same as the single-link fields they replace. Payment-pipeline
+/// test config (event_count/policy_limit_cents/inject_duplicate/
+/// inject_malformed) is intentionally not a field here — this record stays
+/// generic bootstrap data (identity, CPU placement, workspace, cnc address,
+/// links, heartbeat); see tiles/payment_pipeline/process.zig's
+/// writeProcessConfig/readProcessConfig for where that lives instead.
 const std = @import("std");
 const tile = @import("tile.zig");
 const cpu_placement = @import("cpu_placement.zig");
@@ -16,6 +31,12 @@ pub const magic: u32 = 0x544b5350; // "TKSP"
 pub const version: u16 = 1;
 
 pub const shmem_path_cap: usize = 128;
+
+/// Phase 0 needs at most 2 inbound links for any one tile (e.g. an audit
+/// tile fed by both an ingest path and a policy path); 4 leaves headroom
+/// without an unbounded/heap-allocated array in a struct that gets
+/// round-tripped through raw bytes.
+pub const max_links_per_tile: usize = 4;
 
 pub const LaunchSpec = struct {
     magic_field: u32 = magic,
@@ -27,13 +48,13 @@ pub const LaunchSpec = struct {
     /// Global address of this tile's pre-formatted cnc object inside
     /// workspace_name, as returned by fd_wksp_gaddr in the supervisor.
     cnc_gaddr: usize,
-    /// Zeroed (depth==0) when this tile has no upstream/downstream
-    /// correctness link, e.g. tkings has no input and tkaudt has no
-    /// output in the current 5-stage core chain.
-    has_input_link: bool = false,
-    input_link: link.LinkHandles = .{},
-    has_output_link: bool = false,
-    output_link: link.LinkHandles = .{},
+    /// Zero (in_cnt/out_cnt == 0) when this tile has no upstream/downstream
+    /// correctness link, e.g. tkings has no input and tkaudt has no output
+    /// in the current 5-stage core chain.
+    in_cnt: u8 = 0,
+    in_links: [max_links_per_tile]link.LinkHandles = [_]link.LinkHandles{.{}} ** max_links_per_tile,
+    out_cnt: u8 = 0,
+    out_links: [max_links_per_tile]link.LinkHandles = [_]link.LinkHandles{.{}} ** max_links_per_tile,
     shmem_path_buf: [shmem_path_cap]u8 = [_]u8{0} ** shmem_path_cap,
     shmem_path_len: u16,
     heartbeat_interval_ns: u64,
@@ -41,13 +62,6 @@ pub const LaunchSpec = struct {
     /// self-exits(1) after this many heartbeats instead of waiting for
     /// SIGTERM. 0 means run normally until signaled.
     crash_after_heartbeats: u32,
-    /// Payment pipeline behavior shared by every tile so process-mode and
-    /// thread-mode runs make the same decisions for the same input; see
-    /// tiles/payment_pipeline/runtime.zig's PaymentPipelineConfig.
-    event_count: u64 = 0,
-    policy_limit_cents: i64 = 0,
-    inject_duplicate: bool = false,
-    inject_malformed: bool = false,
 
     pub fn init(fields: struct {
         tile_idx: u32,
@@ -58,13 +72,14 @@ pub const LaunchSpec = struct {
         shmem_path: []const u8,
         heartbeat_interval_ns: u64,
         crash_after_heartbeats: u32 = 0,
-        input_link: ?link.LinkHandles = null,
-        output_link: ?link.LinkHandles = null,
-        event_count: u64 = 0,
-        policy_limit_cents: i64 = 0,
-        inject_duplicate: bool = false,
-        inject_malformed: bool = false,
-    }) error{ShmemPathTooLong}!LaunchSpec {
+        /// Topology channels and their resolved shared-memory handles
+        /// (parallel arrays, same index in both). Bucketed here into
+        /// in_links/out_links by matching tile_idx against each channel's
+        /// dst_idx/src_idx — every matching channel is kept, not just the
+        /// last one.
+        channels: []const link.Channel = &.{},
+        link_handles: []const link.LinkHandles = &.{},
+    }) error{ ShmemPathTooLong, TooManyInLinks, TooManyOutLinks }!LaunchSpec {
         if (fields.shmem_path.len > shmem_path_cap) return error.ShmemPathTooLong;
         var spec = LaunchSpec{
             .tile_idx = fields.tile_idx,
@@ -75,17 +90,29 @@ pub const LaunchSpec = struct {
             .shmem_path_len = @intCast(fields.shmem_path.len),
             .heartbeat_interval_ns = fields.heartbeat_interval_ns,
             .crash_after_heartbeats = fields.crash_after_heartbeats,
-            .has_input_link = fields.input_link != null,
-            .input_link = fields.input_link orelse .{},
-            .has_output_link = fields.output_link != null,
-            .output_link = fields.output_link orelse .{},
-            .event_count = fields.event_count,
-            .policy_limit_cents = fields.policy_limit_cents,
-            .inject_duplicate = fields.inject_duplicate,
-            .inject_malformed = fields.inject_malformed,
         };
         @memcpy(spec.shmem_path_buf[0..fields.shmem_path.len], fields.shmem_path);
+        for (fields.channels, fields.link_handles) |ch, lh| {
+            if (ch.dst_idx == fields.tile_idx) {
+                if (spec.in_cnt >= max_links_per_tile) return error.TooManyInLinks;
+                spec.in_links[spec.in_cnt] = lh;
+                spec.in_cnt += 1;
+            }
+            if (ch.src_idx == fields.tile_idx) {
+                if (spec.out_cnt >= max_links_per_tile) return error.TooManyOutLinks;
+                spec.out_links[spec.out_cnt] = lh;
+                spec.out_cnt += 1;
+            }
+        }
         return spec;
+    }
+
+    pub fn inLinks(self: *const LaunchSpec) []const link.LinkHandles {
+        return self.in_links[0..self.in_cnt];
+    }
+
+    pub fn outLinks(self: *const LaunchSpec) []const link.LinkHandles {
+        return self.out_links[0..self.out_cnt];
     }
 
     pub fn shmemPath(self: *const LaunchSpec) []const u8 {
@@ -141,6 +168,8 @@ test "LaunchSpec round-trips through a file" {
     try std.testing.expectEqualStrings("/tmp/tickoni-run", read_back.shmemPath());
     try std.testing.expectEqual(@as(u64, 50_000_000), read_back.heartbeat_interval_ns);
     try std.testing.expectEqual(@as(u32, 7), read_back.crash_after_heartbeats);
+    try std.testing.expectEqual(@as(u8, 0), read_back.in_cnt);
+    try std.testing.expectEqual(@as(u8, 0), read_back.out_cnt);
 }
 
 test "LaunchSpec readFromFile rejects a truncated file" {
@@ -183,5 +212,82 @@ test "LaunchSpec init rejects an over-long shmem path" {
         .cnc_gaddr = 0,
         .shmem_path = &too_long,
         .heartbeat_interval_ns = 1,
+    }));
+}
+
+test "LaunchSpec init keeps every matching inbound channel, not just the last (fan-in)" {
+    const channels = [_]link.Channel{
+        .{ .src_idx = 0, .dst_idx = 2, .depth = 64, .mtu = 128 },
+        .{ .src_idx = 1, .dst_idx = 2, .depth = 64, .mtu = 128 },
+    };
+    const handles = [_]link.LinkHandles{
+        .{ .mcache_gaddr = 111, .dcache_gaddr = 0, .fseq_gaddr = 0, .depth = 64, .mtu = 128 },
+        .{ .mcache_gaddr = 222, .dcache_gaddr = 0, .fseq_gaddr = 0, .depth = 64, .mtu = 128 },
+    };
+
+    const spec = try LaunchSpec.init(.{
+        .tile_idx = 2,
+        .tile_id = try tile.TileId.parse("tkaudt"),
+        .cpu_placement = .floating,
+        .workspace_name = try link.WorkspaceName.parse("tkpay0"),
+        .cnc_gaddr = 0,
+        .shmem_path = "/tmp",
+        .heartbeat_interval_ns = 1,
+        .channels = &channels,
+        .link_handles = &handles,
+    });
+
+    try std.testing.expectEqual(@as(u8, 2), spec.in_cnt);
+    try std.testing.expectEqual(@as(usize, 111), spec.inLinks()[0].mcache_gaddr);
+    try std.testing.expectEqual(@as(usize, 222), spec.inLinks()[1].mcache_gaddr);
+    try std.testing.expectEqual(@as(u8, 0), spec.out_cnt);
+}
+
+test "LaunchSpec init keeps every matching outbound channel (fan-out)" {
+    const channels = [_]link.Channel{
+        .{ .src_idx = 0, .dst_idx = 1, .depth = 64, .mtu = 128 },
+        .{ .src_idx = 0, .dst_idx = 2, .depth = 64, .mtu = 128 },
+    };
+    const handles = [_]link.LinkHandles{
+        .{ .mcache_gaddr = 333, .dcache_gaddr = 0, .fseq_gaddr = 0, .depth = 64, .mtu = 128 },
+        .{ .mcache_gaddr = 444, .dcache_gaddr = 0, .fseq_gaddr = 0, .depth = 64, .mtu = 128 },
+    };
+
+    const spec = try LaunchSpec.init(.{
+        .tile_idx = 0,
+        .tile_id = try tile.TileId.parse("tkings"),
+        .cpu_placement = .floating,
+        .workspace_name = try link.WorkspaceName.parse("tkpay0"),
+        .cnc_gaddr = 0,
+        .shmem_path = "/tmp",
+        .heartbeat_interval_ns = 1,
+        .channels = &channels,
+        .link_handles = &handles,
+    });
+
+    try std.testing.expectEqual(@as(u8, 2), spec.out_cnt);
+    try std.testing.expectEqual(@as(usize, 333), spec.outLinks()[0].mcache_gaddr);
+    try std.testing.expectEqual(@as(usize, 444), spec.outLinks()[1].mcache_gaddr);
+    try std.testing.expectEqual(@as(u8, 0), spec.in_cnt);
+}
+
+test "LaunchSpec init fails closed when inbound links exceed max_links_per_tile" {
+    var channels: [max_links_per_tile + 1]link.Channel = undefined;
+    var handles: [max_links_per_tile + 1]link.LinkHandles = undefined;
+    for (&channels, &handles, 0..) |*ch, *lh, i| {
+        ch.* = .{ .src_idx = @intCast(i + 10), .dst_idx = 5, .depth = 64, .mtu = 128 };
+        lh.* = .{ .mcache_gaddr = i + 1, .dcache_gaddr = 0, .fseq_gaddr = 0, .depth = 64, .mtu = 128 };
+    }
+
+    try std.testing.expectError(error.TooManyInLinks, LaunchSpec.init(.{
+        .tile_idx = 5,
+        .tile_id = try tile.TileId.parse("tkaudt"),
+        .cpu_placement = .floating,
+        .workspace_name = try link.WorkspaceName.parse("tkpay0"),
+        .cnc_gaddr = 0,
+        .shmem_path = "/tmp",
+        .heartbeat_interval_ns = 1,
+        .channels = &channels,
+        .link_handles = &handles,
     }));
 }

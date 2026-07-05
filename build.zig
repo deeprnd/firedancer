@@ -263,6 +263,8 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, exe, fd_lib_dir);
     linkTickoniFiredancer(b, exe, fd_lib_dir);
+    linkTickoniTopoRun(b, exe, fd_lib_dir);
+    linkTickoniTileRun(b, exe, fd_lib_dir);
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -292,7 +294,9 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/c_abi/sandbox.zig",
         "src/tickoni/c_abi/dcache.zig",
         "src/tickoni/c_abi/fseq.zig",
+        "src/tickoni/c_abi/fctl.zig",
         "src/tickoni/c_abi/cnc.zig",
+        "src/tickoni/c_abi/tempo.zig",
         "src/tickoni/c_abi/wksp.zig",
         "src/tickoni/c_abi/boot.zig",
         "src/tickoni/tiles/audit/mod.zig",
@@ -346,7 +350,9 @@ pub fn build(b: *std.Build) void {
         if (std.mem.eql(u8, path, "src/tickoni/c_abi/queue.zig") or
             std.mem.eql(u8, path, "src/tickoni/c_abi/dcache.zig") or
             std.mem.eql(u8, path, "src/tickoni/c_abi/fseq.zig") or
-            std.mem.eql(u8, path, "src/tickoni/c_abi/cnc.zig"))
+            std.mem.eql(u8, path, "src/tickoni/c_abi/fctl.zig") or
+            std.mem.eql(u8, path, "src/tickoni/c_abi/cnc.zig") or
+            std.mem.eql(u8, path, "src/tickoni/c_abi/tempo.zig"))
         {
             // These tests call real Firedancer substrate through the tk_ shim
             // layer, not native Zig mirrors or direct fd_* externs.
@@ -543,6 +549,69 @@ pub fn build(b: *std.Build) void {
         }),
     });
     test_step.dependOn(&b.addRunArtifact(launch_spec_test).step);
+
+    // topology_spec.zig (V1.14.S8.T4): small tiles+channels round-trip,
+    // same import needs as launch_spec.zig.
+    const topology_spec_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/topology_spec.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "c_abi", .module = c_abi_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(topology_spec_test).step);
+
+    // topo_run.zig (V1.14.S8.T3): fd_topo_run_tile adapter. No test {}
+    // blocks yet (Topo/TopoTile are opaque and nothing builds a real one
+    // until V1.14.S8.T4) — this target's only job is to prove the shim
+    // compiles and links against the real Firedancer archives.
+    const topo_run_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/c_abi/topo_run.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    linkTickoniFiredancer(b, topo_run_test, fd_lib_dir);
+    linkTickoniTopoRun(b, topo_run_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(topo_run_test).step);
+
+    // topob.zig (V1.14.S8.T12): fd_topob topology builder. Same
+    // no-test-blocks-yet rationale as topo_run_test above; proves the
+    // shim (including Tickoni's own object-callbacks array) compiles and
+    // links.
+    const topob_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/c_abi/topob.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    linkTickoniFiredancer(b, topob_test, fd_lib_dir);
+    linkTickoniTopoRun(b, topob_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(topob_test).step);
+
+    // topo_build.zig (V1.14.S8.T12): shared topology-builder, actually
+    // calls into topob.zig against a real 8-tile-shaped Topology, so
+    // needs the same c_abi + util imports as cpu_placement_test plus the
+    // Firedancer/topo-adapter link surface.
+    const topo_build_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/runtime/topo_build.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "c_abi", .module = c_abi_mod },
+                .{ .name = "util", .module = util_mod },
+            },
+        }),
+    });
+    linkTickoniFiredancer(b, topo_build_test, fd_lib_dir);
+    linkTickoniTopoRun(b, topo_build_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(topo_build_test).step);
 
     // model tile: unit tests are mock/fixture-backed and must not start servers.
     const model_test_mod = b.createModule(.{
@@ -790,7 +859,31 @@ pub fn build(b: *std.Build) void {
     });
     const sup_test = b.addTest(.{ .root_module = sup_mod });
     linkTickoniCodec(b, sup_test, fd_lib_dir);
+    // supervisor.zig now calls into tile_registry.zig's `entries` array
+    // (V1.14.S8.T1), which embeds every tile's process-mode function
+    // pointer (including tiles.process/rt.link/c_abi callers) as static
+    // data even for tests that only exercise thread mode — needs the same
+    // Firedancer link set as the process-mode integration tests.
+    linkTickoniFiredancer(b, sup_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(sup_test).step);
+
+    // tile_registry.zig (V1.14.S8.T1): single source of truth for tile id
+    // -> behavior, imported by supervisor.zig and tile_main.zig. Same
+    // import set as sup_mod since it needs the same tile-identity types.
+    const tile_registry_mod = b.createModule(.{
+        .root_source_file = b.path("src/app/tickoni/tile_registry.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "runtime", .module = runtime_mod },
+            .{ .name = "tiles", .module = tiles_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
+        },
+    });
+    const tile_registry_test = b.addTest(.{ .root_module = tile_registry_mod });
+    linkTickoniCodec(b, tile_registry_test, fd_lib_dir);
+    linkTickoniFiredancer(b, tile_registry_test, fd_lib_dir);
+    test_step.dependOn(&b.addRunArtifact(tile_registry_test).step);
 
     // topologies.zig: fresh root module (not the shared topologies_named_mod)
     // so it gets its own dedicated test run, since named-import module
@@ -1019,6 +1112,7 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_pipeline_test, fd_lib_dir);
     linkTickoniFiredancer(b, process_pipeline_test, fd_lib_dir);
+    linkTickoniTopoRun(b, process_pipeline_test, fd_lib_dir);
     const run_process_pipeline_test = addPlainTestRun(b, process_pipeline_test);
     run_process_pipeline_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_pipeline_test.step);
@@ -1041,6 +1135,7 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_cpu_placement_test, fd_lib_dir);
     linkTickoniFiredancer(b, process_cpu_placement_test, fd_lib_dir);
+    linkTickoniTopoRun(b, process_cpu_placement_test, fd_lib_dir);
     const run_process_cpu_placement_test = addPlainTestRun(b, process_cpu_placement_test);
     run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_cpu_placement_test.step);
@@ -1065,6 +1160,7 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_topology_test, fd_lib_dir);
     linkTickoniFiredancer(b, process_topology_test, fd_lib_dir);
+    linkTickoniTopoRun(b, process_topology_test, fd_lib_dir);
     const run_process_topology_test = addPlainTestRun(b, process_topology_test);
     run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_topology_test.step);
@@ -1088,6 +1184,7 @@ pub fn build(b: *std.Build) void {
     });
     linkTickoniCodec(b, process_demo_parity_test, fd_lib_dir);
     linkTickoniFiredancer(b, process_demo_parity_test, fd_lib_dir);
+    linkTickoniTopoRun(b, process_demo_parity_test, fd_lib_dir);
     const run_process_demo_parity_test = addPlainTestRun(b, process_demo_parity_test);
     run_process_demo_parity_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_demo_parity_test.step);
@@ -1299,7 +1396,9 @@ pub fn build(b: *std.Build) void {
         .{ "test-sandbox", "src/tickoni/c_abi/sandbox.zig" },
         .{ "test-dcache", "src/tickoni/c_abi/dcache.zig" },
         .{ "test-fseq", "src/tickoni/c_abi/fseq.zig" },
+        .{ "test-fctl", "src/tickoni/c_abi/fctl.zig" },
         .{ "test-cnc", "src/tickoni/c_abi/cnc.zig" },
+        .{ "test-tempo", "src/tickoni/c_abi/tempo.zig" },
         .{ "test-wksp", "src/tickoni/c_abi/wksp.zig" },
         .{ "test-cpu", "src/tickoni/util/cpu.zig" },
         .{ "test-cpu-placement", "src/tickoni/runtime/cpu_placement.zig" },
@@ -1377,7 +1476,9 @@ pub fn build(b: *std.Build) void {
         if (std.mem.eql(u8, entry[1], "src/tickoni/c_abi/queue.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/dcache.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/fseq.zig") or
+            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/fctl.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/cnc.zig") or
+            std.mem.eql(u8, entry[1], "src/tickoni/c_abi/tempo.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/runtime/cnc_counters.zig"))
         {
             linkTickoniFiredancer(b, t, fd_lib_dir);
@@ -1541,6 +1642,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     linkTickoniCodec(b, sup_cov_test, fd_lib_dir);
+    linkTickoniFiredancer(b, sup_cov_test, fd_lib_dir);
     cov_step.dependOn(&b.addInstallArtifact(sup_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
@@ -1599,6 +1701,50 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
     step.root_module.linkSystemLibrary("fd_tango", .{});
     step.root_module.linkSystemLibrary("fd_util", .{});
     step.root_module.linkSystemLibrary("stdc++", .{});
+}
+
+/// Links shim/topo_run.c (the fd_topo_run_tile adapter, V1.14.S8.T3) and
+/// shim/topob.c (the fd_topob topology builder, V1.14.S8.T12) — the two
+/// halves of Tickoni's Firedancer topology adapter, same link surface.
+/// Callers must also call linkTickoniFiredancer (tango/util) — this only
+/// adds the additional disco/ballet/waltz link surface these files and
+/// their callees (fd_metrics, fd_event_report, both compiled into
+/// fd_disco) need, following the same link set as
+/// src/disco/topo/Local.mk's own test_topob unit test.
+fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
+    step.root_module.link_libc = true;
+    step.root_module.addIncludePath(b.path("src"));
+    step.root_module.addCSourceFiles(.{
+        .files = &.{ "src/tickoni/c_abi/shim/topo_run.c", "src/tickoni/c_abi/shim/topob.c" },
+        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+    });
+    step.root_module.addLibraryPath(b.path(fd_lib_dir));
+    step.root_module.linkSystemLibrary("fd_disco", .{});
+    step.root_module.linkSystemLibrary("fd_ballet", .{});
+    step.root_module.linkSystemLibrary("fd_waltz", .{});
+}
+
+/// Links shim/tile_run.c (V1.14.S8.T4's fd_topo_run_tile_t wiring).
+/// Deliberately separate from linkTickoniTopoRun: this file's static
+/// TK_TILE_RUN struct references tk_tile_privileged_init/tk_tile_run,
+/// Zig `export fn`s defined only in runtime/tile_process.zig, so only
+/// call this for targets that also link tile_process.zig (the exe and
+/// the process-mode integration tests) — never for topo_run.c/topob.c's
+/// own standalone adapter unit tests, which don't include
+/// tile_process.zig and would fail to link if this were folded into
+/// linkTickoniTopoRun instead. Callers must also call
+/// linkTickoniFiredancer and linkTickoniTopoRun.
+fn linkTickoniTileRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
+    step.root_module.link_libc = true;
+    step.root_module.addIncludePath(b.path("src"));
+    step.root_module.addCSourceFiles(.{
+        .files = &.{"src/tickoni/c_abi/shim/tile_run.c"},
+        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+    });
+    step.root_module.addLibraryPath(b.path(fd_lib_dir));
+    step.root_module.linkSystemLibrary("fd_disco", .{});
+    step.root_module.linkSystemLibrary("fd_ballet", .{});
+    step.root_module.linkSystemLibrary("fd_waltz", .{});
 }
 
 /// Links shim/ballet.c (Firedancer siphash/protobuf/JSON primitives). Audit

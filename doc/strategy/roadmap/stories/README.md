@@ -16,7 +16,6 @@ Use these templates:
 
 - [`epic_template.md`](../../templates/epic_template.md)
 - [`story_template.md`](../../templates/story_template.md)
-- [`task_template.md`](../../templates/task_template.md)
 - [`status_template.md`](../../templates/status_template.md)
 
 Use these project docs to fill and implement issues:
