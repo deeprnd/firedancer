@@ -8,6 +8,7 @@ const tiles_mod = @import("tiles");
 const c_abi = @import("c_abi");
 const util = @import("util");
 const topologies = @import("topologies");
+const tile_registry = @import("tile_registry.zig");
 
 const Topology = rt.topology.Topology;
 const TileHandle = rt.tile.TileHandle;
@@ -23,10 +24,18 @@ pub const ProcessPipelineConfig = struct {
     /// silent default, per the fail-closed environment-configuration rule.
     run_dir: []const u8,
     heartbeat_interval_ns: u64 = 20_000_000, // 20ms
+    /// Supervisor classifies a tile as stale when its cnc heartbeat has
+    /// not advanced for longer than this. 0 means derive a conservative
+    /// default from heartbeat_interval_ns.
+    heartbeat_stale_after_ns: u64 = 0,
     /// Test-only hook (V1.14.S1.T12 crash isolation): tile i self-exits(1)
     /// after this many heartbeats instead of waiting for a halt signal.
     /// 0 means run normally. Indexed by tile_idx.
     crash_after_heartbeats: [8]u32 = [_]u32{0} ** 8,
+    /// Test-only hook (V1.14.S8.T6 stale-heartbeat proof): the selected
+    /// tile blocks forever after stuck_after_messages loop iterations.
+    stuck_tile_idx: ?u32 = null,
+    stuck_after_messages: u64 = 0,
     /// Payment pipeline behavior, shared with thread-mode
     /// PaymentPipelineConfig so process-mode and thread-mode runs produce
     /// byte-identical decisions/metrics for the same input.
@@ -47,12 +56,16 @@ pub const ProcessPipelineConfig = struct {
 /// Supervisor-owned state for a running V1.14 process-mode pipeline.
 const ProcessState = struct {
     wksp: *c_abi.wksp.Wksp,
+    /// V1.14.S8.T12: the fd_topob-built topology backing this run's
+    /// object layout (mcache/dcache/fseq/metrics/tile/cnc offsets).
+    built_topo: rt.topo_build.BuiltTopo,
     workspace_name: []u8,
     run_dir: []u8,
     cnc_gaddrs: [8]usize,
     /// Parent-side cnc joins, used to send the halt signal during stop.
     cncs: [8]?*c_abi.cnc.Cnc,
     children: [8]?std.process.Child,
+    heartbeat_stale_after_ns: u64,
     /// V1.14.S1.T14 visibility: whether this run's layout is shared-core
     /// and how many tiles are exclusive/shared/floating.
     placement_report: rt.cpu_placement.PlacementReport,
@@ -67,12 +80,24 @@ const ProcessState = struct {
         for (&self.cncs) |*maybe_cnc| {
             if (maybe_cnc.*) |cnc| _ = c_abi.cnc.cncLeave(cnc);
         }
+        self.built_topo.deinit(allocator);
         _ = c_abi.wksp.wkspDetach(self.wksp);
         c_abi.boot.halt();
         allocator.free(self.workspace_name);
         allocator.free(self.run_dir);
     }
 };
+
+fn resolvedHeartbeatStaleAfterNs(config: ProcessPipelineConfig) u64 {
+    if (config.heartbeat_stale_after_ns != 0) return config.heartbeat_stale_after_ns;
+    return std.math.mul(u64, config.heartbeat_interval_ns, 5) catch std.math.maxInt(u64);
+}
+
+/// Bridges a tile_registry.RunFn resolved at runtime into std.Thread.spawn,
+/// whose function argument must be comptime-known.
+fn threadTrampoline(state: *PaymentPipelineState, run_fn: tile_registry.RunFn) void {
+    run_fn(state);
+}
 
 pub const Supervisor = struct {
     allocator: std.mem.Allocator,
@@ -93,6 +118,7 @@ pub const Supervisor = struct {
     /// pins CPUs, so it has no live affinity mask to check against here.
     pub fn init(allocator: std.mem.Allocator, topo: Topology) !Supervisor {
         try topo.validate();
+        try tile_registry.validate(topo);
         const handles = try allocator.alloc(TileHandle, topo.tiles.len);
         for (handles, 0..) |*h, i| h.* = TileHandle.init(@intCast(i));
         return .{
@@ -132,22 +158,16 @@ pub const Supervisor = struct {
 
         // Dev/test lifecycle only.  The supervisor owns these thread starts;
         // tile modules must not spawn background execution owners themselves.
-        self.handles[0].thread = try std.Thread.spawn(.{}, tiles_mod.runIngest, .{state});
-        self.handles[0].state = .running;
-        self.handles[1].thread = try std.Thread.spawn(.{}, tiles_mod.runNormalize, .{state});
-        self.handles[1].state = .running;
-        self.handles[2].thread = try std.Thread.spawn(.{}, tiles_mod.runDedupe, .{state});
-        self.handles[2].state = .running;
-        self.handles[3].thread = try std.Thread.spawn(.{}, tiles_mod.runPolicy, .{state});
-        self.handles[3].state = .running;
-        self.handles[4].thread = try std.Thread.spawn(.{}, tiles_mod.runAudit, .{state});
-        self.handles[4].state = .running;
-        self.handles[5].thread = try std.Thread.spawn(.{}, tiles_mod.runReplay, .{state});
-        self.handles[5].state = .running;
-        self.handles[6].thread = try std.Thread.spawn(.{}, tiles_mod.runMetric, .{state});
-        self.handles[6].state = .running;
-        self.handles[7].thread = try std.Thread.spawn(.{}, tiles_mod.runDiag, .{state});
-        self.handles[7].state = .running;
+        // Looked up by tile id (not position) through the tile registry
+        // (V1.14.S8.T1) — the single source of truth for tile id -> behavior.
+        // std.Thread.spawn's function argument must be comptime-known, so
+        // the runtime-resolved entry.run_fn is passed through a single
+        // comptime-known trampoline rather than directly.
+        for (self.handles, self.topo.tiles) |*h, tile| {
+            const entry = tile_registry.findById(tile.id) orelse return error.UnregisteredTile;
+            h.thread = try std.Thread.spawn(.{}, threadTrampoline, .{ state, entry.run_fn });
+            h.state = .running;
+        }
     }
 
     /// Start every tile in the topology as a separate OS process connected
@@ -189,8 +209,31 @@ pub const Supervisor = struct {
         var normal_dir_handle = try std.Io.Dir.cwd().createDirPathOpen(io, normal_dir, .{});
         normal_dir_handle.close(io);
 
+        // V1.14.S8.T12: build the real Firedancer topology (object graph
+        // and deterministic offsets) via fd_topob. Every self-exec'd
+        // child rebuilds this same topology with identical inputs to get
+        // byte-identical offsets — see topo_build.zig's module doc
+        // ("topology handoff" finding). fd_topo_create_workspace/
+        // fd_topo_join_workspace are deliberately not used here — they
+        // hard-require huge/gigantic pages, which V1.14.S1 rejected for
+        // Tickoni; see topob.zig's topoWkspSetPtr doc comment ("finding
+        // 3") for the reused-layout-math/own-memory hybrid this drives.
+        var built_topo = try rt.topo_build.build(self.allocator, self.topo, workspace_name_slice);
+        var built_topo_owned_by_state = false;
+        errdefer if (!built_topo_owned_by_state) built_topo.deinit(self.allocator);
+
+        // V1.14.S8.T4: the actual shmem region name must match exactly
+        // what fd_topo_join_workspace (called inside fd_topo_run_tile,
+        // automatically, before any Tickoni callback runs) constructs and
+        // looks up — Firedancer's own "%s_%s.wksp" app_name/wksp-name
+        // convention (fd_topo.c's fd_topo_join_workspace) — even though
+        // Tickoni creates it via its own normal-page wkspNewNamed rather
+        // than fd_topo_create_workspace (finding 3). fd_wksp_new_named
+        // passes this name straight to fd_shmem_create_multi/fd_shmem_join
+        // with no prefix/suffix of its own, so both sides resolve to the
+        // same named region as long as the string matches.
         var workspace_name_z_buf: [64]u8 = undefined;
-        const workspace_name_z = try std.fmt.bufPrintZ(&workspace_name_z_buf, "{s}", .{workspace_name_slice});
+        const workspace_name_z = try std.fmt.bufPrintZ(&workspace_name_z_buf, "{s}_{s}.wksp", .{ rt.topo_build.app_name, workspace_name_slice });
         // Best-effort cleanup of a stale workspace left behind by a prior
         // crashed or killed supervisor; fd_wksp_new_named uses O_EXCL and
         // would otherwise fail closed forever on the same run_dir/name.
@@ -198,28 +241,39 @@ pub const Supervisor = struct {
             _ = c_abi.wksp.wkspDeleteNamed(workspace_name_z);
         }
 
-        // 8 MiB and an explicit partition count: covers 8 cncs plus 4
-        // mcache+dcache+fseq triplets (20 allocations) with headroom; the
-        // auto-estimated part_max from a smaller footprint undershoots
-        // what this many small allocations need (confirmed by
-        // fd_wksp_user.c logging "too few partitions available").
-        var sub_page_cnt = [_]usize{2048};
+        // Size the real allocation off fd_topob_finish's computed
+        // footprint/part_max instead of a hand-picked constant, plus a
+        // little headroom.
+        const footprint = c_abi.topob.topoWkspFootprint(built_topo.topo, built_topo.wksp_idx);
+        const page_cnt = footprint / c_abi.wksp.shmem_normal_page_sz + 16;
+        var sub_page_cnt = [_]usize{page_cnt};
         var sub_cpu_idx = [_]usize{0};
-        const rc = c_abi.wksp.wkspNewNamed(workspace_name_z, c_abi.wksp.shmem_normal_page_sz, 1, &sub_page_cnt, &sub_cpu_idx, 0o600, 1, 64);
+        const part_max = c_abi.topob.topoWkspPartMax(built_topo.topo, built_topo.wksp_idx);
+        const rc = c_abi.wksp.wkspNewNamed(workspace_name_z, c_abi.wksp.shmem_normal_page_sz, 1, &sub_page_cnt, &sub_cpu_idx, 0o600, 1, part_max);
         if (rc != 0) return error.WkspCreateFailed;
         const wksp = c_abi.wksp.wkspAttach(workspace_name_z) orelse return error.WkspAttachFailed;
         errdefer _ = c_abi.wksp.wkspDetach(wksp);
 
+        // Inject the attached workspace into the topology and instantiate
+        // every object's content (mcache/dcache/fseq/metrics/cnc — "tile"
+        // has no .new) via the same fd_topob callback array used to
+        // compute the layout above.
+        c_abi.topob.topoWkspSetPtr(built_topo.topo, built_topo.wksp_idx, wksp);
+        c_abi.topob.topoWkspNew(built_topo.topo, built_topo.wksp_idx);
+
         const state = try self.allocator.create(ProcessState);
         state.* = .{
             .wksp = wksp,
+            .built_topo = built_topo,
             .workspace_name = try self.allocator.dupe(u8, workspace_name_slice),
             .run_dir = try self.allocator.dupe(u8, config.run_dir),
             .cnc_gaddrs = [_]usize{0} ** 8,
             .cncs = [_]?*c_abi.cnc.Cnc{null} ** 8,
             .children = [_]?std.process.Child{null} ** 8,
+            .heartbeat_stale_after_ns = resolvedHeartbeatStaleAfterNs(config),
             .placement_report = placement_report,
         };
+        built_topo_owned_by_state = true;
         self.process_state = state;
         boot_needs_halt = false;
         errdefer {
@@ -228,41 +282,74 @@ pub const Supervisor = struct {
             self.process_state = null;
         }
 
-        // Pre-format one cnc per tile inside the shared workspace. The
-        // supervisor is the sole creator; tile processes only join.
+        // Resolve every tile's cnc content (created above by
+        // topoWkspNew's cnc .new callback) into the gaddr-based form
+        // LaunchSpec/tile_process.zig already consume, and join it
+        // parent-side so stopProcess can signal halt. Only how these
+        // objects get created changed (fd_topob instead of a hand-rolled
+        // wkspAlloc); how children join them (LaunchSpec's gaddr fields)
+        // is unchanged.
         for (self.topo.tiles, 0..) |_, i| {
-            const footprint = c_abi.cnc.cncFootprint(64);
-            const gaddr = c_abi.wksp.wkspAlloc(wksp, c_abi.cnc.cnc_align, footprint, 1);
-            if (gaddr == 0) return error.CncAllocFailed;
-            const laddr = c_abi.wksp.wkspLaddr(wksp, gaddr) orelse return error.CncLaddrFailed;
-            _ = c_abi.cnc.cncNew(laddr, 64, @intCast(i), util.process.monotonicNanos()) orelse return error.CncNewFailed;
-            state.cnc_gaddrs[i] = gaddr;
+            const laddr = c_abi.topob.topoObjLaddr(built_topo.topo, built_topo.cnc_obj_id[i]);
+            state.cnc_gaddrs[i] = c_abi.wksp.wkspGaddr(wksp, laddr);
             state.cncs[i] = c_abi.cnc.cncJoin(laddr) orelse return error.CncJoinFailed;
         }
 
-        // Pre-format one mcache+dcache+fseq triplet per channel. The
-        // supervisor is the sole creator; producer/consumer tiles only
-        // join. Bounded by the topology's fixed channel count (currently
-        // always 4 for paymentPipelineProcess()).
+        // Resolve every channel's mcache/dcache/fseq (created above by
+        // topoWkspNew's mcache/dcache/fseq .new callbacks) into the same
+        // gaddr-based LinkHandles shape rt.link.create used to build by
+        // hand.
         var link_handles_buf: [8]rt.link.LinkHandles = undefined;
         std.debug.assert(self.topo.channels.len <= link_handles_buf.len);
         const link_handles = link_handles_buf[0..self.topo.channels.len];
         for (self.topo.channels, 0..) |ch, i| {
-            link_handles[i] = try rt.link.create(wksp, ch.depth, ch.mtu);
+            const ids = built_topo.link_obj_id[i];
+            link_handles[i] = .{
+                .mcache_gaddr = c_abi.wksp.wkspGaddr(wksp, c_abi.topob.topoObjLaddr(built_topo.topo, ids.mcache_obj_id)),
+                .dcache_gaddr = c_abi.wksp.wkspGaddr(wksp, c_abi.topob.topoObjLaddr(built_topo.topo, ids.dcache_obj_id)),
+                .fseq_gaddr = c_abi.wksp.wkspGaddr(wksp, c_abi.topob.topoObjLaddr(built_topo.topo, ids.fseq_obj_id)),
+                .depth = ch.depth,
+                .mtu = ch.mtu,
+            };
         }
 
         var self_exe_path_buf: [std.fs.max_path_bytes]u8 = undefined;
         const self_exe_path = config.tile_exe_path orelse try util.process.selfExePath(&self_exe_path_buf);
 
+        // Payment-pipeline test config is identical for every tile in the
+        // run, so it's written once here rather than duplicated into each
+        // tile's own LaunchSpec (V1.14.S8.T2: keeps that generic bootstrap
+        // record free of payment-pipeline-specific fields). Tile processes
+        // read it back via tile_registry.zig's loadProcessConfig, which
+        // derives this same path from their LaunchSpec's shmemPath().
+        const payment_config_path = try std.fmt.allocPrint(self.allocator, "{s}/payment_pipeline.config", .{config.run_dir});
+        defer self.allocator.free(payment_config_path);
+        try tiles_mod.process.writeProcessConfig(.{
+            .pipeline = .{
+                .event_count = config.event_count,
+                .policy_limit_cents = config.policy_limit_cents,
+                .inject_duplicate = config.inject_duplicate,
+                .inject_malformed = config.inject_malformed,
+            },
+            .stuck_tile = if (config.stuck_tile_idx) |idx| .{
+                .tile_idx = idx,
+                .after_messages = config.stuck_after_messages,
+            } else null,
+        }, io, std.Io.Dir.cwd(), payment_config_path);
+
+        // V1.14.S8.T4: every self-exec'd child rebuilds this same topology
+        // (topo_build.build) to get a real fd_topo_t to hand to
+        // fd_topo_run_tile — it needs the exact Topology value this run
+        // used (e.g. a test's custom CPU placement), not a hardcoded
+        // default, so it's written once here alongside the payment
+        // config (see topology_spec.zig's module doc, "finding 5").
+        const topology_spec_path = try std.fmt.allocPrint(self.allocator, "{s}/topology.spec", .{config.run_dir});
+        defer self.allocator.free(topology_spec_path);
+        const topology_spec = try rt.topology_spec.TopologySpec.fromTopology(self.topo);
+        try topology_spec.writeToFile(io, std.Io.Dir.cwd(), topology_spec_path);
+
         for (self.handles, 0..) |*h, i| {
             const tile = self.topo.tiles[i];
-
-            var input_link: ?rt.link.LinkHandles = null;
-            var output_link: ?rt.link.LinkHandles = null;
-            for (self.topo.channels, 0..) |ch, ci| {
-                if (ch.dst_idx == i) input_link = link_handles[ci];
-                if (ch.src_idx == i) output_link = link_handles[ci];
-            }
 
             const spec = try rt.launch_spec.LaunchSpec.init(.{
                 .tile_idx = @intCast(i),
@@ -273,12 +360,8 @@ pub const Supervisor = struct {
                 .shmem_path = config.run_dir,
                 .heartbeat_interval_ns = config.heartbeat_interval_ns,
                 .crash_after_heartbeats = config.crash_after_heartbeats[i],
-                .input_link = input_link,
-                .output_link = output_link,
-                .event_count = config.event_count,
-                .policy_limit_cents = config.policy_limit_cents,
-                .inject_duplicate = config.inject_duplicate,
-                .inject_malformed = config.inject_malformed,
+                .channels = self.topo.channels,
+                .link_handles = link_handles,
             });
             const spec_path = try std.fmt.allocPrint(self.allocator, "{s}/tile_{d}.spec", .{ config.run_dir, i });
             defer self.allocator.free(spec_path);
@@ -329,7 +412,9 @@ pub const Supervisor = struct {
             };
             switch (term) {
                 .exited => |code| {
-                    if (code == 0) {
+                    if (self.handles[i].state == .stale) {
+                        self.handles[i].crashed_because = .stale;
+                    } else if (code == 0) {
                         self.handles[i].state = .stopped;
                     } else {
                         self.handles[i].state = .crashed;
@@ -338,15 +423,42 @@ pub const Supervisor = struct {
                     }
                 },
                 .signal => {
-                    self.handles[i].state = .crashed;
-                    self.handles[i].crashed_because = .signal;
+                    if (self.handles[i].state == .stale) {
+                        self.handles[i].crashed_because = .stale;
+                    } else {
+                        self.handles[i].state = .crashed;
+                        self.handles[i].crashed_because = .signal;
+                    }
                 },
                 .stopped, .unknown => {
-                    self.handles[i].state = .crashed;
-                    self.handles[i].crashed_because = .exit_code;
+                    if (self.handles[i].state == .stale) {
+                        self.handles[i].crashed_because = .stale;
+                    } else {
+                        self.handles[i].state = .crashed;
+                        self.handles[i].crashed_because = .exit_code;
+                    }
                 },
             }
             maybe_child.* = null;
+        }
+    }
+
+    pub fn refreshProcessHealth(self: *Supervisor) void {
+        const state = self.process_state orelse return;
+        const now = util.process.monotonicNanos();
+        if (now <= 0) return;
+        const now_ns: u64 = @intCast(now);
+        for (state.cncs, 0..) |maybe_cnc, i| {
+            const h = &self.handles[i];
+            if (h.state != .starting and h.state != .running) continue;
+            const cnc = maybe_cnc orelse continue;
+            const heartbeat = c_abi.cnc.heartbeatQuery(cnc);
+            if (heartbeat <= 0) continue;
+            const heartbeat_ns: u64 = @intCast(heartbeat);
+            if (now_ns > heartbeat_ns and now_ns - heartbeat_ns > state.heartbeat_stale_after_ns) {
+                h.state = .stale;
+                h.crashed_because = .stale;
+            }
         }
     }
 
@@ -381,19 +493,18 @@ pub const Supervisor = struct {
         var snap = ProcessMetricSnapshot{};
         for (self.topo.tiles, 0..) |tile, i| {
             const cnc = state.cncs[i] orelse continue;
-            const id = tile.id.slice();
-            if (std.mem.eql(u8, id, "tkings")) {
-                snap.produced = rt.cnc_counters.appCounterRead(cnc, 0);
-            } else if (std.mem.eql(u8, id, "tknorm")) {
-                snap.normalized = rt.cnc_counters.appCounterRead(cnc, 0);
-                snap.invalid = rt.cnc_counters.appCounterRead(cnc, 1);
-            } else if (std.mem.eql(u8, id, "tkdedu")) {
-                snap.duplicates = rt.cnc_counters.appCounterRead(cnc, 0);
-            } else if (std.mem.eql(u8, id, "tkpoly")) {
-                snap.allowed = rt.cnc_counters.appCounterRead(cnc, 0);
-                snap.denied = rt.cnc_counters.appCounterRead(cnc, 1);
-            } else if (std.mem.eql(u8, id, "tkaudt")) {
-                snap.audited = rt.cnc_counters.appCounterRead(cnc, 0);
+            const entry = tile_registry.findById(tile.id) orelse continue;
+            for (entry.counters) |c| {
+                const v = rt.cnc_counters.appCounterRead(cnc, c.idx);
+                switch (c.field) {
+                    .produced => snap.produced = v,
+                    .normalized => snap.normalized = v,
+                    .invalid => snap.invalid = v,
+                    .duplicates => snap.duplicates = v,
+                    .allowed => snap.allowed = v,
+                    .denied => snap.denied = v,
+                    .audited => snap.audited = v,
+                }
             }
         }
         return snap;
@@ -406,8 +517,15 @@ pub const Supervisor = struct {
     /// stop of tiles that are still running.
     pub fn stopProcess(self: *Supervisor, io: std.Io) void {
         const state = self.process_state orelse return;
+        self.refreshProcessHealth();
         for (state.cncs) |maybe_cnc| {
             if (maybe_cnc) |cnc| c_abi.cnc.signal(cnc, c_abi.cnc.signal_halt);
+        }
+        for (self.handles, 0..) |h, i| {
+            const maybe_child = &state.children[i];
+            if (h.state != .stale) continue;
+            const child = maybe_child.* orelse continue;
+            _ = std.os.linux.kill(child.id.?, std.os.linux.SIG.KILL);
         }
         self.waitProcess(io);
         state.deinit(io, self.allocator);

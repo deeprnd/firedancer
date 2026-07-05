@@ -1,0 +1,229 @@
+# V1.14 Sample Supervisor Configuration
+#
+# Documents the supported topology, link, workspace, CPU placement, and
+# sandbox settings for both exclusive-core and reusable shared-core layouts.
+# This file is the documentation target for V1.14.S8.T10.2: every field
+# below corresponds to a real LaunchSpec, topology channel, cpu_placement,
+# or ProcessPipelineConfig field described in the Tile Registry and
+# LaunchSpec docs.
+#
+# This is NOT a parseable config file — it is reference documentation for
+# developers building real supervisor invocations. See the code for actual
+# struct layouts (src/app/tickoni/supervisor.zig,
+# src/tickoni/runtime/launch_spec.zig,
+# src/tickoni/runtime/cpu_placement.zig).
+
+[registry]
+
+# Tile Registry — the single source of truth for tile id → run/process
+# callback, counter schema, and link cardinality. See src/app/tickoni/
+# tile_registry.zig for the actual registry entries.
+#
+# Phase 0 tiles (8 total, indices 0–7):
+#   0: tkings   - ingest    (in:0, out:1)   counters: [produced]
+#   1: tkrnorm  - normalize (in:1, out:1)   counters: [normalized, invalid]
+#   2: tkdedu   - dedupe    (in:1, out:1)   counters: [duplicates]
+#   3: tkpoly   - policy    (in:1, out:1)   counters: [allowed, denied]
+#   4: tkaudt   - audit     (in:1, out:0)   counters: [audited]
+#   5: tkrepl   - replay    (in:0, out:0)   counters: []  (no process_fn)
+#   6: tkmetr   - metrics   (in:0, out:0)   counters: []  (no process_fn)
+#   7: tkdiag   - diag      (in:0, out:0)   counters: []  (no process_fn)
+
+[topology.payment_pipeline]
+
+# Linear chain layout (index-based ordering matches the registry):
+#
+#   tkings(0) ──► tkrnorm(1) ──► tkdedu(2) ──► tkpoly(3) ──► tkaudt(4)
+#   tkrepl(5)  tkmetr(6)  tkdiag(7) have no pipeline links.
+#
+# Per-tile in_link_id[] and out_link_id[] arrays (V1.14.S8.T2):
+#
+#   tile 0 (tkings): in=[],    out=[channel_0_1]
+#   tile 1 (tknorm): in=[channel_0_1],  out=[channel_1_2]
+#   tile 2 (tkdedu): in=[channel_1_2],  out=[channel_2_3]
+#   tile 3 (tkpoly): in=[channel_2_3],  out=[channel_3_4]
+#   tile 4 (tkaudt): in=[channel_3_4],  out=[]
+#   tile 5 (tkrepl): in=[],    out=[]
+#   tile 6 (tkmetr): in=[],    out=[]
+#   tile 7 (tkdiag): in=[],    out=[]
+#
+# Each tile's bootstrap LaunchSpec carries: shmem_path, heartbeat_interval_ns,
+# crash_after_heartbeats (test hook), cpu_placement, in_cnt, in_link_id[],
+# out_cnt, out_link_id[]. Payment-pipeline-specific config (event_count,
+# policy_limit_cents, inject_duplicate, inject_malformed) is written to a
+# separate payment_pipeline.config file in run_dir, not mixed into the
+# generic bootstrap record.
+
+[channels]
+
+# Shared-memory workspace identifiers per inter-tile link (V1.14.S1.T6).
+# Each channel owns one Tango shared-memory queue backed by mcache (producer)
+# and dcache (consumer), controlled by fseq (consumer progress).
+
+[channel_0_1]
+description = "tkings → tkrnorm"
+depth = 64
+mtu = 128
+reliability = "reliable"
+backing = "tango_shm"
+workspace = "tickoni_main"
+producer = "tkings"
+consumer = "tknorm"
+overrun = "backpressure"
+restart = "restart"
+shutdown = "graceful"
+
+[channel_1_2]
+description = "tknorm → tkdedu"
+depth = 64
+mtu = 128
+reliability = "reliable"
+backing = "tango_shm"
+workspace = "tickoni_main"
+producer = "tknorm"
+consumer = "tkdedu"
+overrun = "backpressure"
+restart = "restart"
+shutdown = "graceful"
+
+[channel_2_3]
+description = "tkdedu → tkpoly"
+depth = 64
+mtu = 128
+reliability = "reliable"
+backing = "tango_shm"
+workspace = "tickoni_main"
+producer = "tkdedu"
+consumer = "tkpoly"
+overrun = "backpressure"
+restart = "restart"
+shutdown = "graceful"
+
+[channel_3_4]
+description = "tkpoly → tkaudt"
+depth = 64
+mtu = 128
+reliability = "reliable"
+backing = "tango_shm"
+workspace = "tickoni_main"
+producer = "tkpoly"
+consumer = "tkaudt"
+overrun = "backpressure"
+restart = "restart"
+shutdown = "graceful"
+
+[cpu_placement.exclusive_core]
+
+# Exclusive-core layout: one tile per CPU, no sharing.
+# Each tile is pinned to a distinct CPU id. Fail-closed if the CPU id is
+# unavailable on the running host (V1.14.S1.T11).
+#
+#   tkings   → cpu 0  (exclusive)
+#   tkrnorm  → cpu 1  (exclusive)
+#   tkdedu   → cpu 2  (exclusive)
+#   tkpoly   → cpu 3  (exclusive)
+#   tkaudt   → cpu 4  (exclusive)
+#   tkrepl   → cpu 5  (exclusive)
+#   tkmetr   → cpu 6  (exclusive)
+#   tkdiag   → cpu 7  (exclusive)
+
+[cpu_placement.shared_core]
+
+# Shared-core (reusable) layout: multiple tile processes share one CPU,
+# but remain separate OS processes (not threads in one address space).
+# Only `shared` placement mode allows this; duplicate CPU ids with
+# `exclusive` placement fail closed (V1.14.S1.T11).
+#
+#   tkings   → cpu 0  (exclusive)
+#   tkrnorm  → cpu 0  (shared — same CPU as tkings)
+#   tkdedu   → cpu 1  (exclusive)
+#   tkpoly   → cpu 1  (shared — same CPU as tkdedu)
+#   tkaudt   → cpu 2  (exclusive)
+#   tkrepl   → cpu 3  (floating — no affinity, kernel-scheduled)
+#   tkmetr   → cpu 3  (floating)
+#   tkdiag   → cpu 3  (floating)
+#
+# Note: shared-core placement has lower throughput than exclusive-core;
+# metrics will show higher tail latency on shared tiles.
+
+[sandbox]
+
+# Sandbox settings per tile (V1.14.S8.T4).
+# sandbox_enabled = false: no seccomp-Landlock entry (current Phase 0 default)
+# sandbox_enabled = true: tk_sandbox_enter called via the harness adapter,
+#   using a tile-specific generated seccomp-BPF policy from
+#   contrib/codegen/generate_filters.py
+
+[tile.tkings.sandbox]
+enabled = false
+policy = "none"
+
+[tile.tkrnorm.sandbox]
+enabled = false
+policy = "none"
+
+[tile.tkdedu.sandbox]
+enabled = false
+policy = "none"
+
+[tile.tkpoly.sandbox]
+enabled = false
+policy = "none"
+
+[tile.tkaudt.sandbox]
+enabled = false
+policy = "none"
+
+[tile.tkrepl.sandbox]
+enabled = false
+policy = "none"
+
+[tile.tkmetr.sandbox]
+enabled = false
+policy = "none"
+
+[tile.tkdiag.sandbox]
+enabled = false
+policy = "none"
+
+[harness]
+
+# The harness adapter (src/tickoni/c_abi/topo_run.zig + shim/topo_run.c)
+# is the only layer that knows about fd_topo_t, fd_topo_tile_t, and
+# fd_topo_run_tile. Each Phase 0 tile's process-mode lifecycle is driven
+# by:
+#
+#   fd_topo_join_tile_workspaces(topo, tile, core_dump_level)
+#   fd_topo_fill_tile(topo, tile)
+#   fd_topo_run_tile(topo, tile, sandbox, keep_ct, core_dump, uid, gid,
+#                    allow_fd, &tile_run_callbacks)
+#
+# The tile_run_callbacks struct is built entirely inside shim/topo_run.c
+# from three Zig export callbacks:
+#   - tk_tile_privileged_init  (workspace join, init)
+#   - tk_tile_run              (the tile's main work loop)
+#   - tk_tile_unprivileged_init (post-init teardown)
+#
+# The parent-side supervisor spawn path uses execve + waitProcess (not
+# Firedancer's fdctl/C++ path which couples to fd_boot.c PID namespaces
+# and fd_topo_run.c TILES[]). This is documented in the WIP audit.
+
+[health]
+
+# Supervisor-side health monitoring settings.
+heartbeat_interval_ns = 20000000  # 20ms
+heartbeat_stale_after_ns = 100000000  # 100ms (5x heartbeat interval)
+# stale_tile_idx and stale_after_messages are test hooks, not production settings.
+
+[misc]
+
+# Supervisor config fields not covered above:
+# run_dir: shared directory for per-tile launch-spec files and FD_SHMEM_PATH
+# tile_exe_path: path to tickoni-supervisor binary for child re-exec
+# crash_after_heartbeats: [8]u32 — test-only, per-tile index
+# stuck_tile_idx: ?u32 — test-only, which tile to freeze
+# stuck_after_messages: u64 — test-only, loop iterations before freeze
+# event_count: u64 — number of synthetic events to process
+# policy_limit_cents: i64 — policy decision threshold
+# inject_duplicate: bool — inject duplicate events for dedupe testing
+# inject_malformed: bool — inject malformed events for invalid-event testing

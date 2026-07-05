@@ -28,6 +28,15 @@ python-dev-install extras="dev":
 python-dev-install-all:
   @just python-dev-install "dev,protobuf,mathgen,sim,solana,agave-cluster"
 
+# ── All-in ──────────────────────────────────────────────────────────────────
+
+tests-all:
+  @just build-all
+  @just quality-check-all
+  @just security-check-all
+  @just security-engine-check-changes
+  @just test-all
+
 # ── Build ──────────────────────────────────────────────────────────────────
 
 build-tk:
@@ -94,6 +103,8 @@ _build-fd-tk-libs extras="":
     build/native/gcc/lib/libfd_tango.a
     build/native/gcc/lib/libfd_util.a
     build/native/gcc/lib/libfd_ballet.a
+    build/native/gcc/lib/libfd_disco.a
+    build/native/gcc/lib/libfd_waltz.a
   )
   "${cmd[@]}"
 
@@ -115,6 +126,13 @@ _dev-image:
   {{container}} build --platform linux/arm64 -t {{dev_image}} "$ctx"
 
 # ── Test ───────────────────────────────────────────────────────────────────
+
+test-all:
+  @just test-unit-all
+  @just test-integration-all
+  @just test-cov-all
+  @just test-system-all
+  @just test-e2e-all
 
 test-unit-fd:
   #!/usr/bin/env bash
@@ -216,12 +234,6 @@ infra-run-llamacpp:
 test-integration-all:
   python3 contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"
 
-test-all:
-  @just test-unit-all
-  @just test-integration-all
-  @just test-system-all
-  @just test-e2e-all
-
 # ── Test: Coverage ─────────────────────────────────────────────────────────
 
 test-cov-fd:
@@ -248,12 +260,6 @@ test-cov-tk:
 test-cov-all:
   @just test-cov-fd
   @just test-cov-tk
-
-tests-all:
-  @just build-all
-  @just quality-check-all
-  @just security-check-all
-  @just test-all
 
 # ── Quality: Format ────────────────────────────────────────────────────────
 
@@ -369,8 +375,20 @@ security-sanitize-check-all:
 
 # ── Security: All ──────────────────────────────────────────────────────────
 
+security-engine-check-all:
+     @just security-engine-check-changes
+     @just security-engine-check-orchestration
+
+security-engine-check-changes:
+  python3 contrib/engine/engine_check_changes.py
+
+security-engine-check-orchestration:
+  python3 contrib/engine/linter.py contrib/engine/checks/ --root {{justfile_directory()}} --severity ERROR
+
+# ── Security: All ──────────────────────────────────────────────────────────
+
 security-check-all:
-  python3 contrib/readme/run-badged-command.py security bash -c "just security-codeql-check-all && just security-gitleaks-check-all && just security-seccomp-check-all && just security-proof-check-all && just security-sanitize-check-all"
+  python3 contrib/readme/run-badged-command.py security bash -c "just security-engine-check-all && just security-codeql-check-all && just security-gitleaks-check-all && just security-seccomp-check-all && just security-proof-check-all && just security-sanitize-check-all"
 
 # ── Memory (hugepages) ─────────────────────────────────────────────────────
 

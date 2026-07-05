@@ -92,6 +92,58 @@ test "process_topology_integration: every tile is a distinct OS process parented
     }
 }
 
+test "process_topology_integration: supervisor marks a truly stuck tile stale while blocked consumers keep heartbeating" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const len = try tmp.dir.realPath(std.testing.io, &path_buf);
+    const run_dir = path_buf[0..len];
+
+    const topo = topologies.paymentPipelineProcess();
+    var sup = try Supervisor.init(std.testing.allocator, topo);
+    defer sup.deinit();
+
+    try sup.startPaymentPipelineProcess(std.testing.io, .{
+        .run_dir = run_dir,
+        .event_count = 16,
+        .heartbeat_interval_ns = 10 * std.time.ns_per_ms,
+        .heartbeat_stale_after_ns = 60 * std.time.ns_per_ms,
+        .stuck_tile_idx = 0,
+        .stuck_after_messages = 0,
+        .tile_exe_path = "zig-out/bin/tickoni-supervisor",
+    });
+
+    const max_polls: u32 = 200;
+    var poll: u32 = 0;
+    while (poll < max_polls) : (poll += 1) {
+        sup.refreshProcessHealth();
+        if (sup.monitor()[0].state == rt.tile.TileState.stale) break;
+        util.process.sleepNanos(5 * std.time.ns_per_ms);
+    }
+
+    try std.testing.expectEqual(rt.tile.TileState.stale, sup.monitor()[0].state);
+    try std.testing.expectEqual(rt.tile.CrashReason.stale, sup.monitor()[0].crashed_because);
+    try std.testing.expect(sup.monitor()[0].isAlive());
+
+    // tknorm..tkaudt are all blocked in consume() waiting on tkings, so this
+    // proves the T6 work-loop heartbeat move: blocked consumers stay healthy
+    // enough to avoid stale classification while their upstream tile is
+    // intentionally frozen.
+    for (sup.monitor(), 0..) |h, i| {
+        if (i == 0) continue;
+        try std.testing.expect(h.state != rt.tile.TileState.stale);
+    }
+
+    sup.stopProcess(std.testing.io);
+    try std.testing.expectEqual(rt.tile.TileState.stale, sup.monitor()[0].state);
+    try std.testing.expectEqual(rt.tile.CrashReason.stale, sup.monitor()[0].crashed_because);
+    for (sup.monitor(), 0..) |h, i| {
+        if (i == 0) continue;
+        try std.testing.expectEqual(rt.tile.TileState.stopped, h.state);
+    }
+}
+
 test "process_topology_integration: SIGKILL on one tile is reported by identity without corrupting siblings" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();

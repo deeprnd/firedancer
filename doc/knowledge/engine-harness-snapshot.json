@@ -1,0 +1,19 @@
+{
+  "commit": "e74e1d71a66c1f5c3e749db50cd744298a530bf8",
+  "date": "2026-07-03 22:52:18 +0300",
+  "files": {
+    "src/disco/topo/fd_topo_run.c": "8802d1e6915ef040b4500c396c9da4c3995b4b6187f1e3e30ebed6c42b79b14a",
+    "src/disco/topo/fd_topo.h": "a9fd985d69e3d10d878826c944cd32713efeb7fd2a0d6c2323881e9551dfc8b6",
+    "src/disco/topo/fd_topo.c": "50852f72ac88918cc02a71bbe4f3c2448836348eb70470fd51be9d33f0b9c5d3",
+    "src/disco/stem/fd_stem.c": "87fde4e12e9dfccee27ef893e5ef68d70d0aceb397a7ecf159144832fefcc134",
+    "src/app/shared/commands/run/run.c": "18db423ef9bf2dba1b9d78282365df7cf940ac330ca67f87c26dbfc496dc5b5a",
+    "src/app/shared/commands/run/run1.c": "0345b202c47067f99929dfd1ae5e1c43dfd5907d436235e42d2a782f4537f99b",
+    "src/app/shared/boot/fd_boot.c": "106e21eec3f52253afde48a8432690d6ef257cf6dbc36ac407c662b9949cc9e3",
+    "src/util/sandbox/fd_sandbox.c": "86ee0aefd86bc86f1a9d15f6c2a36ebfb8339da4398c0faddfedf4c6d942702f",
+    "src/util/sandbox/fd_sandbox.h": "51bec18189af7cf72bc97ee2c73f87901a08a43b849e81aae9f5b68fbb2caafb",
+    "src/util/sandbox/fd_sandbox_private.h": "6d98cb78a24ca1e9944c9a2cce8165b5001c90fa5def58b1c3ff8868368edcc9",
+    "src/disco/metrics/fd_metrics.c": "01885a50d6f77c0db05e00c177473c191d627a0f6572ca19a9a9f7cda9989d9a",
+    "src/disco/metrics/fd_metrics.h": "d9ffc80c998bbf74509087776903cda60298555b225938a3b253ad267b411c66",
+    "src/disco/metrics/fd_metrics_base.h": "00ab64cbcb44aea3c76ff8377c9a0a8b7f942bab26c893dbdda0a3e9596b3535"
+  }
+}

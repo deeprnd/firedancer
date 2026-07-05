@@ -37,7 +37,11 @@ pub const Consumer = struct {
     /// non-sleeping hot receive path. idle_polls counts how many spin
     /// budgets were exhausted without a fragment, for backpressure/idle
     /// diagnostics.
-    pub fn consume(self: *Consumer, out_buf: []u8, idle_polls: *std.atomic.Value(u64), stop: *const std.atomic.Value(bool)) ?usize {
+    ///
+    /// `cnc`, if non-null, gets a heartbeat and a halt-signal check on every
+    /// idle-backoff iteration (V1.14.S8.T6) — see Producer.publish's
+    /// matching doc comment for why.
+    pub fn consume(self: *Consumer, out_buf: []u8, idle_polls: *std.atomic.Value(u64), stop: *const std.atomic.Value(bool), cnc: ?*c_abi.cnc.Cnc) ?usize {
         while (true) {
             var spins: u32 = 0;
             while (spins < wait.spin_poll_max) : (spins += 1) {
@@ -46,6 +50,10 @@ pub const Consumer = struct {
             }
             _ = idle_polls.fetchAdd(1, .release);
             if (stop.load(.acquire)) return null;
+            if (cnc) |c| {
+                c_abi.cnc.heartbeat(c, process.monotonicNanos());
+                if (c_abi.cnc.signalQuery(c) == c_abi.cnc.signal_halt) return null;
+            }
             process.sleepNanos(wait.idle_sleep_ns);
         }
     }
@@ -67,7 +75,7 @@ pub const Consumer = struct {
         if (c_abi.queue.fragMetaSeqQuery(meta) != self.next_seq) return null;
 
         self.next_seq += 1;
-        c_abi.fseq.fseqUpdate(self.fseq, self.next_seq);
+        c_abi.fctl.rxCrReturn(self.fseq, self.next_seq);
         return sz;
     }
 };

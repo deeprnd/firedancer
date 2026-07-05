@@ -51,7 +51,7 @@ test "link_bounds: publish larger than the link's mtu fails closed instead of ov
 
     try std.testing.expectError(
         error.PayloadTooLarge,
-        producer.publish(&oversized_payload, &backpressure_waits, &stop_flag),
+        producer.publish(&oversized_payload, &backpressure_waits, &stop_flag, null),
     );
 }
 
@@ -101,8 +101,8 @@ test "link_bounds: producer backpressures and counts waits when the consumer doe
     var backpressure_waits = std.atomic.Value(u64).init(0);
     const payload = [_]u8{ 1, 2, 3, 4 };
 
-    try producer.publish(&payload, &backpressure_waits, &stop_flag);
-    try producer.publish(&payload, &backpressure_waits, &stop_flag);
+    try producer.publish(&payload, &backpressure_waits, &stop_flag, null);
+    try producer.publish(&payload, &backpressure_waits, &stop_flag, null);
     try std.testing.expectEqual(@as(u64, 0), backpressure_waits.load(.acquire));
 
     // A second thread flips stop after giving the producer a real chance to
@@ -117,6 +117,6 @@ test "link_bounds: producer backpressures and counts waits when the consumer doe
     var flipper = try std.Thread.spawn(.{}, Flipper.run, .{&stop_flag});
     defer flipper.join();
 
-    try std.testing.expectError(error.Stopped, producer.publish(&payload, &backpressure_waits, &stop_flag));
+    try std.testing.expectError(error.Stopped, producer.publish(&payload, &backpressure_waits, &stop_flag, null));
     try std.testing.expect(backpressure_waits.load(.acquire) > 0);
 }

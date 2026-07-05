@@ -210,32 +210,122 @@ or leave placeholders. Do not create GitHub task sub-issues while the story is
 still being shaped; otherwise task work can start before the story boundary,
 acceptance criteria, and evidence gates are stable.
 
-Task split guidance:
-  - Split by domain/ownership, not by arbitrary activity.
-  - Prefer tasks such as runtime, policy, audit/replay, API/UI, fixtures,
-    tests, docs, and evidence gate.
-  - Once Ready, every story must include evidence and quality gate tasks,
-    even when the implementation is documentation-only.
-  - Evidence tasks should cover the applicable subset of demo command,
-    product checklist, fixtures, sample configs, audit JSONL, approval/rejection
-    samples, metrics, diagnostics, replay samples, blocked-flow fixtures, and
-    artifact links.
-  - Quality tasks should cover the applicable subset of focused tests,
-    fail-closed validation, forbidden direct access, malformed envelope/hook
-    handling, provider config validation, adapter manifest validation, API
-    integration tests, and roadmap/docs reconciliation.
-  - Implementation tasks should name the docs the implementer must follow. Use
-    doc/contribution/tickoni.md for Tickoni Zig/runtime style, doc/build.md and
-    doc/development.md for command surfaces, doc/testing-tickoni.md and
-    doc/ci.md for verification, doc/security.md for security-sensitive work,
-    and doc/observability.md or doc/telemetry.md for operator signals.
+Task creation rules:
+  - Create task sub-issues only after the story Status is `Ready`.
+  - Each task must have:
+      * A `Task Type` section (Runtime / tile / topology, Capability / policy,
+        Audit / evidence, Replay / divergence, Model gateway, Tool broker /
+        adapter, Approved execution, CaseOps API / UI, Fixtures / sample data,
+        Tests / quality gate, Documentation / roadmap, or Other).
+      * A `Story Acceptance Covered` section listing the exact parent story
+        acceptance criteria the task helps close.
+      * An `Implementation Notes` section naming the expected touch points,
+        files, modules, fixtures, or docs, with important constraints stated.
+      * A `Conditional Requirements` section keeping only the requirements
+        that apply (Validation / fail-closed, Security / no-bypass, Audit /
+        replay artifacts, Config / manifest handling, Docs / roadmap
+        reconciliation); mark unused sections `N/A - reason`.
+      * A `Verification` section listing exact checks (focused test commands,
+        `just test-unit-tk`, `just test-integration-tk`, demo commands).
+      * An `Evidence To Attach` section for test output, demo output, fixture
+        paths, audit samples, replay samples, or linked artifacts.
+      * A `Done Criteria` section confirming the scoped change is implemented,
+        parent acceptance criteria are satisfied, verification commands pass or
+        failures are documented with owner, evidence is attached, and no
+        unrelated files/policy semantics/tile ownership/public contracts/
+        financial authority changed.
+  - Each task must link back to the parent story's acceptance criteria and
+    to the relevant execution docs it must follow:
+      * `doc/execution/contribution/tickoni.md` — Zig/runtime style, Firedancer
+        reuse, C ABI rules, separation constraints.
+      * `doc/execution/build.md` and `doc/execution/development.md` — build/run
+        commands, justfile policy.
+      * `doc/execution/testing-tickoni.md` and `doc/execution/ci.md` — test
+        layer selection, CI gates.
+      * `doc/execution/security.md` — fail-closed behavior, no-bypass
+        expectations, static/preallocated-memory discipline, C/Zig memory and
+        stack safety, agent capability boundaries.
+      * `doc/execution/telemetry.md` — metric/diagnostic fields, label policy,
+        alerting policy.
+      * `doc/execution/observability.md` — per-tile visibility, smoke checks,
+        failure visibility.
+      * `doc/execution/quality.md` — evidence gate checklist, story closure
+        checklist, conditional gates.
+      * `doc/knowledge/architecture.md` — runtime/source-of-truth boundaries.
+      * `doc/knowledge/tile-topology.md` — tile IDs, links, ownership.
   - Keep tasks implementable by one owner without requiring unrelated changes.
-  - Each task should point back to the acceptance criteria it helps close.
--->
 
-- [ ] VX.Y.SN.T1: [Domain task title] - #[github-task-issue]
-- [ ] VX.Y.SN.T2: [Evidence gate task] - #[github-task-issue]
-- [ ] VX.Y.SN.T3: [Quality gate task] - #[github-task-issue]
+Task ordering and purpose (fixed across all stories):
+
+VX.Y.SN.T1 — Architecture and planning. Define the architectural fit of this
+story within the existing tile topology and Firedancer substrate. Identify risks,
+known unknowns, and decisions that must be resolved before implementation. This
+task must name the tiles, links, workspaces, and capability scope the story will
+touch, flag any tile ownership, link shape, or Firedancer integration changes,
+and record every open question. Do not start implementation until this task
+blocks no remaining implementation task.
+
+VX.Y.SN.T2 — Domain-Driven Design and scaffolding. Write out the types, structs,
+tagged unions, enums, and comptime tables the story requires, following
+`doc/execution/contribution/tickoni.md`. Define the input and output shapes for
+every function the story will implement — these must be finalised objects/structs
+that cross trust boundaries. Implement scaffold functions with `NotImplemented`
+errors and `log.warn` calls only. No production logic yet. This task establishes
+the compile-time surface the story will build on.
+
+VX.Y.SN.T3 — Test-Driven Design: write tests, then stub implementation. Write
+full unit and integration tests (following
+`doc/execution/testing-tickoni.md`) against the scaffolding from T2. Then lightly
+implement the scaffolding methods with correct hardcoded return values and a
+`// TODO: implement` comment, plus a `log.warn` line. At this point every input
+and output shape is finalised as concrete structs, so any dependency issues,
+previously unknown risks, import/c_abi layout mismatches, `@sizeOf`/`@alignOf`/
+`@offsetOf` verification failures, or missing C ABI wrapper concerns will surface
+as failing tests or compile errors. Flag every issue, make a decision, and
+re-architect the story if needed. By the end of this task all tests must be
+present and passing. This is the gate before implementation — if tests do not
+pass, implementation tasks must not start.
+
+VX.Y.SN.T4 — Documentation and DevOps sweep. Update `doc/knowledge/`,
+`doc/execution/`, and `doc/strategy/` docs to reflect any decisions made during
+T1–T3, following `doc/execution/quality.md` section 5. Remove any supporting or
+WIP docs that are no longer relevant. Finalise ADR documents and the repo
+architecture. Complete any CI/devops changes (justfile targets, supporting
+scripts, `contrib/` scripts) needed by the story.
+
+VX.Y.SN.T5–T9 — Implementation (5 tasks). Implement the full logic for every
+function that had `NotImplemented`, `// TODO`, and `log.warn` stubs from T2/T3.
+Replace all hardcoded return values with production logic. Spread the work across
+5 tasks by domain/ownership — one task per tile, policy, audit/replay,
+model/tool/adapter boundary, and API/UI surface as applicable. Each task must
+follow the task structure described above and point to the acceptance criteria
+it closes.
+
+VX.Y.SN.T10 — Security audit. Audit the story's code against
+`doc/execution/security.md`. Check: input validation at every trust boundary,
+output/error checking, fail-closed behavior, no-bypass paths, static and
+preallocated memory discipline, C/Zig memory and stack safety, agent capability
+boundaries, deny-by-default policy, and no-elevated-permissions rules. Run
+`just security-check-all` and record results in the task's `Evidence To Attach`
+section. Flag and remediate any findings.
+
+VX.Y.SN.T11 — Telemetry and observability audit. Audit the story's operator
+signals against `doc/execution/telemetry.md` (metric/diagnostic field definitions,
+label policy, alerting policy, generated metrics) and
+`doc/execution/observability.md` (per-tile visibility, smoke checks, failure
+visibility). Ensure new metrics use low-cardinality labels only, new diagnostic
+signals follow the Phase 0 snapshot pattern, and failure visibility is preserved.
+Capture telemetry/observability evidence.
+
+VX.Y.SN.T12 — Evidence and quality gate. Run the full closing gate per
+`doc/execution/quality.md`. Complete the Story Closure Checklist:
+demoability, tests at every applicable layer (unit, integration, system, E2E),
+quality and security checks (fail-closed, forbidden-direct-access, malformed
+config, quality-check-all, security-check-all), evidence artifacts (audit JSONL
+samples, replay samples, approval/rejection samples, metrics/diagnostics output,
+fixtures), and documentation/roadmap reconciliation. Mark each line
+`N/A - reason` where the story does not touch that boundary. Do not move the
+story status to `Done` until every line is checked off or explicitly waived.
 
 ## Evidence Plan
 

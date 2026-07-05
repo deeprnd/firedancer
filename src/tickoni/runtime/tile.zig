@@ -37,22 +37,23 @@ pub const TileState = enum {
     starting,
     running,
     stopping,
+    /// Tile process is still alive but its heartbeat has not advanced
+    /// within the supervisor's stale threshold.
+    stale,
     /// Tile exited with a non-zero status; topology is unhealthy.
     crashed,
 };
 
 /// Identifies why a tile transitioned to .crashed, for supervisor
-/// diagnostics and crash-isolation tests (V1.14.S1.T12). Every retained
-/// value must be producible by an implemented supervisor monitoring path
-/// (src/app/tickoni/supervisor.zig's waitProcess()); CNC signal/heartbeat
-/// failure detection is not implemented today; a `cnc_fail` variant is
-/// intentionally deferred until the supervisor actually classifies CNC
-/// FD_CNC_SIGNAL_FAIL or stale-heartbeat state, rather than existing
-/// unreachable.
+/// diagnostics and crash/health-isolation tests. Every retained value must
+/// be producible by an implemented supervisor monitoring path.
 pub const CrashReason = enum {
     none,
     /// Process exited with a non-zero status (or thread-mode equivalent).
     exit_code,
+    /// Supervisor observed a non-advancing heartbeat past the configured
+    /// stale threshold.
+    stale,
     /// Process was terminated by a signal (e.g. SIGKILL), process mode
     /// only. Distinct from exit_code because the tile never got to exit
     /// on its own terms — a forced-kill/OOM-style death rather than a
@@ -83,7 +84,7 @@ pub const TileHandle = struct {
 
     pub fn isAlive(self: TileHandle) bool {
         return switch (self.state) {
-            .starting, .running, .stopping => true,
+            .starting, .running, .stopping, .stale => true,
             .stopped, .crashed => false,
         };
     }
@@ -129,6 +130,12 @@ test "TileHandle isAlive is true for starting and stopping" {
     h.state = .starting;
     try std.testing.expect(h.isAlive());
     h.state = .stopping;
+    try std.testing.expect(h.isAlive());
+}
+
+test "TileHandle isAlive is true for stale" {
+    var h = TileHandle.init(4);
+    h.state = .stale;
     try std.testing.expect(h.isAlive());
 }
 

@@ -11,3 +11,5 @@ pub const boot = @import("boot.zig");
 pub const cnc_counters = @import("cnc_counters.zig");
 pub const sandbox = @import("sandbox.zig");
 pub const tile_process = @import("tile_process.zig");
+pub const topo_build = @import("topo_build.zig");
+pub const topology_spec = @import("topology_spec.zig");

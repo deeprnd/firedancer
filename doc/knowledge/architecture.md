@@ -88,6 +88,8 @@ tile lifecycle, sandboxing, low-overhead metric and diagnostic paths,
 `fd_http_server` for tile-local HTTP/WebSocket service, bounded polling loops,
 and crash-only behavior. Tickoni should reuse or wrap Firedancer infra tiles
 and primitives where they are generic.
+For the detailed orchestration boundary, see
+[`tile-orchestration.md`](tile-orchestration.md).
 
 Tickoni application, runtime, tile, schema, codec, and business logic is Zig.
 Firedancer and vendored C code are reachable only through one explicit bridge:
@@ -318,6 +320,36 @@ wrapper, the Zig wrapper calls `tk_*`, and the C shim calls Firedancer.
 
 See [rant/static-inline-and-ffi.md](rant/static-inline-and-ffi.md) for why
 this is the standing default over the alternatives.
+
+### How the Firedancer Harness Works
+
+The Firedancer harness at `src/disco/topo/fd_topo_run.c` is a single function
+(`fd_topo_run_tile`) that manages 6 layers:
+
+1. **Launch** — `fd_topo_run_tile_t` struct with `privileged_init`,
+   `unprivileged_init`, `run`, seccomp, and resource limits
+2. **Lifecycle** — join workspaces → privileged_init → sandbox → fill tile
+   → unprivileged_init → run
+3. **Topology** — `fd_topo_t` / `fd_topo_tile_t` (Solana-shaped at the union
+   level, but the harness reads only `name`, `kind_id`, `cpu_idx`,
+   `allow_shutdown`, `metrics` — none are Solana union fields)
+4. **Shared memory** — `mcache`, `dcache`, `fseq`, `cnc`, `fctl` (already
+   wrapped by Tickoni's `c_abi` bridge)
+5. **Execution** — stem loop (`fd_stem.c`) — multi-input multiplexer with
+   callbacks (not reused by Tickoni; see tile-orchestration.md)
+6. **Supervisor** — `run.c` fork+exec + PID namespace + `wait4` (not reused;
+   Tickoni keeps its own self-exec supervisor)
+
+The harness has a clear contract: take a `fd_topo_run_tile_t` descriptor, call
+the callbacks in order, enforce sandbox and lifecycle ordering. Tickoni's own
+`tile_process.zig` is an equivalent but independent implementation of the same
+pattern, using the same Firedancer primitives through the `c_abi` bridge. The
+two implementations are structurally parallel — Tickoni does not need to replace
+`tile_process.zig` with `fd_topo_run_tile`, but keeping the callback signatures
+compatible means switching would be trivial if needed.
+
+See [tile-orchestration.md](tile-orchestration.md) for the full reuse boundary
+and what Tickoni reuses versus rebuilds.
 
 ## Runtime Model
 
