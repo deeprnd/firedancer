@@ -11,6 +11,7 @@
 ///
 /// The existing GNUmakefile (C/Firedancer build) is unchanged.
 const std = @import("std");
+const Io = std.Io;
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -18,6 +19,12 @@ pub fn build(b: *std.Build) void {
     const fd_lib_dir = b.option([]const u8, "fd-lib-dir", "Firedancer lib dir (default: build/native/gcc/lib)") orelse "build/native/gcc/lib";
     const clap_dep = b.dependency("clap", .{});
     const clap_mod = clap_dep.module("clap");
+
+    // Initialize Threaded Io for file I/O in the build runner.
+    // Zig 0.16 replaced std.fs with std.Io — all I/O requires an Io instance.
+    var threaded = std.Io.Threaded.init(b.allocator, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
 
     // Shared modules used by both the exe and test binaries.
     const c_abi_mod = b.addModule("c_abi", .{
@@ -279,92 +286,118 @@ pub fn build(b: *std.Build) void {
     // ---------------------------------------------------------------------------
     const test_step = b.step("test", "Run offline Tickoni unit tests");
 
-    // Files with no cross-module imports: standalone test binaries.
-    for ([_][]const u8{
-        "src/tickoni/runtime/topology.zig",
-        "src/tickoni/runtime/tile.zig",
-        "src/tickoni/util/cpu.zig",
-        "src/tickoni/util/process.zig",
-        "src/tickoni/util/linux_ids.zig",
-        "src/tickoni/util/sizes.zig",
-        "src/tickoni/util/sandbox_defaults.zig",
-        "src/tickoni/runtime/sandbox.zig",
-        "src/tickoni/c_abi/ballet.zig",
-        "src/tickoni/c_abi/queue.zig",
-        "src/tickoni/c_abi/sandbox.zig",
-        "src/tickoni/c_abi/dcache.zig",
-        "src/tickoni/c_abi/fseq.zig",
-        "src/tickoni/c_abi/fctl.zig",
-        "src/tickoni/c_abi/cnc.zig",
-        "src/tickoni/c_abi/tempo.zig",
-        "src/tickoni/c_abi/wksp.zig",
-        "src/tickoni/c_abi/boot.zig",
-        "src/tickoni/tiles/audit/mod.zig",
-        "src/tickoni/tiles/payment_pipeline/mod.zig",
-        "src/tickoni/tiles/case/mod.zig",
-        "src/tickoni/tiles/disp/mod.zig",
-    }) |path| {
-        const t_mod = if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig"))
-            b.createModule(.{
-                .root_source_file = b.path(path),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "audit_codec", .module = audit_codec_mod },
-                    .{ .name = "audit_schema", .module = audit_schema_mod },
-                    .{ .name = "fixture_audit_gen", .module = fixture_audit_gen_mod },
-                },
-            })
-        else if (std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline/mod.zig"))
-            b.createModule(.{
-                .root_source_file = b.path(path),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "audit_tile", .module = audit_tile_mod },
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                },
-            })
-        else if (std.mem.eql(u8, path, "src/tickoni/runtime/sandbox.zig"))
-            b.createModule(.{
-                .root_source_file = b.path(path),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "util", .module = util_mod },
-                },
-            })
-        else
-            b.createModule(.{
-                .root_source_file = b.path(path),
-                .target = target,
-                .optimize = optimize,
-            });
-        const t = b.addTest(.{ .root_module = t_mod });
-        if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig") or
-            std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline/mod.zig"))
-        {
-            linkTickoniCodec(b, t, fd_lib_dir);
+    // Walk-based test discovery (vitest/jest style): walk include dirs,
+    // find *.zig, exclude prefixes.  Special imports/links applied per-file.
+    const unit_test_include = [_][]const u8{
+        "src/tickoni/runtime/",
+        "src/tickoni/util/",
+        "src/tickoni/c_abi/",
+        "src/tickoni/tiles/",
+        "src/tickoni/test/mocks/",
+        "src/tickoni/test/fixtures/",
+    };
+    const unit_test_exclude = [_][]const u8{
+        "src/tickoni/test/integration/",
+        "src/tickoni/test/system/",
+        "src/tickoni/test/demo/",
+        "src/tickoni/test/fixtures/investment/scenarios/.zig-global-cache",
+    };
+
+    var unit_files = std.ArrayList([]const u8).empty;
+    errdefer unit_files.deinit(b.allocator);
+
+    for (unit_test_include) |inc| {
+        var dir = Io.Dir.cwd().openDir(io, inc, .{ .iterate = true }) catch continue;
+        defer dir.close(io);
+
+        var walker = dir.walk(b.allocator) catch continue;
+        defer walker.deinit();
+
+        while (true) {
+            const maybe_entry = (walker.next(io)) catch continue;
+            if (maybe_entry == null) break;
+            const e = maybe_entry.?;
+
+            if (e.kind != .file) continue;
+            const ext = std.fs.path.extension(e.path);
+            if (!std.mem.eql(u8, ext, ".zig")) continue;
+
+            const full = (std.fmt.allocPrint(b.allocator, "{s}{s}", .{ inc, e.path }) catch unreachable);
+
+            var excluded = false;
+            for (unit_test_exclude) |excl| {
+                if (std.mem.startsWith(u8, full, excl)) {
+                    excluded = true;
+                    break;
+                }
+            }
+            if (excluded) {
+                b.allocator.free(full);
+                continue;
+            }
+
+            const t_mod = if (std.mem.eql(u8, full, "src/tickoni/tiles/audit/mod.zig"))
+                b.createModule(.{
+                    .root_source_file = b.path(full),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "audit_codec", .module = audit_codec_mod },
+                        .{ .name = "audit_schema", .module = audit_schema_mod },
+                        .{ .name = "fixture_audit_gen", .module = fixture_audit_gen_mod },
+                    },
+                })
+            else if (std.mem.eql(u8, full, "src/tickoni/tiles/payment_pipeline/mod.zig"))
+                b.createModule(.{
+                    .root_source_file = b.path(full),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "audit_tile", .module = audit_tile_mod },
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                    },
+                })
+            else if (std.mem.eql(u8, full, "src/tickoni/runtime/sandbox.zig"))
+                b.createModule(.{
+                    .root_source_file = b.path(full),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "util", .module = util_mod },
+                    },
+                })
+            else
+                b.createModule(.{
+                    .root_source_file = b.path(full),
+                    .target = target,
+                    .optimize = optimize,
+                });
+
+            const t = b.addTest(.{ .root_module = t_mod });
+            if (std.mem.eql(u8, full, "src/tickoni/tiles/audit/mod.zig") or
+                std.mem.eql(u8, full, "src/tickoni/tiles/payment_pipeline/mod.zig"))
+            {
+                linkTickoniCodec(b, t, fd_lib_dir);
+            }
+            if (std.mem.eql(u8, full, "src/tickoni/c_abi/queue.zig") or
+                std.mem.eql(u8, full, "src/tickoni/c_abi/dcache.zig") or
+                std.mem.eql(u8, full, "src/tickoni/c_abi/fseq.zig") or
+                std.mem.eql(u8, full, "src/tickoni/c_abi/fctl.zig") or
+                std.mem.eql(u8, full, "src/tickoni/c_abi/cnc.zig") or
+                std.mem.eql(u8, full, "src/tickoni/c_abi/tempo.zig"))
+            {
+                linkTickoniFiredancer(b, t, fd_lib_dir);
+            }
+            if (std.mem.eql(u8, full, "src/tickoni/c_abi/ballet.zig")) {
+                linkTickoniCodec(b, t, fd_lib_dir);
+            }
+
+            const t_run = b.addRunArtifact(t);
+            test_step.dependOn(&t_run.step);
+
+            b.allocator.free(full);
         }
-        if (std.mem.eql(u8, path, "src/tickoni/c_abi/queue.zig") or
-            std.mem.eql(u8, path, "src/tickoni/c_abi/dcache.zig") or
-            std.mem.eql(u8, path, "src/tickoni/c_abi/fseq.zig") or
-            std.mem.eql(u8, path, "src/tickoni/c_abi/fctl.zig") or
-            std.mem.eql(u8, path, "src/tickoni/c_abi/cnc.zig") or
-            std.mem.eql(u8, path, "src/tickoni/c_abi/tempo.zig"))
-        {
-            // These tests call real Firedancer substrate through the tk_ shim
-            // layer, not native Zig mirrors or direct fd_* externs.
-            linkTickoniFiredancer(b, t, fd_lib_dir);
-        }
-        if (std.mem.eql(u8, path, "src/tickoni/c_abi/ballet.zig")) {
-            // siphash/pb/json primitives live in shim/ballet.c, linked via
-            // linkTickoniCodec.
-            linkTickoniCodec(b, t, fd_lib_dir);
-        }
-        const t_run = b.addRunArtifact(t);
-        test_step.dependOn(&t_run.step);
     }
 
     // src/tickoni/codec/thesis.zig: dedicated wrapper tests over the canonical
