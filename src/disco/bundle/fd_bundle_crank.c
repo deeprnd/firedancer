@@ -1,5 +1,5 @@
 #include "fd_bundle_crank.h"
-#include "../../flamenco/runtime/fd_pubkey_utils.h"
+#include "../shim/fd_disco_pubkey.h"
 
 #if FD_HAS_AVX
 #include "../../util/simd/fd_avx.h"
@@ -207,9 +207,9 @@ fd_bundle_crank_gen_init( void                 * mem,
     for( ulong i=0UL; i<8UL; i++ ) {
       seed[12] = (char)((ulong)'0' + i);
       uchar out_bump[1];
-      FD_TEST( FD_PUBKEY_SUCCESS==fd_pubkey_find_program_address( (fd_pubkey_t const *)tip_payment_program_addr,
+      FD_TEST( FD_PUBKEY_SUCCESS==fd_pubkey_find_program_address( (fd_acct_addr_t const *)tip_payment_program_addr,
                                                                   1UL, seed_ptr, &seed_len,
-                                                                  (fd_pubkey_t *)g->crank3->tip_payment_accounts[i], out_bump, cerr ) );
+                                                                  (fd_acct_addr_t *)g->crank3->tip_payment_accounts[i], out_bump, cerr ) );
     }
   } while( 0 );
 
@@ -219,13 +219,13 @@ fd_bundle_crank_gen_init( void                 * mem,
     ulong seed_len = 14;
     uchar out_bump[1];
     uchar const * seed_ptr[1] = { (uchar const *)seed };
-    FD_TEST( FD_PUBKEY_SUCCESS==fd_pubkey_find_program_address( (fd_pubkey_t const *)tip_payment_program_addr,
+    FD_TEST( FD_PUBKEY_SUCCESS==fd_pubkey_find_program_address( (fd_acct_addr_t const *)tip_payment_program_addr,
                                                                 1UL, seed_ptr, &seed_len,
-                                                                (fd_pubkey_t *)g->crank3->tip_payment_program_config, out_bump, cerr ) );
+                                                                (fd_acct_addr_t *)g->crank3->tip_payment_program_config, out_bump, cerr ) );
     /* Same seed used for tip distribution config account too */
-    FD_TEST( FD_PUBKEY_SUCCESS==fd_pubkey_find_program_address( (fd_pubkey_t const *)tip_distribution_program_addr,
+    FD_TEST( FD_PUBKEY_SUCCESS==fd_pubkey_find_program_address( (fd_acct_addr_t const *)tip_distribution_program_addr,
                                                                 1UL, seed_ptr, &seed_len,
-                                                                (fd_pubkey_t *)g->crank3->tip_distribution_program_config, out_bump, cerr ) );
+                                                                (fd_acct_addr_t *)g->crank3->tip_distribution_program_config, out_bump, cerr ) );
   } while( 0 );
 
   /* Populate crank2 from crank3 */
@@ -271,9 +271,9 @@ fd_bundle_crank_update_epoch( fd_bundle_crank_gen_t * g,
   };
   ulong seed_szs[3] = { 24, 32, 8 };
   uint custom_err[1];
-  FD_TEST( FD_PUBKEY_SUCCESS==fd_pubkey_find_program_address( (fd_pubkey_t const *)g->crank3->tip_distribution_program,
+  FD_TEST( FD_PUBKEY_SUCCESS==fd_pubkey_find_program_address( (fd_acct_addr_t const *)g->crank3->tip_distribution_program,
                                                               3UL, seeds, seed_szs,
-                                                              (fd_pubkey_t *)g->crank3->new_tip_receiver,
+                                                              (fd_acct_addr_t *)g->crank3->new_tip_receiver,
                                                               &(g->crank3->init_tip_distribution_acct.bump), custom_err ) );
   memcpy( g->crank2->new_tip_receiver, g->crank3->new_tip_receiver, 32UL );
   g->configured_epoch = epoch;
