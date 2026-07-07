@@ -291,12 +291,10 @@ Tickoni-owned areas:
 - `doc/execution`: Build, security, testing, and observability
 - `doc/strategy`: Product and roadmap docs
 
-Firedancer-derived areas:
+Firedancer-derived areas (compiled via `tickoni_fd` scope):
 
-- `src/app/firedancer/`: full C runtime application
-- `src/disco/`: common Firedancer tiles and metrics
-- `src/discof/`: full Firedancer tiles
-- `src/tango/`, `src/util/`, `src/waltz/`, `src/flamenco/`, `src/funk/`: supporting C runtime substrate
+- `src/disco/`: metrics, diagnostics, verification, event handling
+- `src/tango/`, `src/util/`, `src/ballet/`, `src/waltz/`: runtime substrate
 
 Avoid Frankendancer-specific paths such as `fdctl`, `fddev`, and `discoh`
 unless a task explicitly requires shared legacy behavior.

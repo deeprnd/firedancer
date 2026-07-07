@@ -86,14 +86,19 @@ our_changed_files() {
     git ls-files --others --exclude-standard; } | sort -u
 }
 
+# Return only the 5 FD tree dirs that the tickoni_fd scope covers.
+fd_scope_files() {
+  our_changed_files | grep -E '^src/(tango|util|ballet|disco|waltz)/'
+}
+
 cmd_format_check_fd() {
-  mapfile -t files < <(our_changed_files | grep -v '^src/\(app/\)\?tickoni/')
+  mapfile -t files < <(fd_scope_files)
   [ "${#files[@]}" -gt 0 ] || return 0
   run_step "trailing whitespace" pre-commit run trailing-whitespace --files "${files[@]}"
 }
 
 cmd_format_fix_fd() {
-  mapfile -t files < <(our_changed_files | grep -v '^src/\(app/\)\?tickoni/')
+  mapfile -t files < <(fd_scope_files)
   [ "${#files[@]}" -gt 0 ] || return 0
   run_step "trailing whitespace fix" pre-commit run trailing-whitespace --files "${files[@]}"
 }
@@ -108,7 +113,7 @@ cmd_format_fix_tk() {
 
 cmd_lint_check_fd() {
   local files
-  mapfile -t files < <(our_changed_files | grep -v '^src/\(app/\)\?tickoni/')
+  mapfile -t files < <(fd_scope_files)
   [ "${#files[@]}" -gt 0 ] || return 0
 
   local ch_files=()
@@ -122,7 +127,7 @@ cmd_lint_check_fd() {
 
 cmd_lint_shellcheck_fd() {
   local files
-  mapfile -t files < <(our_changed_files | grep -v '^src/\(app/\)\?tickoni/')
+  mapfile -t files < <(fd_scope_files)
   [ "${#files[@]}" -gt 0 ] || return 0
   run_step "shellcheck" run_shellcheck "${files[@]}"
 }

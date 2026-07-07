@@ -40,29 +40,80 @@ tests-all:
 # ── Build ──────────────────────────────────────────────────────────────────
 
 build-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib
 
 build-fd-tk-libs:
   @just _build-fd-tk-libs ""
 
+# tickoni_fd machine profile: builds only the 5 Firedancer libraries
+# Tickoni reuses (tango, util, ballet, disco, waltz). Excludes
+# Solana validator tiles, RPC schemas, unrelated source, unit-test bins,
+# fuzz-test bins, and other binaries (RocksDB, io_uring, etc.).
+#
+# NOTE: Firedancer's everything.mk compiles all sources regardless of
+# requested .a targets. We list only the 5 libraries Tickoni needs as
+# the final archive targets. build-fd variants must pre-create the obj
+# directory because Firedancer writes .d dependency files to nested
+# paths (e.g. obj/ballet/zksdk/instructions/...) that don't exist by
+# default.
 build-fd:
-  {{make}} -j"$(nproc)" firedancer
+  #!/usr/bin/env bash
+  set -euo pipefail
+  mkdir -p build/fd-tickoni-fd/obj
+  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd \
+    build/fd-tickoni-fd/lib/libfd_tango.a \
+    build/fd-tickoni-fd/lib/libfd_util.a \
+    build/fd-tickoni-fd/lib/libfd_ballet.a \
+    build/fd-tickoni-fd/lib/libfd_disco.a \
+    build/fd-tickoni-fd/lib/libfd_waltz.a
 
 build-fd-gcc:
-  make -j"$(nproc)" BUILDDIR=fd-gcc CC=gcc-12 MACHINE=linux_gcc_x86_64 firedancer
+  #!/usr/bin/env bash
+  set -euo pipefail
+  mkdir -p build/fd-gcc/obj
+  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-gcc CC=gcc-12 \
+    build/fd-gcc/lib/libfd_tango.a \
+    build/fd-gcc/lib/libfd_util.a \
+    build/fd-gcc/lib/libfd_ballet.a \
+    build/fd-gcc/lib/libfd_disco.a \
+    build/fd-gcc/lib/libfd_waltz.a
 
 build-fd-clang:
-  make -j"$(nproc)" BUILDDIR=fd-clang CC=clang-18 MACHINE=linux_clang_x86_64 firedancer
+  #!/usr/bin/env bash
+  set -euo pipefail
+  mkdir -p build/fd-clang/obj
+  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-clang CC=clang-18 \
+    build/fd-clang/lib/libfd_tango.a \
+    build/fd-clang/lib/libfd_util.a \
+    build/fd-clang/lib/libfd_ballet.a \
+    build/fd-clang/lib/libfd_disco.a \
+    build/fd-clang/lib/libfd_waltz.a
 
 # Compile-only ARM lane matching the CI machine target; Firedancer runtime remains x86-64 Linux only.
 build-fd-arm:
-  make -j"$(nproc)" BUILDDIR=fd-arm CC=gcc-14 MACHINE=linux_gcc_neoverse_n1 firedancer
+  #!/usr/bin/env bash
+  set -euo pipefail
+  mkdir -p build/fd-arm/obj
+  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-arm CC=gcc-14 \
+    build/fd-arm/lib/libfd_tango.a \
+    build/fd-arm/lib/libfd_util.a \
+    build/fd-arm/lib/libfd_ballet.a \
+    build/fd-arm/lib/libfd_disco.a \
+    build/fd-arm/lib/libfd_waltz.a
 
 build-fd-dev:
-  make -j"$(nproc)" firedancer-dev
+  make -j"$(nproc)" all
 
 build-all:
   python3 contrib/readme/run-badged-command.py build bash -c "just build-fd && just build-tk"
+
+# ── Clean ────────────────────────────────────────────────────────────────────
+
+# Clean all Firedancer and Zig/Tickoni build artifacts.
+# Firedancer outputs live under `build/` (BUILDDIR variants).
+# Zig/Tickoni outputs live under `target/` and `zig-out/`.
+clean-all:
+  rm -rf build/ target/ zig-out/
 
 # ── macOS: run any recipe in the Linux dev container ─────────────────────────
 # Firedancer/Tickoni build natively only on Linux. The `dock` recipe mounts the
@@ -95,7 +146,7 @@ dock +recipe:
 _build-fd-tk-libs extras="":
   #!/usr/bin/env bash
   set -euo pipefail
-  cmd=({{make}} -j"$(nproc)")
+  cmd=({{make}} -j"$(nproc)" MACHINE=tickoni_fd)
   if [ -n "{{extras}}" ]; then
     cmd+=("EXTRAS={{extras}}")
   fi
@@ -137,7 +188,7 @@ test-all:
 test-unit-fd:
   #!/usr/bin/env bash
   set -euo pipefail
-  make -j"$(nproc)" unit-test
+  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd unit-test
   nofile_target="$(awk '/#define CONFIGURE_NR_OPEN_FILES/ { gsub(/[()U]/, "", $3); print $3 }' src/app/shared/commands/configure/configure.h)"
   sudo prlimit --pid $$ --nofile="${nofile_target}:${nofile_target}" --memlock=unlimited
   page_mode="${FD_TEST_UNIT_PAGE_MODE:-auto}"
@@ -145,7 +196,7 @@ test-unit-fd:
     normal)
       echo "running Firedancer unit tests with normal pages"
       just mem-drop-caches || true
-      make run-unit-test TEST_OPTS="--page-sz normal"
+      {{make}} MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd run-unit-test TEST_OPTS="--page-sz normal"
       ;;
     auto)
       just mem-free || true
@@ -155,10 +206,10 @@ test-unit-fd:
       pages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/free_hugepages 2>/dev/null || echo 0)
       if (( pages >= 6 )); then
         echo "running Firedancer unit tests with gigantic pages"
-        make run-unit-test
+        {{make}} MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd run-unit-test
       else
         echo "gigantic pages unavailable, falling back to normal pages"
-        make run-unit-test TEST_OPTS="--page-sz normal"
+        {{make}} MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd run-unit-test TEST_OPTS="--page-sz normal"
       fi
       ;;
     *)
@@ -170,7 +221,7 @@ test-unit-fd:
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.
 test-unit-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build test --summary all
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib test --summary all
 
 # Print computed hash and wire bytes for every audit fixture event, and emit audit JSONL.
 # Use the output to understand or snapshot the current encoding after intentional changes.
@@ -182,7 +233,7 @@ test-unit-all:
   python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
 
 test-e2e-fd:
-  make -j"$(nproc)" integration-test && make run-integration-test
+  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd integration-test && {{make}} MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd run-integration-test
 
 test-e2e-tk:
   @true
@@ -195,7 +246,7 @@ test-integration-fd:
 
 # Tickoni integration lane: transport and boundary wiring against local mocks.
 test-integration-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build integration-test --summary all
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib integration-test --summary all
 
 # Deterministic offline investment demo — no llama.cpp required.
 demo-tk:
@@ -249,7 +300,7 @@ test-cov-fd:
   # the 16 GB GitHub ubuntu-24.04 runner limit (vs. make -j$(nproc) used for unit tests).
   jobs=$(( $(nproc) / 2 ))
   (( jobs < 1 )) && jobs=1
-  make -j"${jobs}" BUILDDIR=fd-cov CC=clang-18 MACHINE=linux_clang_x86_64 EXTRAS="llvm-cov" unit-test
+  {{make}} -j"${jobs}" MACHINE=tickoni_fd BUILDDIR=fd-cov CC=clang-18 EXTRAS="llvm-cov" unit-test
   export TEST_OPTS=""
   (( pages < 6 )) && export TEST_OPTS="--page-sz normal" || true
   python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd

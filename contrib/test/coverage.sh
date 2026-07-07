@@ -36,7 +36,7 @@ cmd_coverage_fd() {
   # TEST_OPTS is also set there (hugepage allocation and prlimit).
   run_step "run unit tests" \
     make run-unit-test BUILDDIR="$builddir" CC=clang-18 \
-    MACHINE=linux_clang_x86_64 EXTRAS="llvm-cov" TEST_OPTS="${TEST_OPTS:-}"
+    MACHINE=tickoni_fd EXTRAS="llvm-cov" TEST_OPTS="${TEST_OPTS:-}"
 
   run_step "merge llvm profiles" bash -c "
     mkdir -p '${covdir}'
