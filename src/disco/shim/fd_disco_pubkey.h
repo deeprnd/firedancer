@@ -8,8 +8,8 @@
    uchar b[32]) from ballet/txn/fd_txn.h — layout-compatible with
    fd_pubkey_t from flamenco.
 */
-#ifndef FD_DISCO_PUBKEY_H
-#define FD_DISCO_PUBKEY_H
+#ifndef HEADER_fd_src_disco_shim_fd_disco_pubkey_h
+#define HEADER_fd_src_disco_shim_fd_disco_pubkey_h
 
 #include "../../ballet/txn/fd_txn.h"
 
@@ -52,4 +52,4 @@ fd_pubkey_find_program_address( fd_acct_addr_t const *   program_id,
                                 uchar *                  out_bump_seed,
                                 uint *                   custom_err );
 
-#endif /* FD_DISCO_PUBKEY_H */
+#endif /* HEADER_fd_src_disco_shim_fd_disco_pubkey_h */

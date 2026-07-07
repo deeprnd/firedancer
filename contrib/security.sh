@@ -73,17 +73,27 @@ cmd_proof_check_fd() {
 }
 
 cmd_sanitize_check_fd() {
+  # Same 5-lib LOCAL_MKS filter as cov/build/test — only tango, util, ballet,
+  # disco, waltz (minus disco/quic, ballet/zksdk, waltz/quic).  Excludes
+  # flamenco and other dirs so we only compile what gets linked into the
+  # Tickoni harness libs.
+  _local_mks=$(find src/tango src/util src/ballet src/disco src/waltz \
+    -name Local.mk | grep -vE 'disco/quic/|ballet/zksdk/|waltz/quic/' | tr '\n' ' ')
   if [ ! -d "build/clang-asan-ubsan" ]; then
     run_step "clang asan+ubsan build" \
-      make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" firedancer
+      make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" \
+        "LOCAL_MKS=$_local_mks" \
+        unit-test
   fi
   run_step "clang asan+ubsan check" \
-    make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" check
+    make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" \
+      "LOCAL_MKS=$_local_mks" \
+      unit-test
 }
 
 cmd_sanitize_check_tk() {
   run_step "zig releasesafe" \
-    zig build test -Doptimize=ReleaseSafe
+    zig build test -Dfd-lib-dir=build/fd-tickoni-fd/lib -Doptimize=ReleaseSafe
 }
 
 case "${1:-}" in

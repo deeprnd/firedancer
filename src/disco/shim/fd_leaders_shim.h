@@ -6,9 +6,9 @@
    provides function definitions in fd_leaders_shim.c to satisfy
    libfd_flamenco.a's empty symbol set.
 */
-#ifndef FD_LEADERS_SHIM_H
-#define FD_LEADERS_SHIM_H
+#ifndef HEADER_fd_src_disco_shim_fd_leaders_shim_h
+#define HEADER_fd_src_disco_shim_fd_leaders_shim_h
 
 #include "../../flamenco/leaders/fd_leaders.h"
 
-#endif /* FD_LEADERS_SHIM_H */
+#endif /* HEADER_fd_src_disco_shim_fd_leaders_shim_h */

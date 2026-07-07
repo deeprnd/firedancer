@@ -270,19 +270,16 @@ test-integration-all:
 test-cov-fd:
   #!/usr/bin/env bash
   set -euo pipefail
-  just mem-free || true
-  trap 'just mem-free' EXIT
-  want=$(free -g | awk '/^Mem:/{print int(($2 - 4) / 6) * 6}')
-  (( want > 0 )) && sudo src/util/shmem/fd_shmem_cfg alloc "$want" gigantic 0 >/dev/null 2>&1 || true
-  pages=$(cat /sys/kernel/mm/hugepages/hugepages-1048576kB/free_hugepages 2>/dev/null || echo 0)
-  sudo prlimit --pid $$ --memlock=unlimited
-  # llvm-cov inflates per-job RSS to ~5 GB; halve parallelism to stay within
-  # the 16 GB GitHub ubuntu-24.04 runner limit (vs. make -j$(nproc) used for unit tests).
+  # No hugepage/sudo allocation — matches test-unit-fd (consumer hardware, no root).
+  # Same LOCAL_MKS filter as test-unit-fd: only the 5 Tickoni libs.
+  # Halve parallelism vs unit-test because llvm-cov inflates per-job RSS.
   jobs=$(( $(nproc) / 2 ))
   (( jobs < 1 )) && jobs=1
-  {{make}} -j"${jobs}" MACHINE=tickoni_fd BUILDDIR=fd-cov CC=clang-18 EXTRAS="llvm-cov" unit-test
-  export TEST_OPTS=""
-  (( pages < 6 )) && export TEST_OPTS="--page-sz normal" || true
+  {{make}} -j"${jobs}" MACHINE=tickoni_fd BUILDDIR=fd-cov \
+    "LOCAL_MKS=$(find src/tango src/util src/ballet src/disco src/waltz -name Local.mk | grep -vE 'disco/quic/|ballet/zksdk/|waltz/quic/' | tr '\n' ' ')" \
+    CC=clang-18 EXTRAS="llvm-cov" unit-test
+  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-cov \
+    CC=clang-18 EXTRAS="llvm-cov" run-unit-test TEST_OPTS="--page-sz normal"
   python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd
 
 test-cov-tk:

@@ -133,7 +133,7 @@ cmd_lint_shellcheck_fd() {
 }
 
 cmd_lint_check_tk() {
-  run_step "zig build check" zig build
+  run_step "zig build check" zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib
 }
 
 case "${1:-}" in
