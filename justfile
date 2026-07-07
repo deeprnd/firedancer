@@ -146,16 +146,16 @@ dock +recipe:
 _build-fd-tk-libs extras="":
   #!/usr/bin/env bash
   set -euo pipefail
-  cmd=({{make}} -j"$(nproc)" MACHINE=tickoni_fd)
+  cmd=({{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd)
   if [ -n "{{extras}}" ]; then
     cmd+=("EXTRAS={{extras}}")
   fi
   cmd+=(
-    build/native/gcc/lib/libfd_tango.a
-    build/native/gcc/lib/libfd_util.a
-    build/native/gcc/lib/libfd_ballet.a
-    build/native/gcc/lib/libfd_disco.a
-    build/native/gcc/lib/libfd_waltz.a
+    build/fd-tickoni-fd/lib/libfd_tango.a
+    build/fd-tickoni-fd/lib/libfd_util.a
+    build/fd-tickoni-fd/lib/libfd_ballet.a
+    build/fd-tickoni-fd/lib/libfd_disco.a
+    build/fd-tickoni-fd/lib/libfd_waltz.a
   )
   "${cmd[@]}"
 
