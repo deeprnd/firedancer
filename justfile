@@ -188,7 +188,14 @@ test-all:
 test-unit-fd:
   #!/usr/bin/env bash
   set -euo pipefail
-  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd unit-test
+  # Override LOCAL_MKS so everything.mk's ?= assignment is skipped.
+  # Only the 5 Tickoni dirs: tango, util, ballet, disco, waltz —
+  # minus subdirs not compiled into the 5 libs (disco/quic, ballet/zksdk,
+  # ballet/reedsol, waltz/quic, waltz/tls). Reduces from 195 Local.mks
+  # (187 tests, 543 objs) to ~93 Local.mks (4 tests, ~150 objs).
+  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd \
+    "LOCAL_MKS=$(find src/tango src/util src/ballet src/disco src/waltz -name Local.mk | grep -vE 'disco/quic/|ballet/zksdk/|waltz/quic/' | tr '\n' ' ')" \
+    unit-test
   nofile_target="$(awk '/#define CONFIGURE_NR_OPEN_FILES/ { gsub(/[()U]/, "", $3); print $3 }' src/app/shared/commands/configure/configure.h)"
   sudo prlimit --pid $$ --nofile="${nofile_target}:${nofile_target}" --memlock=unlimited
   page_mode="${FD_TEST_UNIT_PAGE_MODE:-auto}"
