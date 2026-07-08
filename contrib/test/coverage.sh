@@ -58,12 +58,20 @@ elif [ "$JOB" = "coverage-tk" ]; then
             "$bin"
     done
 
-    # Merge kcov outputs
+    # Merge kcov outputs — find directories created by each binary run
     MERGED="${COV_RAW}/merged"
-    if [ -d "${COV_RAW}/test-0" ] && [ -d "${COV_RAW}/test-1" ]; then
-        kcov --merge "$MERGED" "${COV_RAW}/test-0" "${COV_RAW}/test-1"
-    elif [ -d "${COV_RAW}/test-0" ]; then
-        ln -sfn "$(realpath "${COV_RAW}/test-0")" "$MERGED"
+    kcov_dirs=()
+    for d in "${COV_RAW}"/*/; do
+        [ -d "$d" ] || continue
+        base="$(basename "$d")"
+        [ "$base" = "merged" ] && continue
+        kcov_dirs+=("$d")
+    done
+    if [ "${#kcov_dirs[@]}" -ge 2 ]; then
+        kcov --merge "$MERGED" "${kcov_dirs[@]}"
+    elif [ "${#kcov_dirs[@]}" -eq 1 ]; then
+        mkdir -p "$MERGED"
+        ln -sfn "$(realpath "${kcov_dirs[0]}")" "$MERGED"
     else
         echo 'ERROR: no kcov output directories found' >&2
         exit 1
