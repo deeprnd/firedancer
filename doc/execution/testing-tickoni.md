@@ -94,8 +94,7 @@ commands from the repository root unless noted otherwise.
 - Tickoni Zig supervisor, topology, tile lifecycle, queue wrapper, sandbox
   wrapper, or Phase 0 payment pipeline change: `just test-unit-tk`
 - Tickoni coverage-sensitive change: `just test-cov-tk`
-- Firedancer-derived C infrastructure, Tango, Disco, Discof, Waltz HTTP,
-  utility, or Tickoni C build integration change: `just test-unit-fd`
+- Firedancer-derived C infrastructure, tango, disco, waltz, util, or ballet change: `just test-unit-fd`
 - Firedancer coverage-sensitive change: `just test-cov-fd`
 - Cross-boundary Tickoni/Firedancer unit-impacting change:
   `just test-unit-all`
@@ -215,6 +214,11 @@ as authoritative.
 
 `just test-unit-fd` runs a wrapper around the Firedancer-derived unit-test
 Make targets.
+
+All Firedancer builds use the `tickoni_fd` machine profile, which scopes the
+build to only the 5 libraries Tickoni reuses (`fd_tango`, `fd_util`,
+`fd_ballet`, `fd_disco`, `fd_waltz`). This excludes Solana validator tiles,
+RPC schemas, and unrelated Firedancer source.
 
 It performs these steps:
 

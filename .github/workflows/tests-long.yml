@@ -46,11 +46,11 @@ jobs:
 
       - name: Run test suite
         run: |
-          make -j"$(nproc)" unit-test
+          make -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd unit-test
           nofile_target="$(awk '/#define CONFIGURE_NR_OPEN_FILES/ { gsub(/[()U]/, "", $3); print $3 }' src/app/shared/commands/configure/configure.h)"
           sudo prlimit --pid $$ --nofile="${nofile_target}:${nofile_target}" --memlock=unlimited
           just mem-drop-caches || true
-          make run-unit-test TEST_OPTS="--page-sz normal -j 1"
+          make run-unit-test MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd TEST_OPTS="--page-sz normal -j 1"
 
   cov-fd:
     name: Engine Tests Coverage
@@ -72,7 +72,7 @@ jobs:
       - name: Install LLVM coverage tools
         shell: bash
         run: |
-          sudo apt-get install -y llvm-18
+          sudo apt-get install -y clang-18 clang++-18 llvm-18
           for tool in profdata objdump ar cov; do
             sudo update-alternatives --install /usr/bin/llvm-$tool llvm-$tool \
               /usr/bin/llvm-${tool}-18 100
@@ -81,12 +81,7 @@ jobs:
       - name: Run coverage
         run: |
           sudo prlimit --pid $$ --memlock=unlimited
-          jobs=$(( $(nproc) / 2 ))
-          (( jobs < 1 )) && jobs=1
-          make -j"${jobs}" BUILDDIR=fd-cov CC=clang-18 MACHINE=linux_clang_x86_64 EXTRAS="llvm-cov" unit-test
-          export TEST_OPTS="--page-sz normal -j 1"
-          just mem-drop-caches || true
-          python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd
+          just test-cov-fd
 
       - name: Upload coverage summary
         if: always()

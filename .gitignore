@@ -93,6 +93,7 @@ zig-out/
 # LLMs
 .claude
 .codex
+.hermes-tmp.*
 
 # Version derive
 src/util/fd_version_generated.h

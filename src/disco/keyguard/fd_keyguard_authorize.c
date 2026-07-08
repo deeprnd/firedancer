@@ -1,7 +1,7 @@
 #include "fd_keyguard.h"
 #include "fd_keyguard_client.h"
 #include "../bundle/fd_bundle_crank_constants.h"
-#include "../../flamenco/runtime/fd_system_ids.h"
+#include "../shim/fd_disco_pubkey.h"
 #include "../../flamenco/gossip/fd_gossip_value.h"
 #include "../../ballet/txn/fd_compact_u16.h"
 #include "../../waltz/tls/fd_tls.h"

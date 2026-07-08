@@ -1,9 +1,9 @@
 name: Build Firedancer C libs for Tickoni
-description: Build libfd_tango, libfd_util, and libfd_ballet — required by the Zig harness build
+description: Build libfd_tango, libfd_util, libfd_ballet, libfd_disco, and libfd_waltz — required by the Zig harness build
 
 runs:
   using: composite
   steps:
-    - name: Build libfd_tango, libfd_util, and libfd_ballet
+    - name: Build libfd_tango, libfd_util, libfd_ballet, libfd_disco, and libfd_waltz
       shell: bash
       run: just build-fd-tk-libs

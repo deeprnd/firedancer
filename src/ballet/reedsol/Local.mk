@@ -1,3 +1,4 @@
+$(call make-lib,fd_reedsol)
 $(call add-hdrs,fd_reedsol.h)
 ifdef FD_HAS_GFNI
 $(call add-asms,fd_reedsol_gfni_32,fd_reedsol)

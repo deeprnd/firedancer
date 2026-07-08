@@ -9,7 +9,7 @@
     </td>
     <td>
       <!-- badge:quality:start -->
-<img alt="Quality" src="https://img.shields.io/badge/quality-failing-red?style=flat-square" />
+<img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" />
 <!-- badge:quality:end -->
     </td>
     <td>
@@ -43,12 +43,12 @@
   <tr>
     <td>
       <!-- badge:cov-fd:start -->
-<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-unknown-lightgrey?style=flat-square" />
+<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-36.2%25-red?style=flat-square" />
 <!-- badge:cov-fd:end -->
     </td>
     <td>
       <!-- badge:cov-tk:start -->
-<img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-94.0%25-brightgreen?style=flat-square" />
+<img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-90.2%25-brightgreen?style=flat-square" />
 <!-- badge:cov-tk:end -->
     </td>
     <td></td>

@@ -64,12 +64,17 @@ Each workflow begins with a `detect-changes` job that compares the PR diff again
 
 Compiles the Firedancer engine and the Tickoni Zig harness. Four parallel build jobs run after `detect-changes`:
 
-| Job                      | Runner             | Compiler        | Command              |
+|| Job                      | Runner             | Compiler        | Command              |
 | ------------------------ | ------------------ | --------------- | -------------------- |
 | Engine Build / GCC       | `ubuntu-24.04`     | GCC 12          | `just build-fd-gcc`  |
 | Engine Build / Clang     | `ubuntu-24.04`     | Clang 18        | `just build-fd-clang`|
 | Engine Build / ARM       | `ubuntu-24.04-arm` | GCC 14          | `just build-fd-arm`  |
 | Harness Build            | `ubuntu-24.04`     | Zig (toolchain) | `just build-tk`      |
+
+The engine builds use the `tickoni_fd` machine profile, which scopes the
+Firedancer build to only the 5 libraries Tickoni reuses (`fd_tango`,
+`fd_util`, `fd_ballet`, `fd_disco`, `fd_waltz`). This replaces the previous
+full-tree build and significantly reduces compile time.
 
 The ARM job uses the `ubuntu-24.04-arm` GitHub-hosted runner to catch architecture-specific issues without a self-hosted machine.
 
