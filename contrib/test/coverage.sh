@@ -6,8 +6,8 @@ JOB="${1:?Usage: coverage.sh <job-name>}"
 
 if [ "$JOB" = "coverage-fd" ]; then
     COVDIR=build/fd-cov
-    RAWDIR="${COVDIR}/raw"
-    OBJDIR=build/fd-cov/obj
+    RAWDIR="${COVDIR}/cov/raw"
+    OBJDIR=build/fd-cov
 
     # Build cov.profdata from .profraw files (llvm-cov step 1.3).
     if [ ! -f "${COVDIR}/cov.profdata" ]; then
