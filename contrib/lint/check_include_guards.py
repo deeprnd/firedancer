@@ -13,12 +13,32 @@ def check_file(path):
         first_line = f.readline()
         if first_line.startswith("/* DO NOT INCLUDE DIRECTLY"):
             return
-        # Skip whitespace and comment lines
+        # Skip leading blank lines and comments (/* ... */ blocks and // lines)
         line0 = first_line
         while True:
-            if not line0.startswith("/* ") and not line0.startswith("// ") and line0.strip():
-                break
-            line0 = f.readline()
+            stripped = line0.strip()
+            if not stripped:
+                line0 = f.readline()
+                continue
+            # Skip // single-line comments
+            if line0.lstrip().startswith("//"):
+                line0 = f.readline()
+                continue
+            # Handle /* comment block
+            if "/*" in line0:
+                if "*/" in line0[line0.index("/*") + 2:]:
+                    # Single-line /* ... */ comment
+                    line0 = f.readline()
+                    continue
+                # Multi-line comment: consume until */
+                while True:
+                    line0 = f.readline()
+                    if "*/" in line0:
+                        break
+                line0 = f.readline()
+                continue
+            # First non-comment, non-blank line
+            break
         line1 = f.readline()
         if not line0.startswith("#ifndef ") and not line1.startswith("#define "):
             print(f"{path}: include guard missing")

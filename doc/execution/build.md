@@ -192,10 +192,14 @@ Use the Zig build when you are working on:
 
 Use the Firedancer-side build when you are working on:
 
-- `src/app/firedancer/`
 - `src/disco/`
-- `src/discof/`
-- the runtime C substrate
+- `src/waltz/`
+- `src/tango/`
+- `src/util/`
+- `src/ballet/`
+
+Those trees are compiled via the `tickoni_fd` machine profile, which scopes
+the Firedancer build to only the 5 libraries Tickoni reuses.
 
 That workflow is documented in [Build Engine](../build-system.md).
 
