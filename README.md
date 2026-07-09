@@ -43,7 +43,7 @@
   <tr>
     <td>
       <!-- badge:cov-fd:start -->
-<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-36.2%25-red?style=flat-square" />
+<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-34.4%25-red?style=flat-square" />
 <!-- badge:cov-fd:end -->
     </td>
     <td>

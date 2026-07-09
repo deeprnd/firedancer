@@ -435,7 +435,54 @@ payout.approve
 account.freeze
 risk_rule.override
 policy.modify
+valuation.analysis.propose        deferred until V3.22
 ```
+
+Valuation capabilities (V3.22 — Damodaran DCF):
+
+```text
+valuation_market_data.read
+valuation_financials.read
+valuation_erps.read
+valuation_analysis.analyze
+valuation_analysis.propose
+valuation_transcript.extract
+valuation_peer.compare
+valuation_reverse_dcf.analyze
+valuation_sensitivity.analyze
+valuation_conclusion.render
+valuation_audit.check
+```
+
+Valuation scope dimensions:
+
+- ticker / ISIN / CUSIP
+- valuation currency
+- reporting currency and FX date
+- fiscal period (TTM, FY, quarter)
+- risk-free rate currency and source
+- ERP version and date
+- beta method (bottom-up / regression)
+- revenue-weighted CRP country mix
+- growth structure: stage 1 rate, stage 2 decay, stage 3 stable rate
+- stable ROIC assumption
+- terminal method: Gordon Growth vs exit multiple
+- Monte Carlo iteration count and seed
+- scenario set: bull, base, bear, stress
+- WACC, cost of equity, cost of debt
+- fully diluted share count and treasury method
+- per-share intrinsic value
+- implied growth from reverse DCF
+- peer company set and comparison multiples
+- methodology self-audit checklist result
+
+Valuation policy outcomes:
+
+- `allow` — the analysis may proceed within capability scope
+- `deny` — the request is outside scope or fails self-audit
+- `require_approval` — the analysis is valid but needs reviewer sign-off before proposal
+- `require_more_evidence` — insufficient financial data or invalid ERP
+- `escalate` — self-audit flag or cross-check discrepancy >30%
 
 Exit criteria:
 
@@ -637,6 +684,14 @@ payout.approve
 account.freeze
 risk_rule.override
 policy.modify
+valuation_analysis.analyze       deferred until V3.22
+valuation_analysis.propose       deferred until V3.22
+valuation_conclusion.render      deferred until V3.22
+valuation_peer.compare           deferred until V3.22
+valuation_reverse_dcf.analyze    deferred until V3.22
+valuation_sensitivity.analyze    deferred until V3.22
+valuation_transcript.extract     deferred until V3.22
+valuation_audit.check            deferred until V3.22
 ```
 
 ## V1 Capability Depth By Increment
