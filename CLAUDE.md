@@ -163,7 +163,7 @@ this order:
 4. Firedancer infrastructure reused by Tickoni, especially `src/tango/**`,
    `src/disco/**`, `src/discof/**`, `src/waltz/http/**`, and selected
    `src/util/**`
-5. product-management and architecture sources under `doc/position/**` and
+5. product-management and architecture sources under `doc/strategy/**` and
    `doc/knowledge/architecture.md`
 6. Tickoni contribution, development, testing, security, observability, and
    workflow docs under `doc/execution`
