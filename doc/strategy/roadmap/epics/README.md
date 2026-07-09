@@ -14,9 +14,9 @@ different labels and sub-issue relationships.
 
 Use these templates:
 
-- [`epic_template.md`](../../templates/epic_template.md)
-- [`story_template.md`](../../templates/story_template.md)
-- [`status_template.md`](../../templates/status_template.md)
+- [`epic-template.md`](../../templates/epic-template.md)
+- [`story-template.md`](../../templates/story-template.md)
+- [`status-template.md`](../../templates/status-template.md)
 
 Use these project docs to fill and implement issues:
 
@@ -84,7 +84,7 @@ self-contained, testable story.
 ## Status Legend
 
 For full epic, story, and task issue statuses, use
-[`status_template.md`](../../templates/status_template.md).
+[`status-template.md`](../../templates/status-template.md).
 
 All issue types use the same status enum:
 

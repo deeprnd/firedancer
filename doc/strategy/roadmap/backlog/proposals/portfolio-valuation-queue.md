@@ -15,7 +15,7 @@ epic or story using the relevant template.
 **Proposed milestone:** M4
 **Candidate issue type if accepted:** epic
 **Candidate labels:** [`investing` | `platform` | `enhancement` | `documentation`]
-**Related docs / examples:** [doc/strategy/roadmap/stories/v3.22.md] (Damodaran valuation engine), [doc/strategy/capabilities.md] (valuation capabilities, trading_portfolio.read), [doc/strategy/roadmap/milestones/m4.md] (source M4 description)
+**Related docs / examples:** [doc/strategy/roadmap/epics/v3.22.md] (Damodaran valuation engine), [doc/strategy/capabilities.md] (valuation capabilities, trading_portfolio.read), [doc/strategy/roadmap/milestones/m4.md] (source M4 description)
 
 ## Proposal Summary
 
@@ -256,8 +256,8 @@ If accepted, this should become:
 
 Suggested next artifact:
 
-* [ ] Create epic using `epic_template.md`
-* [ ] Create stories using `story_template.md` for: (1) portfolio CRUD, (2) exposure + rebalance, (3) watchlist + valuation queue, (4) model selection + subscriptions
+* [ ] Create epic using `epic-template.md`
+* [ ] Create stories using `story-template.md` for: (1) portfolio CRUD, (2) exposure + rebalance, (3) watchlist + valuation queue, (4) model selection + subscriptions
 * [ ] Update `capabilities.md` with `portfolio.rebalance.propose`, `portfolio.read`, `watchlist.read`, `valuation_queue.manage`
 * [ ] Create capability/policy decision for concentration limits and rebalance approval thresholds
 * [ ] Update `doc/strategy/roadmap/milestones/m4.md` with the graduated epic/stories

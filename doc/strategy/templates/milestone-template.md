@@ -38,7 +38,7 @@ Required for every milestone:
   - Completion signal (observable evidence the milestone is done)
 
 Read before filling:
-  - doc/strategy/templates/status_template.md for status definitions.
+  - doc/strategy/templates/status-template.md for status definitions.
   - doc/strategy/README.md for product identity, supported workflows, and
     non-goals.
   - doc/knowledge/architecture.md for the runtime model, source-of-truth

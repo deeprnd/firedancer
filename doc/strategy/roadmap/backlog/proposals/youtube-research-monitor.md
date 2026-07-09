@@ -226,8 +226,8 @@ If accepted, this should become:
 
 Suggested next artifact:
 
-* [ ] Create epic using `doc/strategy/templates/epic_template.md`
-* [ ] Create stories under the epic using `doc/strategy/templates/story_template.md`
+* [ ] Create epic using `doc/strategy/templates/epic-template.md`
+* [ ] Create stories under the epic using `doc/strategy/templates/story-template.md`
 * [ ] Create capability definition in `doc/strategy/capabilities.md`
 * [ ] Update tile topology with new YouTube adapter tile if needed
 

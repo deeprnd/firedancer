@@ -5,7 +5,7 @@ final "Evidence and quality gate" task uses to prove the story is demoable,
 tested at every applicable layer, documented, and safe to mark `Done`.
 
 It is the single source of truth for what
-[`story_template.md`](../strategy/templates/story_template.md) calls "Evidence
+[`story-template.md`](../strategy/templates/story-template.md) calls "Evidence
 and quality gate tasks". Those templates say a gate task is
 required; this document says what the gate task must actually check. Do not
 duplicate this checklist into a story or task issue body — link here and mark
@@ -22,7 +22,7 @@ because [`security.md`](security.md) treats replay divergence and unaudited
 state as serious events — a story is not done if its evidence cannot later
 reconstruct what shipped.
 
-[`status_template.md`](../strategy/templates/status_template.md) already
+[`status-template.md`](../strategy/templates/status-template.md) already
 encodes the lifecycle boundary: a story or task only reaches `Done` once
 "verification is complete or explicitly waived" and "evidence is linked." This
 document is what fills in "verification" and "evidence" for that status
@@ -37,7 +37,7 @@ run last, after all domain implementation tasks in the story pass locally.
 
 Use conditional gates: only require topology, policy, tool-broker, adapter,
 audit, or replay evidence when the story actually touches that boundary,
-matching the "Conditional Acceptance" sections in `story_template.md`. Mark a
+matching the "Conditional Acceptance" sections in `story-template.md`. Mark a
 line `N/A - reason` rather than deleting it, so a reviewer sees the boundary
 was considered and intentionally not exercised, not skipped.
 
@@ -50,7 +50,7 @@ behavior end to end without reading source.
       the story's product-visible behavior (`just demo-tk`, a story-specific
       `just` target, or a documented fixture invocation).
 - [ ] The demo output answers the applicable subset of the
-      [Increment Gate Checklist](../strategy/roadmap/stories/README.md#increment-gate-checklist):
+      [Increment Gate Checklist](../strategy/roadmap/epics/README.md#increment-gate-checklist):
       what the user can now do, the demo moment, which
       account/venue/instrument/amount/frequency checks are enforced, what
       happens on an out-of-scope or over-limit request, and whether execution
@@ -161,13 +161,13 @@ and a docs-only story will not have audit samples.
       Tickoni/Firedancer boundary.
 - [ ] Roadmap status for the story (and its parent epic, if this closes it)
       is updated only after every applicable line in this checklist passes —
-      per `story_template.md`, do not move status to `Done` first and true it
+      per `story-template.md`, do not move status to `Done` first and true it
       up after.
 
 ## Conditional Gates
 
 Include only the sections that apply; mark the rest `N/A - reason`. These
-mirror the Conditional Acceptance sections in `story_template.md` so the
+mirror the Conditional Acceptance sections in `story-template.md` so the
 closing gate checks exactly what the story's acceptance criteria promised.
 
 **Financial capability and policy** — `tkpoly` outcomes, capability envelope
@@ -221,6 +221,6 @@ mark `N/A - reason`) each line before moving status to `Done`:
 - [Observability](observability.md)
 - [Telemetry](telemetry.md)
 - [CI](ci.md)
-- [Story Template](../strategy/templates/story_template.md)
-- [Status Template](../strategy/templates/status_template.md)
-- [Roadmap Stories README](../strategy/roadmap/stories/README.md)
+- [Story Template](../strategy/templates/story-template.md)
+- [Status Template](../strategy/templates/status-template.md)
+- [Roadmap Stories README](../strategy/roadmap/epics/README.md)

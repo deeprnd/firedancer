@@ -297,7 +297,7 @@ If accepted, this should become:
 
 Suggested next artifact:
 
-* [ ] Create epic using `epic_template.md` with the expanded scope from this proposal
+* [ ] Create epic using `epic-template.md` with the expanded scope from this proposal
 * [ ] Create investigation story for WebSocket transport vs SSE tradeoff
 * [ ] Create story for WebSocket subscription transport in `tkapi` (proof-of-concept)
 * [ ] Create story for subscription CRUD and DuckDB storage

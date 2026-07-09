@@ -4,7 +4,7 @@
 **Proposed milestone:** M2
 **Candidate issue type if accepted:** epic
 **Candidate labels:** `platform`, `operations`, `security`, `trust`
-**Related docs / examples:** [`development.md`](../../../execution/development.md), [`architecture.md`](../../../knowledge/architecture.md), [`firedancer.md`](../../../execution/contribution/firedancer.md), [`V1.14`](../stories/v1.14.md), [Hermes installer](https://hermes-agent.nousresearch.com/install.sh), [Hermes PowerShell installer](https://hermes-agent.nousresearch.com/install.ps1), [OpenClaw README](https://github.com/openclaw/openclaw)
+**Related docs / examples:** [`development.md`](../../../execution/development.md), [`architecture.md`](../../../knowledge/architecture.md), [`firedancer.md`](../../../execution/contribution/firedancer.md), [`V1.14`](../epics/v1.14.md), [Hermes installer](https://hermes-agent.nousresearch.com/install.sh), [Hermes PowerShell installer](https://hermes-agent.nousresearch.com/install.ps1), [OpenClaw README](https://github.com/openclaw/openclaw)
 
 ## Proposal Summary
 
@@ -228,8 +228,8 @@ If accepted, this should become:
 
 Suggested next artifact:
 
-* [x] Create epic using `epic_template.md`
-* [ ] Create story using `story_template.md`
+* [x] Create epic using `epic-template.md`
+* [ ] Create story using `story-template.md`
 * [ ] Create/update product positioning doc
 * [x] Create capability/policy decision
 * [ ] Keep in backlog with notes

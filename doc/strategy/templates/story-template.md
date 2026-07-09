@@ -10,7 +10,7 @@ operator-visible change. In GitHub, connect it as a sub-issue of one `epic`
 issue and connect domain `task` issues as sub-issues of this story.
 
 Copy this file into the GitHub issue body or into the relevant
-doc/strategy/roadmap/stories/VX.Y.md section, replace placeholders, and remove
+doc/strategy/roadmap/epics/VX.Y.md section, replace placeholders, and remove
 HTML comments before closing the issue.
 
 Story labels:
@@ -65,7 +65,7 @@ Conditional guidance:
     expect it.
 
 Read before filling:
-  - doc/strategy/templates/status_template.md for status definitions and the
+  - doc/strategy/templates/status-template.md for status definitions and the
     rule that task sub-issues are created only after the story is Ready.
   - doc/strategy/README.md for product identity, supported workflows, and
     non-goals.

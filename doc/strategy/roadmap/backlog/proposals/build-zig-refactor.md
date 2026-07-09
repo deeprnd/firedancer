@@ -15,7 +15,7 @@ epic or story using the relevant template.
 **Proposed milestone:** M3
 **Candidate issue type if accepted:** epic
 **Candidate labels:** [`documentation`, `enhancement`]
-**Related docs / examples:** `doc/strategy/templates/proposal_template.md`, `src/tickoni/test/mocks/`, `src/tickoni/codec/`
+**Related docs / examples:** `doc/strategy/templates/proposal-template.md`, `src/tickoni/test/mocks/`, `src/tickoni/codec/`
 
 ## Proposal Summary
 
@@ -182,5 +182,5 @@ If accepted, this should become:
 
 Suggested next artifact:
 
-* [ ] Create story using `story_template.md` for POC implementation.
-* [ ] Create story using `story_template.md` for CI verification after POC.
+* [ ] Create story using `story-template.md` for POC implementation.
+* [ ] Create story using `story-template.md` for CI verification after POC.

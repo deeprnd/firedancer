@@ -249,7 +249,7 @@ If accepted, this should become:
 
 Suggested next artifact:
 
-* [ ] Create epic using `epic_template.md` with the expanded scope from this proposal
+* [ ] Create epic using `epic-template.md` with the expanded scope from this proposal
 * [ ] Create investigation story for broker platform API comparison (eToro, IBKR, SnapTrade, Robinhood)
 * [ ] Create story for sandbox adapter stub (returns deterministic holdings fixtures)
 * [ ] Create story for `broker_read` capability scope and policy definition

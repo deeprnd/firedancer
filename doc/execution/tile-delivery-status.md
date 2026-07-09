@@ -16,7 +16,7 @@ Tile-relevant facts:
 4. The current in-process spike maps tiles to threads and heap-backed queues.
 5. The temporary `firedancer -> tickoni` compatibility behavior remains outside
    the product tile topology until the deprecation window in
-   [`roadmap/stories/v1.11.md`](../strategy/roadmap/stories/v1.11.md) is complete.
+   [`roadmap/epics/v1.11.md`](../strategy/roadmap/epics/v1.11.md) is complete.
 
 ## Current Topology
 

@@ -2,7 +2,7 @@
 
 The consumer-finance roadmap is grouped into higher-level milestones.
 These files provide the milestone view only; the increment files under
-[`stories/README.md`](../stories/README.md) remain the source of truth for
+[`epics/README.md`](../epics/README.md) remain the source of truth for
 version order, product narrative, priority tradeoffs, and increment detail.
 
 Use this folder when the question is:

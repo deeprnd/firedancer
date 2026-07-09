@@ -182,8 +182,8 @@ If accepted, this should become:
 
 Suggested next artifact:
 
-* [ ] Create epic using `epic_template.md`
-* [ ] Create stories using `story_template.md`
+* [ ] Create epic using `epic-template.md`
+* [ ] Create stories using `story-template.md`
 * [ ] Create/update product positioning doc
 * [ ] Create capability/policy decision for leaderboard ranking
 * [ ] Keep in backlog with notes
