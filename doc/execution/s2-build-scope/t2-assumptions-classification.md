@@ -102,7 +102,7 @@ Retail build targets **may compile** these files with portable stubs:
 
 ## Key References
 
-- `mac_windows_consumer_runtime_proposal.md` — existing proposal for Mac/Win support
+- `mac-win-runtime-support.md` — existing proposal for Mac/Win support
 - `tickoni_fd.mk` — current build scope filter for Firedancer libs
 - `native_config.sh` — Linux-only feature detection
 - `fd_sandbox.c` — full Linux sandbox implementation

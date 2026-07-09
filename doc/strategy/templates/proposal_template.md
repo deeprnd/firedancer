@@ -12,7 +12,7 @@ epic or story using the relevant template.
 # Backlog Proposal: [Proposal Title]
 
 **Status:** Backlog Proposal
-**Proposed milestone:** [Unassigned | M1 | M2 | M3 | M4 | M5 | M6]
+**Proposed milestone:** [Unassigned]
 **Candidate issue type if accepted:** [epic | story | documentation | decision]
 **Candidate labels:** [`agents` | `audit` | `crypto` | `documentation` | `enhancement` | `investing` | `operations` | `payments` | `platform` | `security` | `social` | `trust`]
 **Related docs / examples:** [links]

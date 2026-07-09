@@ -64,7 +64,7 @@ Read before filling:
 # VX.Y: [Epic Title]
 
 **Status:** [Backlog] upon creation
-**Milestone:** [M1 | M2 | M3 | M4 | M5 | M6]
+**Milestone:** [M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 | M11]
 **Labels:** `epic`, [`agents` | `audit` | `crypto` | `documentation` | `enhancement` | `investing` | `operations` | `payments` | `platform` | `security` | `social` | `trust`]
 
 <!-- One paragraph: what complete feature this epic delivers and why now. -->
@@ -152,23 +152,91 @@ doc/observability.md and doc/telemetry.md for metrics/diagnostics expectations.
 Create one GitHub sub-issue per story and label each `story`.
 Use doc/strategy/templates/story_template.md for each child story issue.
 
-Story split guidance:
-  - Each story must be independently implementable and independently verified.
-  - Split by user-visible outcome or domain boundary, not by team preference.
-  - Avoid stories that require all other stories to be complete before any
-    acceptance criterion can be tested.
-  - Include one story or child tasks that close evidence, demo, docs, and
-    quality gates for the epic.
-  - Point each story to the project docs that are relevant to its implementer:
-    doc/execution/build.md, doc/execution/development.md,
-    doc/execution/testing-tickoni.md, doc/execution/ci.md,
-    doc/execution/security.md, doc/execution/observability.md, and
-    doc/execution/telemetry.md.
+### How Many Stories?
+
+There is no fixed number. Write as many stories as the epic scope requires:
+
+- Small scoped epics: 2-4 stories.
+- Mid-range epics (e.g. a new tile + integration + UI): 4-7 stories.
+- Large epics (e.g. full subsystem): 7-15+ stories.
+
+The number is determined by decomposition quality, not by a template quota.
+If the epic has 200+ lines of scope, it should have 7+ stories — not 2.
+
+### Decomposition Rules
+
+1. **Independent delivery**: each story must produce a user-visible or
+   operator-visible outcome without waiting for every other story.
+2. **One capability per story**: do not split CRUD from validation. If
+   creating an entity requires validation (rejecting negative values, checking
+   required fields, enforcing bounds), that validation belongs in the same
+   story. Validation is part of the CRUD contract, not a separate story.
+3. **Split by capability lifecycle**, not by layer:
+   - S1: Core capability — the primary create/edit/delete or action flow
+     with its validation, capability envelope, and audit trail.
+   - S2: Read / query / visibility — the operator-facing surface (CaseOps,
+     API, terminal) that surfaces the capability's state.
+   - S3: State management — lifecycle transitions (activate, suspend, delete,
+     migrate) that depend on S1 core being stable.
+   - S4: Policy integration — capability-specific policy checks, approval
+     paths, and scope enforcement via `tkpoly`.
+   - S5: Replay and audit — deterministic replay support, replay capsules,
+     hash-chained audit records for the capability's material events.
+   - S6+: Domain-specific additions — model calls, adapter dispatch, storage,
+     observability, or integration points the epic touches.
+4. **Closure story**: the last story (or the last task in the final story, per
+   the story template's T10 child task) handles evidence, demo, documentation,
+   and quality gates. Do not duplicate this as a separate story line when the
+   story template already covers it via child tasks.
+5. **Domain boundaries**: if the epic touches multiple runtime boundaries
+   (tile ownership, model gateway, adapter, UI), those are separate stories,
+   not features within one story.
+
+### Bad Splits (Avoid)
+
+- CRUD + "validation" as two stories. Validation is part of the CRUD contract.
+- "Backend" + "frontend" as two stories. Both should be independently testable
+  outcomes, not layers of the same feature.
+- "Database" + "API" as two stories. Same reason.
+- Anything that requires ALL other stories to complete before one acceptance
+  criterion can be tested. That is not independent delivery.
+
+### Good Split Example (Portfolio Management Epic)
+
+```
+V4.1.S1: Portfolio CRUD — create/edit/delete portfolios and holdings with
+         validation, capability envelopes, and audit trail.
+V4.1.S2: Portfolio CaseOps surface — portfolio state and mutations visible
+         through CaseOps with stable event IDs and hashes.
+V4.1.S3: Portfolio replay — deterministic replay of portfolio mutations
+         against the same event stream with stable hashes and reconstructed state.
+V4.1.S4: Evidence, demo, and release closure — T10 expansion covering
+         fixtures, quality gates, documentation, and roadmap updates.
+```
+
+Note: S4 is the closure, implemented as child tasks (T10) within that story
+per the story template convention, not as a standalone epic-level story.
+
+### Story Line Format
+
+List stories in delivery sequence. Each line must have:
+- Story ID (VX.Y.SN)
+- Self-contained title describing the deliverable
+- Link to the GitHub issue (TBD at epic creation)
+
+<!--
+List stories. Add or remove lines based on epic scope. Each story must follow
+the decomposition rules above. The template shows 4 lines as a mid-range
+example — adjust the count up or down.
 -->
 
-- [ ] VX.Y.S1: [Self-contained story title] - #[github-story-issue]
-- [ ] VX.Y.S2: [Self-contained story title] - #[github-story-issue]
-- [ ] VX.Y.SN: [Evidence, demo, and release closure story if needed] - #[github-story-issue]
+- [ ] VX.Y.S1: [Core capability — create/edit/delete with validation and audit] - #[github-story-issue]
+- [ ] VX.Y.S2: [Read / query / operator visibility surface] - #[github-story-issue]
+- [ ] VX.Y.S3: [State lifecycle — activate, suspend, delete, migrate] - #[github-story-issue]
+- [ ] VX.Y.S4: [Policy integration — capability-specific checks, approvals, scope] - #[github-story-issue]
+- [ ] VX.Y.S5: [Replay and audit — deterministic replay, capsules, hash chains] - #[github-story-issue]
+- [ ] VX.Y.S6: [Domain-specific additions — model, adapter, storage, observability] - #[github-story-issue]
+- [ ] VX.Y.S7+: [Any additional stories required by epic scope] - #[github-story-issue]
 
 ## Epic Acceptance
 
