@@ -1,13 +1,13 @@
 /// Entrypoint for the internal `__tile-run <spec-file>` subcommand that
 /// src/app/tickoni/supervisor.zig's startPaymentPipelineProcess self-execs
-/// into for every V1.14.S1 process-mode tile. Not part of the advertised
+/// into for every v2.14.S1 process-mode tile. Not part of the advertised
 /// CLI surface (see main.zig's usage text) — this is a supervisor-to-child
 /// handoff, matching the Firedancer convention of one binary re-exec'd per
 /// tile rather than a family of small per-tile binaries.
 ///
 /// The generic single-tile boot/heartbeat/halt lifecycle lives in
 /// src/tickoni/runtime/tile_process.zig; this file only looks up this
-/// tile's process-mode callback in tile_registry.zig (V1.14.S8.T1's single
+/// tile's process-mode callback in tile_registry.zig (v2.14.S8.T1's single
 /// source of truth for tile id -> behavior) and runs it.
 const std = @import("std");
 const rt = @import("runtime");

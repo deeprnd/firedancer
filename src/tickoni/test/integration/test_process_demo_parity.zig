@@ -1,4 +1,4 @@
-/// V1.14.S1 M6 / Release Gate demo/replay parity (T14): CPU placement is a
+/// v2.14.S1 M6 / Release Gate demo/replay parity (T14): CPU placement is a
 /// scheduling policy, not a correctness dimension — floating, explicit
 /// shared-core, and explicit exclusive-core runs of the same deterministic
 /// input must all reach identical final pipeline metrics through the real

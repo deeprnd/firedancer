@@ -1,5 +1,5 @@
 /// Tickoni supervisor: owns tile handles for one topology, starts Phase 0
-/// tiles as in-process threads (dev/test mode) or, for V1.14 process mode,
+/// tiles as in-process threads (dev/test mode) or, for v2.14 process mode,
 /// as supervisor-managed OS processes over Tango shared memory, and
 /// provides start/stop/monitor for either mode.
 const std = @import("std");
@@ -17,7 +17,7 @@ const CrashReason = rt.tile.CrashReason;
 const PaymentPipelineConfig = tiles_mod.PaymentPipelineConfig;
 const PaymentPipelineState = tiles_mod.PaymentPipelineState;
 
-/// V1.14.S1 process-mode configuration for startPaymentPipelineProcess.
+/// v2.14.S1 process-mode configuration for startPaymentPipelineProcess.
 pub const ProcessPipelineConfig = struct {
     /// Directory used for per-tile launch-spec files and as FD_SHMEM_PATH
     /// for the shared Tango workspace. Caller-owned and required — no
@@ -28,11 +28,11 @@ pub const ProcessPipelineConfig = struct {
     /// not advanced for longer than this. 0 means derive a conservative
     /// default from heartbeat_interval_ns.
     heartbeat_stale_after_ns: u64 = 0,
-    /// Test-only hook (V1.14.S1.T12 crash isolation): tile i self-exits(1)
+    /// Test-only hook (v2.14.S1.T12 crash isolation): tile i self-exits(1)
     /// after this many heartbeats instead of waiting for a halt signal.
     /// 0 means run normally. Indexed by tile_idx.
     crash_after_heartbeats: [8]u32 = [_]u32{0} ** 8,
-    /// Test-only hook (V1.14.S8.T6 stale-heartbeat proof): the selected
+    /// Test-only hook (v2.14.S8.T6 stale-heartbeat proof): the selected
     /// tile blocks forever after stuck_after_messages loop iterations.
     stuck_tile_idx: ?u32 = null,
     stuck_after_messages: u64 = 0,
@@ -53,10 +53,10 @@ pub const ProcessPipelineConfig = struct {
     tile_exe_path: ?[]const u8 = null,
 };
 
-/// Supervisor-owned state for a running V1.14 process-mode pipeline.
+/// Supervisor-owned state for a running v2.14 process-mode pipeline.
 const ProcessState = struct {
     wksp: *c_abi.wksp.Wksp,
-    /// V1.14.S8.T12: the fd_topob-built topology backing this run's
+    /// v2.14.S8.T12: the fd_topob-built topology backing this run's
     /// object layout (mcache/dcache/fseq/metrics/tile/cnc offsets).
     built_topo: rt.topo_build.BuiltTopo,
     workspace_name: []u8,
@@ -66,7 +66,7 @@ const ProcessState = struct {
     cncs: [8]?*c_abi.cnc.Cnc,
     children: [8]?std.process.Child,
     heartbeat_stale_after_ns: u64,
-    /// V1.14.S1.T14 visibility: whether this run's layout is shared-core
+    /// v2.14.S1.T14 visibility: whether this run's layout is shared-core
     /// and how many tiles are exclusive/shared/floating.
     placement_report: rt.cpu_placement.PlacementReport,
 
@@ -105,7 +105,7 @@ pub const Supervisor = struct {
     handles: []TileHandle,
     /// Heap-allocated so thread pointers remain stable across supervisor moves.
     pipeline: ?*PaymentPipelineState,
-    /// Non-null while a V1.14 process-mode pipeline is running.
+    /// Non-null while a v2.14 process-mode pipeline is running.
     process_state: ?*ProcessState = null,
 
     /// Runs topo.validate()'s structural checks (duplicate tile ids, channel
@@ -159,7 +159,7 @@ pub const Supervisor = struct {
         // Dev/test lifecycle only.  The supervisor owns these thread starts;
         // tile modules must not spawn background execution owners themselves.
         // Looked up by tile id (not position) through the tile registry
-        // (V1.14.S8.T1) — the single source of truth for tile id -> behavior.
+        // (v2.14.S8.T1) — the single source of truth for tile id -> behavior.
         // std.Thread.spawn's function argument must be comptime-known, so
         // the runtime-resolved entry.run_fn is passed through a single
         // comptime-known trampoline rather than directly.
@@ -171,7 +171,7 @@ pub const Supervisor = struct {
     }
 
     /// Start every tile in the topology as a separate OS process connected
-    /// by Firedancer Tango shared memory (V1.14.S1). Requires
+    /// by Firedancer Tango shared memory (v2.14.S1). Requires
     /// topo.channels to be a tango_shm topology sharing exactly one
     /// workspace (paymentPipelineProcess() builds this shape).
     pub fn startPaymentPipelineProcess(self: *Supervisor, io: std.Io, config: ProcessPipelineConfig) !void {
@@ -184,7 +184,7 @@ pub const Supervisor = struct {
         // process's own affinity mask) has driven this host unresponsive
         // before. Also runs topo.validate()'s structural checks (duplicate
         // exclusive ids, channel/depth/MTU shape) and reports the
-        // resulting layout for diagnostics visibility (V1.14.S1.T14).
+        // resulting layout for diagnostics visibility (v2.14.S1.T14).
         var available_cpus: util.cpu.CpuSet = undefined;
         try util.cpu.getAffinity(0, &available_cpus);
         const placement_report = try rt.cpu_placement.validate(self.topo, &available_cpus);
@@ -209,20 +209,20 @@ pub const Supervisor = struct {
         var normal_dir_handle = try std.Io.Dir.cwd().createDirPathOpen(io, normal_dir, .{});
         normal_dir_handle.close(io);
 
-        // V1.14.S8.T12: build the real Firedancer topology (object graph
+        // v2.14.S8.T12: build the real Firedancer topology (object graph
         // and deterministic offsets) via fd_topob. Every self-exec'd
         // child rebuilds this same topology with identical inputs to get
         // byte-identical offsets — see topo_build.zig's module doc
         // ("topology handoff" finding). fd_topo_create_workspace/
         // fd_topo_join_workspace are deliberately not used here — they
-        // hard-require huge/gigantic pages, which V1.14.S1 rejected for
+        // hard-require huge/gigantic pages, which v2.14.S1 rejected for
         // Tickoni; see topob.zig's topoWkspSetPtr doc comment ("finding
         // 3") for the reused-layout-math/own-memory hybrid this drives.
         var built_topo = try rt.topo_build.build(self.allocator, self.topo, workspace_name_slice);
         var built_topo_owned_by_state = false;
         errdefer if (!built_topo_owned_by_state) built_topo.deinit(self.allocator);
 
-        // V1.14.S8.T4: the actual shmem region name must match exactly
+        // v2.14.S8.T4: the actual shmem region name must match exactly
         // what fd_topo_join_workspace (called inside fd_topo_run_tile,
         // automatically, before any Tickoni callback runs) constructs and
         // looks up — Firedancer's own "%s_%s.wksp" app_name/wksp-name
@@ -318,7 +318,7 @@ pub const Supervisor = struct {
 
         // Payment-pipeline test config is identical for every tile in the
         // run, so it's written once here rather than duplicated into each
-        // tile's own LaunchSpec (V1.14.S8.T2: keeps that generic bootstrap
+        // tile's own LaunchSpec (v2.14.S8.T2: keeps that generic bootstrap
         // record free of payment-pipeline-specific fields). Tile processes
         // read it back via tile_registry.zig's loadProcessConfig, which
         // derives this same path from their LaunchSpec's shmemPath().
@@ -337,7 +337,7 @@ pub const Supervisor = struct {
             } else null,
         }, io, std.Io.Dir.cwd(), payment_config_path);
 
-        // V1.14.S8.T4: every self-exec'd child rebuilds this same topology
+        // v2.14.S8.T4: every self-exec'd child rebuilds this same topology
         // (topo_build.build) to get a real fd_topo_t to hand to
         // fd_topo_run_tile — it needs the exact Topology value this run
         // used (e.g. a test's custom CPU placement), not a hardcoded
@@ -479,7 +479,7 @@ pub const Supervisor = struct {
         audited: u64 = 0,
     };
 
-    /// V1.14.S1.T14 visibility: the CPU placement layout validated at
+    /// v2.14.S1.T14 visibility: the CPU placement layout validated at
     /// start time (exclusive/shared/floating counts and whether the
     /// layout is shared-core). Null when no process-mode pipeline has
     /// been started.

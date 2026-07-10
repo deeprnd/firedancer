@@ -174,10 +174,10 @@ pub fn topoWkspPtr(topo: *Topo, wksp_idx: usize) ?*wksp_mod.Wksp {
     return tk_topo_wksp_ptr(topo, wksp_idx);
 }
 
-/// V1.14.S8.T12 finding 3: fd_topo_create_workspace/fd_topo_join_workspace
+/// v2.14.S8.T12 finding 3: fd_topo_create_workspace/fd_topo_join_workspace
 /// hard-require huge/gigantic pages (fd_topob_finish computes page_sz from
 /// topo->max_page_size and asserts HUGE or GIGANTIC) — the hugetlbfs/root
-/// requirement Tickoni's V1.14.S1 deliberately avoided. fd_topob_finish's
+/// requirement Tickoni's v2.14.S1 deliberately avoided. fd_topob_finish's
 /// offset/footprint layout math is otherwise page-size-independent, so
 /// Tickoni reuses that and backs the memory with its own normal-page
 /// wksp (wkspNewNamed/wkspAttach, sized off topoWkspFootprint below)

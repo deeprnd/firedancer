@@ -1,6 +1,6 @@
-/// V1.14.S8.T5: this struct is defined and tested, but not yet wired into
+/// v2.14.S8.T5: this struct is defined and tested, but not yet wired into
 /// the process-mode harness call path (c_abi/shim/tile_run.c's
-/// tk_topo_run_tile_simple keeps sandbox=0 throughout V1.14). Real entry
+/// tk_topo_run_tile_simple keeps sandbox=0 throughout v2.14). Real entry
 /// via c_abi.sandbox.enter needs unshare(CLONE_NEWUSER) to drop to this
 /// struct's default nobody uid/gid, which is not guaranteed to be
 /// available — confirmed by a concrete EPERM failure under this
@@ -10,11 +10,11 @@
 /// full-runtime process mode depend on something consumer-tier hosts
 /// (V1.21) and hardened hosts may not have — process isolation here comes
 /// from supervisor-managed OS processes and crash-only teardown, not
-/// namespace confinement, so V1.14 does not need this to hold. Wiring
+/// namespace confinement, so v2.14 does not need this to hold. Wiring
 /// real sandbox entry (including a documented fail-closed-with-diagnostic
 /// path when namespaces are unavailable, never escalating privileges) is
 /// scoped to a future V1.21 support-tier story. See
-/// doc/strategy/roadmap/stories/v1.14.md's V1.14.S8.T5 entry.
+/// doc/strategy/roadmap/stories/v2.14.md's v2.14.S8.T5 entry.
 const std = @import("std");
 const util = @import("util");
 const sandbox_defaults = util.sandbox_defaults;

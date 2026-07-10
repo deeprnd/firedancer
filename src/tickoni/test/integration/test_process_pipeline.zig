@@ -1,4 +1,4 @@
-/// V1.14.S1 M4 acceptance proof: process-mode payment pipeline (real
+/// v2.14.S1 M4 acceptance proof: process-mode payment pipeline (real
 /// supervisor-managed OS processes connected by Firedancer Tango shared
 /// memory) produces the same decision counts as the thread-mode spike in
 /// src/tickoni/tiles/payment_pipeline/runtime.zig for the same synthetic

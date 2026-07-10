@@ -7,10 +7,10 @@
 /// Tickoni, even by name — Topo/TopoTile below are opaque; nothing outside
 /// this file may construct or introspect them.
 ///
-/// V1.14.S8.T3 delivers only this adapter. Nothing calls it yet: building
+/// v2.14.S8.T3 delivers only this adapter. Nothing calls it yet: building
 /// a real fd_topo_t/fd_topo_tile_t (a thin Tickoni struct embedding their
 /// Solana-free fields) and migrating tile_process.zig's lifecycle to call
-/// topoRunTile is V1.14.S8.T4.
+/// topoRunTile is v2.14.S8.T4.
 ///
 /// Link requirements: -lfd_disco -lfd_ballet -lfd_waltz (plus -lfd_tango
 /// -lfd_util, already required by other c_abi wrappers) and
@@ -43,13 +43,13 @@ extern fn tk_topo_run_tile(
     tile_run: *anyopaque,
 ) void;
 
-/// V1.14.S8.T4: simplified entry point wired to Tickoni's own
+/// v2.14.S8.T4: simplified entry point wired to Tickoni's own
 /// fd_topo_run_tile_t (built entirely inside shim/topo_run.c from three
 /// Zig `export fn` callbacks — see tile_process.zig's
 /// tk_tile_privileged_init/tk_tile_unprivileged_init/tk_tile_run).
 /// sandbox=0, current process's own uid/gid, regular core dumps — see
 /// shim/topo_run.c's TK_TILE_RUN doc comment for what's still a
-/// placeholder pending V1.14.S8.T5.
+/// placeholder pending v2.14.S8.T5.
 extern fn tk_topo_run_tile_simple(topo: *Topo, tile: *TopoTile) void;
 
 // ---------------------------------------------------------------------------

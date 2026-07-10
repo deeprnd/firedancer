@@ -1,4 +1,4 @@
-/// Versioned handoff record from the V1.14 process-mode supervisor to a
+/// Versioned handoff record from the v2.14 process-mode supervisor to a
 /// self-exec'd tile child process. Written once by the supervisor before
 /// spawning the child and read exactly once by src/app/tickoni/tile_main.zig.
 ///
@@ -8,7 +8,7 @@
 /// The magic/version/length checks below exist to fail closed on a stray,
 /// truncated, or foreign file rather than to support format evolution.
 ///
-/// V1.14.S8.T2: link fields are bounded per-tile arrays (in_links/out_links),
+/// v2.14.S8.T2: link fields are bounded per-tile arrays (in_links/out_links),
 /// not a single input/output pair — a topology where a tile has more than
 /// one inbound or outbound channel is representable here without losing any
 /// of them. `tile-orchestration.md` documents the eventual target shape as
@@ -58,7 +58,7 @@ pub const LaunchSpec = struct {
     shmem_path_buf: [shmem_path_cap]u8 = [_]u8{0} ** shmem_path_cap,
     shmem_path_len: u16,
     heartbeat_interval_ns: u64,
-    /// Test-only hook (V1.14.S1.T12 crash isolation): if > 0, the tile
+    /// Test-only hook (v2.14.S1.T12 crash isolation): if > 0, the tile
     /// self-exits(1) after this many heartbeats instead of waiting for
     /// SIGTERM. 0 means run normally until signaled.
     crash_after_heartbeats: u32,

@@ -1,6 +1,6 @@
 /// Narrow Zig bindings over src/tango/tempo/fd_tempo.h.
 ///
-/// Tickoni uses only the housekeeping-scheduler helpers needed by V1.14.S8.T13.
+/// Tickoni uses only the housekeeping-scheduler helpers needed by v2.14.S8.T13.
 /// The shim hides Firedancer's fd_rng_t requirement for async_reload behind a
 /// thread-local RNG, so Zig callers stay on the Tickoni-owned `tk_*` surface.
 const std = @import("std");

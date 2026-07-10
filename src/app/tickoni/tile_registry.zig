@@ -1,4 +1,4 @@
-/// V1.14.S8.T1: single source of truth for tile id -> behavior. Before this
+/// v2.14.S8.T1: single source of truth for tile id -> behavior. Before this
 /// file, tile identity was independently mapped in four places: supervisor's
 /// thread-mode spawn (position-indexed), supervisor's snapshotProcessMetrics
 /// (string-matched), tile_main's process dispatch (string-matched if/else),
@@ -47,8 +47,8 @@ pub const TileEntry = struct {
     /// doc comment for that scope boundary.
     process_fn: ?ProcessFn = null,
     counters: []const CounterSchemaEntry = &.{},
-    /// Expected link cardinality (V1.14.S8 registry responsibility).
-    /// V1.14.S8.T2 wires these into real validation: validate(topo) below
+    /// Expected link cardinality (v2.14.S8 registry responsibility).
+    /// v2.14.S8.T2 wires these into real validation: validate(topo) below
     /// fails closed if a topology's actual per-tile channel count for this
     /// id doesn't match.
     in_cnt: u8 = 0,
@@ -63,7 +63,7 @@ fn id(comptime s: []const u8) rt.tile.TileId {
 /// the whole run (see supervisor.zig's startPaymentPipelineProcess), from
 /// the path convention "<shmem_path>/payment_pipeline.config" — sibling to
 /// this tile's own LaunchSpec file, derived from spec.shmemPath() rather
-/// than carried as a LaunchSpec field (V1.14.S8.T2 keeps that record
+/// than carried as a LaunchSpec field (v2.14.S8.T2 keeps that record
 /// payment-pipeline-agnostic).
 fn loadProcessConfig(io: std.Io, spec: *const rt.launch_spec.LaunchSpec) !tiles.process.ProcessRuntimeConfig {
     var path_buf: [rt.launch_spec.shmem_path_cap + 32]u8 = undefined;
@@ -209,7 +209,7 @@ pub fn findById(tile_id: rt.tile.TileId) ?*const TileEntry {
 
 /// Kept for completeness/self-checks; the actual spawn/dispatch call sites
 /// use findById so behavior stays correct if a topology ever reorders
-/// tiles (see V1.14.S8.T1's acceptance criterion: lookups must be by id,
+/// tiles (see v2.14.S8.T1's acceptance criterion: lookups must be by id,
 /// not by position).
 pub fn findByIdx(idx: usize) *const TileEntry {
     return &entries[idx];
@@ -385,7 +385,7 @@ test "validate rejects unexpected fan-in against a registry entry expecting a si
     try std.testing.expectError(error.LinkCardinalityMismatch, validate(topo));
 }
 
-/// V1.14.S8.T10.4: counts inbound channels for a given tile index in a
+/// v2.14.S8.T10.4: counts inbound channels for a given tile index in a
 /// channel array. Used by validate() to compute per-tile in_cnt.
 fn countInbound(channels: []const rt.link.Channel, tile_idx: usize) u8 {
     var n: u8 = 0;
@@ -395,7 +395,7 @@ fn countInbound(channels: []const rt.link.Channel, tile_idx: usize) u8 {
     return n;
 }
 
-/// V1.14.S8.T10.4: counts outbound channels for a given tile index in a
+/// v2.14.S8.T10.4: counts outbound channels for a given tile index in a
 /// channel array. Used by validate() to compute per-tile out_cnt.
 fn countOutbound(channels: []const rt.link.Channel, tile_idx: usize) u8 {
     var n: u8 = 0;
@@ -405,7 +405,7 @@ fn countOutbound(channels: []const rt.link.Channel, tile_idx: usize) u8 {
     return n;
 }
 
-// V1.14.S8.T10.4: positive fan-in fixture — a 4-tile topology where
+// v2.14.S8.T10.4: positive fan-in fixture — a 4-tile topology where
 // both tkrnorm(1) and tkdedu(2) feed tkaudt(3). Proves both inbound
 // links are present in the channel array (the topology supports fan-in;
 // the registry entry for tkaudt gates acceptance via in_cnt).
@@ -439,7 +439,7 @@ test "T10.4 positive fan-in: channel array has 2 inbound links to tkaudt" {
 }
 
 // ---------------------------------------------------------------------------
-// V1.14.S8.T10 subtasks: malformed harness-callback, provider-config, and
+// v2.14.S8.T10 subtasks: malformed harness-callback, provider-config, and
 // adapter-manifest validation tests.
 // ---------------------------------------------------------------------------
 

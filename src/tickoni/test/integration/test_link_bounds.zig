@@ -1,4 +1,4 @@
-/// V1.14.S1 M6 fail-closed matrix (T14): runtime link dcache bounds check and
+/// v2.14.S1 M6 fail-closed matrix (T14): runtime link dcache bounds check and
 /// backpressure visibility, exercised directly against a real Tango
 /// workspace (single process — no tile spawn needed, since these are
 /// producer/consumer-local behaviors, not process-isolation behaviors).

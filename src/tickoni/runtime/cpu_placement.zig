@@ -1,4 +1,4 @@
-/// V1.14.S1 CPU placement policy: exclusive/shared/floating, validated
+/// v2.14.S1 CPU placement policy: exclusive/shared/floating, validated
 /// against this host's live CPU set. Tickoni-owned policy layered on top
 /// of Firedancer substrate, not a Firedancer validator auto-layout concept
 /// (see doc/knowledge/tile-topology.md's "Process And Core Placement
@@ -12,7 +12,7 @@
 /// declare `shared`. This module adds the check that needs live host
 /// information — whether a declared CPU id actually exists in this
 /// process's affinity mask — and reports the resulting layout shape for
-/// supervisor/diagnostics visibility (V1.14.S1.T14: shared-core placement
+/// supervisor/diagnostics visibility (v2.14.S1.T14: shared-core placement
 /// must stay explicit, not an implicit auto-layout).
 const std = @import("std");
 

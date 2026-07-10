@@ -1,8 +1,8 @@
-# V1.14 Sample Supervisor Configuration
+# V2.14 Sample Supervisor Configuration
 #
 # Documents the supported topology, link, workspace, CPU placement, and
 # sandbox settings for both exclusive-core and reusable shared-core layouts.
-# This file is the documentation target for V1.14.S8.T10.2: every field
+# This file is the documentation target for V2.14.S8.T10.2: every field
 # below corresponds to a real LaunchSpec, topology channel, cpu_placement,
 # or ProcessPipelineConfig field described in the Tile Registry and
 # LaunchSpec docs.
@@ -36,7 +36,7 @@
 #   tkings(0) ──► tkrnorm(1) ──► tkdedu(2) ──► tkpoly(3) ──► tkaudt(4)
 #   tkrepl(5)  tkmetr(6)  tkdiag(7) have no pipeline links.
 #
-# Per-tile in_link_id[] and out_link_id[] arrays (V1.14.S8.T2):
+# Per-tile in_link_id[] and out_link_id[] arrays (V2.14.S8.T2):
 #
 #   tile 0 (tkings): in=[],    out=[channel_0_1]
 #   tile 1 (tknorm): in=[channel_0_1],  out=[channel_1_2]
@@ -56,7 +56,7 @@
 
 [channels]
 
-# Shared-memory workspace identifiers per inter-tile link (V1.14.S1.T6).
+# Shared-memory workspace identifiers per inter-tile link (V2.14.S1.T6).
 # Each channel owns one Tango shared-memory queue backed by mcache (producer)
 # and dcache (consumer), controlled by fseq (consumer progress).
 
@@ -116,7 +116,7 @@ shutdown = "graceful"
 
 # Exclusive-core layout: one tile per CPU, no sharing.
 # Each tile is pinned to a distinct CPU id. Fail-closed if the CPU id is
-# unavailable on the running host (V1.14.S1.T11).
+# unavailable on the running host (V2.14.S1.T11).
 #
 #   tkings   → cpu 0  (exclusive)
 #   tkrnorm  → cpu 1  (exclusive)
@@ -132,7 +132,7 @@ shutdown = "graceful"
 # Shared-core (reusable) layout: multiple tile processes share one CPU,
 # but remain separate OS processes (not threads in one address space).
 # Only `shared` placement mode allows this; duplicate CPU ids with
-# `exclusive` placement fail closed (V1.14.S1.T11).
+# `exclusive` placement fail closed (V2.14.S1.T11).
 #
 #   tkings   → cpu 0  (exclusive)
 #   tkrnorm  → cpu 0  (shared — same CPU as tkings)
@@ -148,7 +148,7 @@ shutdown = "graceful"
 
 [sandbox]
 
-# Sandbox settings per tile (V1.14.S8.T4).
+# Sandbox settings per tile (V2.14.S8.T4).
 # sandbox_enabled = false: no seccomp-Landlock entry (current Phase 0 default)
 # sandbox_enabled = true: tk_sandbox_enter called via the harness adapter,
 #   using a tile-specific generated seccomp-BPF policy from
