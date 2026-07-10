@@ -7,11 +7,11 @@
 
 #include <net/if.h>
 
-#define NAME_SZ                          (256UL)
-#define AFFINITY_SZ                      (256UL)
-#define CONFIGURE_STAGE_COUNT            ( 12UL)
-#define GOSSIP_TILE_ENTRYPOINTS_MAX      ( 16UL)
-#define IP4_PORT_STR_MAX                 ( 22UL)
+#define NAME_SZ                     (256UL)
+#define AFFINITY_SZ                 (256UL)
+#define CONFIGURE_STAGE_COUNT       ( 24UL)
+#define GOSSIP_TILE_ENTRYPOINTS_MAX ( 16UL)
+#define IP4_PORT_STR_MAX            ( 22UL)
 
 struct fd_configf {
   struct {
@@ -69,6 +69,7 @@ struct fd_configf {
     uint max_incremental_snapshots_to_keep;
     uint max_retry_abort;
     uint min_download_speed_mibs;
+    ulong wait_for_peers_timeout_seconds;
   } snapshots;
 
   struct {
@@ -120,6 +121,7 @@ struct fd_config_net {
   struct {
     char xdp_mode[ 8 ];
     int  xdp_zero_copy;
+    char poll_mode[ 16 ]; /* "prefbusy" or "softirq" */
 
     uint xdp_rx_queue_size;
     uint xdp_tx_queue_size;
@@ -268,6 +270,7 @@ struct fd_config {
     struct {
       int report_shreds;
       int report_transactions;
+      int report_transaction_diffs;
     } event;
 
     struct {

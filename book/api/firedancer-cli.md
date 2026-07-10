@@ -10,6 +10,22 @@ and use these commands at your own risk.
 
 :::
 
+## `configure`
+The Firedancer binary supports the `configure` command documented in the
+[`fdctl` command reference](/api/cli.md#configure), and adds
+Firedancer-only configure stages for the full client:
+
+ - `irq-affinity` Removes Firedancer tile CPUs from configurable
+   `/proc/irq/*/smp_affinity` masks.
+ - `irq-balance` Configures the irqbalance daemon to avoid Firedancer
+   tile CPUs. If irqbalance is not running, this stage is a no-op.
+ - `snapshots` Prepares the snapshot download directory.
+
+## `set-identity`
+The Firedancer binary supports the `set-identity` command documented in
+[`fdctl` command reference](/api/cli.md#set-identity), but removes
+configuration options `require-tower` and `force`.
+
 ## `add-authorized-voter`
 Adds an authorized voter to the running validator. The `<keypair>`
 argument is required and must be the path to an Agave style

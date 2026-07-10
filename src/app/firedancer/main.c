@@ -15,6 +15,7 @@ extern fd_topo_obj_callbacks_t fd_obj_cb_netdev_tbl;
 extern fd_topo_obj_callbacks_t fd_obj_cb_neigh4_hmap;
 extern fd_topo_obj_callbacks_t fd_obj_cb_fib4;
 extern fd_topo_obj_callbacks_t fd_obj_cb_keyswitch;
+extern fd_topo_obj_callbacks_t fd_obj_cb_node_info;
 extern fd_topo_obj_callbacks_t fd_obj_cb_tile;
 extern fd_topo_obj_callbacks_t fd_obj_cb_store;
 extern fd_topo_obj_callbacks_t fd_obj_cb_fec_sets;
@@ -23,6 +24,7 @@ extern fd_topo_obj_callbacks_t fd_obj_cb_accdb;
 extern fd_topo_obj_callbacks_t fd_obj_cb_banks;
 extern fd_topo_obj_callbacks_t fd_obj_cb_progcache;
 extern fd_topo_obj_callbacks_t fd_obj_cb_rnonce_ss;
+extern fd_topo_obj_callbacks_t fd_obj_cb_adminctl;
 
 fd_topo_obj_callbacks_t * CALLBACKS[] = {
   &fd_obj_cb_mcache,
@@ -33,6 +35,7 @@ fd_topo_obj_callbacks_t * CALLBACKS[] = {
   &fd_obj_cb_neigh4_hmap,
   &fd_obj_cb_fib4,
   &fd_obj_cb_keyswitch,
+  &fd_obj_cb_node_info,
   &fd_obj_cb_tile,
   &fd_obj_cb_store,
   &fd_obj_cb_fec_sets,
@@ -41,6 +44,7 @@ fd_topo_obj_callbacks_t * CALLBACKS[] = {
   &fd_obj_cb_banks,
   &fd_obj_cb_progcache,
   &fd_obj_cb_rnonce_ss,
+  &fd_obj_cb_adminctl,
   NULL,
 };
 
@@ -51,9 +55,18 @@ configure_stage_t * STAGES[] = {
   &fd_cfg_stage_ethtool_channels,
   &fd_cfg_stage_ethtool_offloads,
   &fd_cfg_stage_ethtool_loopback,
+  &fd_cfg_stage_irq_balance,
+  &fd_cfg_stage_irq_affinity,
+  &fd_cfg_stage_sysfs_poll,
+  &fd_cfg_stage_kworkers,
+  &fd_cfg_stage_cpuset,
+  &fd_cfg_stage_nohz_full,
+  &fd_cfg_stage_rcu_nocbs,
   &fd_cfg_stage_snapshots,
   NULL,
 };
+
+FD_STATIC_ASSERT( sizeof(STAGES)/sizeof(STAGES[0])<=CONFIGURE_STAGE_COUNT, stage_array_larger_than_configure_stage_count );
 
 
 extern fd_topo_run_tile_t fd_tile_net;
@@ -76,6 +89,7 @@ extern fd_topo_run_tile_t fd_tile_rpc;
 extern fd_topo_run_tile_t fd_tile_bundle;
 extern fd_topo_run_tile_t fd_tile_genesi;
 extern fd_topo_run_tile_t fd_tile_ipecho;
+extern fd_topo_run_tile_t fd_tile_admin;
 
 extern fd_topo_run_tile_t fd_tile_gossvf;
 extern fd_topo_run_tile_t fd_tile_gossip;
@@ -129,6 +143,7 @@ fd_topo_run_tile_t * TILES[] = {
   &fd_tile_snapwr,
   &fd_tile_genesi,
   &fd_tile_ipecho,
+  &fd_tile_admin,
   &fd_tile_solcap,
   NULL,
 };

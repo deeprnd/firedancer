@@ -398,6 +398,11 @@ telemetry = true
     # download and retry downloading the snapshot from a different peer.
     min_download_speed_mibs = 10
 
+    # Maximum time to wait for a snapshot peer to become available
+    # before aborting startup.  Applies when waiting for either full or
+    # incremental snapshot peers.
+    wait_for_peers_timeout_seconds = 30
+
     # At startup we must choose which full/incremental snapshots to use
     # to initiate catchup.  Snapshots may come from the local disk, from
     # gossip peers that advertise RPC server addresses, or from external
@@ -633,12 +638,6 @@ telemetry = true
     #
     # It is not recommended to change this value, except in development
     # or test environments to decrease memory usage or test edge cases.
-
-    # max_fork_width specifies the maximum number of forks that will
-    # play through the same slot.  Specifically, the maximum number
-    # of forks that will compute the epoch boundary.  If the number
-    # of forks that play through the epoch boundary is greater than
-    # max_fork_width, the client will crash.
     max_fork_width = 32
 
     # The program cache pre-loads frequently executed programs for
@@ -1053,6 +1052,34 @@ telemetry = true
         # "operation not supported".
         xdp_zero_copy = false
 
+        # The poll_mode option determines how Firedancer polls NAPI (Linux's
+        # high perf networking mechanisms).  Its possible values are:
+        #
+        #  "softirq" (default)
+        #   Relies significantly more on Linux to manage NAPI through wakeups,
+        #   softirqs, and under higher network load, a separate ksoftirqd
+        #   thread which Linux schedules onto a separate core.
+        #
+        #  "prefbusy"
+        #   Experimental option which gives Firedancer significantly more
+        #   control over how and when NAPI is polled.  Reduces networking
+        #   related IRQs and ksoftirqds to near zero on well supported NIC
+        #   drivers, increasing determinism and stability during DoS attacks
+        #   and high net load.
+        #
+        #   Hardware Support: Currently best supported on mlx5 (Mellanox).
+        #   Depending on the driver, XDP Copy Mode can see noticeable throughput
+        #   gains (up to 2.4x on mlx5, 1.5x on i40e).  Zero-copy RX throughput
+        #   generally remains the same across both poll modes.
+        #
+        # Extra info
+        #
+        #  Requires a kernel version of at least v5.11 (Feb 2021).
+        #
+        #  Prefbusy mode increases tail latency for other applications on
+        #  the system sharing the same network interface.
+        poll_mode = "softirq"
+
         # XDP uses metadata queues shared across the kernel and
         # userspace to relay events about incoming and outgoing packets.
         # This setting defines the number of entries in these metadata
@@ -1242,7 +1269,7 @@ telemetry = true
         idle_timeout_millis = 10000
 
         # Max delay for outgoing ACKs.
-        ack_delay_millis = 50
+        ack_delay_millis = 10
 
         # QUIC retry is a feature to combat new connection request
         # spamming.  See rfc9000 8.1.2 for more details.  This flag
@@ -1923,6 +1950,17 @@ telemetry = true
         # volume of events and should only be used for debugging and
         # development purposes.
         report_transactions = false
+
+        # Whether to emit detailed post-execution account data for
+        # every dispatched transaction (committable or not).  Each
+        # event carries the txn result, compute/cost/fee metadata,
+        # and the post-state of every account the transaction
+        # modified, along with its writable and readonly account
+        # lock sets.  Primarily useful for development and debugging
+        # mismatches between validator clients.  This generates a
+        # very high volume of events and should only be used for
+        # debugging and development purposes.
+        report_transaction_diffs = false
 
     # The following options relate to the 'firedance-dev pktgen' tool
     # only.  pktgen tests net tile transmit throughput by generating a
