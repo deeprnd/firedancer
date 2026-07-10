@@ -18,7 +18,7 @@ pub fn monotonicNanos() i64 {
 }
 
 /// Resolves the running process's own executable path via /proc/self/exe,
-/// for the V1.14 self-exec tile-launch pattern (supervisor re-execs itself
+/// for the v2.14 self-exec tile-launch pattern (supervisor re-execs itself
 /// as `<self> __tile-run <spec>` per tile). This Zig build's std.fs has no
 /// selfExePathAlloc equivalent, so this reads the symlink directly.
 pub fn selfExePath(buf: []u8) ![]const u8 {

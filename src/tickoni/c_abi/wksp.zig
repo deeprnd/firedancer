@@ -1,6 +1,6 @@
 /// Narrow Zig bindings over the subset of src/util/wksp/fd_wksp.h needed to
 /// create/join a named, process-shared workspace that backs Tango
-/// mcache/dcache/fseq/cnc objects for V1.14 process mode.
+/// mcache/dcache/fseq/cnc objects for v2.14 process mode.
 ///
 /// Uses FD_SHMEM_NORMAL_PAGE_SZ (4 KiB) workspaces, which fd_wksp_new_named
 /// backs with a plain file under the FD_SHMEM_PATH directory (see

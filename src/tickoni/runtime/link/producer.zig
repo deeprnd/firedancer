@@ -67,7 +67,7 @@ pub const Producer = struct {
     /// non-sleeping hot transmit path.
     ///
     /// `cnc`, if non-null, gets a heartbeat and a halt-signal check on every
-    /// idle-backoff iteration (V1.14.S8.T6) — this is what makes a producer
+    /// idle-backoff iteration (v2.14.S8.T6) — this is what makes a producer
     /// blocked inside this wait still visible to supervisor-side
     /// heartbeat-staleness detection and still responsive to a HALT that
     /// arrives mid-wait, instead of only being checked between stage

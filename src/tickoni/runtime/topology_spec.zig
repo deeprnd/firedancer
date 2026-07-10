@@ -1,4 +1,4 @@
-/// V1.14.S8.T4: small serialized description of Topology (tiles + channels
+/// v2.14.S8.T4: small serialized description of Topology (tiles + channels
 /// only — no Firedancer types, nowhere near the ~40-80KB fd_topo_t),
 /// written once by the supervisor and read by every self-exec'd child
 /// before it calls topo_build.build() to rebuild an identical topology

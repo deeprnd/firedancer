@@ -1,9 +1,9 @@
-/// V1.14.S8.T12: builds a real Firedancer fd_topo_t from Tickoni's own
+/// v2.14.S8.T12: builds a real Firedancer fd_topo_t from Tickoni's own
 /// Topology (tiles + channels), driving it through c_abi.topob's fd_topob
 /// wrappers. Called identically by the supervisor (parent, to pre-format
 /// the shared workspace) and by each self-exec'd tile process (child, to
 /// re-derive an identical topology and find its own tile) — see the
-/// V1.14.S8.T12 "topology handoff" finding: Tickoni rebuilds the topology
+/// v2.14.S8.T12 "topology handoff" finding: Tickoni rebuilds the topology
 /// in every process rather than serializing fd_topo_t through a handoff
 /// file, matching Firedancer's own self-exec convention.
 ///

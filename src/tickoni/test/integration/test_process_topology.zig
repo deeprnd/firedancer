@@ -1,4 +1,4 @@
-/// V1.14.S1 M6 acceptance proof: process isolation (T13) and crash
+/// v2.14.S1 M6 acceptance proof: process isolation (T13) and crash
 /// isolation (T12) through the real supervisor — real child processes,
 /// real /proc introspection, a real SIGKILL. Also covers the process-mode
 /// fail-closed configuration checks that don't need real shared memory to

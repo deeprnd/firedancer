@@ -1,4 +1,4 @@
-/// V1.14.S1 M5 acceptance proof: an explicit shared-core CPU placement
+/// v2.14.S1 M5 acceptance proof: an explicit shared-core CPU placement
 /// (two tiles both declaring `.shared = 0`) starts as two distinct OS
 /// processes pinned to the same CPU — proving shared-core placement means
 /// shared CPU assignment, not a shared process or address space — and the
@@ -123,7 +123,7 @@ test "process_cpu_placement_integration: a malformed (out-of-range) cpu id fails
 }
 
 // ---------------------------------------------------------------------------
-// V1.14.S2.T14 — Shared-core must be explicit; undeclared collisions fail closed.
+// v2.14.S2.T14 — Shared-core must be explicit; undeclared collisions fail closed.
 // ---------------------------------------------------------------------------
 
 // Two tiles pinned to the same CPU via `exclusive` (neither declares `shared`)
@@ -177,7 +177,7 @@ test "process_cpu_placement_integration: exclusive and shared on the same cpu co
 }
 
 // ---------------------------------------------------------------------------
-// V1.14.S2.T14 — Shared-core lower-throughput visibility.
+// v2.14.S2.T14 — Shared-core lower-throughput visibility.
 // ---------------------------------------------------------------------------
 
 // Shared-core placement (two tiles on the same CPU) produces measurably lower
