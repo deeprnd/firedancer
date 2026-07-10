@@ -1,6 +1,6 @@
 /// Narrow Zig bindings over src/util/fd_util.h's fd_boot/fd_halt lifecycle.
 ///
-/// Every process that touches fd_shmem/fd_wksp/fd_tango substrate (the V1.14
+/// Every process that touches fd_shmem/fd_wksp/fd_tango substrate (the v2.14
 /// process-mode supervisor and every spawned tile) must call fd_boot exactly
 /// once before using it and fd_halt once at shutdown; fd_boot is what reads
 /// --shmem-path/FD_SHMEM_PATH and brings the shared-memory subsystem online

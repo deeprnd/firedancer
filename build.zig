@@ -550,7 +550,7 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(launch_spec_test).step);
 
-    // topology_spec.zig (V1.14.S8.T4): small tiles+channels round-trip,
+    // topology_spec.zig (v2.14.S8.T4): small tiles+channels round-trip,
     // same import needs as launch_spec.zig.
     const topology_spec_test = b.addTest(.{
         .root_module = b.createModule(.{
@@ -564,9 +564,9 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(topology_spec_test).step);
 
-    // topo_run.zig (V1.14.S8.T3): fd_topo_run_tile adapter. No test {}
+    // topo_run.zig (v2.14.S8.T3): fd_topo_run_tile adapter. No test {}
     // blocks yet (Topo/TopoTile are opaque and nothing builds a real one
-    // until V1.14.S8.T4) — this target's only job is to prove the shim
+    // until v2.14.S8.T4) — this target's only job is to prove the shim
     // compiles and links against the real Firedancer archives.
     const topo_run_test = b.addTest(.{
         .root_module = b.createModule(.{
@@ -579,7 +579,7 @@ pub fn build(b: *std.Build) void {
     linkTickoniTopoRun(b, topo_run_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(topo_run_test).step);
 
-    // topob.zig (V1.14.S8.T12): fd_topob topology builder. Same
+    // topob.zig (v2.14.S8.T12): fd_topob topology builder. Same
     // no-test-blocks-yet rationale as topo_run_test above; proves the
     // shim (including Tickoni's own object-callbacks array) compiles and
     // links.
@@ -594,7 +594,7 @@ pub fn build(b: *std.Build) void {
     linkTickoniTopoRun(b, topob_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(topob_test).step);
 
-    // topo_build.zig (V1.14.S8.T12): shared topology-builder, actually
+    // topo_build.zig (v2.14.S8.T12): shared topology-builder, actually
     // calls into topob.zig against a real 8-tile-shaped Topology, so
     // needs the same c_abi + util imports as cpu_placement_test plus the
     // Firedancer/topo-adapter link surface.
@@ -860,14 +860,14 @@ pub fn build(b: *std.Build) void {
     const sup_test = b.addTest(.{ .root_module = sup_mod });
     linkTickoniCodec(b, sup_test, fd_lib_dir);
     // supervisor.zig now calls into tile_registry.zig's `entries` array
-    // (V1.14.S8.T1), which embeds every tile's process-mode function
+    // (v2.14.S8.T1), which embeds every tile's process-mode function
     // pointer (including tiles.process/rt.link/c_abi callers) as static
     // data even for tests that only exercise thread mode — needs the same
     // Firedancer link set as the process-mode integration tests.
     linkTickoniFiredancer(b, sup_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(sup_test).step);
 
-    // tile_registry.zig (V1.14.S8.T1): single source of truth for tile id
+    // tile_registry.zig (v2.14.S8.T1): single source of truth for tile id
     // -> behavior, imported by supervisor.zig and tile_main.zig. Same
     // import set as sup_mod since it needs the same tile-identity types.
     const tile_registry_mod = b.createModule(.{
@@ -1090,7 +1090,7 @@ pub fn build(b: *std.Build) void {
     // already-spawned children exec'ing that same path.
     const process_mode_exe_install = b.addInstallArtifact(exe, .{});
 
-    // V1.14.S1 process-mode payment pipeline: spawns real supervisor-managed
+    // v2.14.S1 process-mode payment pipeline: spawns real supervisor-managed
     // tile processes over Firedancer Tango shared memory. Tickoni internals
     // run for real; the "external tool" substituted per
     // doc/execution/testing-tickoni.md's integration-lane rule is the
@@ -1117,7 +1117,7 @@ pub fn build(b: *std.Build) void {
     run_process_pipeline_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_pipeline_test.step);
 
-    // V1.14.S1 M5: explicit shared-core CPU placement and the
+    // v2.14.S1 M5: explicit shared-core CPU placement and the
     // CPU-unavailable fail-closed path, both through the real supervisor.
     const process_cpu_placement_test = b.addTest(.{
         .root_module = b.createModule(.{
@@ -1140,7 +1140,7 @@ pub fn build(b: *std.Build) void {
     run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_cpu_placement_test.step);
 
-    // V1.14.S1 M6: process isolation (T13: one OS process per tile,
+    // v2.14.S1 M6: process isolation (T13: one OS process per tile,
     // parented by the supervisor), crash isolation (T12: SIGKILL one
     // tile, siblings unaffected), and the remaining process-mode
     // fail-closed configuration checks.
@@ -1165,7 +1165,7 @@ pub fn build(b: *std.Build) void {
     run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_topology_test.step);
 
-    // V1.14.S1 M6: demo/replay parity — floating vs. explicit shared-core
+    // v2.14.S1 M6: demo/replay parity — floating vs. explicit shared-core
     // CPU placement must reach identical final pipeline metrics through the
     // real supervisor (T14).
     const process_demo_parity_test = b.addTest(.{
@@ -1189,7 +1189,7 @@ pub fn build(b: *std.Build) void {
     run_process_demo_parity_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_demo_parity_test.step);
 
-    // V1.14.S1 M6: runtime link fail-closed matrix (dcache bounds, missing link
+    // v2.14.S1 M6: runtime link fail-closed matrix (dcache bounds, missing link
     // objects) and backpressure visibility. Single-process — no tile spawn,
     // so no stdio-inheritance hang risk — uses the normal test-runner path.
     const link_bounds_test = b.addTest(.{
@@ -1666,7 +1666,7 @@ pub fn build(b: *std.Build) void {
 /// b.addRunArtifact on a test binary always enables Zig's test-server
 /// protocol (--listen=- plus .stdio = .zig_test), which communicates with
 /// the build runner over the test binary's own stdin/stdout. A test that
-/// spawns real child OS processes (V1.14 process-mode tests) risks those
+/// spawns real child OS processes (v2.14 process-mode tests) risks those
 /// children inheriting that stdout descriptor, which keeps the pipe's
 /// write end open after the test itself finishes and hangs the build
 /// runner waiting for EOF that never arrives. This builds the Run step by
@@ -1703,8 +1703,8 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
     step.root_module.linkSystemLibrary("stdc++", .{});
 }
 
-/// Links shim/topo_run.c (the fd_topo_run_tile adapter, V1.14.S8.T3) and
-/// shim/topob.c (the fd_topob topology builder, V1.14.S8.T12) — the two
+/// Links shim/topo_run.c (the fd_topo_run_tile adapter, v2.14.S8.T3) and
+/// shim/topob.c (the fd_topob topology builder, v2.14.S8.T12) — the two
 /// halves of Tickoni's Firedancer topology adapter, same link surface.
 /// Callers must also call linkTickoniFiredancer (tango/util) — this only
 /// adds the additional disco/ballet/waltz link surface these files and
@@ -1724,7 +1724,7 @@ fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: 
     step.root_module.linkSystemLibrary("fd_waltz", .{});
 }
 
-/// Links shim/tile_run.c (V1.14.S8.T4's fd_topo_run_tile_t wiring).
+/// Links shim/tile_run.c (v2.14.S8.T4's fd_topo_run_tile_t wiring).
 /// Deliberately separate from linkTickoniTopoRun: this file's static
 /// TK_TILE_RUN struct references tk_tile_privileged_init/tk_tile_run,
 /// Zig `export fn`s defined only in runtime/tile_process.zig, so only

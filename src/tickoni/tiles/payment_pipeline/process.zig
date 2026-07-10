@@ -1,4 +1,4 @@
-/// V1.14.S1 process-mode payment pipeline stage orchestration: runs inside
+/// v2.14.S1 process-mode payment pipeline stage orchestration: runs inside
 /// each tile's own process (dispatched from src/app/tickoni/tile_registry.zig),
 /// reading/writing Tango shared-memory links (src/tickoni/runtime/link.zig)
 /// instead of the thread-mode heap ring
@@ -15,7 +15,7 @@
 /// forward rather than drop), so consumers loop exactly event_count times
 /// instead of needing an explicit end-of-stream signal on the link.
 ///
-/// V1.14.S8.T2: these functions take a PaymentPipelineConfig by value
+/// v2.14.S8.T2: these functions take a PaymentPipelineConfig by value
 /// instead of reading event_count/policy_limit_cents/inject_duplicate/
 /// inject_malformed off a LaunchSpec — this file has no dependency on
 /// LaunchSpec's shape at all. The supervisor writes one shared config file

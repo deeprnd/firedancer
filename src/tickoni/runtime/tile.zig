@@ -70,7 +70,7 @@ pub const TileHandle = struct {
     /// Meaningful only when state == .crashed.
     exit_code: u8,
     /// Non-null when the tile runs as a supervisor-managed OS process
-    /// (V1.14 process mode).
+    /// (v2.14 process mode).
     pid: ?std.process.Child.Id = null,
     /// Effective CPU placement for this tile, copied from the topology at
     /// start time so diagnostics do not need to re-consult the topology.

@@ -1,7 +1,7 @@
 /// Generic single-tile process-mode lifecycle, reusable across any Tickoni
 /// process-mode tile regardless of which pipeline it belongs to. Drives
 /// Firedancer's real fd_topo_run_tile (src/disco/topo/fd_topo_run.c)
-/// through the c_abi.topo_run/topob adapter (V1.14.S8.T3/T4) — a single
+/// through the c_abi.topo_run/topob adapter (v2.14.S8.T3/T4) — a single
 /// spawned process's own boot/attach/run/halt mechanics, with the
 /// tile-specific work as a caller-supplied step — not the parent-side
 /// orchestration loop that spawns and tracks every tile (that stays in
@@ -76,7 +76,7 @@ export fn tk_tile_privileged_init(topo: *anyopaque, tile: *anyopaque) callconv(.
     // not request a stop before every tile has demonstrably reached
     // RUN"), because the old direct LaunchSpec.cnc_gaddr join was fast
     // enough that the race rarely mattered in practice. Rebuilding the
-    // whole topology before a tile can even join its cnc (V1.14.S8.T4)
+    // whole topology before a tile can even join its cnc (v2.14.S8.T4)
     // is much slower, especially for tiles with no pipeline work
     // (tkrepl/tkmetr/tkdiag) that the supervisor's poll-for-real-progress
     // callers have no reason to wait for — so a HALT sent while such a
@@ -96,7 +96,7 @@ export fn tk_tile_privileged_init(topo: *anyopaque, tile: *anyopaque) callconv(.
 /// test hook, since this callback has no way to propagate an error back
 /// through fd_topo_run_tile's C call frames — matches the process-level
 /// observable behavior (non-zero exit, cnc never reaches BOOT) the
-/// crash-isolation tests (V1.14.S1.T12) check for.
+/// crash-isolation tests (v2.14.S1.T12) check for.
 export fn tk_tile_run(topo: *anyopaque, tile: *anyopaque) callconv(.c) void {
     _ = tile;
     const topo_typed: *c_abi.topob.Topo = @ptrCast(topo);
@@ -121,7 +121,7 @@ export fn tk_tile_run(topo: *anyopaque, tile: *anyopaque) callconv(.c) void {
         // specifically to fire on the very first iteration.
         g_ctx.heartbeats += 1;
         if (g_ctx.spec.crash_after_heartbeats > 0 and g_ctx.heartbeats >= g_ctx.spec.crash_after_heartbeats) {
-            // Test-only crash-isolation hook (V1.14.S1.T12): exit without
+            // Test-only crash-isolation hook (v2.14.S1.T12): exit without
             // a clean cnc transition, simulating an unexpected tile failure.
             std.process.exit(1);
         }

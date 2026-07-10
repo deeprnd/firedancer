@@ -4,7 +4,7 @@
 **Proposed milestone:** M2
 **Candidate issue type if accepted:** epic
 **Candidate labels:** `platform`, `operations`, `security`, `trust`
-**Related docs / examples:** [`development.md`](../../../execution/development.md), [`architecture.md`](../../../knowledge/architecture.md), [`firedancer.md`](../../../execution/contribution/firedancer.md), [`V1.14`](../epics/v1.14.md), [Hermes installer](https://hermes-agent.nousresearch.com/install.sh), [Hermes PowerShell installer](https://hermes-agent.nousresearch.com/install.ps1), [OpenClaw README](https://github.com/openclaw/openclaw)
+**Related docs / examples:** [`development.md`](../../../execution/development.md), [`architecture.md`](../../../knowledge/architecture.md), [`firedancer.md`](../../../execution/contribution/firedancer.md), [`V2.14`](../epics/v2.14.md), [Hermes installer](https://hermes-agent.nousresearch.com/install.sh), [Hermes PowerShell installer](https://hermes-agent.nousresearch.com/install.ps1), [OpenClaw README](https://github.com/openclaw/openclaw)
 
 ## Proposal Summary
 
@@ -214,7 +214,7 @@ This should not move forward if:
 | Version enforcement | Hard minimum per demo, warning-only compatibility, or strict manifest lock | Product/security decision; default should fail closed for demos |
 | Installer verification | SHA256 checksums, Sigstore, minisign, GPG, platform package signatures, or multiple | Security decision before publishing scripts |
 | Sandbox substitute | Linux-only seccomp/Landlock, host-native sandbox equivalents, or no privileged native mode | Security decision; do not infer silently |
-| Shared-memory substitute | Keep Firedancer workspaces Linux-only, use heap/normal-page queues for portable proof mode, or design an OS abstraction | Architecture decision tied to `V1.14` |
+| Shared-memory substitute | Keep Firedancer workspaces Linux-only, use heap/normal-page queues for portable proof mode, or design an OS abstraction | Architecture decision tied to `V2.14` |
 | Cross-platform conformance | Hash/replay fixture equivalence, CLI smoke tests, CaseOps paper-demo tests, or full integration matrix | Testing decision before graduating to stories |
 
 ## Graduation Path

@@ -496,7 +496,7 @@ which are not adapter modules themselves but core orchestration components:
   Firedancer `fd_topo_t` from Tickoni's own `Topology` by calling through
   `c_abi.topob`'s `fd_topob_*` wrappers. Called identically by the supervisor
   (parent) and each self-exec'd tile process (child) to rebuild an identical
-  topology — the "topology handoff" pattern (V1.14.S8.T12). Returns
+  topology — the "topology handoff" pattern (V2.14.S8.T12). Returns
   `BuiltTopo` with allocated `buf`, opaque `topo`, workspace index, per-tile
   `cnc_obj_id[]`, and per-channel `link_obj_id[]` (mcache/dcache/fseq).
   Does not create the workspace or instantiate object content — that is the
@@ -578,7 +578,7 @@ require deliberate Tickoni implementation or are explicitly not reused:
     new `metrics.zig` wrapper + shim, similar to the queue wrappers. The
     infrastructure is clean (Firedancer-owned, no Solana semantics).
 
-#### fd_topo_run.c Audits (from v1.14.s8-wip.md)
+#### fd_topo_run.c Audits (from v2.14.s8-wip.md)
 
 The following concrete findings were verified during audit S8:
 
@@ -602,7 +602,7 @@ The following concrete findings were verified during audit S8:
   uses `fd_topo_cnc_fseq_init` from `fd_topo.c`, but this is the shared
   infrastructure file — not the builder.
 
-#### fd_topob.c Usability (from v1.14.s8-wip.md)
+#### fd_topob.c Usability (from v2.14.s8-wip.md)
 
 `fd_topob.c` is a generic topology builder that is usable for Tickoni:
 
@@ -624,7 +624,7 @@ The following concrete findings were verified during audit S8:
 with Tickoni names. Extract and reuse the CPU placement algorithm as-is. No
 Solana semantics leak into Tickoni product code.
 
-#### Structural Resolutions (from v1.14.s8-wip.md)
+#### Structural Resolutions (from v2.14.s8-wip.md)
 
 The following structural tensions were identified during S8 planning and have
 been resolved:
@@ -642,7 +642,7 @@ been resolved:
    lifecycle implementation, not the adapter.
 
 3. **tempo/fctl shims explicitly scoped:** Audit 8's plan requires them for
-   proper stuck-tile defense. Resolved as V1.14.S8.T11.
+   proper stuck-tile defense. Resolved as V2.14.S8.T11.
 
 4. **Seccomp policy generation risk resolved:** generate_filters.py is
    completely topology-independent. Input is a flat .seccomppolicy text file;

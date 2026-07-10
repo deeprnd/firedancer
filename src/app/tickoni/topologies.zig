@@ -106,7 +106,7 @@ pub fn investmentWorkflow() Topology {
     };
 }
 
-// V1.14.S1 process-mode variant of paymentPipeline: same 8 tiles and 4
+// v2.14.S1 process-mode variant of paymentPipeline: same 8 tiles and 4
 // core channels, backed by Tango shared memory in one shared workspace
 // instead of the heap-backed dev/test ring. All tiles are floating (no
 // hard exclusive-core requirement); src/app/tickoni/supervisor.zig's
@@ -150,7 +150,7 @@ const payment_process_channels = [_]Channel{
     },
 };
 
-/// V1.14.S1 process-isolated variant of paymentPipeline(): the same tile
+/// v2.14.S1 process-isolated variant of paymentPipeline(): the same tile
 /// identities and channel shape, with every core channel backed by a
 /// shared Tango workspace instead of a heap-backed ring. CPU placement
 /// defaults to floating here; callers that need exclusive/shared pinning

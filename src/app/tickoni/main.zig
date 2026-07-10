@@ -15,7 +15,7 @@ const usage =
     \\Commands:
     \\  start           Run the Phase 0 Tickoni pipeline spike (dev/test mode)
     \\  start-process   Run the Phase 0 pipeline as isolated OS processes over
-    \\                  Tango shared memory (V1.14.S1); requires <run-dir>
+    \\                  Tango shared memory (v2.14.S1); requires <run-dir>
     \\  status          Print topology tile names
     \\
 ;
@@ -29,7 +29,7 @@ pub fn main(init: std.process.Init) !void {
         std.process.exit(1);
     };
 
-    // Internal supervisor-to-child handoff for V1.14.S1 process mode, not
+    // Internal supervisor-to-child handoff for v2.14.S1 process mode, not
     // part of the advertised command surface: `__tile-run <spec-file>`.
     if (std.mem.eql(u8, cmd, "__tile-run")) {
         const spec_path = it.next() orelse std.process.exit(1);
@@ -109,7 +109,7 @@ fn cmdStart(init: std.process.Init, topo: rt.topology.Topology) !void {
     try File.writeStreamingAll(stdout, init.io, "tickoni-supervisor: stopped\n");
 }
 
-/// V1.14.S1: run the payment pipeline as one OS process per tile connected
+/// v2.14.S1: run the payment pipeline as one OS process per tile connected
 /// by Tango shared memory instead of in-process threads. run_dir holds the
 /// per-tile launch specs and the FD_SHMEM_PATH workspace backing.
 fn cmdStartProcess(init: std.process.Init, topo: rt.topology.Topology, run_dir: []const u8) !void {

@@ -1,6 +1,6 @@
 /// Narrow Zig bindings over src/tango/cnc/fd_cnc.h.
 ///
-/// `fd_cnc_t` owns tile boot/heartbeat/halt/fail state for V1.14 process
+/// `fd_cnc_t` owns tile boot/heartbeat/halt/fail state for v2.14 process
 /// mode. Zig callers bind only through Tickoni-owned `tk_*` shim symbols; the
 /// shim calls the real Firedancer functions/static inline helpers.
 const std = @import("std");
