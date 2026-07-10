@@ -17,7 +17,6 @@ Constructed using a full topology which is pruned down. */
 #include "../../../../disco/topo/fd_topob.h"
 #include "../../../../disco/topo/fd_cpu_topo.h"
 #include "../../../../util/pod/fd_pod_format.h"
-#include "../../../../util/tile/fd_tile_private.h"
 #include "../../../../discof/restore/utils/fd_slot_delta_parser.h"
 #include "../../../../discof/restore/utils/fd_ssctrl.h"
 #include "../../../../discof/restore/utils/fd_ssmsg.h"
@@ -203,7 +202,7 @@ forktest_topo( config_t * config ) {
   fd_topo_cpus_init( cpus );
 
   ulong affinity_tile_cnt = 0UL;
-  if( FD_LIKELY( !is_auto_affinity ) ) affinity_tile_cnt = fd_tile_private_cpus_parse( config->firedancer.development.forktest.affinity, parsed_tile_to_cpu );
+  if( FD_LIKELY( !is_auto_affinity ) ) affinity_tile_cnt = fd_topob_parse_affinity_cstr( config->firedancer.development.forktest.affinity, parsed_tile_to_cpu, 0 );
 
   ulong tile_to_cpu[ FD_TILE_MAX ] = {0};
   for( ulong i=0UL; i<affinity_tile_cnt; i++ ) {
@@ -347,7 +346,7 @@ forktest_topo( config_t * config ) {
                        topo->tile_cnt, affinity_tile_cnt ));
   } else {
     ushort blocklist_cores[ FD_TILE_MAX ];
-    topo->blocklist_cores_cnt = fd_tile_private_cpus_parse( config->layout.blocklist_cores, blocklist_cores );
+    topo->blocklist_cores_cnt = fd_topob_parse_affinity_cstr( config->layout.blocklist_cores, blocklist_cores, 0 );
     if( FD_UNLIKELY( topo->blocklist_cores_cnt>FD_TILE_MAX ) ) {
       FD_LOG_ERR(( "The CPU string in the configuration file under [layout.blocklist_cores] specifies more CPUs than Firedancer can use. "
                     "You should reduce the number of CPUs in the excluded cores string." ));
@@ -390,6 +389,11 @@ forktest_topo( config_t * config ) {
   /**/                 fd_topob_tile_uses( topo, &topo->tiles[ fd_topo_find_tile( topo, "tower",  0UL ) ], banks_obj, FD_SHMEM_JOIN_MODE_READ_ONLY  );
   FOR(execrp_tile_cnt) fd_topob_tile_uses( topo, &topo->tiles[ fd_topo_find_tile( topo, "execrp", i   ) ], banks_obj, FD_SHMEM_JOIN_MODE_READ_WRITE );
   FD_TEST( fd_pod_insertf_ulong( topo->props, banks_obj->id, "banks" ) );
+
+  fd_topo_obj_t * node_info_obj = fd_topob_obj( topo, "node_info", "replay" );
+  fd_topob_tile_uses( topo, replay_tile, node_info_obj, FD_SHMEM_JOIN_MODE_READ_WRITE );
+  fd_topob_tile_uses( topo, &topo->tiles[ fd_topo_find_tile( topo, "tower", 0UL ) ], node_info_obj, FD_SHMEM_JOIN_MODE_READ_WRITE );
+  FD_TEST( fd_pod_insertf_ulong( topo->props, node_info_obj->id, "node_info" ) );
 
   ulong fec_set_cnt = 2UL*shred_depth + config->tiles.shred.max_pending_shred_sets + 6UL;
   ulong fec_sets_sz = fec_set_cnt*sizeof(fd_fec_set_t); /* mirrors # of dcache entires in frankendancer */

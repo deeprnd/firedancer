@@ -182,8 +182,7 @@ fd_config_fill( fd_config_t * config,
   struct utsname utsname;
   if( FD_UNLIKELY( -1==uname( &utsname ) ) )
     FD_LOG_ERR(( "could not get uname (%i-%s)", errno, fd_io_strerror( errno ) ));
-  strncpy( config->hostname, utsname.nodename, sizeof(config->hostname) );
-  config->hostname[ sizeof(config->hostname)-1UL ] = '\0'; /* Just truncate the name if it's too long to fit */
+  fd_cstr_ncpy( config->hostname, utsname.nodename, sizeof(config->hostname) ); /* Just truncate the name if it's too long to fit */
 
   ulong cluster = FD_CLUSTER_UNKNOWN;
   config->is_live_cluster = cluster!=FD_CLUSTER_UNKNOWN;
@@ -380,6 +379,8 @@ fd_config_validatef( fd_configf_t const * config ) {
     }
   }
 
+  CFG_HAS_NON_ZERO( snapshots.wait_for_peers_timeout_seconds );
+
   CFG_HAS_NON_ZERO( accounts.max_accounts   );
   CFG_HAS_NON_ZERO( accounts.cache_size_gib );
 
@@ -418,6 +419,11 @@ fd_config_validate( fd_config_t const * config ) {
   CFG_HAS_NON_ZERO( net.ingress_buffer_size );
   if( 0==strcmp( config->net.provider, "xdp" ) ) {
     CFG_HAS_NON_EMPTY( net.xdp.xdp_mode );
+
+    if( 0!=strcmp( config->net.xdp.poll_mode, "prefbusy" ) && 0!=strcmp( config->net.xdp.poll_mode, "softirq" ) ) {
+      FD_LOG_ERR(( "invalid `net.xdp.poll_mode`: must be \"prefbusy\" or \"softirq\"" ));
+    }
+
     CFG_HAS_POW2     ( net.xdp.xdp_rx_queue_size );
     CFG_HAS_POW2     ( net.xdp.xdp_tx_queue_size );
     if( 0!=strcmp( config->net.xdp.rss_queue_mode, "dedicated" ) &&
