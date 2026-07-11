@@ -1,6 +1,5 @@
 ifdef FD_HAS_HOSTED
 # Compiled without project warning flags (upstream code, unmodified).
-$(call add-objs,picohttpparser,fd_waltz)
 $(OBJDIR)/lib/libfd_waltz.a: $(OBJDIR)/obj/third_party/picohttpparser/picohttpparser.o
 
 PICOHTTP_CFLAGS_NOWARN:=$(filter-out -W%,$(filter-out -Werror,$(CPPFLAGS) $(CFLAGS)))
