@@ -19,9 +19,18 @@ FD_TK_LIB_TEST_SRCS=( "${FD_TK_LIB_SRCS[@]}" \
                       src/third_party/zstd \
                       src/third_party/nanopb )
 
-# Coverage builds that exclude s2n-bignum (same dirs as FD_TK_LIB_SRCS minus it).
+# Coverage builds that exclude s2n-bignum (same as test minus s2n-bignum).
+# Must include third-party extras (lz4/blst/zstd) so their Local.mks are
+# included — otherwise EXTRAS="lz4" only defines FD_HAS_LZ4 but the lz4
+# source files are never compiled and the unit-test linker fails.
 FD_TK_LIB_COV_SRCS=( src/tango src/util src/ballet src/disco src/waltz \
-                     src/third_party/cjson )
+                     src/third_party/s2n-bignum \
+                     src/third_party/cjson \
+                     src/third_party/picohttpparser \
+                     src/third_party/blst \
+                     src/third_party/lz4 \
+                     src/third_party/zstd \
+                     src/third_party/nanopb )
 
 # Directories compiled into FD but NOT linked into our Tickoni harness libs.
 FD_TK_LIB_EXCLUDES='disco/quic/|disco/gui/|ballet/zksdk/|ballet/zstd/|waltz/quic/'
