@@ -8,4 +8,4 @@
 FD_HAS_BLST:=1
 CFLAGS+=-DFD_HAS_BLST=1
 BLST_LIBS:=$(BASEDIR)/$(BUILDDIR)/lib/libfd_blst.a
-LDFLAGS+=$(BLST_LIBS)
+LDFLAGS+=-lfd_blst

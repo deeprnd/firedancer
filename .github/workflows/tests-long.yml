@@ -46,11 +46,9 @@ jobs:
 
       - name: Run test suite
         run: |
-          make -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd unit-test
-          nofile_target="$(awk '/#define CONFIGURE_NR_OPEN_FILES/ { gsub(/[()U]/, "", $3); print $3 }' src/app/shared/commands/configure/configure.h)"
-          sudo prlimit --pid $$ --nofile="${nofile_target}:${nofile_target}" --memlock=unlimited
+          sudo prlimit --pid $$ --nofile="$(awk '/#define CONFIGURE_NR_OPEN_FILES/ { gsub(/[()U]/, "", $3); print $3 }' src/app/shared/commands/configure/configure.h):$(awk '/#define CONFIGURE_NR_OPEN_FILES/ { gsub(/[()U]/, "", $3); print $3 }' src/app/shared/commands/configure/configure.h)" --memlock=unlimited
           just mem-drop-caches || true
-          make run-unit-test MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd TEST_OPTS="--page-sz normal -j 1"
+          just test-unit-fd
 
   cov-fd:
     name: Engine Tests Coverage

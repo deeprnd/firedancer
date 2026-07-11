@@ -2,6 +2,8 @@
 
 static FD_TL fd_event_reporter_t fd_event_tl_storage[1];
 
+__attribute__((weak)) FD_TL fd_event_reporter_t * fd_event_tl = NULL;
+
 void
 fd_event_register( fd_topo_t const *      topo,
                    fd_topo_tile_t const * tile ) {

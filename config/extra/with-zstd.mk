@@ -6,4 +6,4 @@
 FD_HAS_ZSTD:=1
 CFLAGS+=-DFD_HAS_ZSTD=1
 CPPFLAGS+=-isystem src/third_party/zstd/lib
-LDFLAGS+=$(BASEDIR)/$(BUILDDIR)/lib/libfd_zstd.a
+LDFLAGS+=-lfd_zstd

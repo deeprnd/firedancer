@@ -8,6 +8,41 @@ make := `command -v gmake || command -v make`
 # recipes transparently re-run inside this Linux container (see the `dock` recipe).
 dev_image := "tickoni-dev:24.04"
 
+# Shared Firedancer lib definitions — used by contrib/fd-build-lib.sh and
+# contrib/security.sh. It provides:
+#   FD_TK_LIB_SRCS          source dirs for the 5 harness libs
+#   FD_TK_LIB_TEST_SRCS     + picohttpparser, blst, lz4, zstd, nanopb (for tests)
+#   FD_TK_LIB_COV_SRCS      core + cjson only (coverage)
+#   FD_TK_LIB_EXCLUDES      grep -vE pattern for non-linked subdirs
+#   FD_TK_LIBS              libfd_tango.a libfd_util.a libfd_ballet.a libfd_disco.a libfd_waltz.a
+#   FD_TK_LIBS_EXTRA        libfd_blst.a libfd_zstd.a libfd_lz4.a
+#   fd_compute_mks()        produce LOCAL_MKS from a source-dir list
+
+# Per-compiler build directories. Each Firedancer build profile compiles
+# to a different BUILDDIR/lib/ subtree.  *_build is the short name
+# passed to `make` as BUILDDIR (Firedancer prefixes `build/`); *_dir
+# is the complete path (used in `mkdir -p` and archive targets); *_lib
+# is the full lib/ subtree path.
+fd_tickoni_build := "fd-tickoni-fd"
+fd_tickoni_dir   := "build/fd-tickoni-fd"
+fd_tickoni_lib   := "build/fd-tickoni-fd/lib"
+
+fd_gcc_build     := "fd-gcc"
+fd_gcc_dir       := "build/fd-gcc"
+fd_gcc_lib       := "build/fd-gcc/lib"
+
+fd_clang_build   := "fd-clang"
+fd_clang_dir     := "build/fd-clang"
+fd_clang_lib     := "build/fd-clang/lib"
+
+fd_arm_build     := "fd-arm"
+fd_arm_dir       := "build/fd-arm"
+fd_arm_lib       := "build/fd-arm/lib"
+
+fd_cov_build     := "fd-cov"
+fd_cov_dir       := "build/fd-cov"
+fd_cov_lib       := "build/fd-cov/lib"
+
 # Resolve a docker-compatible container CLI: prefer docker, then podman, then
 # nerdctl, then colima's bundled nerdctl. Empty if none is installed.
 container := `if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; elif command -v nerdctl >/dev/null 2>&1; then echo nerdctl; elif command -v colima >/dev/null 2>&1; then echo "colima nerdctl -p tickoni --"; else echo ""; fi`
@@ -40,10 +75,7 @@ tests-all:
 # ── Build ──────────────────────────────────────────────────────────────────
 
 build-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib
-
-build-fd-tk-libs:
-  @just _build-fd-tk-libs ""
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}}
 
 # tickoni_fd machine profile: builds only the 5 Firedancer libraries
 # Tickoni reuses (tango, util, ballet, disco, waltz). Excludes
@@ -52,54 +84,27 @@ build-fd-tk-libs:
 #
 # NOTE: Firedancer's everything.mk compiles all sources regardless of
 # requested .a targets. We list only the 5 libraries Tickoni needs as
-# the final archive targets. build-fd variants must pre-create the obj
-# directory because Firedancer writes .d dependency files to nested
-# paths (e.g. obj/ballet/zksdk/instructions/...) that don't exist by
-# default.
+# the final archive targets.
+#
+# Adding a new lib: edit contrib/fd-tk-libs.sh (FD_TK_LIBS or
+# FD_TK_LIBS_EXTRA arrays). All justfile/CI/quality/security consumers
+# pick up the change automatically.
 build-fd:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  mkdir -p build/fd-tickoni-fd/obj
-  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd \
-    build/fd-tickoni-fd/lib/libfd_tango.a \
-    build/fd-tickoni-fd/lib/libfd_util.a \
-    build/fd-tickoni-fd/lib/libfd_ballet.a \
-    build/fd-tickoni-fd/lib/libfd_disco.a \
-    build/fd-tickoni-fd/lib/libfd_waltz.a
+  mkdir -p {{fd_tickoni_dir}}/obj
+  bash contrib/fd-build-lib.sh {{fd_tickoni_build}}
 
 build-fd-gcc:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  mkdir -p build/fd-gcc/obj
-  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-gcc CC=gcc-12 \
-    build/fd-gcc/lib/libfd_tango.a \
-    build/fd-gcc/lib/libfd_util.a \
-    build/fd-gcc/lib/libfd_ballet.a \
-    build/fd-gcc/lib/libfd_disco.a \
-    build/fd-gcc/lib/libfd_waltz.a
+  mkdir -p {{fd_gcc_dir}}/obj
+  bash contrib/fd-build-lib.sh {{fd_gcc_build}} gcc-12
 
 build-fd-clang:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  mkdir -p build/fd-clang/obj
-  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-clang CC=clang-18 \
-    build/fd-clang/lib/libfd_tango.a \
-    build/fd-clang/lib/libfd_util.a \
-    build/fd-clang/lib/libfd_ballet.a \
-    build/fd-clang/lib/libfd_disco.a \
-    build/fd-clang/lib/libfd_waltz.a
+  mkdir -p {{fd_clang_dir}}/obj
+  bash contrib/fd-build-lib.sh {{fd_clang_build}} clang-18
 
 # Compile-only ARM lane matching the CI machine target; Firedancer runtime remains x86-64 Linux only.
 build-fd-arm:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  mkdir -p build/fd-arm/obj
-  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-arm CC=gcc-14 \
-    build/fd-arm/lib/libfd_tango.a \
-    build/fd-arm/lib/libfd_util.a \
-    build/fd-arm/lib/libfd_ballet.a \
-    build/fd-arm/lib/libfd_disco.a \
-    build/fd-arm/lib/libfd_waltz.a
+  mkdir -p {{fd_arm_dir}}/obj
+  bash contrib/fd-build-lib.sh {{fd_arm_build}} gcc-14
 
 build-fd-dev:
   make -j"$(nproc)" all
@@ -139,26 +144,9 @@ dock +recipe:
   {{container}} run --rm \
     -v "{{justfile_directory()}}":/work -w /work \
     {{dev_image}} \
-    bash -lc 'just _build-fd-tk-libs tk-arm && just {{recipe}}'
+    bash -lc 'bash contrib/fd-build-lib.sh {{fd_tickoni_build}} && just {{recipe}}'
 
 # Build the Linux dev image once (just + Zig 0.16.0 + build toolchain). Idempotent.
-[private]
-_build-fd-tk-libs extras="":
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cmd=({{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd)
-  if [ -n "{{extras}}" ]; then
-    cmd+=("EXTRAS={{extras}}")
-  fi
-  cmd+=(
-    build/fd-tickoni-fd/lib/libfd_tango.a
-    build/fd-tickoni-fd/lib/libfd_util.a
-    build/fd-tickoni-fd/lib/libfd_ballet.a
-    build/fd-tickoni-fd/lib/libfd_disco.a
-    build/fd-tickoni-fd/lib/libfd_waltz.a
-  )
-  "${cmd[@]}"
-
 [private]
 _dev-image:
   #!/usr/bin/env bash
@@ -185,23 +173,20 @@ test-all:
   @just test-system-all
   @just test-e2e-all
 
+# Build test binaries: libs + unit-test target.
+# Uses FD_TK_LIB_TEST_SRCS (extra: picohttpparser, blst, lz4, zstd, nanopb).
 test-unit-fd:
-  #!/usr/bin/env bash
-  set -euo pipefail
   # Override LOCAL_MKS so everything.mk's ?= assignment is skipped.
   # Only the 5 Tickoni dirs: tango, util, ballet, disco, waltz —
   # minus subdirs not compiled into the 5 libs (disco/quic, ballet/zksdk,
-  # ballet/reedsol, waltz/quic, waltz/tls). Reduces from 195 Local.mks
-  # (187 tests, 543 objs) to ~93 Local.mks (4 tests, ~150 objs).
-  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd \
-    "LOCAL_MKS=$(find src/tango src/util src/ballet src/disco src/waltz -name Local.mk | grep -vE 'disco/quic/|ballet/zksdk/|waltz/quic/' | tr '\n' ' ')" \
-    unit-test
-  {{make}} MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd run-unit-test TEST_OPTS="--page-sz normal"
+  # ballet/reedsol, waltz/quic, waltz/tls).
+  bash contrib/fd-build-lib.sh {{fd_tickoni_build}} gcc-12 test
+  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} run-unit-test TEST_OPTS="--page-sz normal"
 
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.
 test-unit-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib test --summary all
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
 
 # Print computed hash and wire bytes for every audit fixture event, and emit audit JSONL.
 # Use the output to understand or snapshot the current encoding after intentional changes.
@@ -213,7 +198,7 @@ test-unit-all:
   python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
 
 test-e2e-fd:
-  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd integration-test && {{make}} MACHINE=tickoni_fd BUILDDIR=fd-tickoni-fd run-integration-test
+  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} integration-test && {{make}} MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} run-integration-test
 
 test-e2e-tk:
   @true
@@ -226,7 +211,7 @@ test-integration-fd:
 
 # Tickoni integration lane: transport and boundary wiring against local mocks.
 test-integration-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib integration-test --summary all
+  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} integration-test --summary all
 
 # Deterministic offline investment demo — no llama.cpp required.
 demo-tk:
@@ -267,19 +252,14 @@ test-integration-all:
 
 # ── Test: Coverage ─────────────────────────────────────────────────────────
 
+# Build coverage: libs (core + cjson) + unit-test target with llvm-cov.
+# Uses FD_TK_LIB_COV_SRCS (core dirs + cjson only).
 test-cov-fd:
-  #!/usr/bin/env bash
-  set -euo pipefail
   # No hugepage/sudo allocation — matches test-unit-fd (consumer hardware, no root).
-  # Same LOCAL_MKS filter as test-unit-fd: only the 5 Tickoni libs.
+  # Same LOCAL_MKS filter: core + cjson only (coverage).
   # Halve parallelism vs unit-test because llvm-cov inflates per-job RSS.
-  jobs=$(( $(nproc) / 2 ))
-  (( jobs < 1 )) && jobs=1
-  {{make}} -j"${jobs}" MACHINE=tickoni_fd BUILDDIR=fd-cov \
-    "LOCAL_MKS=$(find src/tango src/util src/ballet src/disco src/waltz -name Local.mk | grep -vE 'disco/quic/|ballet/zksdk/|waltz/quic/' | tr '\n' ' ')" \
-    CC=clang-18 EXTRAS="llvm-cov" unit-test
-  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=fd-cov \
-    CC=clang-18 EXTRAS="llvm-cov" run-unit-test TEST_OPTS="--page-sz normal"
+  mkdir -p {{fd_cov_dir}}/obj
+  bash contrib/fd-build-lib.sh {{fd_cov_build}} clang-18 cov
   python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd
 
 test-cov-tk:

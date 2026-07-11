@@ -3,7 +3,7 @@
 
 #include "firedancer.h"
 
-#include "../../../ballet/json/cJSON.h"
+#include "third_party/cjson/cJSON.h"
 #include "../../../ballet/pb/fd_pb_encode.h"
 #include "../../../ballet/pb/fd_pb_tokenize.h"
 #include "../../../ballet/siphash13/fd_siphash13.h"
