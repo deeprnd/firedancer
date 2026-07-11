@@ -14,7 +14,7 @@
     </td>
     <td>
       <!-- badge:security:start -->
-<img alt="Security" src="https://img.shields.io/badge/security-failing-red?style=flat-square" />
+<img alt="Security" src="https://img.shields.io/badge/security-unknown-lightgrey?style=flat-square" />
 <!-- badge:security:end -->
     </td>
   </tr>
@@ -43,7 +43,7 @@
   <tr>
     <td>
       <!-- badge:cov-fd:start -->
-<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-34.4%25-red?style=flat-square" />
+<img alt="HFT Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-unknown-lightgrey?style=flat-square" />
 <!-- badge:cov-fd:end -->
     </td>
     <td>

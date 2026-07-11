@@ -275,7 +275,7 @@ define _make-proof
 
 .PHONY: $(1)
 $(1):
-	$(CBMC) $(MKPATH)$(2) --c17 -DCBMC --function cbmc_main
+	$(CBMC) $(MKPATH)$(2) -D__STDC_VERSION__=201710L --c11 -DCBMC --function cbmc_main
 
 proof: $(1)
 

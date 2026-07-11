@@ -64,9 +64,28 @@ else
 fi
 
 # Post-build: cov mode runs unit-test with coverage after libs.
-# Only needs llvm-cov (lz4 not required for coverage build).
+# Must include lz4 in EXTRAS: libfd_util.a contains fd_checkpt.c and
+# fd_restore.c which use LZ4 stream API; without EXTRAS="lz4" the .o
+# files are compiled with FD_HAS_LZ4=0 and the unit-test linker fails.
+# Must also pass BUILD_TARGET="unit-test" and clean stale objects in the
+# same make invocation so libs are recompiled with lz4 flags — same fix
+# as MODE=test (see lines 53-61), otherwise make considers libs
+# up-to-date and never recompiles them with the new flags.
+# Must also execute run-unit-test: without this, unit-test binaries are
+# built but never run, so no .profraw files are generated and
+# coverage.sh fails.  Halve parallelism vs unit-test because llvm-cov
+# inflates per-job RSS.  Also reduce --job-mem so a single test's page
+# budget (default 1 GiB = 262144 normal pages) fits the available free
+# pages on typical consumer hardware (coverage adds ~50% RSS overhead).
 if [ "$MODE" = "cov" ]; then
+  rm -rf "${OBJDIR:?}/"*
+  rm -f "${LIBDIR:?}/libfd_lz4.a" "${LIBDIR}/libfd_blst.a" "${LIBDIR}/libfd_zstd.a" \
+        "${LIBDIR}/libfd_ballet.a" "${LIBDIR}/libfd_waltz.a" "${LIBDIR}/libfd_disco.a" \
+        "${LIBDIR}/libfd_tango.a" "${LIBDIR}/libfd_util.a"
+  fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" \
+    "SRCS=${SRCS[*]}" EXTRAS="lz4 llvm-cov" BUILD_TARGET="unit-test"
+  COV_JOBS=$(( $(nproc) / 2 ))
+  [[ "$COV_JOBS" -lt 1 ]] && COV_JOBS=1
   make -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" CC="${CC}" \
-    EXTRAS="llvm-cov" LOCAL_MKS="$(fd_compute_mks "${SRCS[@]}")" \
-    unit-test
+    run-unit-test TEST_OPTS="--page-sz normal --job-mem 268435456 -j ${COV_JOBS}"
 fi
