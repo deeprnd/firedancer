@@ -73,12 +73,11 @@ cmd_proof_check_fd() {
 }
 
 cmd_sanitize_check_fd() {
-  # Same 5-lib LOCAL_MKS filter as cov/build/test — only tango, util, ballet,
-  # disco, waltz (minus disco/quic, ballet/zksdk, waltz/quic).  Excludes
-  # flamenco and other dirs so we only compile what gets linked into the
-  # Tickoni harness libs.
-  _local_mks=$(find src/tango src/util src/ballet src/disco src/waltz \
-    -name Local.mk | grep -vE 'disco/quic/|ballet/zksdk/|waltz/quic/' | tr '\n' ' ')
+  # Source the shared FD lib definitions so the 5-lib scope stays in one place.
+  # contrib/fd-tk-libs.sh defines FD_TK_LIB_SRCS, FD_TK_LIB_EXCLUDES, etc.
+  source contrib/fd-tk-libs.sh
+  local _local_mks
+  _local_mks=$(fd_compute_mks "${FD_TK_LIB_SRCS[@]}")
   if [ ! -d "build/clang-asan-ubsan" ]; then
     run_step "clang asan+ubsan build" \
       make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" \
