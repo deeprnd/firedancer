@@ -57,7 +57,7 @@ if [ "$MODE" = "test" ]; then
   rm -rf "${OBJDIR:?}/"*
   # Also delete empty extra-libs from a prior MODE=libs build — make
   # would consider them up-to-date and skip recompilation with EXTRAS.
-  rm -f "${LIBDIR:?}/libfd_lz4.a" "${LIBDIR}/libfd_blst.a" "${LIBDIR}/libfd_zstd.a"
+  rm -f "${LIBDIR:?}/libfd_lz4.a" "${LIBDIR}/libfd_blst.a" "${LIBDIR}/libfd_zstd.a" "${LIBDIR}/libfd_ballet.a" "${LIBDIR}/libfd_waltz.a" "${LIBDIR}/libfd_disco.a" "${LIBDIR}/libfd_tango.a" "${LIBDIR}/libfd_util.a"
   fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" EXTRAS="lz4 blst zstd" BUILD_TARGET="unit-test"
 else
   fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}"
