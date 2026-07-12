@@ -52,7 +52,7 @@ def _coverage_color(pct: float) -> str:
 
 
 def _read_coverage_pct(path: Path) -> float | None:
-    """Return average line/branch/function coverage, or None if nothing was measured."""
+    """Return branch coverage percentage, or None if nothing was measured."""
     if not path.exists():
         raise FileNotFoundError(f"Missing coverage summary: {path}")
     try:
@@ -60,15 +60,14 @@ def _read_coverage_pct(path: Path) -> float | None:
     except Exception as exc:
         raise ValueError(f"Failed to parse {path}: {exc}") from exc
     total = data.get("total", {})
-    pcts = [
-        float(total[m]["pct"])
-        for m in ("lines", "branches", "functions")
-        if isinstance(total.get(m, {}).get("pct"), (int, float))
-        and total[m].get("total", 0) > 0
-    ]
-    if not pcts:
+    branches = total.get("branches", {})
+    total_count = branches.get("total", 0)
+    if total_count == 0:
         return None
-    return round(sum(pcts) / len(pcts), 1)
+    pct = branches.get("pct", None)
+    if pct is None:
+        return None
+    return round(float(pct), 1)
 
 
 def badge_for_exit_code(alt: str, label: str, exit_code: int) -> str:

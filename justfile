@@ -179,6 +179,7 @@ test-all:
 # Build test binaries: libs + unit-test target.
 # Uses FD_TK_LIB_TEST_SRCS (extra: picohttpparser, blst, lz4, zstd, nanopb).
 test-unit-fd:
+  set timeout := 600
   # Override LOCAL_MKS so everything.mk's ?= assignment is skipped.
   # Only the 5 Tickoni dirs: tango, util, ballet, disco, waltz —
   # minus subdirs not compiled into the 5 libs (disco/quic, ballet/zksdk,

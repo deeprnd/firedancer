@@ -94,34 +94,42 @@ def _build_summary(
 
 def cmd_coverage_fd(covdir: Path, output: Path, config: Path) -> int:
     profdata = covdir / "cov.profdata"
-    mappings_ar = covdir / "mappings.ar"
+    unitdir = covdir / "unit-test"
 
     if not profdata.exists():
         print(f"ERROR: {profdata} not found — run the unit tests with EXTRAS=llvm-cov first", file=sys.stderr)
         return 1
-    if not mappings_ar.exists():
-        print(f"ERROR: {mappings_ar} not found — coverage mappings archive was not built", file=sys.stderr)
+
+    # Use compiled test binaries instead of individual .o files.
+    # Test binaries contain binary IDs that allow llvm-cov to match coverage
+    # data directly (~0.1s). Individual .o files lack binary IDs and force
+    # llvm-cov to scan all symbols in 12,918+ functions (~900s+).
+    test_bins = sorted([
+        str(b) for b in unitdir.iterdir()
+        if b.is_file() and b.name.startswith("test_") and not b.name.startswith("bench_")
+    ])
+
+    if not test_bins:
+        print(f"ERROR: no test binaries found in {unitdir}", file=sys.stderr)
         return 1
 
-    # coverage.sh always rebuilds cov.profdata and mappings.ar before calling this
-    # function, so stale detection is unnecessary and would only remove valid data.
+    cmd = [
+        "llvm-cov", "export",
+        "--format=text",
+        "--summary-only",
+        f"--instr-profile={profdata}",
+        "--ignore-filename-regex=(test_|fuzz_)*\\.c",
+    ] + test_bins
 
     t0 = time.monotonic()
     result = subprocess.run(
-        [
-            "llvm-cov", "export",
-            "--format=text",
-            "--summary-only",
-            f"--instr-profile={profdata}",
-            "--ignore-filename-regex=(test_|fuzz_).*\\.c",
-            str(mappings_ar),
-        ],
+        cmd,
         capture_output=True,
         text=True,
         timeout=900,
     )
     elapsed = round(time.monotonic() - t0, 1)
-    print(f"[coverage] llvm-cov export took {elapsed}s", file=sys.stderr)
+    print(f"[coverage] llvm-cov export took {elapsed}s ({len(test_bins)} test binaries)", file=sys.stderr)
     if result.returncode != 0:
         print(result.stderr, file=sys.stderr)
         raise RuntimeError(f"llvm-cov export failed (exit {result.returncode})")
