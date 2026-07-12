@@ -258,6 +258,7 @@ test-integration-all:
 # Build coverage: libs (core + cjson) + unit-test target with llvm-cov.
 # Uses FD_TK_LIB_COV_SRCS (core dirs + cjson only).
 test-cov-fd:
+  set timeout := 600
   # No hugepage/sudo allocation — matches test-unit-fd (consumer hardware, no root).
   # Same LOCAL_MKS filter: core + cjson only (coverage).
   # Halve parallelism vs unit-test because llvm-cov inflates per-job RSS.
