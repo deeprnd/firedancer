@@ -10,6 +10,7 @@ Usage:
 """
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -121,12 +122,19 @@ def cmd_coverage_fd(covdir: Path, output: Path, config: Path) -> int:
         "--ignore-filename-regex=(test_|fuzz_)*\\.c",
     ] + test_bins
 
+    # Disable debuginfod — llvm-cov tries to query debuginfod.ubuntu.com
+    # for debug symbol data and hangs when the DNS resolver (systemd-resolved
+    # stub at 127.0.0.53) is unreachable (no network, container, etc.).
+    cov_env = os.environ.copy()
+    cov_env["DEBUGINFOD_URLS"] = ""
+
     t0 = time.monotonic()
     result = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         timeout=900,
+        env=cov_env,
     )
     elapsed = round(time.monotonic() - t0, 1)
     print(f"[coverage] llvm-cov export took {elapsed}s ({len(test_bins)} test binaries)", file=sys.stderr)
