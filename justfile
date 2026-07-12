@@ -86,6 +86,9 @@ build-tk:
 # requested .a targets. We list only the 5 libraries Tickoni needs as
 # the final archive targets.
 #
+# CI alias — .github/actions/build-fd-tk-libs/action.yml delegates to this.
+build-fd-tk-libs: build-fd
+
 # Adding a new lib: edit contrib/fd-tk-libs.sh (FD_TK_LIBS or
 # FD_TK_LIBS_EXTRA arrays). All justfile/CI/quality/security consumers
 # pick up the change automatically.

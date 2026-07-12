@@ -77,15 +77,16 @@ cmd_sanitize_check_fd() {
   # contrib/fd-tk-libs.sh defines FD_TK_LIB_SRCS, FD_TK_LIB_EXCLUDES, etc.
   source contrib/fd-tk-libs.sh
   local _local_mks
-  _local_mks=$(fd_compute_mks "${FD_TK_LIB_SRCS[@]}")
-  if [ ! -d "build/clang-asan-ubsan" ]; then
-    run_step "clang asan+ubsan build" \
-      make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" \
-        "LOCAL_MKS=$_local_mks" \
-        unit-test
-  fi
-  run_step "clang asan+ubsan check" \
-    make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" \
+  _local_mks=$(fd_compute_mks "${FD_TK_LIB_TEST_SRCS[@]}")
+  # Always rebuild libs first (they depend on EXTRAS flags), then build unit tests.
+  # Use -B to force rebuild: if EXTRAS changed the FD_HAS_* defs, stale .a files
+  # from a previous build with different EXTRAS would silently link wrong code.
+  run_step "clang asan+ubsan lib" \
+    make -B -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan blst zstd lz4" \
+      "LOCAL_MKS=$_local_mks" \
+      lib
+  run_step "clang asan+ubsan unit-test" \
+    make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan blst zstd lz4" \
       "LOCAL_MKS=$_local_mks" \
       unit-test
 }
