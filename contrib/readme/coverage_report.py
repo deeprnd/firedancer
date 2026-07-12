@@ -10,8 +10,10 @@ Usage:
 """
 
 import json
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
@@ -93,27 +95,49 @@ def _build_summary(
 
 def cmd_coverage_fd(covdir: Path, output: Path, config: Path) -> int:
     profdata = covdir / "cov.profdata"
-    mappings_ar = covdir / "mappings.ar"
+    unitdir = covdir / "unit-test"
 
     if not profdata.exists():
         print(f"ERROR: {profdata} not found — run the unit tests with EXTRAS=llvm-cov first", file=sys.stderr)
         return 1
-    if not mappings_ar.exists():
-        print(f"ERROR: {mappings_ar} not found — coverage mappings archive was not built", file=sys.stderr)
+
+    # Use compiled test binaries instead of individual .o files.
+    # Test binaries contain binary IDs that allow llvm-cov to match coverage
+    # data directly (~0.1s). Individual .o files lack binary IDs and force
+    # llvm-cov to scan all symbols in 12,918+ functions (~900s+).
+    test_bins = sorted([
+        str(b) for b in unitdir.iterdir()
+        if b.is_file() and b.name.startswith("test_") and not b.name.startswith("bench_")
+    ])
+
+    if not test_bins:
+        print(f"ERROR: no test binaries found in {unitdir}", file=sys.stderr)
         return 1
 
+    cmd = [
+        "llvm-cov", "export",
+        "--format=text",
+        "--summary-only",
+        f"--instr-profile={profdata}",
+        "--ignore-filename-regex=(test_|fuzz_)*\\.c",
+    ] + test_bins
+
+    # Disable debuginfod — llvm-cov tries to query debuginfod.ubuntu.com
+    # for debug symbol data and hangs when the DNS resolver (systemd-resolved
+    # stub at 127.0.0.53) is unreachable (no network, container, etc.).
+    cov_env = os.environ.copy()
+    cov_env["DEBUGINFOD_URLS"] = ""
+
+    t0 = time.monotonic()
     result = subprocess.run(
-        [
-            "llvm-cov", "export",
-            "--format=text",
-            "--summary-only",
-            f"--instr-profile={profdata}",
-            "--ignore-filename-regex=(test_|fuzz_).*\\.c",
-            str(mappings_ar),
-        ],
+        cmd,
         capture_output=True,
         text=True,
+        timeout=900,
+        env=cov_env,
     )
+    elapsed = round(time.monotonic() - t0, 1)
+    print(f"[coverage] llvm-cov export took {elapsed}s ({len(test_bins)} test binaries)", file=sys.stderr)
     if result.returncode != 0:
         print(result.stderr, file=sys.stderr)
         raise RuntimeError(f"llvm-cov export failed (exit {result.returncode})")

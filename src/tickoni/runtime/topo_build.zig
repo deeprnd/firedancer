@@ -77,10 +77,10 @@ fn linkNameZ(buf: []u8, idx: usize) [*:0]const u8 {
     return @ptrCast(buf.ptr);
 }
 
-fn tileCpuIdx(placement: cpu_placement.CpuPlacement) usize {
+fn tileCpuIdx(tile_idx: usize, placement: cpu_placement.CpuPlacement) usize {
     return switch (placement) {
         .exclusive => |cpu| cpu,
-        .shared => |cpu| cpu,
+        .shared => |cpu| cpu + @as(usize, @intCast(tile_idx)),
         .floating => cpu_idx_floating,
     };
 }
@@ -120,7 +120,7 @@ pub fn build(
         var tile_name_buf: [8]u8 = undefined;
         const tile_id = c_abi.topob.topobTile(topo, toZ(&tile_name_buf, t.id.slice()), wksp_name_z, wksp_name_z, 0);
         _ = tile_id;
-        cpu_idx_arr[i] = tileCpuIdx(t.cpu_placement);
+        cpu_idx_arr[i] = tileCpuIdx(i, t.cpu_placement);
     }
 
     c_abi.topob.topobAutoLayout(topo, @as([*]const usize, cpu_idx_arr.ptr));

@@ -47,8 +47,10 @@
 | <span class="metrics-name">tile_&#8203;cpu_&#8203;duration_&#8203;nanos</span><br/>{cpu_&#8203;regime="<span class="metrics-enum">idle</span>"} | counter | CPU time spent in each CPU regime, in nanoseconds (Idle (task was not runnable)) |
 | <span class="metrics-name">tile_&#8203;cpu_&#8203;duration_&#8203;nanos</span><br/>{cpu_&#8203;regime="<span class="metrics-enum">user</span>"} | counter | CPU time spent in each CPU regime, in nanoseconds (User (task was scheduled and executing in user mode)) |
 | <span class="metrics-name">tile_&#8203;cpu_&#8203;duration_&#8203;nanos</span><br/>{cpu_&#8203;regime="<span class="metrics-enum">system</span>"} | counter | CPU time spent in each CPU regime, in nanoseconds (System (task was scheduled and executing in kernel mode)) |
+| <span class="metrics-name">tile_&#8203;cpu_&#8203;duration_&#8203;nanos</span><br/>{cpu_&#8203;regime="<span class="metrics-enum">interrupt</span>"} | counter | CPU time spent in each CPU regime, in nanoseconds (Interrupt (CPU time stolen by hardirq/softirq handlers or a hypervisor; fixed tiles only)) |
 | <span class="metrics-name">tile_&#8203;irq_&#8203;preempted</span> | counter | Times the tile was interrupted by an IRQ (fixed tiles only) |
 | <span class="metrics-name">tile_&#8203;tlb_&#8203;shootdown</span> | counter | TLB shootdowns observed on the tile CPU (fixed tiles only) |
+| <span class="metrics-name">tile_&#8203;timer_&#8203;tick</span> | counter | Local timer interrupts (LOC) observed on the tile CPU (fixed tiles only) |
 
 </div>
 
@@ -73,6 +75,15 @@
 | <span class="metrics-name">ipecho_&#8203;conn_&#8203;closed</span><br/>{conn_&#8203;close_&#8203;result="<span class="metrics-enum">error</span>"} | counter | Connections to the ipecho service made and closed, by outcome (Closed abnormally) |
 | <span class="metrics-name">ipecho_&#8203;bytes_&#8203;read</span> | counter | Bytes read from all connections to the ipecho service |
 | <span class="metrics-name">ipecho_&#8203;bytes_&#8203;written</span> | counter | Bytes written to all connections to the ipecho service |
+
+</div>
+
+## Admin Tile
+
+<div class="metrics">
+
+| Metric | Type | Description |
+|--------|------|-------------|
 
 </div>
 
@@ -575,6 +586,19 @@
 | <span class="metrics-name">execle_&#8203;vm_&#8203;regime_&#8203;duration_&#8203;nanos</span><br/>{vm_&#8203;regime="<span class="metrics-enum">setup_&#8203;cpi</span>"} | counter | Mutually exclusive and exhaustive duration spent in virtual machine execution regimes, in nanoseconds (VM setup (CPI)) |
 | <span class="metrics-name">execle_&#8203;vm_&#8203;regime_&#8203;duration_&#8203;nanos</span><br/>{vm_&#8203;regime="<span class="metrics-enum">commit_&#8203;cpi</span>"} | counter | Mutually exclusive and exhaustive duration spent in virtual machine execution regimes, in nanoseconds (VM commit (CPI)) |
 | <span class="metrics-name">execle_&#8203;vm_&#8203;regime_&#8203;duration_&#8203;nanos</span><br/>{vm_&#8203;regime="<span class="metrics-enum">interpreter</span>"} | counter | Mutually exclusive and exhaustive duration spent in virtual machine execution regimes, in nanoseconds (VM interpreter execution) |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;lookup</span> | counter | Program cache lookups |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;hit</span> | counter | Program cache hits |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;miss</span> | counter | Program cache misses |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;oom_&#8203;heap</span> | counter | Program cache out-of-memory events (heap) |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;oom_&#8203;desc</span> | counter | Program cache out-of-memory events (descriptor table) |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;fill</span> | counter | Program cache insertions |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;fill_&#8203;bytes</span> | counter | Bytes inserted into program cache |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;spill</span> | counter | Program cache spills (OOM fallback mechanism) |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;spill_&#8203;bytes</span> | counter | Bytes spilled from program cache (OOM fallback mechanism) |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;eviction</span> | counter | Program cache evictions |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;eviction_&#8203;bytes</span> | counter | Bytes evicted from program cache |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;duration_&#8203;seconds</span> | counter | Time spent on program cache operations, in seconds |
+| <span class="metrics-name">execle_&#8203;progcache_&#8203;load_&#8203;duration_&#8203;seconds</span> | counter | Time spent loading programs, in seconds |
 | <span class="metrics-name">execle_&#8203;accdb_&#8203;account_&#8203;acquired</span><br/>{accdb_&#8203;cache_&#8203;class="<span class="metrics-enum">class0</span>"} | counter | Number of accounts acquired from the account database, attributed to the cache size class of the account's current data size (0-128 B) |
 | <span class="metrics-name">execle_&#8203;accdb_&#8203;account_&#8203;acquired</span><br/>{accdb_&#8203;cache_&#8203;class="<span class="metrics-enum">class1</span>"} | counter | Number of accounts acquired from the account database, attributed to the cache size class of the account's current data size (129-512 B) |
 | <span class="metrics-name">execle_&#8203;accdb_&#8203;account_&#8203;acquired</span><br/>{accdb_&#8203;cache_&#8203;class="<span class="metrics-enum">class2</span>"} | counter | Number of accounts acquired from the account database, attributed to the cache size class of the account's current data size (513 B-2 KiB) |
@@ -982,6 +1006,10 @@
 
 | Metric | Type | Description |
 |--------|------|-------------|
+| <span class="metrics-name">replay_&#8203;identity_&#8203;balance_&#8203;lamports</span> | gauge | Identity account balance at the optimistically confirmed slot |
+| <span class="metrics-name">replay_&#8203;active_&#8203;stake_&#8203;lamports</span> | gauge | Our active stake at the optimistically confirmed slot |
+| <span class="metrics-name">replay_&#8203;cluster_&#8203;active_&#8203;stake_&#8203;lamports</span> | gauge | Total cluster active stake at the optimistically confirmed slot |
+| <span class="metrics-name">replay_&#8203;epoch_&#8203;credits</span> | gauge | Our vote account epoch credits at the optimistically confirmed slot |
 | <span class="metrics-name">replay_&#8203;store_&#8203;query_&#8203;acquired</span> | counter | Store slock acquires for query |
 | <span class="metrics-name">replay_&#8203;store_&#8203;query_&#8203;released</span> | counter | Store slock releases for query |
 | <span class="metrics-name">replay_&#8203;store_&#8203;query_&#8203;wait_&#8203;seconds</span> | histogram | Time spent waiting to acquire the slock for query |
@@ -1726,6 +1754,7 @@
 | <span class="metrics-name">bank_&#8203;txn_&#8203;result</span><br/>{transaction_&#8203;error="<span class="metrics-enum">unbalanced_&#8203;transaction</span>"} | counter | Result of loading and executing a transaction (The total balance before the transaction does not equal the total balance after the transaction) |
 | <span class="metrics-name">bank_&#8203;txn_&#8203;result</span><br/>{transaction_&#8203;error="<span class="metrics-enum">program_&#8203;cache_&#8203;hit_&#8203;max_&#8203;limit</span>"} | counter | Result of loading and executing a transaction (The total program cache size hit the maximum allowed limit) |
 | <span class="metrics-name">bank_&#8203;txn_&#8203;result</span><br/>{transaction_&#8203;error="<span class="metrics-enum">commit_&#8203;cancelled</span>"} | counter | Result of loading and executing a transaction (The process for committing the transaction was cancelled internally) |
+| <span class="metrics-name">bank_&#8203;txn_&#8203;result</span><br/>{transaction_&#8203;error="<span class="metrics-enum">instructions_&#8203;sysvar_&#8203;overflow</span>"} | counter | Result of loading and executing a transaction (The instructions sysvar could not be serialized because the transaction's instruction data exceeds the maximum size) |
 | <span class="metrics-name">bank_&#8203;txn_&#8203;result</span><br/>{transaction_&#8203;error="<span class="metrics-enum">bundle_&#8203;peer</span>"} | counter | Result of loading and executing a transaction (Transaction is part of a bundle and one of the peer transactions failed) |
 | <span class="metrics-name">bank_&#8203;txn_&#8203;processing_&#8203;failed</span> | counter | Transactions for which the processing stage failed and won't land on chain |
 | <span class="metrics-name">bank_&#8203;txn_&#8203;fee_&#8203;only</span> | counter | Transactions that will land on chain but without executing |

@@ -6,6 +6,7 @@
 #include "../../disco/store/fd_store.h"
 #include "../../disco/bundle/fd_bundle_crank.h"
 #include "../../disco/keyguard/fd_keyswitch.h"
+#include "../../disco/node_info/fd_node_info.h"
 #include "../../discof/reasm/fd_reasm.h"
 #include "../../discof/replay/fd_sched.h"
 #include "../../flamenco/capture/fd_capture_ctx.h"
@@ -322,17 +323,18 @@ struct fd_replay_tile {
   int         recv_poh;
   ulong       next_leader_slot;
   long        next_leader_tickcount;
+  double      tick_per_ns;
   ulong       highwater_leader_slot;
   ulong       reset_slot;
   fd_bank_t * reset_bank;
   fd_hash_t   reset_block_id;
   long        reset_timestamp_nanos;
-  double      slot_duration_nanos;
-  double      slot_duration_ticks;
   fd_bank_t * leader_bank;
 
   fd_pubkey_t      identity_pubkey[1];
   ulong            identity_idx;
+
+  fd_node_info_box_t * node_info; /* shared */
 
   fd_keyswitch_t * keyswitch;
   int              halt_leader;
