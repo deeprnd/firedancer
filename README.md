@@ -48,7 +48,7 @@
     </td>
     <td>
       <!-- badge:cov-tk:start -->
-<img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-90.2%25-brightgreen?style=flat-square" />
+<img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-unknown-lightgrey?style=flat-square" />
 <!-- badge:cov-tk:end -->
     </td>
     <td></td>

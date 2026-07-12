@@ -23,6 +23,8 @@ BADGE_SPECS = {
     "integration": ("Integration Tests", "integration tests", "boolean",  None),
     "quality":     ("Quality",           "quality",           "boolean",  None),
     "security":    ("Security",          "security",          "boolean",  None),
+    "system":      ("System Tests",      "system tests",      "boolean",  None),
+    "e2e":         ("E2E Tests",         "e2e tests",         "boolean",  None),
     "cov-fd":      ("HFT Engine Coverage",        "engine coverage",      "coverage", REPO_ROOT / "build/coverage/fd/coverage-summary.json"),
     "cov-tk":      ("AI Harness Coverage",        "harness coverage",     "coverage", REPO_ROOT / "build/coverage/tk/coverage-summary.json"),
 }
