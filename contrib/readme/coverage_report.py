@@ -102,6 +102,28 @@ def cmd_coverage_fd(covdir: Path, output: Path, config: Path) -> int:
         print(f"ERROR: {mappings_ar} not found — coverage mappings archive was not built", file=sys.stderr)
         return 1
 
+    # Detect stale coverage data: if any .o file is newer than cov.profdata,
+    # the profile won't match the current objects and llvm-cov will hang.
+    stale = False
+    if profdata.exists():
+        cov_mtime = profdata.stat().st_mtime
+        for o in Path(covdir).rglob("*.o"):
+            if o.stat().st_mtime > cov_mtime:
+                print(f"WARNING: stale coverage data detected ({o} newer than {profdata}), cleaning", file=sys.stderr)
+                stale = True
+                break
+    if stale:
+        # Clean both artifacts so coverage.sh rebuilds them
+        for f in (profdata, mappings_ar):
+            if f.exists():
+                f.unlink()
+                print(f"removed {f}", file=sys.stderr)
+        # coverage.sh will rebuild; but if called standalone via just,
+        # still need to try or bail
+        if not profdata.exists():
+            print(f"ERROR: coverage data cleaned and not rebuilt — run the full test-cov-fd target", file=sys.stderr)
+            return 1
+
     result = subprocess.run(
         [
             "llvm-cov", "export",
@@ -113,6 +135,7 @@ def cmd_coverage_fd(covdir: Path, output: Path, config: Path) -> int:
         ],
         capture_output=True,
         text=True,
+        timeout=300,
     )
     if result.returncode != 0:
         print(result.stderr, file=sys.stderr)
