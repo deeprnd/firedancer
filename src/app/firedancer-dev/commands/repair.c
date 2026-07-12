@@ -7,7 +7,6 @@
 #include "../../../disco/topo/fd_topob.h"
 #include "../../../disco/topo/fd_cpu_topo.h"
 #include "../../../util/pod/fd_pod_format.h"
-#include "../../../util/tile/fd_tile_private.h"
 
 #include "../../firedancer/topology.h"
 #include "../../shared/commands/configure/configure.h"
@@ -112,6 +111,7 @@ repair_generate_epoch_info_msg( ulong                                       epoc
   epoch_info_msg->start_slot        = fd_epoch_slot0( epoch_schedule, epoch );
   epoch_info_msg->slot_cnt          = fd_epoch_slot_cnt( epoch_schedule, epoch );
   epoch_info_msg->excluded_id_stake = 0UL;
+  epoch_info_msg->ns_per_slot       = FD_SLOT_PARAMS_400MS.ns_per_slot;
 
   fd_memset( &epoch_info_msg->features, 0xFF, sizeof(fd_features_t) );
 
@@ -289,7 +289,7 @@ repair_topo( config_t * config ) {
   fd_topo_cpus_init( cpus );
 
   ulong affinity_tile_cnt = 0UL;
-  if( FD_LIKELY( !is_auto_affinity ) ) affinity_tile_cnt = fd_tile_private_cpus_parse( config->layout.affinity, parsed_tile_to_cpu );
+  if( FD_LIKELY( !is_auto_affinity ) ) affinity_tile_cnt = fd_topob_parse_affinity_cstr( config->layout.affinity, parsed_tile_to_cpu, 0 );
 
   for( ulong i=0UL; i<affinity_tile_cnt; i++ ) {
     if( FD_UNLIKELY( parsed_tile_to_cpu[ i ]!=USHORT_MAX && parsed_tile_to_cpu[ i ]>=cpus->cpu_cnt ) )

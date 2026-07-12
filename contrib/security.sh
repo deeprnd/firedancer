@@ -73,20 +73,20 @@ cmd_proof_check_fd() {
 }
 
 cmd_sanitize_check_fd() {
-  # Same 5-lib LOCAL_MKS filter as cov/build/test — only tango, util, ballet,
-  # disco, waltz (minus disco/quic, ballet/zksdk, waltz/quic).  Excludes
-  # flamenco and other dirs so we only compile what gets linked into the
-  # Tickoni harness libs.
-  _local_mks=$(find src/tango src/util src/ballet src/disco src/waltz \
-    -name Local.mk | grep -vE 'disco/quic/|ballet/zksdk/|waltz/quic/' | tr '\n' ' ')
-  if [ ! -d "build/clang-asan-ubsan" ]; then
-    run_step "clang asan+ubsan build" \
-      make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" \
-        "LOCAL_MKS=$_local_mks" \
-        unit-test
-  fi
-  run_step "clang asan+ubsan check" \
-    make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan" \
+  # Source the shared FD lib definitions so the 5-lib scope stays in one place.
+  # contrib/fd-tk-libs.sh defines FD_TK_LIB_SRCS, FD_TK_LIB_EXCLUDES, etc.
+  source contrib/fd-tk-libs.sh
+  local _local_mks
+  _local_mks=$(fd_compute_mks "${FD_TK_LIB_TEST_SRCS[@]}")
+  # Always rebuild libs first (they depend on EXTRAS flags), then build unit tests.
+  # Use -B to force rebuild: if EXTRAS changed the FD_HAS_* defs, stale .a files
+  # from a previous build with different EXTRAS would silently link wrong code.
+  run_step "clang asan+ubsan lib" \
+    make -B -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan blst zstd lz4" \
+      "LOCAL_MKS=$_local_mks" \
+      lib
+  run_step "clang asan+ubsan unit-test" \
+    make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan blst zstd lz4" \
       "LOCAL_MKS=$_local_mks" \
       unit-test
 }

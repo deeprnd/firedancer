@@ -1,12 +1,12 @@
 {
-  "commit": "e74e1d71a66c1f5c3e749db50cd744298a530bf8",
-  "date": "2026-07-03 22:52:18 +0300",
+  "commit": "02a7870fd0ae527e2fa6216b36a554ad31905540",
+  "date": "2026-07-11 19:15:24 +0300",
   "files": {
     "src/disco/topo/fd_topo_run.c": "8802d1e6915ef040b4500c396c9da4c3995b4b6187f1e3e30ebed6c42b79b14a",
-    "src/disco/topo/fd_topo.h": "a9fd985d69e3d10d878826c944cd32713efeb7fd2a0d6c2323881e9551dfc8b6",
+    "src/disco/topo/fd_topo.h": "e850d366111a1d9222f474cd2418f5f69bb955d98f8c928474c8d6f0fd5cdb2e",
     "src/disco/topo/fd_topo.c": "50852f72ac88918cc02a71bbe4f3c2448836348eb70470fd51be9d33f0b9c5d3",
-    "src/disco/stem/fd_stem.c": "87fde4e12e9dfccee27ef893e5ef68d70d0aceb397a7ecf159144832fefcc134",
-    "src/app/shared/commands/run/run.c": "18db423ef9bf2dba1b9d78282365df7cf940ac330ca67f87c26dbfc496dc5b5a",
+    "src/disco/stem/fd_stem.c": "ef9e9bd0d18d5f1d9a65865d86dfb66c9a56d558f485d531abd686da8baa7048",
+    "src/app/shared/commands/run/run.c": "6d96ec1f4cd19a026f21a8ea36595b63f631485f8b3ebce60f1a537f6e981e47",
     "src/app/shared/commands/run/run1.c": "0345b202c47067f99929dfd1ae5e1c43dfd5907d436235e42d2a782f4537f99b",
     "src/app/shared/boot/fd_boot.c": "106e21eec3f52253afde48a8432690d6ef257cf6dbc36ac407c662b9949cc9e3",
     "src/util/sandbox/fd_sandbox.c": "86ee0aefd86bc86f1a9d15f6c2a36ebfb8339da4398c0faddfedf4c6d942702f",

@@ -42,8 +42,20 @@ llama_dir="$(tk_resolve_llama_cpp_dir)"
 server_bin="${llama_dir}/llama-server"
 
 if [[ -x "$server_bin" ]]; then
-  echo "llama.cpp present: ${llama_dir}"
-  exit 0
+  # Rebuild if the binary's backend doesn't match the requested one.
+  has_cuda=$(ldd "$server_bin" 2>/dev/null | grep -ci 'cuda\|cublas' || echo 0)
+  if (( gpu_build == 1 && has_cuda == 0 )); then
+    echo "binary exists but lacks CUDA; rebuilding with CUDA"
+    # fall through to rebuild
+  elif (( gpu_build == 0 && has_cuda > 0 )); then
+    echo "binary has CUDA but CPU build requested; rebuilding CPU-only"
+    rm -rf "${llama_dir}/build"
+  else
+    echo "llama.cpp present: ${llama_dir}"
+    exit 0
+  fi
+else
+  echo "llama.cpp missing: ${llama_dir}"
 fi
 
 if (( check_only )); then

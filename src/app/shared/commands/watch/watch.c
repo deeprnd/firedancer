@@ -4,6 +4,9 @@
 #include "../../../../discof/restore/fd_snapct_tile.h"
 #include "../../../../discof/gossip/fd_gossip_tile.h"
 #include "../../../../disco/metrics/fd_metrics.h"
+#include "../../../../disco/node_info/fd_node_info.h"
+#include "../../../../disco/genesis/fd_genesis_cluster.h"
+#include "../../../../util/pod/fd_pod.h"
 #include "../../../../util/tile/fd_tile.h"
 
 #include <errno.h>
@@ -254,6 +257,10 @@ static ulong rserve_rps_valid_samples_idx = 0UL;
 static ulong rserve_rps_valid_samples[ 100UL ];
 static ulong rserve_rps_invalid_samples_idx = 0UL;
 static ulong rserve_rps_invalid_samples[ 100UL ];
+static ulong rserve_rps_miss_samples[ 100UL ];
+static ulong rserve_rps_sigvfy_samples[ 100UL ];
+static ulong rserve_rps_stale_samples[ 100UL ];
+static ulong rserve_rps_other_rej_samples[ 100UL ];
 
 #define RESET   "\033[0m"
 #define BOLD    "\033[1m"
@@ -261,6 +268,7 @@ static ulong rserve_rps_invalid_samples[ 100UL ];
 
 #define RED     "\033[31m"
 #define GREEN   "\033[32m"
+#define ORANGE  "\033[38;5;208m"
 #define YELLOW  "\033[33m"
 #define BLUE    "\033[34m"
 #define MAGENTA "\033[35m"
@@ -936,12 +944,15 @@ write_rserve( config_t const * config,
   ulong rserve_tile_idx = fd_topo_find_tile( &config->topo, "rserve", 0UL );
   if( rserve_tile_idx==ULONG_MAX ) return 0UL;
 
-  (void)cur_tile;
+  ulong const * t = cur_tile + rserve_tile_idx*FD_METRICS_TOTAL_SZ;
 
   ulong shreds_stored_sum = 0UL;
   ulong num_stored_shreds = fd_ulong_min( shreds_stored_samples_idx, sizeof(shreds_stored_sample)/sizeof(shreds_stored_sample[0]));
   for( ulong i=0UL; i<num_stored_shreds; i++ ) shreds_stored_sum += shreds_stored_sample[ i ];
   char * shreds_stored = COUNTF( 100.0*(double)shreds_stored_sum/(double)num_stored_shreds );
+
+  ulong shreds_cur = t[ MIDX( GAUGE, RSERVE, SHREDS_CURRENT ) ];
+  ulong shreds_max = t[ MIDX( GAUGE, RSERVE, SHREDS_MAX     ) ];
 
   ulong valid_sum = 0UL;
   ulong num_valid_samples = fd_ulong_min( rserve_rps_valid_samples_idx, sizeof(rserve_rps_valid_samples)/sizeof(rserve_rps_valid_samples[0]) );
@@ -956,16 +967,51 @@ write_rserve( config_t const * config,
   ulong num_total_samples = fd_ulong_max( num_valid_samples, 1UL );
   char * total_str = COUNTF( 100.0*(double)(valid_sum+invalid_sum)/(double)num_total_samples );
 
+  ulong n_inv = fd_ulong_max( num_invalid_samples, 1UL );
+
+  ulong miss_sum = 0UL;
+  for( ulong i=0UL; i<num_invalid_samples; i++ ) miss_sum += rserve_rps_miss_samples[ i ];
+  char * miss_str = COUNTF( 100.0*(double)miss_sum/(double)n_inv );
+
+  ulong sigvfy_sum = 0UL;
+  for( ulong i=0UL; i<num_invalid_samples; i++ ) sigvfy_sum += rserve_rps_sigvfy_samples[ i ];
+  char * sigvfy_str = COUNTF( 100.0*(double)sigvfy_sum/(double)n_inv );
+
+  ulong stale_sum = 0UL;
+  for( ulong i=0UL; i<num_invalid_samples; i++ ) stale_sum += rserve_rps_stale_samples[ i ];
+  char * stale_str = COUNTF( 100.0*(double)stale_sum/(double)n_inv );
+
+  ulong other_sum = 0UL;
+  for( ulong i=0UL; i<num_invalid_samples; i++ ) other_sum += rserve_rps_other_rej_samples[ i ];
+  char * other_str = COUNTF( 100.0*(double)other_sum/(double)n_inv );
+
+  ulong  disk_used  = t[ MIDX( GAUGE, RSERVE, DISK_CURRENT_BYTES   ) ];
+  ulong  disk_alloc = t[ MIDX( GAUGE, RSERVE, DISK_ALLOCATED_BYTES ) ];
+  double disk_gb    = (double)disk_alloc/1e9;
+  double disk_pct   = disk_alloc ? 100.0*(double)disk_used/(double)disk_alloc : 0.0;
+
+  char * shreds_cur_str = COUNT( shreds_cur );
+  char * shreds_max_str = COUNT( shreds_max );
+
   PRINT( "🔧 " BOLD GREEN "RSERVE......" RESET UNBOLD
          " " BOLD "RX" UNBOLD " %s"
          " " BOLD "TX" UNBOLD " %s"
-         " " BOLD "STORED SHREDS" UNBOLD " %s /s"
-         " " BOLD "RPS" UNBOLD " %s (%s valid, %s invalid) /s" CLEARLN "\n",
+         " " BOLD "STORED SHREDS" UNBOLD " %s /s (%s / %s)"
+         " " BOLD "DISK" UNBOLD " %.1f GB (%4.1f%%)",
       DIFF_LINK_BYTES( "net_rserve", COUNTER, LINK, FRAG_CONSUMED_BYTES ),
       DIFF_LINK_BYTES( "rserve_net", COUNTER, LINK, FRAG_CONSUMED_BYTES ),
-      shreds_stored,
+      shreds_stored, shreds_cur_str, shreds_max_str,
+      disk_gb, disk_pct );
+  PRINT( " " BOLD "RPS" UNBOLD " %s (%s valid, %s invalid) /s" CLEARLN "\n",
       total_str, valid_str, invalid_str );
-  return 1U;
+
+  PRINT( "               "
+         " " BOLD "MISS"    UNBOLD " %s /s"
+         " " BOLD "SIGVFY"  UNBOLD " %s /s"
+         " " BOLD "STALE"   UNBOLD " %s /s"
+         " " BOLD "OTHER"   UNBOLD " %s /s" CLEARLN "\n",
+      miss_str, sigvfy_str, stale_str, other_str );
+  return 2U;
 }
 
 static uint
@@ -1161,13 +1207,133 @@ write_event( config_t const * config,
   return 1U;
 }
 
+static char *
+base58_short( char        out[ static 16 ],
+              uchar const key[ static 32 ] ) {
+  char enc[ FD_BASE58_ENCODED_32_SZ ];
+  ulong len;
+  fd_base58_encode_32( key, &len, enc );
+  char * p = fd_cstr_init( out );
+  p = fd_cstr_append_text( p, enc, 6 ),
+  p = fd_cstr_append_text( p, "…", sizeof("…")-1 ),
+  p = fd_cstr_append_text( p, enc+len-6, 6 );
+  fd_cstr_fini( p );
+  return out;
+}
+
 static void
-write_summary( config_t const * config,
-               ulong const *    cur_tile,
-               ulong const *    prev_tile,
-               ulong const *    cur_link,
-               ulong const *    prev_link,
-               int              interposing ) {
+fmt_balance( char  out[ static 64 ],
+             ulong lamports ) {
+  ulong maj = lamports / 1000000000UL;
+  ulong min = lamports % 1000000000UL;
+  fd_cstr_printf_check( out, 64UL, NULL, "%lu.%09lu", maj, min );
+}
+
+static uint
+write_node_info( config_t const *       config,
+                 ulong const *          cur_tile,
+                 fd_node_info_t const * node_info ) {
+
+  char identity_str[ FD_BASE58_ENCODED_32_SZ ];
+  if( FD_LIKELY( node_info && !fd_pubkey_check_zero( &node_info->identity ) ) ) {
+    fd_base58_encode_32( node_info->identity.key, NULL, identity_str );
+  } else {
+    strcpy( identity_str, "???" );
+  }
+
+  char vote_acc_str[ FD_BASE58_ENCODED_32_SZ ];
+  if( FD_LIKELY( node_info && !fd_pubkey_check_zero( &node_info->vote_account ) ) ) {
+    fd_base58_encode_32( node_info->vote_account.key, NULL, vote_acc_str );
+  } else {
+    strcpy( vote_acc_str, "???" );
+  }
+
+  char shred_ver_str[ 16 ];
+  ulong ipecho_idx = fd_topo_find_tile( &config->topo, "ipecho", 0UL );
+  ushort shred_version = 0;
+  if( FD_LIKELY( ipecho_idx!=ULONG_MAX ) ) shred_version = (ushort)cur_tile[ ipecho_idx*FD_METRICS_TOTAL_SZ+MIDX( GAUGE, IPECHO, CURRENT_SHRED_VERSION ) ];
+  if( shred_version ) {
+    fd_cstr_printf_check( shred_ver_str, sizeof(shred_ver_str), NULL, "%hu", shred_version );
+  } else if( config->consensus.expected_shred_version ) {
+    fd_cstr_printf_check( shred_ver_str, sizeof(shred_ver_str), NULL, "(%hu)", config->consensus.expected_shred_version );
+  } else {
+    fd_cstr_printf_check( shred_ver_str, sizeof(shred_ver_str), NULL, "???" );
+  }
+
+  char genesis_hash_b58[ FD_BASE58_ENCODED_32_SZ ] = {0};
+  char genesis_short[ 16 ] = {0};
+  int  has_genesis_b58 = 0;
+  if( FD_LIKELY( node_info && !fd_pubkey_check_zero( &node_info->genesis_hash ) ) ) {
+    fd_base58_encode_32( node_info->genesis_hash.key, NULL, genesis_hash_b58 );
+    base58_short( genesis_short, node_info->genesis_hash.key );
+    has_genesis_b58 = 1;
+  } else {
+    fd_cstr_ncpy( genesis_short, "???", sizeof(genesis_short) );
+  }
+
+  char const * cluster_str = "unknown";
+  if( has_genesis_b58 ) {
+    ulong cluster_id = fd_genesis_cluster_identify( genesis_hash_b58 );
+    cluster_str = fd_genesis_cluster_name( cluster_id );
+  }
+
+  char uptime_str[ 32UL ];
+  long now = fd_log_wallclock();
+  if( FD_LIKELY( config->boot_timestamp_nanos>0L && now>config->boot_timestamp_nanos ) ) {
+    ulong elapsed_s = (ulong)( (now - config->boot_timestamp_nanos) / (long)1e9 );
+    ulong days  = elapsed_s / 86400UL;
+    ulong hours = (elapsed_s % 86400UL) / 3600UL;
+    ulong mins  = (elapsed_s % 3600UL) / 60UL;
+    ulong secs  = elapsed_s % 60UL;
+    if( days ) fd_cstr_printf_check( uptime_str, sizeof(uptime_str), NULL, "%lud %luh %lum", days, hours, mins );
+    else if( hours ) fd_cstr_printf_check( uptime_str, sizeof(uptime_str), NULL, "%luh %lum %lus", hours, mins, secs );
+    else fd_cstr_printf_check( uptime_str, sizeof(uptime_str), NULL, "%lum %lus", mins, secs );
+  } else {
+    fd_cstr_printf_check( uptime_str, sizeof(uptime_str), NULL, "???" );
+  }
+
+  ulong replay_idx = fd_topo_find_tile( &config->topo, "replay", 0UL );
+  ulong const * replay_metrics = &cur_tile[ replay_idx*FD_METRICS_TOTAL_SZ ];
+  ulong identity_balance = replay_metrics[ MIDX( GAUGE, REPLAY, IDENTITY_BALANCE_LAMPORTS     ) ];
+  ulong stake_amount     = replay_metrics[ MIDX( GAUGE, REPLAY, ACTIVE_STAKE_LAMPORTS         ) ];
+  ulong epoch_credits    = replay_metrics[ MIDX( GAUGE, REPLAY, EPOCH_CREDITS                 ) ];
+  ulong tot_stake        = replay_metrics[ MIDX( GAUGE, REPLAY, CLUSTER_ACTIVE_STAKE_LAMPORTS ) ];
+  char identity_balance_str[ 64 ]; fmt_balance( identity_balance_str, identity_balance );
+  char stake_amount_str    [ 64 ]; fmt_balance( stake_amount_str,     stake_amount     );
+  double stake_percent = 0.0;
+  if( tot_stake>0UL ) stake_percent = 100.0*(double)stake_amount/(double)tot_stake;
+
+  PRINT( "🔑" BOLD ORANGE " NODE........" RESET UNBOLD
+         " " BOLD "ID"      UNBOLD " %44s"
+         " " BOLD "VOTE"    UNBOLD " %44s"
+         " " BOLD "CLUSTER" UNBOLD " %s"
+         " " BOLD "UPTIME"  UNBOLD " %s"
+         " " BOLD "SHRED"   UNBOLD " %s"
+         " " BOLD "GENESIS" UNBOLD " %s",
+    identity_str,
+    vote_acc_str,
+    cluster_str,
+    uptime_str,
+    shred_ver_str,
+    genesis_short );
+  PRINT( CLEARLN "\n" );
+
+  PRINT( "                " BOLD "BALANCE" UNBOLD " %s"
+         " " BOLD "STAKE"   UNBOLD " %s (%.2f %%)"
+         " " BOLD "CREDITS" UNBOLD " %lu" CLEARLN "\n",
+         identity_balance_str, stake_amount_str, stake_percent, epoch_credits );
+
+  return 2U;
+}
+
+static void
+write_summary( config_t const *           config,
+               fd_node_info_box_t const * shinfo,
+               ulong const *              cur_tile,
+               ulong const *              prev_tile,
+               ulong const *              cur_link,
+               ulong const *              prev_link,
+               int                        interposing ) {
   (void)config;
   (void)prev_tile;
   (void)cur_tile;
@@ -1188,6 +1354,9 @@ write_summary( config_t const * config,
   if( FD_UNLIKELY( !snap_shutdown_time && !shutdown ) ) snap_shutdown_time = 1L; /* Was not shutdown on boot */
   if( FD_UNLIKELY( !snap_shutdown_time && shutdown  ) ) snap_shutdown_time = 2L; /* Was shutdown on boot */
   if( FD_UNLIKELY( snap_shutdown_time==1L && shutdown  ) ) snap_shutdown_time = fd_log_wallclock();
+
+  fd_node_info_t node_info[1]; fd_node_info_read( node_info, shinfo );
+  lines_printed += write_node_info( config, cur_tile, node_info );
 
   if( FD_UNLIKELY( write_bench( config, cur_tile, prev_tile ) ) ) lines_printed++;
 
@@ -1256,6 +1425,11 @@ run( config_t const * config,
   (void)config;
   (void)drain_output_fd;
 
+  ulong node_info_obj_id = fd_pod_query_ulong( config->topo.props, "node_info", ULONG_MAX );
+  FD_TEST( node_info_obj_id!=ULONG_MAX );
+  fd_node_info_box_t * node_info = fd_node_info_box_join( fd_topo_obj_laddr( &config->topo, node_info_obj_id ) );
+  FD_TEST( node_info );
+
   ulong tile_cnt = config->topo.tile_cnt;
 
   ulong cons_cnt = 0UL;
@@ -1279,7 +1453,7 @@ run( config_t const * config,
   int interposing = drain_output_fd>=0;
 
   frame_len = 0UL;
-  write_summary( config, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, links+last_snap*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), links+(1UL-last_snap)*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), interposing );
+  write_summary( config, node_info, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, links+last_snap*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), links+(1UL-last_snap)*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), interposing );
   flush_frame();
 
   long next = fd_log_wallclock()+(long)1e9;
@@ -1287,7 +1461,7 @@ run( config_t const * config,
     if( FD_UNLIKELY( drain_output_fd>=0 ) ) {
       if( FD_UNLIKELY( drain( drain_output_fd ) ) ) {
         frame_len = 0UL;
-        write_summary( config, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, links+last_snap*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), links+(1UL-last_snap)*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), interposing );
+        write_summary( config, node_info, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, links+last_snap*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), links+(1UL-last_snap)*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), interposing );
         flush_frame();
       }
     }
@@ -1355,7 +1529,30 @@ run( config_t const * config,
           diff_tile( config, "rserve", tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, MIDX( COUNTER, RSERVE, FAILED_INVALID_TOKEN ) ) +
           diff_tile( config, "rserve", tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, MIDX( COUNTER, RSERVE, FAILED_NOT_FOR_US ) ) +
           diff_tile( config, "rserve", tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, MIDX( COUNTER, RSERVE, FAILED_OUTDATED ) ) +
+          diff_tile( config, "rserve", tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, MIDX( COUNTER, RSERVE, FAILED_PING_CACHE_LOOKUP ) ) +
           diff_tile( config, "rserve", tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, MIDX( COUNTER, RSERVE, FAILED_INVALID_SHRED_INDEX ) ) );
+      {
+        ulong slot = rserve_rps_invalid_samples_idx % (sizeof(rserve_rps_miss_samples)/sizeof(rserve_rps_miss_samples[0]));
+        ulong const * prev = tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ;
+        ulong const * cur  = tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ;
+
+        rserve_rps_miss_samples[ slot ] = (ulong)(
+            diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, MISSED_RESPONSE_TYPES_PING ) ) +
+            diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, MISSED_RESPONSE_TYPES_WINDOW ) ) +
+            diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, MISSED_RESPONSE_TYPES_HIGHEST_WINDOW ) ) +
+            diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, MISSED_RESPONSE_TYPES_ORPHAN ) ) );
+
+        rserve_rps_sigvfy_samples[ slot ] = (ulong)diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, FAILED_SIGVERIFY ) );
+
+        rserve_rps_stale_samples[ slot ] = (ulong)diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, FAILED_OUTDATED ) );
+
+        rserve_rps_other_rej_samples[ slot ] = (ulong)(
+            diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, FAILED_OWN_KEY ) ) +
+            diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, FAILED_INVALID_TOKEN ) ) +
+            diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, FAILED_NOT_FOR_US ) ) +
+            diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, FAILED_INVALID_SHRED_INDEX ) ) +
+            diff_tile( config, "rserve", prev, cur, MIDX( COUNTER, RSERVE, FAILED_PING_CACHE_LOOKUP ) ) );
+      }
       rserve_rps_invalid_samples_idx++;
 
       /* Move cursor to top of dashboard and overwrite in place.
@@ -1368,7 +1565,7 @@ run( config_t const * config,
       } else {
         PRINT( "\033[%luA\r", lines_printed );
       }
-      write_summary( config, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, links+last_snap*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), links+(1UL-last_snap)*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), interposing );
+      write_summary( config, node_info, tiles+last_snap*tile_cnt*FD_METRICS_TOTAL_SZ, tiles+(1UL-last_snap)*tile_cnt*FD_METRICS_TOTAL_SZ, links+last_snap*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), links+(1UL-last_snap)*(cons_cnt*8UL*FD_METRICS_ALL_LINK_IN_TOTAL), interposing );
       PRINT( "\033[0J" );    /* clear any leftover lines below */
       PRINT( "\033[?25h" ); /* show cursor */
       flush_frame();

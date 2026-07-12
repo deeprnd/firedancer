@@ -53,8 +53,9 @@ def main():
     if len(sys.argv) > 1:
         paths = [Path(p) for p in sys.argv[1:] if p.endswith(".h")]
     else:
-        os.chdir(Path(__file__).parents[2])
-        paths = [p for p in Path("./src").rglob("*.h") if ".pb.h" not in p.name]
+        paths = [p for p in Path("./src").rglob("*.h")
+                 if ".pb.h" not in p.name
+                 and not str(p).startswith("src/third_party/")]
     for path in paths:
         try:
             check_file(path)

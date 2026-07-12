@@ -4,32 +4,39 @@
 set -euo pipefail
 JOB="${1:?Usage: coverage.sh <job-name>}"
 
+_start=$(date +%s)
+log() { echo "[$(date +%H:%M:%S)] [$(( $(date +%s) - _start ))s] $*"; }
+
 if [ "$JOB" = "coverage-fd" ]; then
     COVDIR=build/fd-cov
     RAWDIR="${COVDIR}/cov/raw"
-    OBJDIR=build/fd-cov
+
+    # Always start fresh — delete coverage artifacts to prevent stale state.
+    rm -f "${COVDIR}/cov.profdata"
 
     # Build cov.profdata from .profraw files (llvm-cov step 1.3).
-    if [ ! -f "${COVDIR}/cov.profdata" ]; then
-        mkdir -p "${COVDIR}"
-        llvm-profdata merge -o "${COVDIR}/cov.profdata" "${RAWDIR}"/*.profraw
-    fi
+    mkdir -p "${COVDIR}"
+    _t0=$(date +%s)
+    llvm-profdata merge -o "${COVDIR}/cov.profdata" "${RAWDIR}"/*.profraw
+    log "[profdata] merge done in $(( $(date +%s) - _t0 ))s"
 
-    # Build mappings.ar from .o files with __llvm_covmap sections (llvm-cov step 1.4).
-    if [ ! -f "${COVDIR}/mappings.ar" ]; then
-        rm -f "${COVDIR}/mappings.ar"
-        mkdir -p "${COVDIR}"
-        while IFS= read -r -d '' obj; do
-            if llvm-objdump -h "$obj" 2>/dev/null | grep -q llvm_covmap; then
-                llvm-ar --thin q "${COVDIR}/mappings.ar" "$obj"
-            fi
-        done < <(find "${OBJDIR}" -name '*.o' -print0)
-    fi
-
-    python3 contrib/readme/coverage_report.py coverage-fd \
+    # Run coverage report using test binaries. llvm-cov export takes ~0.1s
+    # with binary IDs vs ~900s with individual .o files.
+    _t0=$(date +%s)
+    set +e
+    timeout 900 python3 contrib/readme/coverage_report.py coverage-fd \
         "${COVDIR}" \
         build/coverage/fd/coverage-summary.json \
         --config contrib/test/coverage-fd.json
+    cov_rc=$?
+    set -e
+    _t1=$(( $(date +%s) - _t0 ))
+    log "[coverage-report] exit=$cov_rc in ${_t1}s"
+    if [ "$cov_rc" -eq 137 ]; then
+        echo "ERROR: llvm-cov export timed out after 900s" >&2
+        exit 1
+    fi
+    exit "$cov_rc"
 elif [ "$JOB" = "coverage-tk" ]; then
     command -v kcov >/dev/null 2>&1 || {
         echo "ERROR: kcov not found. Install it with: sudo apt-get install kcov" >&2

@@ -19,7 +19,6 @@
 #include "../../disco/topo/fd_cpu_topo.h"
 #include "../../disco/bundle/fd_bundle_tile.h"
 #include "../../util/pod/fd_pod_format.h"
-#include "../../util/tile/fd_tile_private.h"
 #include "../../discof/restore/utils/fd_ssctrl.h"
 #include "../../discof/restore/utils/fd_ssmsg.h"
 #include "../../flamenco/capture/fd_solcap_writer.h"
@@ -36,9 +35,11 @@ extern fd_topo_obj_callbacks_t * CALLBACKS[];
 extern fd_topo_run_tile_t *      TILES[];
 
 static ulong
-tile_max_event_sz( char const * name ) {
+tile_max_event_sz( fd_topo_tile_t const * tile ) {
   for( fd_topo_run_tile_t ** t=TILES; *t; t++ ) {
-    if( FD_UNLIKELY( !strcmp( (*t)->name, name ) ) ) return (*t)->max_event_sz;
+    if( FD_UNLIKELY( !strcmp( (*t)->name, tile->name ) ) ) {
+      return (*t)->max_event_sz ? (*t)->max_event_sz( tile ) : 0UL;
+    }
   }
   return 0UL;
 }
@@ -52,7 +53,7 @@ wire_event_links( fd_topo_t * topo ) {
     fd_topo_tile_t * tile = &topo->tiles[ i ];
     if( FD_UNLIKELY( !strcmp( tile->name, "event" ) ) ) continue;
 
-    ulong max_sz = tile_max_event_sz( tile->name );
+    ulong max_sz = tile_max_event_sz( tile );
     if( FD_LIKELY( !max_sz ) ) continue;
 
     char link_name[ sizeof(((fd_topo_link_t *)0)->name) ];
@@ -432,6 +433,7 @@ fd_topo_initialize( config_t * config ) {
   fd_topob_wksp( topo, "tower"  );
   fd_topob_wksp( topo, "txsend" );
   fd_topob_wksp( topo, "sign"   )->core_dump_level = FD_TOPO_CORE_DUMP_LEVEL_NEVER;
+  fd_topob_wksp( topo, "admin"  )->core_dump_level = FD_TOPO_CORE_DUMP_LEVEL_NEVER;
 
   if( leader_enabled ) {
     fd_topob_wksp( topo, "quic"   );
@@ -488,6 +490,8 @@ fd_topo_initialize( config_t * config ) {
     fd_topob_wksp( topo, "poh_shred"     );
     fd_topob_wksp( topo, "poh_replay"    );
   }
+
+  fd_topob_wksp( topo, "adminctl"      )->core_dump_level = FD_TOPO_CORE_DUMP_LEVEL_NEVER;
 
   fd_topob_wksp( topo, "progcache"     );
   fd_topob_wksp( topo, "fec_sets"      );
@@ -625,7 +629,7 @@ fd_topo_initialize( config_t * config ) {
   fd_topo_cpus_init( cpus );
 
   ulong affinity_tile_cnt = 0UL;
-  if( FD_LIKELY( !is_auto_affinity ) ) affinity_tile_cnt = fd_tile_private_cpus_parse( config->layout.affinity, parsed_tile_to_cpu );
+  if( FD_LIKELY( !is_auto_affinity ) ) affinity_tile_cnt = fd_topob_parse_affinity_cstr( config->layout.affinity, parsed_tile_to_cpu, 1 );
 
   ulong tile_to_cpu[ FD_TILE_MAX ] = {0};
   for( ulong i=0UL; i<affinity_tile_cnt; i++ ) {
@@ -696,6 +700,8 @@ fd_topo_initialize( config_t * config ) {
     fd_topob_wksp( topo, "solcap" );
     fd_topob_tile( topo, "solcap", "solcap", "metric_in", tile_to_cpu[ topo->tile_cnt ], 0, 0, 0 );
   }
+
+  fd_topo_tile_t * admin_tile = fd_topob_tile( topo, "admin", "admin", "metric_in", tile_to_cpu[ topo->tile_cnt ], 0, 0, 0 );
 
   /*                                        topo, tile_name, tile_kind_id, fseq_wksp,   link_name,       link_kind_id, reliable,            polled */
   FOR(gossvf_tile_cnt) for( ulong j=0UL; j<net_tile_cnt; j++ )
@@ -863,7 +869,7 @@ fd_topo_initialize( config_t * config ) {
     fd_topob_wksp( topo, "event"      );
     fd_topob_wksp( topo, "event_sign" );
     fd_topob_wksp( topo, "sign_event" );
-    fd_topob_link( topo, "event_sign", "event_sign", 128UL, 132UL, 1UL );
+    fd_topob_link( topo, "event_sign", "event_sign", 128UL, 317UL, 1UL );
     fd_topob_link( topo, "sign_event", "sign_event", 128UL, 64UL, 1UL );
     fd_topob_tile( topo, "event", "event", "metric_in",  tile_to_cpu[ topo->tile_cnt ], 0, 1, 0 );
     fd_topob_tile_in(  topo, "event",  0UL, "metric_in", "genesi_out", 0UL, FD_TOPOB_RELIABLE,   FD_TOPOB_POLLED   );
@@ -884,8 +890,6 @@ fd_topo_initialize( config_t * config ) {
     fd_topob_tile_out( topo, "event",  0UL,              "event_sign", 0UL                                         );
     fd_topob_tile_in(  topo, "event",  0UL, "metric_in", "sign_event", 0UL, FD_TOPOB_UNRELIABLE, FD_TOPOB_UNPOLLED );
     fd_topob_tile_out( topo, "sign",   0UL,              "sign_event", 0UL                                         );
-
-    wire_event_links( topo );
   }
 
   if( FD_UNLIKELY( config->tiles.bundle.enabled ) ) {
@@ -999,14 +1003,14 @@ fd_topo_initialize( config_t * config ) {
                        topo->tile_cnt, affinity_tile_cnt ));
   } else {
     ushort blocklist_cores[ FD_TILE_MAX ];
-    topo->blocklist_cores_cnt = fd_tile_private_cpus_parse( config->layout.blocklist_cores, blocklist_cores );
+    topo->blocklist_cores_cnt = fd_topob_parse_affinity_cstr( config->layout.blocklist_cores, blocklist_cores, 0 );
     if( FD_UNLIKELY( topo->blocklist_cores_cnt>FD_TILE_MAX ) ) {
       FD_LOG_ERR(( "The CPU string in the configuration file under [layout.blocklist_cores] specifies more CPUs than Firedancer can use. "
                     "You should reduce the number of CPUs in the excluded cores string." ));
     }
 
     for( ulong i=0UL; i<topo->blocklist_cores_cnt; i++ ) {
-      /* Since we use fd_tile_private_cpus_parse() like for affinity, the user
+      /* Since we use fd_topob_parse_affinity_cstr() like for affinity, the user
          may input a string containing `f`. That's parsed correctly, but it's
          meaningless for blocklisted cores, so we reject it here.  */
       if( FD_UNLIKELY( blocklist_cores[ i ]==USHORT_MAX ) ) {
@@ -1016,6 +1020,10 @@ fd_topo_initialize( config_t * config ) {
       topo->blocklist_cores_cpu_idx[ i ] = blocklist_cores[ i ];
     }
   }
+
+  fd_topo_obj_t * admin_ctl = fd_topob_obj_named( topo, "adminctl", "adminctl", "admin" );
+  FD_TEST( fd_pod_insertf_ulong( topo->props, admin_ctl->id, "adminctl" ) );
+  fd_topob_tile_uses( topo, admin_tile, admin_ctl, FD_SHMEM_JOIN_MODE_READ_WRITE );
 
   /* There is a special fseq that sits between the pack, execle, and poh
      tiles to indicate when the execle/poh tiles are done processing a
@@ -1045,6 +1053,13 @@ fd_topo_initialize( config_t * config ) {
     }
     FD_TEST( fd_pod_insertf_ulong( topo->props, rnonce_ss_obj->id, "rnonce_ss" ) );
   }
+
+  /* node_info holds various rarely-changing config that cannot be
+     represented as simple scalar metrics */
+  fd_topo_obj_t * node_info_obj = fd_topob_obj( topo, "node_info", "replay" );
+  fd_topob_tile_uses( topo, &topo->tiles[ fd_topo_find_tile( topo, "replay", 0UL ) ], node_info_obj, FD_SHMEM_JOIN_MODE_READ_WRITE );
+  fd_topob_tile_uses( topo, &topo->tiles[ fd_topo_find_tile( topo, "tower", 0UL  ) ], node_info_obj, FD_SHMEM_JOIN_MODE_READ_WRITE );
+  FD_TEST( fd_pod_insertf_ulong( topo->props, node_info_obj->id, "node_info" ) );
 
   fd_topo_obj_t * banks_obj = setup_topo_banks( topo, "banks", config->firedancer.runtime.max_live_slots, config->firedancer.runtime.max_fork_width, config->development.bench.larger_max_cost_per_block );
   /**/                 fd_topob_tile_uses( topo, &topo->tiles[ fd_topo_find_tile( topo, "replay", 0UL ) ], banks_obj, FD_SHMEM_JOIN_MODE_READ_WRITE );
@@ -1101,6 +1116,13 @@ fd_topo_initialize( config_t * config ) {
     if( FD_UNLIKELY( config->tiles.bundle.enabled ) ) {
     /**/                   fd_topob_tile_in(  topo, "gui",    0UL,           "metric_in", "bundle_status", 0UL,         FD_TOPOB_RELIABLE,   FD_TOPOB_POLLED );
     }
+  }
+
+  /* Grant the admin tile access to every keyswitch object in the
+     topology for add authorized voters and set identity. */
+  for( ulong i=0UL; i<topo->tile_cnt; i++ ) {
+    if( topo->tiles[ i ].id_keyswitch_obj_id!=ULONG_MAX ) fd_topob_tile_uses( topo, admin_tile, &topo->objs[ topo->tiles[ i ].id_keyswitch_obj_id ], FD_SHMEM_JOIN_MODE_READ_WRITE );
+    if( topo->tiles[ i ].av_keyswitch_obj_id!=ULONG_MAX ) fd_topob_tile_uses( topo, admin_tile, &topo->objs[ topo->tiles[ i ].av_keyswitch_obj_id ], FD_SHMEM_JOIN_MODE_READ_WRITE );
   }
 
   /* Auto layout must run after all fd_topob_tile() calls so every tile gets a blocklist-aware CPU assignment. */
@@ -1231,6 +1253,8 @@ fd_topo_initialize( config_t * config ) {
     if( FD_UNLIKELY( !strcmp( topo->tiles[ i ].name, "gui" ) ) ) topo->tiles[ i ].gui.tile_cnt = topo->tile_cnt;
   }
 
+  if( FD_LIKELY( telemetry_enabled ) ) wire_event_links( topo );
+
   FOR(net_tile_cnt) fd_topos_net_tile_finish( topo, i );
   fd_topob_finish( topo, CALLBACKS );
   config->topo = *topo;
@@ -1295,6 +1319,8 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
     tile->genesi.accdb_obj_id    = fd_pod_query_ulong( config->topo.props, "accdb", ULONG_MAX );
     FD_TEST( tile->genesi.accdb_obj_id!=ULONG_MAX );
 
+  } else if( FD_UNLIKELY( !strcmp( tile->name, "admin" ) ) ) {
+
   } else if( FD_UNLIKELY( !strcmp( tile->name, "gossvf") ) ) {
 
     fd_cstr_ncpy( tile->gossvf.identity_key_path, config->paths.identity_key, sizeof(tile->gossvf.identity_key_path) );
@@ -1354,6 +1380,7 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
     tile->snapct.max_full_snapshots_to_keep           = config->firedancer.snapshots.max_full_snapshots_to_keep;
     tile->snapct.max_incremental_snapshots_to_keep    = config->firedancer.snapshots.max_incremental_snapshots_to_keep;
     tile->snapct.max_retry_abort                      = config->firedancer.snapshots.max_retry_abort;
+    tile->snapct.wait_for_peers_timeout_nanos         = (long)( config->firedancer.snapshots.wait_for_peers_timeout_seconds * (ulong)1e9 );
     tile->snapct.target_uid                           = config->uid;
     tile->snapct.target_gid                           = config->gid;
     tile->snapct.sources.gossip.allow_any             = config->firedancer.snapshots.sources.gossip.allow_any;
@@ -1502,6 +1529,7 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
     tile->execrp.dump_txn_to_pb = config->capture.dump_txn_to_pb;
     tile->execrp.dump_txn_as_fixture = config->capture.dump_txn_as_fixture;
     tile->execrp.dump_syscall_to_pb = config->capture.dump_syscall_to_pb;
+    tile->execrp.report_transaction_diffs = config->development.event.report_transaction_diffs;
 
   } else if( FD_UNLIKELY( !strcmp( tile->name, "tower" ) ) ) {
     tile->tower.authorized_voter_paths_cnt = config->firedancer.paths.authorized_voter_paths_cnt;
@@ -1596,10 +1624,11 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
 
   } else if( FD_UNLIKELY( !strcmp( tile->name, "execle" ) ) ) {
 
-    tile->execle.txncache_obj_id  = fd_pod_query_ulong( config->topo.props, "txncache",  ULONG_MAX ); FD_TEST( tile->execle.txncache_obj_id !=ULONG_MAX );
-    tile->execle.progcache_obj_id = fd_pod_query_ulong( config->topo.props, "progcache", ULONG_MAX ); FD_TEST( tile->execle.progcache_obj_id!=ULONG_MAX );
-    tile->execle.accdb_obj_id     = fd_pod_query_ulong( config->topo.props, "accdb",     ULONG_MAX ); FD_TEST( tile->execle.accdb_obj_id    !=ULONG_MAX );
-    tile->execle.max_live_slots   = config->firedancer.runtime.max_live_slots;
+    tile->execle.txncache_obj_id    = fd_pod_query_ulong( config->topo.props, "txncache",  ULONG_MAX ); FD_TEST( tile->execle.txncache_obj_id !=ULONG_MAX );
+    tile->execle.progcache_obj_id   = fd_pod_query_ulong( config->topo.props, "progcache", ULONG_MAX ); FD_TEST( tile->execle.progcache_obj_id!=ULONG_MAX );
+    tile->execle.accdb_obj_id       = fd_pod_query_ulong( config->topo.props, "accdb",     ULONG_MAX ); FD_TEST( tile->execle.accdb_obj_id    !=ULONG_MAX );
+    tile->execle.max_live_slots     = config->firedancer.runtime.max_live_slots;
+    tile->execle.report_transaction_diffs = config->development.event.report_transaction_diffs;
 
   } else if( FD_UNLIKELY( !strcmp( tile->name, "poh" ) ) ) {
     fd_cstr_ncpy( tile->poh.identity_key_path, config->paths.identity_key, sizeof(tile->poh.identity_key_path) );
@@ -1649,6 +1678,7 @@ fd_topo_configure_tile( fd_topo_tile_t * tile,
     fd_cstr_ncpy( tile->gui.cluster, config->cluster, sizeof(tile->gui.cluster) );
     fd_cstr_ncpy( tile->gui.identity_key_path, config->paths.identity_key, sizeof(tile->gui.identity_key_path) );
     fd_cstr_ncpy( tile->gui.vote_key_path, config->paths.vote_account, sizeof(tile->gui.vote_key_path) );
+    fd_cstr_ncpy( tile->gui.accounts_database_path, config->paths.accounts, sizeof(tile->gui.accounts_database_path) );
     tile->gui.max_http_connections      = config->tiles.gui.max_http_connections;
     tile->gui.max_websocket_connections = config->tiles.gui.max_websocket_connections;
     tile->gui.max_http_request_length   = config->tiles.gui.max_http_request_length;

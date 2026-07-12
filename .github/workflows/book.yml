@@ -21,8 +21,7 @@ concurrency:
 jobs:
   # Build job
   build:
-    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
-    timeout-minutes: 30
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -50,12 +49,10 @@ jobs:
 
   # Deployment job
   deploy:
-    if: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
-    timeout-minutes: 30
+    timeout-minutes: 2
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-      deployment: ${{ vars.SKIP_FIREDANCER_CI != 'true' }}
     needs: build
     runs-on: ubuntu-latest
     name: Deploy

@@ -4,7 +4,8 @@
 #include "../../disco/topo/fd_topo.h"
 #include "../../flamenco/accdb/fd_accdb.h"
 #include "../../flamenco/accdb/fd_accdb_shmem.h"
-#include "../../ballet/bzip2/bzlib.h"
+#include "../../disco/events/generated/fd_event_gen.h"
+#include "../../third_party/bzip2/bzlib.h"
 #include "../../ballet/sha256/fd_sha256.h"
 #include "../../flamenco/runtime/fd_hashes.h"
 #include "../../util/archive/fd_tar.h"
@@ -600,6 +601,11 @@ populate_allowed_fds( fd_topo_t const *      topo,
 
 #include "../../disco/stem/fd_stem.c"
 
+static ulong
+max_event_sz( fd_topo_tile_t const * tile FD_PARAM_UNUSED ) {
+  return sizeof(fd_event_accdb_partition_added_t);
+}
+
 fd_topo_run_tile_t fd_tile_genesi = {
   .name                     = "genesi",
   .rlimit_file_cnt_fn       = rlimit_file_cnt,
@@ -612,5 +618,6 @@ fd_topo_run_tile_t fd_tile_genesi = {
   .scratch_footprint        = scratch_footprint,
   .privileged_init          = privileged_init,
   .unprivileged_init        = unprivileged_init,
+  .max_event_sz             = max_event_sz,
   .run                      = stem_run,
 };
