@@ -132,6 +132,21 @@ fd_x509_mock_cert( uchar buf[ static FD_X509_MOCK_CERT_SZ ],
   fd_memcpy( buf+FD_X509_MOCK_PUBKEY_OFF, public_key, 32UL );
 }
 
+/* Portable memmem replacement for platforms without GNU libc. */
+#ifndef HAVE_MEMMEM
+static
+uchar const * fd_memmem( uchar const * haystack, ulong haystack_len,
+                         uchar const * needle,    ulong needle_len ) {
+  if( !needle_len || needle_len > haystack_len ) return NULL;
+  for( ulong i = 0; i <= haystack_len - needle_len; i++ )
+    if( !memcmp( haystack+i, needle, needle_len ) )
+      return haystack+i;
+  return NULL;
+}
+#define memmem(a,b,c,d) fd_memmem(a,b,c,d)
+#define HAVE_MEMMEM
+#endif
+
 static uchar const *
 fd_x509_mock_pubkey_v1( uchar const * cert,
                         ulong         cert_sz ) {
