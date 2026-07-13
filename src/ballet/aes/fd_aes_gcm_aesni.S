@@ -128,8 +128,21 @@
 //      reduction.  For single-block processing, we use the x^64 optimization.
 
 # Make stack non-executable
+#if !defined(__MACH__)
 .section .note.GNU-stack,"",@progbits
+#endif
 
+
+/* GNU assembler directives - no-op on macOS clang */
+#if !defined(__MACH__)
+#define GNU_TYPE(name)	.type name,@function
+#define GNU_SIZE(name,end)	.size name,end
+#define GNU_ALIGN(n)	.align n
+#else
+#define GNU_TYPE(name)
+#define GNU_SIZE(name,end)
+#define GNU_ALIGN(n)
+#endif
 #define SYM_FUNC_START(name)			\
 	.globl name ;				\
 	.balign 16, 0x90 ;			\
@@ -139,11 +152,8 @@
 
 #define SYM_FUNC_END(name)			\
 	.cfi_endproc; 				\
-#if !defined(__MACH__)
-	.type name @function ;			\
-	.set .L__sym_size_##name, .-name ;	\
-	.size name, .L__sym_size_##name
-#endif
+GNU_TYPE(name) ;			\
+GNU_SIZE(name,.-name)
 
 .section .rodata
 .p2align 4
@@ -1146,7 +1156,8 @@ SYM_FUNC_START(aes_gcm_dec_final_aesni_avx)
 	_aes_gcm_final	0
 SYM_FUNC_END(aes_gcm_dec_final_aesni_avx)
 
-# Advertise IBT, SHSTK compliance
+/* Advertise IBT, SHSTK compliance (GNU as specific; ignore on macOS) */
+#if !defined(__MACH__)
 .section ".note.gnu.property", "a"
 .p2align 3
 .long 1f - 0f
@@ -1163,3 +1174,4 @@ SYM_FUNC_END(aes_gcm_dec_final_aesni_avx)
 3:
 .p2align 3
 4:
+#endif
