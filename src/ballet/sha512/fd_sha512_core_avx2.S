@@ -4,8 +4,10 @@
 # to extract only the version needed and named appropriately for
 # interfacing the existing API and exposing for library use.
 
-# Make stack non-executable
+# Make stack non-executable (GNU as specific; ignore on macOS)
+#if !defined(__MACH__)
 .section .note.GNU-stack,"",@progbits
+#endif
 
 .text
 .globl	fd_sha512_core_avx2

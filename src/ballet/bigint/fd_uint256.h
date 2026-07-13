@@ -19,9 +19,10 @@
 #endif
 
 /* fd_uint256_t represents a uint256 as a buffer of 32 bytes,
-   or equivalently (on little endian platforms) an array of 4 ulong. */
+   or equivalently (on little endian platforms) an array of 4 uint64_t.
+   Uses uint64_t not ulong to match fiat-crypto signatures. */
 union FD_UINT256_ALIGNED fd_uint256 {
-  ulong limbs[4];
+  uint64_t limbs[4];
   uchar buf[32];
 };
 typedef union fd_uint256 fd_uint256_t;
