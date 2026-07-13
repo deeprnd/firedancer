@@ -2,6 +2,7 @@ $(call add-objs,fd_shred_dest,fd_disco)
 $(call add-objs,fd_shredder,fd_disco)
 $(call add-objs,fd_stake_ci,fd_disco)
 ifdef FD_HAS_HOSTED
+ifdef FD_HAS_LINUX
 $(call add-objs,fd_fec_resolver,fd_disco)
 $(call add-objs,fd_shred_tile,fd_disco)
 $(call make-unit-test,test_fec_resolver,test_fec_resolver,fd_disco fd_ballet fd_util fd_tango fd_reedsol)

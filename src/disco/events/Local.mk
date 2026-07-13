@@ -1,4 +1,5 @@
 ifdef FD_HAS_HOSTED
+ifdef FD_HAS_LINUX
 $(call add-hdrs,fd_circq.h fd_event_report.h)
 $(call add-hdrs,generated/fd_event_gen.h)
 $(call add-objs,fd_circq fd_event_client fd_event_report,fd_disco)
@@ -9,4 +10,5 @@ $(call make-unit-test,test_circq,test_circq,fd_disco fd_flamenco fd_tango fd_uti
 $(call run-unit-test,test_circq)
 $(call make-unit-test,test_event_client,test_event_client,fd_disco fd_waltz fd_flamenco fd_tango fd_ballet fd_util,$(OPENSSL_LIBS))
 $(call run-unit-test,test_event_client)
+endif
 endif

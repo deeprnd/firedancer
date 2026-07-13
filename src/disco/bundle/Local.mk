@@ -20,6 +20,8 @@ endif
 
 ifdef FD_HAS_HOSTED
 ifdef FD_HAS_DOUBLE
+ifdef FD_HAS_LINUX
 $(call add-objs,fd_bundle_tile,fd_disco)
+endif
 endif
 endif
