@@ -1391,10 +1391,14 @@ fd_sha512_core_avx2:
 .Lepilogue_avx2:
 	.byte	0xf3,0xc3
 .cfi_endproc
+#if !defined(__MACH__)
 .size	fd_sha512_core_avx2,.-fd_sha512_core_avx2
+#endif
 
+#if !defined(__MACH__)
 .align	128
 .type	fd_sha512_core_avx2_k,@object
+#endif
 fd_sha512_core_avx2_k:
 .quad	0x428a2f98d728ae22,0x7137449123ef65cd
 .quad	0x428a2f98d728ae22,0x7137449123ef65cd
