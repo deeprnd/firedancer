@@ -85,8 +85,10 @@
 // 32, masking support, and new instructions such as vpternlogd (which can do a
 // three-argument XOR).  These features are very useful for AES-GCM.
 
-# Make stack non-executable
+/* Make stack non-executable (GNU as specific; ignore on macOS) */
+#if !defined(__MACH__)
 .section .note.GNU-stack,"",@progbits
+#endif
 
 #define SYM_FUNC_START(name)	\
 	.globl name ;				\
@@ -97,9 +99,11 @@
 
 #define SYM_FUNC_END(name)				\
 	.cfi_endproc; 						\
+#if !defined(__MACH__)
 	.type name @function ;				\
 	.set .L__sym_size_##name, .-name ;	\
 	.size name, .L__sym_size_##name
+#endif
 
 .section .rodata
 .p2align 6

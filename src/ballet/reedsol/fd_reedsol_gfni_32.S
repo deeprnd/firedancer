@@ -5,12 +5,16 @@
 #                                  uchar       *         _scratch )     (rcx)
 .section .rodata,"a",@progbits
 gfni_const_tbl:
+#if !defined(__MACH__)
 .align 32
+#endif
 .incbin "src/ballet/reedsol/constants/gfni_constants.bin"
 .previous
 
-# Make stack non-executable
+/* Make stack non-executable (GNU as specific; ignore on macOS) */
+#if !defined(__MACH__)
 .section .note.GNU-stack,"",@progbits
+#endif
 
 .text
 

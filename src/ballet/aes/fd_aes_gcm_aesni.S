@@ -139,9 +139,11 @@
 
 #define SYM_FUNC_END(name)			\
 	.cfi_endproc; 				\
+#if !defined(__MACH__)
 	.type name @function ;			\
 	.set .L__sym_size_##name, .-name ;	\
 	.size name, .L__sym_size_##name
+#endif
 
 .section .rodata
 .p2align 4
