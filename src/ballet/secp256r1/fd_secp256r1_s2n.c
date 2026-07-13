@@ -67,7 +67,7 @@ fd_secp256r1_scalar_mul( fd_secp256r1_scalar_t *       r,
                          fd_secp256r1_scalar_t const * a,
                          fd_secp256r1_scalar_t const * b ) {
   ulong t[ 8 ];
-  bignum_mul_4_8( t, (ulong *)a->limbs, (ulong *)b->limbs );
+  bignum_mul_4_8( t, (uint64_t *)a->limbs, (uint64_t *)b->limbs );
   bignum_mod_n256( r->limbs, 8, t );
   return r;
 }
@@ -76,7 +76,7 @@ static inline fd_secp256r1_scalar_t *
 fd_secp256r1_scalar_inv( fd_secp256r1_scalar_t       * r,
                          fd_secp256r1_scalar_t const * a ) {
   ulong t[ 12 ];
-  bignum_modinv( 4, r->limbs, (ulong *)a->limbs, (ulong *)fd_secp256r1_const_n[0].limbs, t );
+  bignum_modinv( 4, r->limbs, (uint64_t *)a->limbs, (uint64_t *)fd_secp256r1_const_n[0].limbs, t );
   return r;
 }
 
@@ -110,7 +110,7 @@ fd_secp256r1_fp_sqrt( fd_secp256r1_fp_t *       r,
   fd_secp256r1_fp_t _t0[1], _t1[1];
   ulong * t0 = _t0->limbs;
   ulong * t1 = _t1->limbs;
-  ulong * x = (ulong *)a->limbs;
+  ulong * x = (uint64_t *)a->limbs;
 
 	bignum_montsqr_p256( t0, x );
 	bignum_montmul_p256( t0, t0, x );
@@ -156,9 +156,9 @@ fd_secp256r1_point_frombytes( fd_secp256r1_point_t * r,
 
   /* y^2 = x^3 + ax + b */
   bignum_montsqr_p256( y2->limbs, r->x->limbs );
-  bignum_add_p256    ( y2->limbs, y2->limbs, (ulong *)fd_secp256r1_const_a_mont[0].limbs );
+  bignum_add_p256    ( y2->limbs, y2->limbs, (uint64_t *)fd_secp256r1_const_a_mont[0].limbs );
   bignum_montmul_p256( y2->limbs, y2->limbs, r->x->limbs );
-  bignum_add_p256    ( y2->limbs, y2->limbs, (ulong *)fd_secp256r1_const_b_mont[0].limbs );
+  bignum_add_p256    ( y2->limbs, y2->limbs, (uint64_t *)fd_secp256r1_const_b_mont[0].limbs );
 
   /* y = sqrt(y^2) */
   if( FD_UNLIKELY( !fd_secp256r1_fp_sqrt( r->y, y2 ) ) ) {
@@ -186,9 +186,9 @@ fd_secp256r1_point_eq_x( fd_secp256r1_point_t const *  p,
   }
 
   /* x = demont(X / Z^2) mod n */
-  bignum_montinv_p256( affine_x->limbs, (ulong *)p->z->limbs );
+  bignum_montinv_p256( affine_x->limbs, (uint64_t *)p->z->limbs );
   bignum_montsqr_p256( affine_x->limbs, affine_x->limbs );
-  bignum_montmul_p256( affine_x->limbs, affine_x->limbs, (ulong *)p->x->limbs );
+  bignum_montmul_p256( affine_x->limbs, affine_x->limbs, (uint64_t *)p->x->limbs );
   bignum_demont_p256( affine_x_mod_n->limbs, affine_x->limbs );
   bignum_mod_n256_4 ( affine_x_mod_n->limbs, affine_x_mod_n->limbs );
 
@@ -219,14 +219,14 @@ fd_secp256r1_point_eq_mixed( fd_secp256r1_point_t const * a,
   }
 
   fd_secp256r1_fp_t z1z1[1];
-  bignum_montsqr_p256( z1z1->limbs, (ulong *)a->z->limbs );
+  bignum_montsqr_p256( z1z1->limbs, (uint64_t *)a->z->limbs );
 
   fd_secp256r1_fp_t temp[1];
-  bignum_montmul_p256( temp->limbs, (ulong *)x->limbs, z1z1->limbs );
+  bignum_montmul_p256( temp->limbs, (uint64_t *)x->limbs, z1z1->limbs );
 
   if( FD_UNLIKELY( fd_uint256_eq( a->x, temp ) ) ) {
-    bignum_montmul_p256( temp->limbs, z1z1->limbs,  (ulong *)a->z->limbs );
-    bignum_montmul_p256( temp->limbs, temp->limbs, (ulong *)y->limbs );
+    bignum_montmul_p256( temp->limbs, z1z1->limbs,  (uint64_t *)a->z->limbs );
+    bignum_montmul_p256( temp->limbs, temp->limbs, (uint64_t *)y->limbs );
     return fd_uint256_eq( a->y, temp );
   } else {
     return 0;
@@ -264,12 +264,12 @@ fd_secp256r1_double_scalar_mul_base( fd_secp256r1_point_t *        r,
                                      fd_secp256r1_scalar_t const * u2 ) {
   /* u1*G */
   ulong rtmp[ 8 ];
-  p256_scalarmulbase( rtmp, (ulong *)u1->limbs, 6, (ulong *)fd_secp256r1_base_point_table );
+  p256_scalarmulbase( rtmp, (uint64_t *)u1->limbs, 6, (uint64_t *)fd_secp256r1_base_point_table );
   bignum_tomont_p256( rtmp, rtmp );
   bignum_tomont_p256( rtmp+4, rtmp+4 );
 
   /* u2*A */
-  p256_montjscalarmul( (ulong *)r, (ulong *)u2->limbs, (ulong *)a );
+  p256_montjscalarmul( (uint64_t *)r, (uint64_t *)u2->limbs, (uint64_t *)a );
 
   /* u1*G + u2*A */
   fd_secp256r1_point_add_mixed( r, r, rtmp );

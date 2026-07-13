@@ -3,6 +3,7 @@
 
 /* Implementation of uint256. */
 
+#include <stdint.h>
 #include "../fd_ballet_base.h"
 
 /* Align at most at 32 bytes.
@@ -32,14 +33,10 @@ typedef union fd_uint256 fd_uint256_t;
 static inline fd_uint256_t *
 fd_uint256_bswap( fd_uint256_t *       r,
                   fd_uint256_t const * a ) {
-  ulong r3 = fd_ulong_bswap( a->limbs[0] );
-  ulong r2 = fd_ulong_bswap( a->limbs[1] );
-  ulong r1 = fd_ulong_bswap( a->limbs[2] );
-  ulong r0 = fd_ulong_bswap( a->limbs[3] );
-  r->limbs[3] = r3;
-  r->limbs[2] = r2;
-  r->limbs[1] = r1;
-  r->limbs[0] = r0;
+  r->limbs[3] = (uint64_t) fd_ulong_bswap( a->limbs[0] );
+  r->limbs[2] = (uint64_t) fd_ulong_bswap( a->limbs[1] );
+  r->limbs[1] = (uint64_t) fd_ulong_bswap( a->limbs[2] );
+  r->limbs[0] = (uint64_t) fd_ulong_bswap( a->limbs[3] );
   return r;
 }
 
@@ -91,7 +88,7 @@ fd_uint256_cmp( fd_uint256_t const * a,
 static inline ulong
 fd_uint256_bit( fd_uint256_t const * a,
                 int                  i ) {
-  return a->limbs[i / 64] & (1UL << (i % 64));
+  return (uint64_t)a->limbs[i / 64] & (1ULL << (i % 64));
 }
 
 #include "./fd_uint256_mul.h"
