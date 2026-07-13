@@ -121,10 +121,10 @@ fd_uint256_add(fd_uint256_t *       r,
                fd_uint256_t const * a,
                fd_uint256_t const * b ) {
   uchar c0;
-  fd_ulong_add_carry4( &r->limbs[0], &c0, a->limbs[0], b->limbs[0], 0, 0 );
-  fd_ulong_add_carry4( &r->limbs[1], &c0, a->limbs[1], b->limbs[1], 0, c0 );
-  fd_ulong_add_carry4( &r->limbs[2], &c0, a->limbs[2], b->limbs[2], 0, c0 );
-  fd_ulong_add_carry4( &r->limbs[3], &c0, a->limbs[3], b->limbs[3], 0, c0 );
+  fd_ulong_add_carry4( (ulong *)&r->limbs[0], &c0, a->limbs[0], b->limbs[0], 0, 0 );
+  fd_ulong_add_carry4( (ulong *)&r->limbs[1], &c0, a->limbs[1], b->limbs[1], 0, c0 );
+  fd_ulong_add_carry4( (ulong *)&r->limbs[2], &c0, a->limbs[2], b->limbs[2], 0, c0 );
+  fd_ulong_add_carry4( (ulong *)&r->limbs[3], &c0, a->limbs[3], b->limbs[3], 0, c0 );
   return r;
 }
 
@@ -180,7 +180,7 @@ fd_uint256_mul_mod_p( fd_uint256_t *       r,
   ulong m;
 
   for( int i=0; i<4; i++ ) {
-    fd_ulong_vec_mul( l, u, a->limbs, b->limbs[i] );
+    fd_ulong_vec_mul( l, u, (ulong const *)a->limbs, b->limbs[i] );
     fd_ulong_add_carry4( &t[0], &c0, t[0], l[0], 0, 0 );
     fd_ulong_add_carry4( &t[1], &c0, t[1], l[1], u[0], c0 );
     fd_ulong_add_carry4( &t[2], &c0, t[2], l[2], u[1], c0 );
@@ -188,7 +188,7 @@ fd_uint256_mul_mod_p( fd_uint256_t *       r,
 
     m = t[0] * p_inv;
 
-    fd_ulong_vec_mul( l, h, p->limbs, m );
+    fd_ulong_vec_mul( l, h, (ulong const *)p->limbs, m );
     fd_ulong_add_carry4( &tmp,  &c1, t[0], l[0], 0, 0 );
     fd_ulong_add_carry4( &t[0], &c1, t[1], l[1], h[0], c1 );
     fd_ulong_add_carry4( &t[1], &c1, t[2], l[2], h[1], c1 );
@@ -203,10 +203,10 @@ fd_uint256_mul_mod_p( fd_uint256_t *       r,
 
   if( fd_uint256_cmp( r, p ) >= 0 ) {
     int b = 0;
-    fd_ulong_sub_borrow( &r->limbs[0], &b, r->limbs[0], p->limbs[0], b );
-    fd_ulong_sub_borrow( &r->limbs[1], &b, r->limbs[1], p->limbs[1], b );
-    fd_ulong_sub_borrow( &r->limbs[2], &b, r->limbs[2], p->limbs[2], b );
-    fd_ulong_sub_borrow( &r->limbs[3], &b, r->limbs[3], p->limbs[3], b );
+    fd_ulong_sub_borrow( (ulong *)&r->limbs[0], &b, r->limbs[0], p->limbs[0], b );
+    fd_ulong_sub_borrow( (ulong *)&r->limbs[1], &b, r->limbs[1], p->limbs[1], b );
+    fd_ulong_sub_borrow( (ulong *)&r->limbs[2], &b, r->limbs[2], p->limbs[2], b );
+    fd_ulong_sub_borrow( (ulong *)&r->limbs[3], &b, r->limbs[3], p->limbs[3], b );
   }
 #endif
   return r;

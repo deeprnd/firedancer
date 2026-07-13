@@ -39,7 +39,7 @@
 #endif
 
 /* ── Platform compat wrapper ── */
-static inline int fd_shmem_private_getrandom( void *buf, size_t buflen, unsigned int flags ) {
+static inline int fd_shmem_private_getrandom( void *buf __attribute__((unused)), size_t buflen __attribute__((unused)), unsigned int flags __attribute__((unused)) ) {
 #if defined(FD_HAS_LINUX)
   long n = syscall( SYS_getrandom, buf, buflen, flags );
   (void)n;
