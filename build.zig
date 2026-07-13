@@ -17,8 +17,6 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const fd_lib_dir = b.option([]const u8, "fd-lib-dir", "Firedancer lib dir (default: build/native/gcc/lib)") orelse "build/native/gcc/lib";
     const clap_dep = b.dependency("clap", .{});
-    // Gate test compilation behind --test flag so `zig build` alone never
-    // compiles test binaries.  Use `zig build --test` to compile + run them.
     const clap_mod = clap_dep.module("clap");
 
     // Shared modules used by both the exe and test binaries.
@@ -414,12 +412,14 @@ pub fn build(b: *std.Build) void {
             .{ .name = "trade_ticket", .module = trade_ticket_mod },
         },
     });
-        // ---------------------------------------------------------------------------
-        // Test step — offline Tickoni unit tests only.
-        // Pure logic and fixture/mock-backed proofs belong here; no running servers.
-        // Run with: zig build --test test
-        // ---------------------------------------------------------------------------
-        const test_step = b.step("test", "Run offline Tickoni unit tests");
+    const investment_demo_test = b.addTest(.{ .root_module = investment_demo_mod });
+
+    // ---------------------------------------------------------------------------
+    // Test step — offline Tickoni unit tests only.
+    // Pure logic and fixture/mock-backed proofs belong here; no running servers.
+    // Run with: zig build --test test
+    // ---------------------------------------------------------------------------
+    const test_step = b.step("test", "Run offline Tickoni unit tests");
 
     // Files with no cross-module imports: standalone test binaries.
     for ([_][]const u8{
