@@ -1,5 +1,8 @@
-#ifndef _GNU_SOURCE
+#if !defined(_GNU_SOURCE) && !defined(__MACH__)
 #define _GNU_SOURCE
+#endif
+#if defined(__MACH__)
+#define _DARWIN_C_SOURCE
 #endif
 
 #include <ctype.h>
@@ -14,7 +17,12 @@
 #include <sys/resource.h>
 #include <sys/mman.h>
 
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
 #include "../sanitize/fd_sanitize.h"
+#include "../fd_util_base.h"
 #include "fd_tile_private.h"
 
 /* Operating system shims ********************************************/
@@ -276,6 +284,8 @@ fd_tile_private_manager( void * _args ) {
   if( FD_UNLIKELY( prctl( PR_SET_NAME, thread_name, 0, 0, 0 ) ) ) FD_LOG_ERR(( "prctl(PR_SET_NAME) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
 #elif defined(__MACH__)
   pthread_setname_np( thread_name );
+#else
+  (void)thread_name;
 #endif
 
   if( FD_UNLIKELY( !( (id ==fd_log_thread_id()                                       ) &
