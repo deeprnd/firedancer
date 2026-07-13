@@ -5,6 +5,7 @@
 #
 # On ARM (Apple Silicon): -mcpu=apple-m1 (or newer) with NEON/CRYPTO.
 # On Intel: -march=skylake with SSE4.2/AVX2.
+# On both: FD_HAS_THREADS and FD_HAS_ATOMIC for tile threading support.
 
 BUILDDIR?=macos/clang
 
@@ -13,6 +14,7 @@ include config/base.mk
 include config/extra/with-clang.mk
 include config/extra/with-debug.mk
 include config/extra/with-optimization.mk
+include config/extra/with-threads.mk
 
 # Platform detection
 UNAME?=$(shell uname)

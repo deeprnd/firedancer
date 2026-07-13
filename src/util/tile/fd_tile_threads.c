@@ -314,10 +314,14 @@ fd_tile_private_manager( void * _args ) {
     fd_tile_private_stack0 = (ulong)stack;
     fd_tile_private_stack1 = (ulong)stack + stack_sz;
 
-    /* Prevent another fork() from smashing the stack */
+    /* Prevent another fork() from smashing the stack (Linux only) */
+#if defined(__linux__)
     if( FD_UNLIKELY( madvise( stack, FD_TILE_PRIVATE_STACK_SZ, MADV_DONTFORK ) ) ) {
       FD_LOG_ERR(( "madvise(stack,MADV_DONTFORK) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
     }
+#else
+    (void)stack; /* madvise(MADV_DONTFORK) not available on this platform */
+#endif
 
   } else { /* Pthread provided stack */
     fd_log_private_stack_discover( stack_sz, &fd_tile_private_stack0, &fd_tile_private_stack1 ); /* logs details */
