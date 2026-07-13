@@ -545,6 +545,9 @@ before_credit( fd_diag_tile_t *    ctx,
       ctx->first_seen_died[ i ] = LONG_MAX;
     }
   }
+#else
+  (void)now_since_boot_nanos;
+#endif
 
   check_engine_metric( ctx, now );
 #if defined(__linux__)
@@ -812,11 +815,13 @@ fd_topo_run_tile_t fd_tile_diag = {
   .name                     = "diag",
 #if defined(__linux__)
   .populate_allowed_seccomp = populate_allowed_seccomp,
+  .privileged_init          = privileged_init,
+#else
+  .privileged_init          = NULL,
 #endif
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,
-  .privileged_init          = privileged_init,
   .unprivileged_init        = unprivileged_init,
   .run                      = stem_run,
 };
