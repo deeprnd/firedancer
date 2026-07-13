@@ -35,6 +35,21 @@ endif
 include config/machine/native.mk
 include config/extra/with-hosted.mk
 
+# Platform detection — define FD_HAS_LINUX/FD_HAS_MACOS/FD_HAS_WINDOWS
+# so source code can gate platform-specific implementations.
+# MUST come after native.mk (which includes base.mk that does
+# CPPFLAGS:=...) because base.mk resets CPPFLAGS with :=, wiping
+# out any += we do before it.  Use ?= so command-line -D can still
+# override.
+UNAME?=$(shell uname)
+ifeq ($(UNAME), Linux)
+  CPPFLAGS+=-DFD_HAS_LINUX=1
+  FD_HAS_LINUX:=1
+else ifeq ($(UNAME), Darwin)
+  CPPFLAGS+=-DFD_HAS_MACOS=1
+  FD_HAS_MACOS:=1
+endif
+
 # Parse EXTRAS from the command line to include corresponding with-*.mk files.
 # This is necessary because tickoni_fd.mk overrides LOCAL_MKS and doesn't
 # include the extras infrastructure like the default machine profiles do.

@@ -52,7 +52,12 @@ runs:
 
     - id: deps-sh-hash
       shell: bash
-      run: cat /etc/os-release '${{ inputs.deps-script-path }}' | sha256sum | awk '{print "HASH=" $1}' >> "$GITHUB_OUTPUT"
+      run: |
+        if [ "${{ runner.os }}" = "Linux" ]; then
+          cat /etc/os-release '${{ inputs.deps-script-path }}' | sha256sum | awk '{print "HASH=" $1}' >> "$GITHUB_OUTPUT"
+        else
+          cat '${{ inputs.deps-script-path }}' | sha256sum | awk '{print "HASH=" $1}' >> "$GITHUB_OUTPUT"
+        fi
 
     - id: deps-sh-cache
       uses: corca-ai/local-cache@v2

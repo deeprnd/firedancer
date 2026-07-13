@@ -1,4 +1,3 @@
-set shell := ["bash", "-c"]
 
 # Prefer GNU Make 4.x (Homebrew installs it as `gmake` on macOS); fall back to `make`.
 # Firedancer's GNUmakefile uses `undefine`, which needs GNU Make >= 3.82.
@@ -18,11 +17,14 @@ dev_image := "tickoni-dev:24.04"
 #   FD_TK_LIBS_EXTRA        libfd_blst.a libfd_zstd.a libfd_lz4.a
 #   fd_compute_mks()        produce LOCAL_MKS from a source-dir list
 
-# Per-compiler build directories. Each Firedancer build profile compiles
-# to a different BUILDDIR/lib/ subtree.  *_build is the short name
-# passed to `make` as BUILDDIR (Firedancer prefixes `build/`); *_dir
-# is the complete path (used in `mkdir -p` and archive targets); *_lib
-# is the full lib/ subtree path.
+# Per-compiler build directories (kept for CI compatibility). Each Firedancer
+# build profile compiles to a different BUILDDIR/lib/ subtree.  *_build is the
+# short name passed to `make` as BUILDDIR (Firedancer prefixes `build/`); *_dir
+# is the complete path (used in `mkdir -p` and archive targets); *_lib is the
+# full lib/ subtree path.
+#
+# CI recipes (test-*, quality-*, security-*) reference these by name, so the
+# defaults here must stay in sync with what the CI workflows expect.
 fd_tickoni_build := "fd-tickoni-fd"
 fd_tickoni_dir   := "build/fd-tickoni-fd"
 fd_tickoni_lib   := "build/fd-tickoni-fd/lib"
@@ -92,22 +94,33 @@ build-fd-tk-libs: build-fd
 # Adding a new lib: edit contrib/fd-tk-libs.sh (FD_TK_LIBS or
 # FD_TK_LIBS_EXTRA arrays). All justfile/CI/quality/security consumers
 # pick up the change automatically.
+# ── Public build recipes ─────────────────────────────────────────────────────
+
+# Auto-detect host platform/arch and route to the correct platform-specific recipe.
+# CI recipes below (build-fd-gcc, build-fd-clang, build-fd-arm, build-fd-macos-*)
+# are called directly with explicit values for reproducibility.
 build-fd:
-  mkdir -p {{fd_tickoni_dir}}/obj
-  bash contrib/fd-build-lib.sh {{fd_tickoni_build}}
+  exec bash contrib/fd-build-linux.sh
 
+# Linux GCC (CI: maps to fd-gcc for test/quality/security compatibility)
 build-fd-gcc:
-  mkdir -p {{fd_gcc_dir}}/obj
-  bash contrib/fd-build-lib.sh {{fd_gcc_build}} gcc-12
+  bash contrib/fd-build-lib.sh fd-gcc gcc-12
 
+# Linux Clang (CI: maps to fd-clang for test/quality/security compatibility)
 build-fd-clang:
-  mkdir -p {{fd_clang_dir}}/obj
-  bash contrib/fd-build-lib.sh {{fd_clang_build}} clang-18
+  bash contrib/fd-build-lib.sh fd-clang clang-18
 
-# Compile-only ARM lane matching the CI machine target; Firedancer runtime remains x86-64 Linux only.
+# Linux ARM (CI: maps to fd-arm for test/quality/security compatibility)
 build-fd-arm:
-  mkdir -p {{fd_arm_dir}}/obj
-  bash contrib/fd-build-lib.sh {{fd_arm_build}} gcc-14
+  bash contrib/fd-build-lib.sh fd-arm gcc-14
+
+# macOS Intel build
+build-fd-macos-intel:
+  bash contrib/fd-build-lib.sh fd-macos-intel clang
+
+# macOS ARM build
+build-fd-macos-arm:
+  bash contrib/fd-build-lib.sh fd-macos-arm clang
 
 build-fd-dev:
   make -j"$(nproc)" all
@@ -234,6 +247,27 @@ test-system-fd:
 
 test-system-all:
   python3 contrib/readme/run-badged-command.py system bash -c "just test-system-tk && just test-system-fd"
+
+# ── Infrastructure: ensure llama.cpp and model (for LLM system tests) ──────
+
+# Build llama.cpp (CPU or CUDA if detected).
+infra-ensure-llamacpp:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
+    if (( gpu_count > 0 )); then
+      bash contrib/test/ensure_llama_cpp.sh --gpu
+    else
+      bash contrib/test/ensure_llama_cpp.sh
+    fi
+  else
+    bash contrib/test/ensure_llama_cpp.sh
+  fi
+
+# Download the GGUF model for system tests (requires `hf` CLI).
+infra-ensure-model:
+  bash contrib/test/ensure_hf_model.sh
 
 infra-run-llamacpp:
   #!/usr/bin/env bash
@@ -436,25 +470,3 @@ mem-free page_type="gigantic" numa="0":
 
 mem-drop-caches:
   sync
-  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
-  sudo sh -c 'echo 1 > /proc/sys/vm/compact_memory'
-
-# ── Infra (harness) ─────────────────────────────────────────────────────
-
-infra-check-model:
-  bash contrib/test/ensure_hf_model.sh --check-only
-
-infra-ensure-model:
-  bash contrib/test/ensure_hf_model.sh
-
-infra-check-llamacpp:
-  bash contrib/test/ensure_llama_cpp.sh --check-only
-
-infra-ensure-llamacpp:
-  bash contrib/test/ensure_llama_cpp.sh
-
-infra-run-llamacpp-cpu:
-  bash contrib/test/run_llm_server.sh cpu
-
-infra-run-llamacpp-gpu:
-  bash contrib/test/run_llm_server.sh gpu

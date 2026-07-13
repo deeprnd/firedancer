@@ -90,7 +90,18 @@ fd_build_fd() {
   local mks
   mks=$(fd_compute_mks ${SRCS})
 
-  local -a cmd=( make -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" )
+  # Use gmake on macOS (GitHub Actions runners ship BSD make 3.81,
+  # but Firedancer's GNUmakefile requires GNU make >= 3.82 for
+  # the 'undefine' directive).
+  local MAKE
+  MAKE="$(command -v gmake 2>/dev/null || command -v make)"
+  [ "$MAKE" = "/usr/bin/make" ] && MAKE="$(command -v make)"  # fallback
+  # On macOS runners prefer gmake if available.
+  if command -v gmake >/dev/null 2>&1; then
+    MAKE="$(command -v gmake)"
+  fi
+
+  local -a cmd=( "$MAKE" -j"$(fd_nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" )
   [ -n "${EXTRAS}" ] && cmd+=( "EXTRAS=${EXTRAS}" )
   cmd+=( "CC=${CC}" )
   cmd+=( "LOCAL_MKS=${mks}" )
@@ -109,4 +120,16 @@ fd_lib_prefix() {
     result+=("${prefix}/${lib}")
   done
   printf '%s\n' "${result[@]}"
+}
+
+# Portable nproc wrapper — macOS has no nproc.
+# Usage: local jobs; jobs=$(fd_nproc)
+fd_nproc() {
+  if command -v nproc >/dev/null 2>&1; then
+    nproc
+  elif command -v sysctl >/dev/null 2>&1; then
+    sysctl -n hw.ncpu
+  else
+    echo 1
+  fi
 }

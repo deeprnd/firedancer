@@ -2,6 +2,20 @@
 #define _GNU_SOURCE
 #endif
 
+/* Platform compat stubs for mmap constants — needed before sys/mman.h on macOS */
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS 0x1000
+#endif
+#ifndef MAP_HUGETLB
+#define MAP_HUGETLB 0x40000
+#endif
+#ifndef MAP_HUGE_2MB
+#define MAP_HUGE_2MB (21 << 26)
+#endif
+#ifndef MAP_HUGE_1GB
+#define MAP_HUGE_1GB (30 << 26)
+#endif
+
 #include "fd_shmem_private.h"
 
 /* Portable APIs */
@@ -60,20 +74,46 @@ fd_shmem_page_sz_to_cstr( ulong page_sz ) {
   return "unknown";
 }
 
-#if FD_HAS_HOSTED
+#ifdef FD_HAS_LINUX
+#include <linux/mempolicy.h>
+#include <linux/mman.h>
+#else
+/* MPOL_* constants from linux/mempolicy.h — stub for macOS */
+#ifndef MPOL_DEFAULT
+#define MPOL_DEFAULT 0
+#endif
+#ifndef MPOL_RELOCATE
+#define MPOL_RELOCATE 1
+#endif
+#ifndef MPOL_BIND
+#define MPOL_BIND 1
+#endif
+#ifndef MPOL_MF_MOVE
+#define MPOL_MF_MOVE 1
+#endif
+#ifndef MPOL_MF_STRICT
+#define MPOL_MF_STRICT 2
+#endif
+#ifndef MPOL_F_STATIC_NODES
+#define MPOL_F_STATIC_NODES (1 << 0)
+#endif
+#endif
 
+#ifdef FD_HAS_HOSTED
 #include <ctype.h>
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <linux/mempolicy.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <linux/mman.h>
 
 #if FD_HAS_THREADS
 pthread_mutex_t fd_shmem_private_lock[1];
 #endif
+
+#endif /* FD_HAS_HOSTED */
+
+#if FD_HAS_HOSTED
 
 char  fd_shmem_private_base[ FD_SHMEM_PRIVATE_BASE_MAX ]; /* ""  at thread group start, initialized at boot */
 ulong fd_shmem_private_base_len;                          /* 0UL at ",                  initialized at boot */

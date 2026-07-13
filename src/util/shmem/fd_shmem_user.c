@@ -1,16 +1,60 @@
+/* macOS needs _DARWIN_C_SOURCE for getentropy, MAP_ANONYMOUS, and madvise;
+ * _DEFAULT_SOURCE for arc4random_buf() on newer SDKs (Xcode 16+/macOS 15+).
+ * This MUST precede ALL includes (fd_shmem_private.h -> unistd.h, etc.) */
+#ifdef __APPLE__
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE
+#endif
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif
+#endif
+
 #if FD_HAS_HOSTED
 #define _GNU_SOURCE
 #endif
 
 #include "fd_shmem_private.h"
 
+/* ── Platform compat includes ─────────────────────────────────────── */
+
 #if FD_HAS_HOSTED
 
 #include <errno.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <sys/random.h>
+
+#if defined(FD_HAS_LINUX)
+#include <sys/syscall.h>
+#endif
+
+#ifndef MAP_ANON
+#define MAP_ANON MAP_ANONYMOUS
+#endif
+
+#ifndef MADV_DONTDUMP
+#define MADV_DONTDUMP 0
+#endif
+
+/* ── Platform compat wrapper ── */
+static inline int fd_shmem_private_getrandom( void *buf, size_t buflen, unsigned int flags ) {
+#if defined(FD_HAS_LINUX)
+  long n = syscall( SYS_getrandom, buf, buflen, flags );
+  (void)n;
+  return (int)n;
+#elif defined(FD_HAS_MACOS)
+  /* arc4random_buf() is always available on macOS (since 10.7)
+   * and needs no feature test macro (unlike getentropy()). */
+  (void)flags;
+  arc4random_buf( buf, buflen );
+  return (int)buflen;
+#else
+  errno = ENOSYS;
+  return -1;
+#endif
+}
 
 /* fd_shmem_private_key converts the cstr pointed to by name into a
    valid key and stores it at the location pointed to by key assumed
@@ -109,7 +153,7 @@ fd_shmem_private_map_rand( ulong size,
 
   /* Failure is unlikely, 1000 iterations should guarantee success */
   for( ulong i = 0; i < 1000; i++ ) {
-    long n = getrandom( &ret_addr, sizeof(ret_addr), 0 );
+    long n = fd_shmem_private_getrandom( &ret_addr, sizeof(ret_addr), 0 );
     if( FD_UNLIKELY( n!=sizeof(ret_addr) ) ) FD_LOG_ERR(( "could not generate random address, getrandom() failed (%i-%s)", errno, fd_io_strerror( errno ) ));
 
     /* Assume 47-bit virtual addressing */

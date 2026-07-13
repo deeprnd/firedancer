@@ -84,8 +84,8 @@ if [ "$MODE" = "cov" ]; then
         "${LIBDIR}/libfd_tango.a" "${LIBDIR}/libfd_util.a"
   fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" \
     "SRCS=${SRCS[*]}" EXTRAS="lz4 llvm-cov" BUILD_TARGET="unit-test"
-  COV_JOBS=$(( $(nproc) / 2 ))
+  COV_JOBS=$(( $(fd_nproc) / 2 ))
   [[ "$COV_JOBS" -lt 1 ]] && COV_JOBS=1
-  make -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" CC="${CC}" \
+  make -j"$(fd_nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" CC="${CC}" \
     run-unit-test TEST_OPTS="--page-sz normal --job-mem 268435456 -j ${COV_JOBS}"
 fi
