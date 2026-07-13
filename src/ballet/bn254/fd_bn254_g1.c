@@ -276,7 +276,7 @@ fd_bn254_g1_scalar_mul( fd_bn254_g1_t *           r,
     fd_bn254_glv_mul3x2( p11, b1, na );
     fd_bn254_glv_mul2x1( p21, b2, nb );
     fd_bn254_glv_add4( t, p11, p21 );
-    fd_bn254_glv_sub4( (ulong *)k1->limbs, s->limbs, t );
+    fd_bn254_glv_sub4( (ulong *)k1->limbs, (ulong const *)s->limbs, t );
   }
 
   /* k2 = b1*N_B - b2*N_C (may be negative) */

@@ -71,6 +71,20 @@ runs:
       shell: bash
       run: FD_AUTO_INSTALL_PACKAGES=1 '${{ inputs.deps-script-path }}' check
 
+    - name: Ensure zstd CLI is available
+      shell: bash
+      run: |
+        if command -v zstd >/dev/null 2>&1; then
+          echo "zstd already installed"
+        elif [ "${{ runner.os }}" = "macOS" ]; then
+          brew install zstd
+        elif [ "${{ env.HAS_APT_GET }}" = "1" ]; then
+          sudo apt-get install -y zstd
+        else
+          echo "zstd not available and no install method known"
+          exit 1
+        fi
+
     - name: Install dependencies from cache
       shell: bash
       run: tar -Izstd -xvf deps-bundle.tar.zst
