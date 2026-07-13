@@ -31,8 +31,16 @@ LOCAL_MKS := $(filter src/tango/% src/util/% src/ballet/% src/disco/% src/waltz/
 LOCAL_MKS := $(filter-out src/discof/% src/disco/tickoni/% src/flamenco/% src/choreo/% src/app/platform/%,$(LOCAL_MKS))
 endif
 
-# Use native detection for compiler feature flags.
-include config/machine/native.mk
+# Platform-specific config.
+# On macOS, use the dedicated macOS build profile which auto-detects
+# architecture (Apple Silicon vs Intel) and sets correct flags.
+# On Linux, use native detection (native_config.sh).
+UNAME?=$(shell uname)
+ifeq ($(UNAME), Darwin)
+  include config/machine/macos_clang.mk
+else
+  include config/machine/native.mk
+endif
 include config/extra/with-hosted.mk
 
 # Platform detection — define FD_HAS_LINUX/FD_HAS_MACOS/FD_HAS_WINDOWS
