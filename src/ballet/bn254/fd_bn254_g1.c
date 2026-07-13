@@ -276,7 +276,7 @@ fd_bn254_g1_scalar_mul( fd_bn254_g1_t *           r,
     fd_bn254_glv_mul3x2( p11, b1, na );
     fd_bn254_glv_mul2x1( p21, b2, nb );
     fd_bn254_glv_add4( t, p11, p21 );
-    fd_bn254_glv_sub4( k1->limbs, s->limbs, t );
+    fd_bn254_glv_sub4( (ulong *)k1->limbs, s->limbs, t );
   }
 
   /* k2 = b1*N_B - b2*N_C (may be negative) */
@@ -286,10 +286,10 @@ fd_bn254_g1_scalar_mul( fd_bn254_g1_t *           r,
     ulong pos[ 4 ], neg[ 4 ];
     fd_bn254_glv_mul3x1( pos, b1, nb );
     fd_bn254_glv_mul2x2( neg, b2, nc );
-    ulong borrow = fd_bn254_glv_sub4( k2_abs->limbs, pos, neg );
+    ulong borrow = fd_bn254_glv_sub4( (ulong *)k2_abs->limbs, pos, neg );
     if( borrow ) {
       k2_neg = 1;
-      fd_bn254_glv_negate4( k2_abs->limbs );
+      fd_bn254_glv_negate4( (ulong *)k2_abs->limbs );
     }
   }
 
