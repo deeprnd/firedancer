@@ -13,8 +13,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#if defined(__linux__)
 #include "fd_proc_interrupts.h"
 #include "generated/fd_diag_tile_seccomp.h"
+#endif
 
 #define REPORT_INTERVAL_MILLIS (100L)
 
@@ -39,6 +41,7 @@ struct fd_diag_tile {
   int stat_fds[ FD_TILE_MAX ];
   int sched_fds[ FD_TILE_MAX ];
 
+#if defined(__linux__)
   ulong       irq_cnt[ FD_METRICS_ENUM_SOFTIRQ_CNT ][ FD_TILE_MAX ];
   fd_cpuset_t cpu_has_tile[ fd_cpuset_word_cnt ];
   int         proc_interrupts_fd;
@@ -49,6 +52,7 @@ struct fd_diag_tile {
   ulong       loc_baseline[ FD_TILE_MAX ];
   ulong       irq_ticks_baseline[ FD_TILE_MAX ];
   ulong       softirq_baseline[ FD_METRICS_ENUM_SOFTIRQ_CNT ][ FD_TILE_MAX ];
+#endif
 
   ulong volatile * metrics    [ FD_TILE_MAX ];
   ushort           cpu_to_tile[ FD_TILE_MAX ];
@@ -81,6 +85,7 @@ scratch_footprint( fd_topo_tile_t const * tile ) {
   return sizeof(fd_diag_tile_t);
 }
 
+#if defined(__linux__)
 static int
 read_stat_file( int              fd,
                 ulong            ns_per_tick,
@@ -229,6 +234,7 @@ read_sched_file( int              fd,
 
   return 0;
 }
+#endif /* __linux__ */
 
 static void
 check_engine_metric( fd_diag_tile_t * ctx, long now ) {
@@ -361,6 +367,7 @@ check_engine_metric( fd_diag_tile_t * ctx, long now ) {
   FD_MGAUGE_SET( DIAG, TURBINE_STATUS, turbine_status );
 }
 
+#if defined(__linux__)
 static void
 irq_metrics( fd_diag_tile_t * ctx ) {
   if( FD_UNLIKELY( -1==lseek( ctx->proc_softirqs_fd, 0, SEEK_SET ) ) ) FD_LOG_ERR(( "lseek failed (%i-%s)", errno, strerror( errno ) ));
@@ -455,6 +462,7 @@ interrupt_metrics( fd_diag_tile_t * ctx ) {
     }
   }
 }
+#endif /* __linux__ */
 
 static void
 before_credit( fd_diag_tile_t *    ctx,
@@ -470,7 +478,11 @@ before_credit( fd_diag_tile_t *    ctx,
       .tv_sec  = diff / (long)1e9,
       .tv_nsec = diff % (long)1e9
     };
+#if defined(__linux__)
     clock_nanosleep( CLOCK_REALTIME, 0, &ts, NULL );
+#else
+    nanosleep( &ts, NULL );
+#endif
     return;
   }
   ctx->next_report_nanos += REPORT_INTERVAL_MILLIS*1000L*1000L;
@@ -478,10 +490,16 @@ before_credit( fd_diag_tile_t *    ctx,
   *charge_busy = 1;
 
   struct timespec boottime;
+#if defined(__linux__)
   if( FD_UNLIKELY( -1==clock_gettime( CLOCK_BOOTTIME, &boottime ) ) ) FD_LOG_ERR(( "clock_gettime(CLOCK_BOOTTIME) failed (%i-%s)", errno, strerror( errno ) ));
+#else
+  if( FD_UNLIKELY( -1==clock_gettime( CLOCK_MONOTONIC, &boottime ) ) ) FD_LOG_ERR(( "clock_gettime(CLOCK_MONOTONIC) failed (%i-%s)", errno, strerror( errno ) ));
+#endif
   ulong now_since_boot_nanos = (ulong)boottime.tv_sec*1000000000UL + (ulong)boottime.tv_nsec;
 
+#if defined(__linux__)
   interrupt_metrics( ctx ); /* before idle computation below, which subtracts it */
+#endif
 
   for( ulong i=0UL; i<ctx->tile_cnt; i++ ) {
     if( FD_UNLIKELY( -1==ctx->stat_fds[ i ] ) ) continue;
@@ -530,9 +548,12 @@ before_credit( fd_diag_tile_t *    ctx,
   }
 
   check_engine_metric( ctx, now );
+#if defined(__linux__)
   irq_metrics( ctx );
+#endif
 }
 
+#if defined(__linux__)
 static void
 privileged_init( fd_topo_t const *      topo,
                  fd_topo_tile_t const * tile ) {
@@ -643,6 +664,7 @@ read_starttime( int     fd,
   *out_starttime_nanos = starttime_ticks * ns_per_tick;
   return 0;
 }
+#endif /* __linux__ */
 
 static void
 unprivileged_init( fd_topo_t const *      topo,
@@ -652,6 +674,7 @@ unprivileged_init( fd_topo_t const *      topo,
   memset( ctx->first_seen_died, 0, sizeof( ctx->first_seen_died ) );
   ctx->next_report_nanos = fd_log_wallclock();
 
+#if defined(__linux__)
   /* Snapshot the cumulative-since-boot /proc interrupt/softirq counters
      so the metrics we report are counted since process startup. */
   memset( ctx->softirq_baseline,    0, sizeof( ctx->softirq_baseline    ) );
@@ -687,6 +710,14 @@ unprivileged_init( fd_topo_t const *      topo,
       if( FD_UNLIKELY( died ) ) ctx->stat_fds[ i ] = -1;
     }
   }
+#else
+  /* On non-Linux, set starttime to 0 and mark all /proc fds as unavailable */
+  for( ulong i=0UL; i<FD_TILE_MAX; i++ ) {
+    ctx->stat_fds[ i ] = -1;
+    ctx->sched_fds[ i ] = -1;
+    ctx->starttime_nanos[ i ] = 0UL;
+  }
+#endif
 
   memset( &ctx->check_engine, 0, sizeof(ctx->check_engine) );
 
@@ -697,11 +728,15 @@ unprivileged_init( fd_topo_t const *      topo,
   ctx->tiles.tower_idx  = fd_topo_find_tile( topo, "tower",  0UL );
   ctx->tiles.replay_idx = fd_topo_find_tile( topo, "replay", 0UL );
 
+#if defined(__linux__)
   fd_cpuset_new( &ctx->cpu_has_tile );
+#endif
   for( ulong i=0UL; i<(topo->tile_cnt); i++ ) {
     ulong cpu_idx = topo->tiles[ i ].cpu_idx;
     if( cpu_idx>=FD_TILE_MAX ) continue;
+#if defined(__linux__)
     fd_cpuset_insert( ctx->cpu_has_tile, cpu_idx );
+#endif
   }
 
   for( ulong i=0UL; i<FD_TILE_MAX; i++ ) ctx->cpu_to_tile[ i ] = USHORT_MAX;
@@ -719,6 +754,7 @@ unprivileged_init( fd_topo_t const *      topo,
   ctx->check_engine.byte_snapshot_ns = now;
 }
 
+#if defined(__linux__)
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
@@ -730,12 +766,14 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
   populate_sock_filter_policy_fd_diag_tile( out_cnt, out, (uint)fd_log_private_logfile_fd() );
   return sock_filter_policy_fd_diag_tile_instr_cnt;
 }
+#endif
 
 static ulong
 populate_allowed_fds( fd_topo_t const *      topo,
                       fd_topo_tile_t const * tile,
                       ulong                  out_fds_cnt,
                       int *                  out_fds ) {
+#if defined(__linux__)
   fd_diag_tile_t * ctx = fd_topo_obj_laddr( topo, tile->tile_obj_id );
 
   if( FD_UNLIKELY( out_fds_cnt<5UL+2UL*ctx->tile_cnt ) ) FD_LOG_ERR(( "out_fds_cnt %lu", out_fds_cnt ));
@@ -752,6 +790,13 @@ populate_allowed_fds( fd_topo_t const *      topo,
     if( -1!=ctx->sched_fds[ i ] ) out_fds[ out_cnt++ ] = ctx->sched_fds[ i ]; /* /proc/<pid>/task/<tid>/sched */
   }
   return out_cnt;
+#else
+  (void)topo; (void)tile; (void)out_fds_cnt;
+  out_fds[ 0 ] = 2; /* stderr */
+  if( -1!=fd_log_private_logfile_fd() )
+    out_fds[ 1 ] = fd_log_private_logfile_fd(); /* logfile */
+  return 2UL;
+#endif
 }
 
 #define STEM_BURST (1UL)
@@ -766,7 +811,9 @@ populate_allowed_fds( fd_topo_t const *      topo,
 
 fd_topo_run_tile_t fd_tile_diag = {
   .name                     = "diag",
+#if defined(__linux__)
   .populate_allowed_seccomp = populate_allowed_seccomp,
+#endif
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,
