@@ -499,7 +499,6 @@ before_credit( fd_diag_tile_t *    ctx,
 
 #if defined(__linux__)
   interrupt_metrics( ctx ); /* before idle computation below, which subtracts it */
-#endif
 
   for( ulong i=0UL; i<ctx->tile_cnt; i++ ) {
     if( FD_UNLIKELY( -1==ctx->stat_fds[ i ] ) ) continue;
