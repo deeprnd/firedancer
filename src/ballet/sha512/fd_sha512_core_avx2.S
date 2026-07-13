@@ -11,8 +11,10 @@
 
 .text
 .globl	fd_sha512_core_avx2
+#if !defined(__MACH__)
 .type	fd_sha512_core_avx2,@function
-.align	64
+#endif
+.p2align	6
 fd_sha512_core_avx2:
 .cfi_startproc
 	endbr64
@@ -56,7 +58,7 @@ fd_sha512_core_avx2:
 	movq	48(%rdi),%r10
 	movq	56(%rdi),%r11
 	jmp	.Loop_avx2
-.align	16
+.p2align	4
 .Loop_avx2:
 	vmovdqu	-128(%rsi),%xmm0
 	vmovdqu	-128+16(%rsi),%xmm1
@@ -117,8 +119,7 @@ fd_sha512_core_avx2:
 	movq	%r9,%r12
 	addq	$32*8,%rbp
 	jmp	.Lavx2_00_47
-
-.align	16
+.p2align	4
 .Lavx2_00_47:
 	leaq	-128(%rsp),%rsp
 .cfi_escape	0x0f,0x06,0x77,0xf8,0x00,0x06,0x23,0x08
@@ -1481,6 +1482,7 @@ fd_sha512_core_avx2_k:
 .byte	83,72,65,53,49,50,32,98,108,111,99,107,32,116,114,97,110,115,102,111,114,109,32,102,111,114,32,120,56,54,95,54,52,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
 
 # Advertise IBT, SHSTK compliance
+#if !defined(__MACH__)
 .section ".note.gnu.property", "a"
 .p2align 3
 .long 1f - 0f
@@ -1497,3 +1499,4 @@ fd_sha512_core_avx2_k:
 3:
 .p2align 3
 4:
+#endif
