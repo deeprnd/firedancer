@@ -1669,6 +1669,7 @@ pub fn build(b: *std.Build) void {
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
 
+}
 /// b.addRunArtifact on a test binary always enables Zig's test-server
 /// protocol (--listen=- plus .stdio = .zig_test), which communicates with
 /// the build runner over the test binary's own stdin/stdout. A test that
