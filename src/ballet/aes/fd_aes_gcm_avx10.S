@@ -90,20 +90,27 @@
 .section .note.GNU-stack,"",@progbits
 #endif
 
+/* GNU assembler directives - no-op on macOS clang */
+#if !defined(__MACH__)
+#define GNU_TYPE(name)	.type name,@function
+#define GNU_SIZE(name,end)	.size name,end
+#else
+#define GNU_TYPE(name)
+#define GNU_SIZE(name,end)
+#endif
+
 #define SYM_FUNC_START(name)	\
 	.globl name ;				\
 	.balign 16, 0x90 ;			\
-	name: ;						\
-		.cfi_startproc; 		\
+	name: ;					\
+		.cfi_startproc; \	\
 		endbr64
 
 #define SYM_FUNC_END(name)				\
-	.cfi_endproc; 						\
-#if !defined(__MACH__)
-	.type name @function ;				\
+	.cfi_endproc; 					\
+	GNU_TYPE(name) ;			\
 	.set .L__sym_size_##name, .-name ;	\
-	.size name, .L__sym_size_##name
-#endif
+	GNU_SIZE(name, .L__sym_size_##name)
 
 .section .rodata
 .p2align 6
