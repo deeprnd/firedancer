@@ -7,10 +7,12 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sched.h>
+#if defined(__linux__)
 #include <syscall.h>
+#include <sys/prctl.h>
+#endif
 #include <sys/resource.h>
 #include <sys/mman.h>
-#include <sys/prctl.h>
 
 #include "../sanitize/fd_sanitize.h"
 #include "fd_tile_private.h"
@@ -270,7 +272,11 @@ fd_tile_private_manager( void * _args ) {
 
   char thread_name[ 20 ];
   FD_TEST( fd_cstr_printf_check( thread_name, sizeof( thread_name ), NULL, "tile:%lu", idx ) );
+#if defined(__linux__)
   if( FD_UNLIKELY( prctl( PR_SET_NAME, thread_name, 0, 0, 0 ) ) ) FD_LOG_ERR(( "prctl(PR_SET_NAME) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+#elif defined(__MACH__)
+  pthread_setname_np( thread_name );
+#endif
 
   if( FD_UNLIKELY( !( (id ==fd_log_thread_id()                                       ) &
                       (idx==(id-fd_tile_private_id0)                                 ) &

@@ -87,7 +87,12 @@ runs:
 
     - name: Install dependencies from cache
       shell: bash
-      run: tar -Izstd -xvf deps-bundle.tar.zst
+      run: |
+        if [ "${{ runner.os }}" = "macOS" ]; then
+          tar -xvf deps-bundle.tar.zst --zstd
+        else
+          tar -Izstd -xvf deps-bundle.tar.zst
+        fi
       if: steps.deps-sh-cache.outputs.cache-hit == 'true'
 
     - name: Install dependencies from scratch
