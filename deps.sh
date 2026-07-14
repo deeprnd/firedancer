@@ -262,11 +262,7 @@ check_macos_pkgs () {
     return 0
   fi
 
-  if [[ -z "${SUDO}" ]]; then
-    PACKAGE_INSTALL_CMD=( brew install ${MISSING_FORMULAE[*]} )
-  else
-    PACKAGE_INSTALL_CMD=( "${SUDO}" brew install ${MISSING_FORMULAE[*]} )
-  fi
+  PACKAGE_INSTALL_CMD=( brew install ${MISSING_FORMULAE[*]} )
 }
 
 check_arch_pkgs () {
