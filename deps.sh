@@ -262,7 +262,11 @@ check_macos_pkgs () {
     return 0
   fi
 
-  PACKAGE_INSTALL_CMD=( brew install ${MISSING_FORMULAE[*]} )
+  if [[ -z "${SUDO}" ]]; then
+    PACKAGE_INSTALL_CMD=( brew install ${MISSING_FORMULAE[*]} )
+  else
+    PACKAGE_INSTALL_CMD=( "${SUDO}" brew install ${MISSING_FORMULAE[*]} )
+  fi
 }
 
 check_arch_pkgs () {
@@ -301,6 +305,9 @@ check_arch_pkgs () {
 }
 
 check () {
+  # Initialize to avoid 'unbound variable' with set -u when all packages are present.
+  PACKAGE_INSTALL_CMD=( )
+
   # macOS has no /etc/os-release — must be handled separately.
   if [[ "$OS" = "Darwin" ]]; then
     check_macos_pkgs
