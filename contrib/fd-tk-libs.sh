@@ -85,6 +85,16 @@ fd_build_fd() {
     SRCS="${FD_TK_LIB_SRCS[*]}"
   fi
 
+  # When EXTRAS is set (e.g. "lz4 blst zstd"), the LOCAL_MKS must also
+  # include the corresponding third-party source dirs so their Local.mk
+  # files are found and compiled. Without this, FD_HAS_LZ4/BLST/ZSTD is
+  # defined but the .o files are never produced — ar gets empty lists.
+  if [ -n "${EXTRAS}" ]; then
+    for extra in ${EXTRAS}; do
+      SRCS="${SRCS} src/third_party/${extra}"
+    done
+  fi
+
   [ -z "${TARGETS}" ] && TARGETS=$(printf '%s\n' "${FD_TK_LIBS[@]}" "${FD_TK_LIBS_EXTRA[@]}" | tr '\n' ' ')
 
   local mks
