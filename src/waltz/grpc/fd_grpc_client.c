@@ -2,6 +2,16 @@
 #include "fd_grpc_client_private.h"
 #include "../../third_party/nanopb/pb_encode.h" /* pb_msgdesc_t */
 #include <sys/socket.h>
+#if defined(__APPLE__)
+/* MSG_NOSIGNAL and MSG_DONTWAIT are Linux-only; on macOS, non-blocking
+   is set via fcntl(O_NONBLOCK) and SIGPIPE is handled elsewhere. */
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+#ifndef MSG_DONTWAIT
+#define MSG_DONTWAIT 0
+#endif
+#endif
 #include "../h2/fd_h2_rbuf_sock.h"
 #include "fd_grpc_codec.h"
 #if FD_HAS_OPENSSL
@@ -372,7 +382,7 @@ fd_grpc_client_rxtx_socket( fd_grpc_client_t * client,
   ulong const frame_tx_lo_1 = client->frame_tx->lo_off;
   ulong const frame_tx_hi_1 = client->frame_tx->hi_off;
 
-  int rx_err = fd_h2_rbuf_recvmsg( client->frame_rx, sock_fd, MSG_NOSIGNAL|MSG_DONTWAIT );
+  int rx_err = fd_h2_rbuf_recvmsg( client->frame_rx, sock_fd, MSG_DONTWAIT );
   if( FD_UNLIKELY( rx_err ) ) {
     FD_LOG_INFO(( "Disconnected: recvmsg error (%i-%s)", rx_err, fd_io_strerror( rx_err ) ));
     errno = rx_err;
@@ -383,7 +393,7 @@ fd_grpc_client_rxtx_socket( fd_grpc_client_t * client,
   fd_h2_rx( conn, client->frame_rx, client->frame_tx, client->frame_scratch, client->frame_scratch_max, &fd_grpc_client_h2_callbacks );
   fd_grpc_client_service_streams( client, fd_log_wallclock() );
 
-  int tx_err = fd_h2_rbuf_sendmsg( client->frame_tx, sock_fd, MSG_NOSIGNAL|MSG_DONTWAIT );
+  int tx_err = fd_h2_rbuf_sendmsg( client->frame_tx, sock_fd, MSG_DONTWAIT );
   if( FD_LIKELY( tx_err && tx_err==EAGAIN ) ) return 1;
   if( FD_UNLIKELY( tx_err ) ) {
     FD_LOG_WARNING(( "fd_h2_rbuf_sendmsg failed (%i-%s)", tx_err, fd_io_strerror( tx_err ) ));
