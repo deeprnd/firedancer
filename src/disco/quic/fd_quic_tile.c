@@ -626,10 +626,10 @@ unprivileged_init( fd_topo_t const *      topo,
 }
 
 
+
 #if FD_HAS_LINUX
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
-#endif
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
@@ -637,6 +637,8 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
   populate_sock_filter_policy_quic( out_cnt, out, (uint)fd_log_private_logfile_fd(), (uint)ctx->keylog_fd );
   return sock_filter_policy_quic_instr_cnt;
 }
+#endif
+
 
 static ulong
 populate_allowed_fds( fd_topo_t const *      topo,
