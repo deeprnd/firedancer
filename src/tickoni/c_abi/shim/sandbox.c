@@ -1,6 +1,6 @@
 /* Thin wrappers around Firedancer sandbox primitives. */
 
-#include "fd_util.h"
+#include "../../../util/fd_util.h"
 
 /* Sandbox functions are Linux-only (seccomp, user namespaces). */
 #if FD_HAS_LINUX
