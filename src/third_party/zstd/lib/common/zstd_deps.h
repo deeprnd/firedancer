@@ -34,6 +34,10 @@
 #if !defined(_GNU_SOURCE) && !defined(__ANDROID__) /* NDK doesn't ship qsort_r(). */
 #define _GNU_SOURCE
 #endif
+#elif defined(__APPLE__)
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE
+#endif
 #endif
 
 #include <limits.h>
