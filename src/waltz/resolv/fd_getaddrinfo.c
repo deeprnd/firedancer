@@ -5,7 +5,11 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
+#if FD_HAS_LINUX
 #include <endian.h>
+#else
+#include <machine/endian.h>
+#endif
 #include "fd_lookup.h"
 #include "../../util/io/fd_io.h"
 
