@@ -180,6 +180,5 @@ static void populate_sock_filter_policy_fd_xdp_tile( ulong out_cnt, void *out, u
 }
 
 #endif /* !defined(__linux__) */
-#endif /* defined(__linux__) */
 
 #endif /* HEADER_fd_src_disco_net_xdp_generated_fd_xdp_tile_seccomp_h */

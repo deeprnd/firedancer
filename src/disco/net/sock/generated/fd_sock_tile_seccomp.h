@@ -145,6 +145,5 @@ static void populate_sock_filter_policy_fd_sock_tile( ulong out_cnt, void *out, 
 }
 
 #endif /* !defined(__linux__) */
-#endif /* defined(__linux__) */
 
 #endif /* HEADER_fd_src_disco_net_sock_generated_fd_sock_tile_seccomp_h */

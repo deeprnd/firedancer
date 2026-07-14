@@ -187,6 +187,5 @@ static void populate_sock_filter_policy_netlink( ulong out_cnt, void *out, uint 
 }
 
 #endif /* !defined(__linux__) */
-#endif /* defined(__linux__) */
 
 #endif /* HEADER_fd_src_disco_netlink_generated_netlink_seccomp_h */

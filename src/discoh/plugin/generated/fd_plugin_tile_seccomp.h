@@ -94,6 +94,5 @@ static void populate_sock_filter_policy_fd_plugin_tile( ulong out_cnt, void *out
 }
 
 #endif /* !defined(__linux__) */
-#endif /* defined(__linux__) */
 
 #endif /* HEADER_fd_src_discoh_plugin_generated_fd_plugin_tile_seccomp_h */

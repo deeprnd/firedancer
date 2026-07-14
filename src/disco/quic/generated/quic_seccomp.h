@@ -99,6 +99,5 @@ static void populate_sock_filter_policy_quic( ulong out_cnt, void *out, uint log
 }
 
 #endif /* !defined(__linux__) */
-#endif /* defined(__linux__) */
 
 #endif /* HEADER_fd_src_disco_quic_generated_quic_seccomp_h */

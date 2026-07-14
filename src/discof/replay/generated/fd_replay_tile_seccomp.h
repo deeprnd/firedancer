@@ -128,6 +128,5 @@ static void populate_sock_filter_policy_fd_replay_tile( ulong out_cnt, void *out
 }
 
 #endif /* !defined(__linux__) */
-#endif /* defined(__linux__) */
 
 #endif /* HEADER_fd_src_discof_replay_generated_fd_replay_tile_seccomp_h */

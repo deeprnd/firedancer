@@ -335,6 +335,5 @@ static void populate_sock_filter_policy_fd_bundle_tile( ulong out_cnt, void *out
 }
 
 #endif /* !defined(__linux__) */
-#endif /* defined(__linux__) */
 
 #endif /* HEADER_fd_src_disco_bundle_generated_fd_bundle_tile_seccomp_h */
