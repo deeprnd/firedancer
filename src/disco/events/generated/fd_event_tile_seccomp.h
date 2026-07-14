@@ -307,16 +307,16 @@ static void populate_sock_filter_policy_fd_event_tile( ulong out_cnt, struct soc
 #else /* !defined(__linux__) */
 
 /* Stub seccomp implementation for non-Linux platforms.
-   On macOS/Windows, seccomp filtering is not available, so these
-   functions are no-ops.
-*/
+   On macOS/Windows, seccomp filtering is not available.
+   These are no-op functions. */
 
 static const uint sock_filter_policy_fd_event_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_event_tile( ulong out_cnt, struct sock_filter out[ static 1 ], uint logfile_fd ) {
+static void populate_sock_filter_policy_fd_event_tile( ulong out_cnt, void *out, uint logfile_fd, uint http_server_fd ) {
   (void)out_cnt;
-  (void)out;
+  (void)*out;
   (void)logfile_fd;
+  (void)http_server_fd;
   /* On non-Linux, no seccomp filtering is applied */
 }
 

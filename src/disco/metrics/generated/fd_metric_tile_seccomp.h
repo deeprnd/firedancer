@@ -165,16 +165,16 @@ static void populate_sock_filter_policy_fd_metric_tile( ulong out_cnt, struct so
 #else /* !defined(__linux__) */
 
 /* Stub seccomp implementation for non-Linux platforms.
-   On macOS/Windows, seccomp filtering is not available, so these
-   functions are no-ops.
-*/
+   On macOS/Windows, seccomp filtering is not available.
+   These are no-op functions. */
 
 static const uint sock_filter_policy_fd_metric_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_metric_tile( ulong out_cnt, struct sock_filter out[ static 1 ], uint logfile_fd ) {
+static void populate_sock_filter_policy_fd_metric_tile( ulong out_cnt, void *out, uint logfile_fd, uint metrics_socket_fd ) {
   (void)out_cnt;
-  (void)out;
+  (void)*out;
   (void)logfile_fd;
+  (void)metrics_socket_fd;
   /* On non-Linux, no seccomp filtering is applied */
 }
 

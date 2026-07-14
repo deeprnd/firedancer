@@ -165,16 +165,17 @@ static void populate_sock_filter_policy_fd_xdp_tile( ulong out_cnt, struct sock_
 #else /* !defined(__linux__) */
 
 /* Stub seccomp implementation for non-Linux platforms.
-   On macOS/Windows, seccomp filtering is not available, so these
-   functions are no-ops.
-*/
+   On macOS/Windows, seccomp filtering is not available.
+   These are no-op functions. */
 
 static const uint sock_filter_policy_fd_xdp_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_xdp_tile( ulong out_cnt, struct sock_filter out[ static 1 ], uint logfile_fd ) {
+static void populate_sock_filter_policy_fd_xdp_tile( ulong out_cnt, void *out, uint logfile_fd, uint xsk_fd, uint allow_fd2 ) {
   (void)out_cnt;
-  (void)out;
+  (void)*out;
   (void)logfile_fd;
+  (void)xsk_fd;
+  (void)allow_fd2;
   /* On non-Linux, no seccomp filtering is applied */
 }
 
