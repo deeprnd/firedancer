@@ -417,7 +417,11 @@ fd_lookup_name( struct address buf[ static MAXADDRS ],
     int dlabel = dpolicy->label;
     int dprec = dpolicy->prec;
     int prefixlen = 0;
-    int fd = socket( family, SOCK_DGRAM|SOCK_CLOEXEC, IPPROTO_UDP );
+    int sock_flags = SOCK_DGRAM;
+#if FD_HAS_LINUX
+    sock_flags |= SOCK_CLOEXEC;
+#endif
+    int fd = socket( family, sock_flags, IPPROTO_UDP );
     if( fd >= 0 ) {
       if( !connect( fd, da, dalen ) ) {
         key |= DAS_USABLE;
