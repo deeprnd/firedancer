@@ -14,7 +14,9 @@
 
 #include <sys/socket.h> /* SOCK_CLOEXEC, SOCK_NONBLOCK needed for seccomp filter */
 
+#if FD_HAS_LINUX
 #include "generated/fd_gui_tile_seccomp.h"
+#endif
 
 #include "../../disco/tiles.h"
 #include "../../disco/keyguard/fd_keyload.h"
@@ -814,7 +816,9 @@ rlimit_file_cnt( fd_topo_t const *      topo FD_PARAM_UNUSED,
 fd_topo_run_tile_t fd_tile_gui = {
   .name                     = "gui",
   .rlimit_file_cnt_fn       = rlimit_file_cnt,
-  .populate_allowed_seccomp = populate_allowed_seccomp,
+  #if FD_HAS_LINUX
+.populate_allowed_seccomp = populate_allowed_seccomp,
+#endif
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,

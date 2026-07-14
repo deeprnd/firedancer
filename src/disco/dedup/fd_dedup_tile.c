@@ -1,6 +1,8 @@
 
 #include "../fd_txn_m.h"
+#if FD_HAS_LINUX
 #include "generated/fd_dedup_tile_seccomp.h"
+#endif
 
 #include "../topo/fd_topo.h"
 #include "../metrics/fd_metrics.h"
@@ -334,7 +336,9 @@ populate_allowed_fds( fd_topo_t const *      topo,
 
 fd_topo_run_tile_t fd_tile_dedup = {
   .name                     = "dedup",
-  .populate_allowed_seccomp = populate_allowed_seccomp,
+  #if FD_HAS_LINUX
+.populate_allowed_seccomp = populate_allowed_seccomp,
+#endif
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,

@@ -33,7 +33,9 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#if FD_HAS_LINUX
 #include "generated/fd_event_tile_seccomp.h"
+#endif
 
 #define GRPC_BUF_MAX (2048UL<<10UL) /* 2 MiB */
 
@@ -622,7 +624,9 @@ during_housekeeping( fd_event_tile_t * ctx ) {
 fd_topo_run_tile_t fd_tile_event = {
   .name                     = "event",
   .rlimit_file_cnt          = 5UL, /* stderr, logfile, /etc/hosts, /etc/resolv.conf, and socket to the server */
-  .populate_allowed_seccomp = populate_allowed_seccomp,
+  #if FD_HAS_LINUX
+.populate_allowed_seccomp = populate_allowed_seccomp,
+#endif
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,

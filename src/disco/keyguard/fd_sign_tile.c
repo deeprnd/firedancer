@@ -1,7 +1,9 @@
 #define _GNU_SOURCE
 #include "../tiles.h"
 
+#if FD_HAS_LINUX
 #include "generated/fd_sign_tile_seccomp.h"
+#endif
 
 #include "../keyguard/fd_keyguard.h"
 #include "../keyguard/fd_keyload.h"
@@ -455,7 +457,9 @@ populate_allowed_fds( fd_topo_t const *      topo,
 
 fd_topo_run_tile_t fd_tile_sign = {
   .name                     = "sign",
-  .populate_allowed_seccomp = populate_allowed_seccomp,
+  #if FD_HAS_LINUX
+.populate_allowed_seccomp = populate_allowed_seccomp,
+#endif
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,

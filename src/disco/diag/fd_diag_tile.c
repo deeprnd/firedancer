@@ -15,7 +15,9 @@
 
 #if defined(__linux__)
 #include "fd_proc_interrupts.h"
+#if FD_HAS_LINUX
 #include "generated/fd_diag_tile_seccomp.h"
+#endif
 #endif
 
 #define REPORT_INTERVAL_MILLIS (100L)
@@ -814,7 +816,9 @@ populate_allowed_fds( fd_topo_t const *      topo,
 fd_topo_run_tile_t fd_tile_diag = {
   .name                     = "diag",
 #if defined(__linux__)
-  .populate_allowed_seccomp = populate_allowed_seccomp,
+  #if FD_HAS_LINUX
+.populate_allowed_seccomp = populate_allowed_seccomp,
+#endif
   .privileged_init          = privileged_init,
 #else
   .privileged_init          = NULL,

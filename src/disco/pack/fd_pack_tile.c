@@ -1,6 +1,8 @@
 #include "../tiles.h"
 
+#if FD_HAS_LINUX
 #include "generated/fd_pack_tile_seccomp.h"
+#endif
 
 #include "../../util/pod/fd_pod_format.h"
 #include "../../discof/replay/fd_replay_tile.h" // layering violation
@@ -1530,6 +1532,7 @@ unprivileged_init( fd_topo_t const *      topo,
     FD_LOG_ERR(( "scratch overflow %lu %lu %lu", scratch_top - (ulong)scratch - scratch_footprint( tile ), scratch_top, (ulong)scratch + scratch_footprint( tile ) ));
 }
 
+#if FD_HAS_LINUX
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
@@ -1541,6 +1544,7 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
   populate_sock_filter_policy_fd_pack_tile( out_cnt, out, (uint)fd_log_private_logfile_fd() );
   return sock_filter_policy_fd_pack_tile_instr_cnt;
 }
+#endif
 
 static ulong
 populate_allowed_fds( fd_topo_t const *      topo,
@@ -1603,7 +1607,9 @@ populate_allowed_fds( fd_topo_t const *      topo,
 
 fd_topo_run_tile_t fd_tile_pack = {
   .name                     = "pack",
+  #if FD_HAS_LINUX
   .populate_allowed_seccomp = populate_allowed_seccomp,
+#endif
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,
