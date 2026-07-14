@@ -43,7 +43,7 @@ else
 endif
 include config/extra/with-hosted.mk
 
-# Platform detection — define FD_HAS_LINUX/FD_HAS_MACOS/FD_HAS_WINDOWS
+# Platform detection — define FD_HAS_HOSTED/FD_HAS_LINUX/FD_HAS_MACOS/FD_HAS_WINDOWS
 # so source code can gate platform-specific implementations.
 # MUST come after native.mk (which includes base.mk that does
 # CPPFLAGS:=...) because base.mk resets CPPFLAGS with :=, wiping
@@ -54,7 +54,8 @@ ifeq ($(UNAME), Linux)
   CPPFLAGS+=-DFD_HAS_LINUX=1
   FD_HAS_LINUX:=1
 else ifeq ($(UNAME), Darwin)
-  CPPFLAGS+=-DFD_HAS_MACOS=1
+  CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_MACOS=1
+  FD_HAS_HOSTED:=1
   FD_HAS_MACOS:=1
 endif
 
