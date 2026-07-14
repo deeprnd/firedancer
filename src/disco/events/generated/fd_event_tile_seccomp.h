@@ -312,11 +312,12 @@ static void populate_sock_filter_policy_fd_event_tile( ulong out_cnt, struct soc
 
 static const uint sock_filter_policy_fd_event_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_event_tile( ulong out_cnt, void *out, uint logfile_fd, uint http_server_fd ) {
+static void populate_sock_filter_policy_fd_event_tile( ulong out_cnt, void *out, uint logfile_fd, uint etc_hosts_fd, uint etc_resolv_conf ) {
   (void)out_cnt;
-  (void)*out;
+  (void)out;
   (void)logfile_fd;
-  (void)http_server_fd;
+  (void)etc_hosts_fd;
+  (void)etc_resolv_conf;
   /* On non-Linux, no seccomp filtering is applied */
 }
 

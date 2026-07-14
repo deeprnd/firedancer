@@ -192,13 +192,12 @@ static void populate_sock_filter_policy_fd_guih_tile( ulong out_cnt, struct sock
 
 static const uint sock_filter_policy_fd_guih_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_guih_tile( ulong out_cnt, void *out, uint logfile_fd ) {
+static void populate_sock_filter_policy_fd_guih_tile( ulong out_cnt, void *out, uint logfile_fd, uint gui_socket_fd ) {
   (void)out_cnt;
   (void)out;
   (void)logfile_fd;
-  (void)out_cnt;
-  (void)*out;
-  (void)logfile_fd;
+  (void)gui_socket_fd;
+  /* On non-Linux, no seccomp filtering is applied */
 }
 
 #endif /* !defined(__linux__) */

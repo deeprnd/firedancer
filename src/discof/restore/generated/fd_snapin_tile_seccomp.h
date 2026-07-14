@@ -108,13 +108,12 @@ static void populate_sock_filter_policy_fd_snapin_tile( ulong out_cnt, struct so
 
 static const uint sock_filter_policy_fd_snapin_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_snapin_tile( ulong out_cnt, void *out, uint logfile_fd ) {
+static void populate_sock_filter_policy_fd_snapin_tile( ulong out_cnt, void *out, uint logfile_fd, uint accounts_fd ) {
   (void)out_cnt;
   (void)out;
   (void)logfile_fd;
-  (void)out_cnt;
-  (void)*out;
-  (void)logfile_fd;
+  (void)accounts_fd;
+  /* On non-Linux, no seccomp filtering is applied */
 }
 
 #endif /* !defined(__linux__) */

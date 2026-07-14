@@ -170,12 +170,12 @@ static void populate_sock_filter_policy_fd_xdp_tile( ulong out_cnt, struct sock_
 
 static const uint sock_filter_policy_fd_xdp_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_xdp_tile( ulong out_cnt, void *out, uint logfile_fd, uint xsk_fd, uint allow_fd2 ) {
+static void populate_sock_filter_policy_fd_xdp_tile( ulong out_cnt, void *out, uint logfile_fd, uint xsk_fd, uint lo_xsk_fd ) {
   (void)out_cnt;
-  (void)*out;
+  (void)out;
   (void)logfile_fd;
   (void)xsk_fd;
-  (void)allow_fd2;
+  (void)lo_xsk_fd;
   /* On non-Linux, no seccomp filtering is applied */
 }
 

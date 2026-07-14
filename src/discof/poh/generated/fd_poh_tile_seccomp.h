@@ -98,9 +98,7 @@ static void populate_sock_filter_policy_fd_poh_tile( ulong out_cnt, void *out, u
   (void)out_cnt;
   (void)out;
   (void)logfile_fd;
-  (void)out_cnt;
-  (void)*out;
-  (void)logfile_fd;
+  /* On non-Linux, no seccomp filtering is applied */
 }
 
 #endif /* !defined(__linux__) */

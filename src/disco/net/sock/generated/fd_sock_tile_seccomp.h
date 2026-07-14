@@ -134,13 +134,13 @@ static void populate_sock_filter_policy_fd_sock_tile( ulong out_cnt, struct sock
 
 static const uint sock_filter_policy_fd_sock_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_sock_tile( ulong out_cnt, void *out, uint logfile_fd, uint tx_sock, uint rx_sock_min, uint rx_sock_max ) {
+static void populate_sock_filter_policy_fd_sock_tile( ulong out_cnt, void *out, uint logfile_fd, uint tx_fd, uint rx_fd0, uint rx_fd1 ) {
   (void)out_cnt;
-  (void)*out;
+  (void)out;
   (void)logfile_fd;
-  (void)tx_sock;
-  (void)rx_sock_min;
-  (void)rx_sock_max;
+  (void)tx_fd;
+  (void)rx_fd0;
+  (void)rx_fd1;
   /* On non-Linux, no seccomp filtering is applied */
 }
 

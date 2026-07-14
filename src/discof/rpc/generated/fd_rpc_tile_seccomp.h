@@ -202,13 +202,13 @@ static void populate_sock_filter_policy_fd_rpc_tile( ulong out_cnt, struct sock_
 
 static const uint sock_filter_policy_fd_rpc_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_rpc_tile( ulong out_cnt, void *out, uint logfile_fd ) {
+static void populate_sock_filter_policy_fd_rpc_tile( ulong out_cnt, void *out, uint logfile_fd, uint rpc_socket_fd, uint accdb_ro_fd ) {
   (void)out_cnt;
   (void)out;
   (void)logfile_fd;
-  (void)out_cnt;
-  (void)*out;
-  (void)logfile_fd;
+  (void)rpc_socket_fd;
+  (void)accdb_ro_fd;
+  /* On non-Linux, no seccomp filtering is applied */
 }
 
 #endif /* !defined(__linux__) */

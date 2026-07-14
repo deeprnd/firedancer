@@ -200,9 +200,7 @@ static void populate_sock_filter_policy_fd_ipecho_tile( ulong out_cnt, void *out
   (void)out_cnt;
   (void)out;
   (void)logfile_fd;
-  (void)out_cnt;
-  (void)*out;
-  (void)logfile_fd;
+  /* On non-Linux, no seccomp filtering is applied */
 }
 
 #endif /* !defined(__linux__) */

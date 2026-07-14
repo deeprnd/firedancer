@@ -260,13 +260,14 @@ static void populate_sock_filter_policy_fd_snapld_tile( ulong out_cnt, struct so
 
 static const uint sock_filter_policy_fd_snapld_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_snapld_tile( ulong out_cnt, void *out, uint logfile_fd ) {
+static void populate_sock_filter_policy_fd_snapld_tile( ulong out_cnt, void *out, uint logfile_fd, uint in_full_fd, uint in_incr_fd, uint sockfd ) {
   (void)out_cnt;
   (void)out;
   (void)logfile_fd;
-  (void)out_cnt;
-  (void)*out;
-  (void)logfile_fd;
+  (void)in_full_fd;
+  (void)in_incr_fd;
+  (void)sockfd;
+  /* On non-Linux, no seccomp filtering is applied */
 }
 
 #endif /* !defined(__linux__) */

@@ -176,13 +176,13 @@ static void populate_sock_filter_policy_netlink( ulong out_cnt, struct sock_filt
 
 static const uint sock_filter_policy_netlink_instr_cnt = 0;
 
-static void populate_sock_filter_policy_netlink( ulong out_cnt, void *out, uint logfile_fd, uint monitor_fd, uint req_fd, uint prober_fd ) {
+static void populate_sock_filter_policy_netlink( ulong out_cnt, void *out, uint logfile_fd, uint nl_mon_fd, uint nl_req_fd, uint arp_probe_fd ) {
   (void)out_cnt;
-  (void)*out;
+  (void)out;
   (void)logfile_fd;
-  (void)monitor_fd;
-  (void)req_fd;
-  (void)prober_fd;
+  (void)nl_mon_fd;
+  (void)nl_req_fd;
+  (void)arp_probe_fd;
   /* On non-Linux, no seccomp filtering is applied */
 }
 

@@ -138,13 +138,13 @@ static void populate_sock_filter_policy_fd_solcap_tile( ulong out_cnt, struct so
 
 static const uint sock_filter_policy_fd_solcap_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_solcap_tile( ulong out_cnt, void *out, uint logfile_fd ) {
+static void populate_sock_filter_policy_fd_solcap_tile( ulong out_cnt, void *out, uint logfile_fd, uint solcap_fd_0, uint solcap_fd_1 ) {
   (void)out_cnt;
   (void)out;
   (void)logfile_fd;
-  (void)out_cnt;
-  (void)*out;
-  (void)logfile_fd;
+  (void)solcap_fd_0;
+  (void)solcap_fd_1;
+  /* On non-Linux, no seccomp filtering is applied */
 }
 
 #endif /* !defined(__linux__) */

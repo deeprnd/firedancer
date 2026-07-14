@@ -172,7 +172,7 @@ static const uint sock_filter_policy_fd_metric_tile_instr_cnt = 0;
 
 static void populate_sock_filter_policy_fd_metric_tile( ulong out_cnt, void *out, uint logfile_fd, uint metrics_socket_fd ) {
   (void)out_cnt;
-  (void)*out;
+  (void)out;
   (void)logfile_fd;
   (void)metrics_socket_fd;
   /* On non-Linux, no seccomp filtering is applied */

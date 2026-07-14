@@ -146,13 +146,14 @@ static void populate_sock_filter_policy_fd_tower_tile( ulong out_cnt, struct soc
 
 static const uint sock_filter_policy_fd_tower_tile_instr_cnt = 0;
 
-static void populate_sock_filter_policy_fd_tower_tile( ulong out_cnt, void *out, uint logfile_fd ) {
+static void populate_sock_filter_policy_fd_tower_tile( ulong out_cnt, void *out, uint logfile_fd, uint checkpt_fd, uint restore_fd, uint accounts_fd ) {
   (void)out_cnt;
   (void)out;
   (void)logfile_fd;
-  (void)out_cnt;
-  (void)*out;
-  (void)logfile_fd;
+  (void)checkpt_fd;
+  (void)restore_fd;
+  (void)accounts_fd;
+  /* On non-Linux, no seccomp filtering is applied */
 }
 
 #endif /* !defined(__linux__) */

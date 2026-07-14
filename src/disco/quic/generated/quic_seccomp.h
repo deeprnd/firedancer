@@ -92,7 +92,7 @@ static const uint sock_filter_policy_quic_instr_cnt = 0;
 
 static void populate_sock_filter_policy_quic( ulong out_cnt, void *out, uint logfile_fd, uint keylog_fd ) {
   (void)out_cnt;
-  (void)*out;
+  (void)out;
   (void)logfile_fd;
   (void)keylog_fd;
   /* On non-Linux, no seccomp filtering is applied */
