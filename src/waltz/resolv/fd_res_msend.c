@@ -11,7 +11,15 @@
 #include <unistd.h>
 #include <errno.h>
 #include <pthread.h>
-#include "syscall.h"
+#if FD_HAS_LINUX
+#include <sys/syscall.h>
+#elif FD_HAS_MACOS
+/* macOS doesn't have SYS_close constant; define it */
+#ifndef SYS_close
+#define SYS_close 3
+#endif
+/* On macOS, syscall() is in unistd.h */
+#endif
 #include "fd_lookup.h"
 #include "../../util/fd_util.h"
 
@@ -55,7 +63,15 @@ start_tcp( struct pollfd * pfd,
     .msg_controllen = 0,
     .msg_flags      = 0
   };
+#if FD_HAS_LINUX
   int fd = socket( family, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0 );
+#else
+  int fd = socket( family, SOCK_STREAM, 0 );
+  if( fd >= 0 ) {
+    int flags = fcntl( fd, F_GETFL );
+    if( flags >= 0 ) fcntl( fd, F_SETFL, flags | O_NONBLOCK );
+  }
+#endif
   pfd->fd = fd;
   pfd->events = POLLOUT;
   if( !setsockopt( fd, IPPROTO_TCP, TCP_FASTOPEN_CONNECT,
@@ -132,7 +148,15 @@ fd_res_msend_rc( int                     nqueries,
   }
 
   /* Get local address and open/bind a socket */
+#if FD_HAS_LINUX
   fd = socket( family, SOCK_DGRAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0 );
+#else
+  fd = socket( family, SOCK_DGRAM, 0 );
+  if( fd >= 0 ) {
+    int flags = fcntl( fd, F_GETFL );
+    if( flags >= 0 ) fcntl( fd, F_SETFL, flags | O_NONBLOCK );
+  }
+#endif
 
   /* Handle case where system lacks IPv6 support */
   if( fd < 0 && family == AF_INET6 && errno == EAFNOSUPPORT ) {
@@ -140,7 +164,15 @@ fd_res_msend_rc( int                     nqueries,
     if( i==nns ) {
       return -1;
     }
+#if FD_HAS_LINUX
     fd = socket( AF_INET, SOCK_DGRAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0 );
+#else
+    fd = socket( AF_INET, SOCK_DGRAM, 0 );
+    if( fd >= 0 ) {
+      int flags = fcntl( fd, F_GETFL );
+      if( flags >= 0 ) fcntl( fd, F_SETFL, flags | O_NONBLOCK );
+    }
+#endif
     family = AF_INET;
     sl = sizeof sa.sin;
   }
