@@ -114,13 +114,13 @@ build-fd-clang:
 build-fd-arm:
   bash contrib/fd-build-lib.sh fd-arm gcc-14
 
-# macOS Intel build
+# macOS Intel build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
 build-fd-macos-intel:
-  bash contrib/fd-build-lib.sh fd-macos-intel clang
+  bash contrib/fd-build-lib.sh fd-tickoni-fd clang
 
-# macOS ARM build
+# macOS ARM build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
 build-fd-macos-arm:
-  bash contrib/fd-build-lib.sh fd-macos-arm clang libs "lz4 blst zstd"
+  bash contrib/fd-build-lib.sh fd-tickoni-fd clang libs "lz4 blst zstd"
 
 build-fd-dev:
   make -j"$(nproc)" all
