@@ -1707,8 +1707,11 @@ unprivileged_init( fd_topo_t const *      topo,
   }
 }
 
+
+#if FD_HAS_LINUX
 FD_FN_UNUSED static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
+#endif
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {

@@ -202,8 +202,11 @@ rlimit_file_cnt( fd_topo_t const *      topo FD_PARAM_UNUSED,
          FD_IPECHO_MAX_CONNECTION_CNT;  /* for the server's connections */
 }
 
+
+#if FD_HAS_LINUX
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
+#endif
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {

@@ -1962,8 +1962,11 @@ unprivileged_init( fd_topo_t const *      topo,
   FD_LOG_INFO(( "my identity key: %s", identity_key_b58 ));
 }
 
+
+#if FD_HAS_LINUX
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
+#endif
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {

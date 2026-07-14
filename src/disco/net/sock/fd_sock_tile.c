@@ -28,8 +28,11 @@
    Must be aligned by alignof(struct cmsghdr) */
 #define FD_SOCK_CMSG_MAX (64UL)
 
+
+#if FD_HAS_LINUX
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
+#endif
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
