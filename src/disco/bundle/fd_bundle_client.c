@@ -25,6 +25,11 @@
 #include <netinet/ip.h>
 #endif
 #include <netinet/tcp.h>
+#if FD_HAS_LINUX
+#define FD_BUNDLE_SOL_TCP SOL_TCP
+#else
+#define FD_BUNDLE_SOL_TCP IPPROTO_TCP
+#endif
 
 #if FD_HAS_LINUX
 #define FD_BUNDLE_SOCKET_CLOEXEC_FLAG SOCK_CLOEXEC
@@ -126,7 +131,7 @@ fd_bundle_client_create_conn( fd_bundle_tile_t * ctx ) {
   }
 #if !FD_HAS_LINUX
   /* macOS doesn't support SOCK_CLOEXEC; use fcntl to set O_CLOEXEC */
-  if( FD_UNLIKELY( fcntl( tcp_sock, F_SETFD, FD_GETFD( tcp_sock ) | FD_CLOEXEC )==-1 ) ) {
+  if( FD_UNLIKELY( fcntl( tcp_sock, F_SETFD, fcntl( tcp_sock, F_GETFD ) | FD_CLOEXEC )==-1 ) ) {
     FD_LOG_ERR(( "fcntl(tcp_sock,F_SETFD,FD_CLOEXEC) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
   }
 #endif
@@ -137,7 +142,7 @@ fd_bundle_client_create_conn( fd_bundle_tile_t * ctx ) {
   }
 
   int tcp_nodelay = 1;
-  if( FD_UNLIKELY( 0!=setsockopt( tcp_sock, SOL_TCP, TCP_NODELAY, &tcp_nodelay, sizeof(int) ) ) ) {
+  if( FD_UNLIKELY( 0!=setsockopt( tcp_sock, FD_BUNDLE_SOL_TCP, TCP_NODELAY, &tcp_nodelay, sizeof(int) ) ) ) {
     FD_LOG_ERR(( "setsockopt failed (%d-%s)", errno, fd_io_strerror( errno ) ));
   }
 

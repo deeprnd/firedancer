@@ -19,6 +19,11 @@
 #endif
 
 #include <netinet/tcp.h>
+#if FD_HAS_LINUX
+#define FD_EVENT_SOL_TCP SOL_TCP
+#else
+#define FD_EVENT_SOL_TCP IPPROTO_TCP
+#endif
 #include <unistd.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -405,7 +410,7 @@ reconnect( fd_event_client_t * client,
   addr.sin_addr.s_addr = ip4_addr;
 
   int tcp_nodelay = 1;
-  if( FD_UNLIKELY( -1==setsockopt( client->sockfd, SOL_TCP, TCP_NODELAY, &tcp_nodelay, sizeof(int) ) ) ) FD_LOG_ERR(( "setsockopt failed (%d-%s)", errno, fd_io_strerror( errno ) ));
+  if( FD_UNLIKELY( -1==setsockopt( client->sockfd, FD_EVENT_SOL_TCP, TCP_NODELAY, &tcp_nodelay, sizeof(int) ) ) ) FD_LOG_ERR(( "setsockopt failed (%d-%s)", errno, fd_io_strerror( errno ) ));
   if( FD_UNLIKELY( -1==setsockopt( client->sockfd, SOL_SOCKET, SO_SNDBUF, &client->so_sndbuf, sizeof(int) ) ) ) FD_LOG_ERR(( "setsockopt(SOL_SOCKET,SO_SNDBUF,%i) failed (%i-%s)", client->so_sndbuf, errno, fd_io_strerror( errno ) ));
 
   if( FD_UNLIKELY( -1==connect( client->sockfd, fd_type_pun_const( &addr ), sizeof(struct sockaddr_in) ) && errno!=EINPROGRESS ) ) {
