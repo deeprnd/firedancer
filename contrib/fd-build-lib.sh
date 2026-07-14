@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 # Thin wrapper around fd_build_fd() from contrib/fd-tk-libs.sh.
-# Usage: contrib/fd-build-lib.sh <BUILDDIR> [CC] [MODE]
+# Usage: contrib/fd-build-lib.sh <BUILDDIR> [CC] [MODE] [EXTRAS]
 #   BUILDDIR: Firedancer BUILDDIR name (no build/ prefix)
 #   CC:       compiler binary (default: gcc-12)
 #   MODE:     "libs" (default), "test", or "cov"
 #              libs = basic 5 libs, basic SRCS (tango util ballet disco waltz + cjson + s2n-bignum)
 #              test = 5 libs + extras (blst/zstd/lz4/nanopb), build unit-test target
 #              cov  = coverage build (clang-18, llvm-cov, basic SRCS + cjson)
+#   EXTRAS:   space-separated list of extras to include (e.g. "lz4 blst zstd")
+#             passed through to fd_build_fd as EXTRAS= key=value
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source contrib/fd-tk-libs.sh
 
-BUILDDIR="${1:?usage: fd-build-lib.sh <BUILDDIR> [CC] [MODE]}"
+BUILDDIR="${1:?usage: fd-build-lib.sh <BUILDDIR> [CC] [MODE] [EXTRAS]}"
 CC="${2:-gcc-12}"
 MODE="${3:-libs}"
+EXTRAS="${4:-}"
 
 LIBDIR="build/${BUILDDIR}/lib"
 OBJDIR="build/${BUILDDIR}/obj"
@@ -60,7 +63,7 @@ if [ "$MODE" = "test" ]; then
   rm -f "${LIBDIR:?}/libfd_lz4.a" "${LIBDIR}/libfd_blst.a" "${LIBDIR}/libfd_zstd.a" "${LIBDIR}/libfd_ballet.a" "${LIBDIR}/libfd_waltz.a" "${LIBDIR}/libfd_disco.a" "${LIBDIR}/libfd_tango.a" "${LIBDIR}/libfd_util.a"
   fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" EXTRAS="lz4 blst zstd" BUILD_TARGET="unit-test"
 else
-  fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}"
+  [ -n "${EXTRAS}" ] && fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" "EXTRAS=${EXTRAS}" || fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}"
 fi
 
 # Post-build: cov mode runs unit-test with coverage after libs.
