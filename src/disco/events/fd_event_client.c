@@ -24,6 +24,7 @@
 #else
 #define FD_EVENT_SOL_TCP IPPROTO_TCP
 #endif
+#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -400,8 +401,13 @@ reconnect( fd_event_client_t * client,
   uint const ip4_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr;
   client->server_ip4_addr = ip4_addr;
 
-  client->sockfd = socket( AF_INET, SOCK_STREAM|SOCK_NONBLOCK, 0 );
+  client->sockfd = socket( AF_INET, SOCK_STREAM, 0 );
   if( FD_UNLIKELY( -1==client->sockfd ) ) FD_LOG_ERR(( "socket() failed (%d-%s)", errno, fd_io_strerror( errno ) ));
+
+#if !FD_HAS_LINUX
+  /* macOS doesn't support SOCK_NONBLOCK; use fcntl to set O_NONBLOCK */
+  if( FD_UNLIKELY( -1==fcntl( client->sockfd, F_SETFL, O_NONBLOCK ) ) ) FD_LOG_ERR(( "fcntl(F_SETFL,O_NONBLOCK) failed (%d-%s)", errno, fd_io_strerror( errno ) ));
+#endif
 
   struct sockaddr_in addr;
   fd_memset( &addr, 0, sizeof( addr ) );
