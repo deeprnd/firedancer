@@ -577,6 +577,7 @@ unprivileged_init( fd_topo_t const *      topo,
       FD_MHIST_MAX( BUNDLE, MESSAGE_RX_DELAY_NANOS ) );
 }
 
+#if FD_HAS_LINUX
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
@@ -593,6 +594,7 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
   );
   return sock_filter_policy_fd_bundle_tile_instr_cnt;
 }
+#endif
 
 static ulong
 populate_allowed_fds( fd_topo_t const *      topo,

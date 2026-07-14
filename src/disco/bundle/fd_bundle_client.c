@@ -21,8 +21,17 @@
 #include <poll.h> /* poll */
 #include <sys/socket.h> /* socket */
 #include <netinet/in.h>
+#if FD_HAS_LINUX
 #include <netinet/ip.h>
+#endif
 #include <netinet/tcp.h>
+
+#if FD_HAS_LINUX
+#define FD_BUNDLE_SOCKET_CLOEXEC_FLAG SOCK_CLOEXEC
+#else
+/* macOS does not support SOCK_CLOEXEC; use O_CLOEXEC after socket() */
+#define FD_BUNDLE_SOCKET_CLOEXEC_FLAG 0
+#endif
 
 #define FD_BUNDLE_CLIENT_REQUEST_TIMEOUT ((long)8e9) /* 8 seconds */
 
@@ -111,10 +120,16 @@ fd_bundle_client_create_conn( fd_bundle_tile_t * ctx ) {
   uint const ip4_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr;
   ctx->server_ip4_addr = ip4_addr;
 
-  int tcp_sock = socket( AF_INET, SOCK_STREAM|SOCK_CLOEXEC, 0 );
+  int tcp_sock = socket( AF_INET, SOCK_STREAM|FD_BUNDLE_SOCKET_CLOEXEC_FLAG, 0 );
   if( FD_UNLIKELY( tcp_sock<0 ) ) {
     FD_LOG_ERR(( "socket(AF_INET,SOCK_STREAM|SOCK_CLOEXEC,0) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
   }
+#if !FD_HAS_LINUX
+  /* macOS doesn't support SOCK_CLOEXEC; use fcntl to set O_CLOEXEC */
+  if( FD_UNLIKELY( fcntl( tcp_sock, F_SETFD, FD_GETFD( tcp_sock ) | FD_CLOEXEC )==-1 ) ) {
+    FD_LOG_ERR(( "fcntl(tcp_sock,F_SETFD,FD_CLOEXEC) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+  }
+#endif
   ctx->tcp_sock = tcp_sock;
 
   if( FD_UNLIKELY( 0!=setsockopt( tcp_sock, SOL_SOCKET, SO_RCVBUF, &ctx->so_rcvbuf, sizeof(int) ) ) ) {
