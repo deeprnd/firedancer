@@ -120,7 +120,7 @@ build-fd-macos-intel:
 
 # macOS ARM build
 build-fd-macos-arm:
-  bash contrib/fd-build-lib.sh fd-macos-arm clang
+  bash contrib/fd-build-lib.sh fd-macos-arm clang EXTRAS="lz4 blst zstd"
 
 build-fd-dev:
   make -j"$(nproc)" all
