@@ -17,6 +17,7 @@
 
 #include <fcntl.h>
 #include <errno.h>
+#include <inttypes.h> /* PRIu64 for portable uint64 format */
 #include <unistd.h> /* close */
 #include <poll.h> /* poll */
 #include <sys/socket.h> /* socket */
@@ -770,7 +771,7 @@ fd_bundle_client_handle_builder_fee_info(
   }
   if( FD_UNLIKELY( res.commission > 100 ) ) {
     ctx->metrics.decode_fail_cnt++;
-    FD_LOG_WARNING(( "BlockBuilderFeeInfoResponse commission out of range (0-100): %llu", res.commission ));
+    FD_LOG_WARNING(( "BlockBuilderFeeInfoResponse commission out of range (0-100): %" PRIu64, res.commission ));
     return;
   }
 
