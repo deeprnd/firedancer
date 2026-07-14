@@ -1,4 +1,8 @@
+#if FD_HAS_LINUX
 #define _GNU_SOURCE /* SYS_close */
+#else
+#define _DARWIN_C_SOURCE /* POSIX/C99 extensions on macOS */
+#endif
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -7,18 +11,13 @@
 #include <stdint.h>
 #include <string.h>
 #include <poll.h>
+#include <fcntl.h>
 #include <time.h>
 #include <unistd.h>
 #include <errno.h>
 #include <pthread.h>
 #if FD_HAS_LINUX
 #include <sys/syscall.h>
-#elif FD_HAS_MACOS
-/* macOS doesn't have SYS_close constant; define it */
-#ifndef SYS_close
-#define SYS_close 3
-#endif
-/* On macOS, syscall() is in unistd.h */
 #endif
 #include "fd_lookup.h"
 #include "../../util/fd_util.h"
@@ -31,7 +30,11 @@ static void
 cleanup( struct pollfd * pfd ) {
   for( int i=0; pfd[i].fd >= -1; i++ ) {
     if( pfd[i].fd >= 0 ) {
+#if FD_HAS_LINUX
       syscall( SYS_close, pfd[i].fd );
+#else
+      close( pfd[i].fd );
+#endif
     }
   }
 }
@@ -74,6 +77,9 @@ start_tcp( struct pollfd * pfd,
 #endif
   pfd->fd = fd;
   pfd->events = POLLOUT;
+
+#if FD_HAS_LINUX
+  /* TCP Fast Open (Linux only) */
   if( !setsockopt( fd, IPPROTO_TCP, TCP_FASTOPEN_CONNECT,
       &(int){1}, sizeof(int) ) ) {
     int r = sendmsg( fd, &mh, MSG_FASTOPEN|MSG_NOSIGNAL );
@@ -81,6 +87,8 @@ start_tcp( struct pollfd * pfd,
     if( r >= 0 ) return r;
     if( errno == EINPROGRESS ) return 0;
   }
+#endif
+
   int r = connect( fd, sa, sl );
   if( !r || errno == EINPROGRESS ) return 0;
   close( fd );
@@ -347,7 +355,11 @@ fd_res_msend_rc( int                     nqueries,
          Immediately close TCP socket so as not to consume
          resources we no longer need. */
       alens[i] = alen;
+#if FD_HAS_LINUX
       syscall( SYS_close, pfd[i].fd );
+#else
+      close( pfd[i].fd );
+#endif
       pfd[i].fd = -1;
     }
   }
