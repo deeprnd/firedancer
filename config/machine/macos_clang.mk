@@ -16,6 +16,9 @@ include config/extra/with-debug.mk
 include config/extra/with-optimization.mk
 include config/extra/with-threads.mk
 
+# Platform detection (MUST come before any platform-specific settings)
+UNAME?=$(shell uname)
+
 # Use system GAS assembler on macOS — clang's integrated assembler rejects
 # .cfi_escape / .cfi_restore directives that are valid GAS but fail on
 # macOS clang 16 with "invalid CFI advance_loc expression".
@@ -23,8 +26,6 @@ ifeq ($(UNAME), Darwin)
 ASFLAGS+=-no-integrated-as
 endif
 
-# Platform detection
-UNAME?=$(shell uname)
 ifeq ($(UNAME), Darwin)
   FD_HAS_MACOS:=1
   CPPFLAGS+=-DFD_HAS_MACOS=1

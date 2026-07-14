@@ -1,8 +1,15 @@
+#if defined(__linux__)
 #define _GNU_SOURCE
+#endif
 #include "fd_backtrace.h"
 #include "../fd_util_base.h"
 #include "../log/fd_log.h"
 
+#if FD_HAS_BACKTRACE
+#include <execinfo.h>
+#endif
+
+#if defined(__linux__)
 #include <unistd.h>
 #include <string.h>
 #include <dlfcn.h>
@@ -33,3 +40,31 @@ fd_backtrace_log( void ** addrs,
     }
   }
 }
+
+#elif defined(__APPLE__)
+
+/* macOS: use backtrace_symbols instead of <link.h> */
+#include <unistd.h>
+#include <string.h>
+
+void
+fd_backtrace_log( void ** addrs,
+                  ulong   addrs_cnt ) {
+  for( ulong i=0UL; i<addrs_cnt; i++ ) {
+    void * addr = addrs[ i ];
+    void * syms[1];
+    char ** names = NULL;
+    int cnt;
+
+    syms[0] = addr;
+    names = backtrace_symbols( syms, 1 );
+    if( FD_LIKELY( names ) ) {
+      fd_log_private_fprintf_0( STDERR_FILENO, "%p %s\n", addr, names[0] ? names[0] : "" );
+      free( names );
+    } else {
+      fd_log_private_fprintf_0( STDERR_FILENO, "%p\n", addr );
+    }
+  }
+}
+
+#endif /* __linux__ / __APPLE__ */
