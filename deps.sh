@@ -301,19 +301,24 @@ check_arch_pkgs () {
 }
 
 check () {
-  DISTRO="${ID_LIKE:-${ID:-}}"
-  for word in $DISTRO ; do
-    case "$word" in
-      fedora|debian|alpine|macos|arch)
-        check_${word}_pkgs
-        ;;
-      rhel|centos)
-        ;;
-      *)
-        echo "Unsupported distro $DISTRO. Your mileage may vary."
-        ;;
-    esac
-  done
+  # macOS has no /etc/os-release — must be handled separately.
+  if [[ "$OS" = "Darwin" ]]; then
+    check_macos_pkgs
+  else
+    DISTRO="${ID_LIKE:-${ID:-}}"
+    for word in $DISTRO ; do
+      case "$word" in
+        fedora|debian|alpine|macos|arch)
+          check_${word}_pkgs
+          ;;
+        rhel|centos)
+          ;;
+        *)
+          echo "Unsupported distro $DISTRO. Your mileage may vary."
+          ;;
+      esac
+    done
+  fi
 
   if [[ ! -z "${PACKAGE_INSTALL_CMD[@]}" ]]; then
     echo "[!] Found missing system packages"
