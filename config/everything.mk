@@ -323,10 +323,10 @@ $(OBJDIR)/obj/%.check : src/%.c
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -fsyntax-only $<
 
 $(OBJDIR)/lib/%.a :
-	@echo -e "AR\t$(notdir $@)"
+	@echo -e "AR	$(notdir $@)"
 	$(Q)$(MKDIR) $(dir $@) && \
 $(RM) $@ && \
-$(AR) $(ARFLAGS) $@ $^
+$(AR) $(ARFLAGS) $@ $$(for _o in $^; do [ -s "$$_o" ] && echo "$$_o"; done)
 
 $(OBJDIR)/include/firedancer/% : src/%
 	$(Q)$(MKDIR) $(dir $@) && \

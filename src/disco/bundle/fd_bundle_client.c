@@ -770,7 +770,7 @@ fd_bundle_client_handle_builder_fee_info(
   }
   if( FD_UNLIKELY( res.commission > 100 ) ) {
     ctx->metrics.decode_fail_cnt++;
-    FD_LOG_WARNING(( "BlockBuilderFeeInfoResponse commission out of range (0-100): %lu", res.commission ));
+    FD_LOG_WARNING(( "BlockBuilderFeeInfoResponse commission out of range (0-100): %llu", res.commission ));
     return;
   }
 
