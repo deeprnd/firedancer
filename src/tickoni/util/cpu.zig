@@ -61,13 +61,13 @@ pub fn count(cpu_set: *const CpuSet) usize {
 // On macOS they don't exist — provide stubs so the same topo/run pipeline
 // compiles on both platforms.
 pub const CpuSetAffinity = struct {
-    pub fn getAffinity(pid: c_int, cpu_set: *CpuSet) !void {
+    pub fn getAffinity(pid: c_int, cpu_set: *CpuSet) void {
         _ = pid;
         _ = cpu_set;
         // Stub on non-Linux: no-op, returns success
     }
 
-    pub fn setAffinity(pid: c_int, cpu_set: *const CpuSet) !void {
+    pub fn setAffinity(pid: c_int, cpu_set: *const CpuSet) void {
         _ = pid;
         _ = cpu_set;
         // Stub on non-Linux: no-op, returns success
