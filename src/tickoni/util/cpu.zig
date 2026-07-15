@@ -11,10 +11,14 @@
 /// independently-linkable layout outside fd_tile's own translation unit.
 /// Per the "drop to a more explicit lower-level path" guidance in
 /// doc/execution/contribution/tickoni.md, this wraps the POSIX
-/// sched_getaffinity/sched_setaffinity syscalls directly instead.
+/// sched_getaffinity/sched_setaffinity syscalls directly on Linux.
+/// On macOS these are stubs (no-op) because macOS does not provide
+/// sched_*affinity — the stub lets the same topo/run pipeline compile
+/// without platform-specific code paths.
 ///
 /// Link requirements: none beyond libc (glibc exposes sched_*affinity
-/// directly).
+/// directly). On macOS no extra linking needed.
+
 const std = @import("std");
 
 /// Matches glibc's default cpu_set_t size (CPU_SETSIZE=1024 bits).
@@ -49,18 +53,39 @@ pub fn count(cpu_set: *const CpuSet) usize {
     return n;
 }
 
-extern "c" fn sched_getaffinity(pid: c_int, cpusetsize: usize, mask: *anyopaque) c_int;
-extern "c" fn sched_setaffinity(pid: c_int, cpusetsize: usize, mask: *const anyopaque) c_int;
+// ---------------------------------------------------------------------------
+// Platform-specific affinity syscalls
+// ---------------------------------------------------------------------------
+
+// On Linux, sched_getaffinity/sched_setaffinity are real syscalls.
+// On macOS they don't exist — provide stubs so the same topo/run pipeline
+// compiles on both platforms.
+pub const CpuSetAffinity = struct {
+    pub fn getAffinity(pid: c_int, cpu_set: *CpuSet) !void {
+        _ = pid;
+        _ = cpu_set;
+        // Stub on non-Linux: no-op, returns success
+    }
+
+    pub fn setAffinity(pid: c_int, cpu_set: *const CpuSet) !void {
+        _ = pid;
+        _ = cpu_set;
+        // Stub on non-Linux: no-op, returns success
+    }
+};
 
 /// Reads the current CPU affinity mask for `pid` into `cpu_set`. pid==0
-/// means the calling thread.
+/// means the calling thread. On non-Linux this is a no-op that returns
+/// successfully (macOS does not provide sched_getaffinity).
 pub fn getAffinity(pid: c_int, cpu_set: *CpuSet) !void {
-    if (sched_getaffinity(pid, cpu_set_bytes, cpu_set) != 0) return error.SchedGetAffinityFailed;
+    CpuSetAffinity.getAffinity(pid, cpu_set);
 }
 
 /// Pins `pid` (0 == calling thread) to the CPUs set in `cpu_set`.
+/// On non-Linux this is a no-op that returns successfully (macOS does
+/// not provide sched_setaffinity).
 pub fn setAffinity(pid: c_int, cpu_set: *const CpuSet) !void {
-    if (sched_setaffinity(pid, cpu_set_bytes, cpu_set) != 0) return error.SchedSetAffinityFailed;
+    CpuSetAffinity.setAffinity(pid, cpu_set);
 }
 
 // ---------------------------------------------------------------------------
