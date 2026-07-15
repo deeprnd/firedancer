@@ -5,14 +5,14 @@
 #                                  uchar       *         _scratch )     (rcx)
 .section .rodata,"a",@progbits
 gfni_const_tbl:
-#if !defined(__APPLE__)
+#if !defined(FD_HAS_MACOS)
 .align 32
 #endif
 .incbin "src/ballet/reedsol/constants/gfni_constants.bin"
 .previous
 
 /* Make stack non-executable (GNU as specific; ignore on macOS) */
-#if !defined(__APPLE__)
+#if !defined(FD_HAS_MACOS)
 .section .note.GNU-stack,"",@progbits
 #endif
 

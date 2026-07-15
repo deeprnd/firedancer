@@ -1,10 +1,10 @@
 /* Make stack non-executable (GNU as specific; ignore on macOS) */
-#if !defined(__APPLE__)
+#if !defined(FD_HAS_MACOS)
 .section .note.GNU-stack,"",@progbits
 #endif
 
 /* GNU assembler directives - no-op on macOS clang */
-#if !defined(__APPLE__)
+#if !defined(FD_HAS_MACOS)
 #define GNU_TYPE(name)	.type name,@function
 #define GNU_SIZE(name,end)	.size name,end
 #define GNU_ALIGN(n)	.align n

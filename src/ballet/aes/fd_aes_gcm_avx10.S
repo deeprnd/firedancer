@@ -86,12 +86,12 @@
 // three-argument XOR).  These features are very useful for AES-GCM.
 
 /* Make stack non-executable (GNU as specific; ignore on macOS) */
-#if !defined(__APPLE__)
+#if !defined(FD_HAS_MACOS)
 .section .note.GNU-stack,"",@progbits
 #endif
 
 /* GNU assembler directives - no-op on macOS clang */
-#if !defined(__APPLE__)
+#if !defined(FD_HAS_MACOS)
 #define GNU_TYPE(name)	.type name,@function
 #define GNU_SIZE(name,end)	.size name,end
 #define GNU_ALIGN(n)	.align n
@@ -1252,7 +1252,7 @@ SYM_FUNC_START(aes_gcm_dec_final_vaes_avx10)
 SYM_FUNC_END(aes_gcm_dec_final_vaes_avx10)
 
 /* Advertise IBT, SHSTK compliance (GNU as specific; ignore on macOS) */
-#if !defined(__APPLE__)
+#if !defined(FD_HAS_MACOS)
 .section ".note.gnu.property", "a"
 .p2align 3
 .long 1f - 0f

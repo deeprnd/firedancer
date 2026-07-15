@@ -128,13 +128,13 @@
 //      reduction.  For single-block processing, we use the x^64 optimization.
 
 # Make stack non-executable
-#if !defined(__APPLE__)
+#if !defined(FD_HAS_MACOS)
 .section .note.GNU-stack,"",@progbits
 #endif
 
 
 /* GNU assembler directives - no-op on macOS clang */
-#if !defined(__APPLE__)
+#if !defined(FD_HAS_MACOS)
 #define GNU_TYPE(name)	.type name,@function
 #define GNU_SIZE(name,end)	.size name,end
 #define GNU_ALIGN(n)	.align n
@@ -1157,7 +1157,7 @@ SYM_FUNC_START(aes_gcm_dec_final_aesni_avx)
 SYM_FUNC_END(aes_gcm_dec_final_aesni_avx)
 
 /* Advertise IBT, SHSTK compliance (GNU as specific; ignore on macOS) */
-#if !defined(__APPLE__)
+#if !defined(FD_HAS_MACOS)
 .section ".note.gnu.property", "a"
 .p2align 3
 .long 1f - 0f
