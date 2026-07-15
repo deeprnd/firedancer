@@ -95,7 +95,13 @@ fd_build_fd() {
     done
   fi
 
-  [ -z "${TARGETS}" ] && TARGETS=$(printf '%s\n' "${FD_TK_LIBS[@]}" "${FD_TK_LIBS_EXTRA[@]}" | tr '\n' ' ')
+  [ -z "${TARGETS}" ] && {
+    if [ -n "${EXTRAS}" ]; then
+      TARGETS=$(printf '%s\n' "${FD_TK_LIBS[@]}" "${FD_TK_LIBS_EXTRA[@]}" | tr '\n' ' ')
+    else
+      TARGETS=$(printf '%s\n' "${FD_TK_LIBS[@]}" | tr '\n' ' ')
+    fi
+  }
 
   local mks
   mks=$(fd_compute_mks ${SRCS})
