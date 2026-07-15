@@ -62,7 +62,7 @@ ifeq ($(UNAME), Darwin)
     FD_HAS_AVX2:=1
     FD_HAS_AVX512:=1
     FD_IS_X86_64:=1
-    CPPFLAGS+=-march=skylake-avx512
+    CPPFLAGS+=-march=icelake-server
     CPPFLAGS+=-DFD_HAS_X86=1 -DFD_HAS_SSE=1 -DFD_HAS_AVX=1 -DFD_HAS_AVX2=1 -DFD_HAS_AVX512=1 -DFD_IS_X86_64=1 -DFD_HAS_INT128=1 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1 -DFD_HAS_THREADS=1
   endif
 endif
