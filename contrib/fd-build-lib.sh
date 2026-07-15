@@ -35,9 +35,15 @@ TARGETS=()
 for lib in "${FD_TK_LIBS[@]}"; do
   TARGETS+=( "${LIBDIR}/${lib}" )
 done
-for lib in "${FD_TK_LIBS_EXTRA[@]}"; do
-  TARGETS+=( "${LIBDIR}/${lib}" )
-done
+# Only include extra libs (blst, zstd, lz4) when EXTRAS is set.
+# Without EXTRAS, FD_HAS_* flags are undefined so their Local.mks
+# are ifdef-skipped and the generic %.a rule has zero prerequisites
+# (see config/everything.mk line 329).
+if [ -n "${EXTRAS:-}" ]; then
+  for lib in "${FD_TK_LIBS_EXTRA[@]}"; do
+    TARGETS+=( "${LIBDIR}/${lib}" )
+  done
+fi
 
 # Compute LOCAL_MKS and run fd_build_fd
 # For test mode, pass EXTRAS so tickoni_fd.mk gets FD_HAS_LZ4/BLST/ZSTD
