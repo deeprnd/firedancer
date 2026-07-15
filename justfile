@@ -115,8 +115,10 @@ build-fd-arm:
   bash contrib/fd-build-lib.sh fd-arm gcc-14
 
 # macOS Intel build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
+# EXTRAS="" prevents blst/zstd/lz4 from being built: their vendor sources
+# have path mismatches and platform-specific assembly that fails on macOS Intel.
 build-fd-macos-intel:
-  bash contrib/fd-build-lib.sh fd-tickoni-fd clang
+  bash contrib/fd-build-lib.sh fd-tickoni-fd clang libs ""
 
 # macOS ARM build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
 build-fd-macos-arm:
