@@ -44,6 +44,8 @@ fd_backtrace_log( void ** addrs,
 #elif defined(__APPLE__)
 
 /* macOS: use backtrace_symbols instead of <link.h> */
+#include <execinfo.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 
