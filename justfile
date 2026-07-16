@@ -156,19 +156,19 @@ dock +recipe:
 	set -euo pipefail
 	if [ "$(uname)" != "Darwin" ]; then exec just {{recipe}}; fi
 	if [ -z "{{container}}" ]; then
-		echo "No container runtime found (checked docker, podman, nerdctl, colima)." >&2
-		exit 1
+	echo "No container runtime found (checked docker, podman, nerdctl, colima)." >&2
+	exit 1
 	fi
 	# colima's bundled nerdctl needs a VM with the containerd runtime; use a
 	# dedicated profile so an existing (docker-runtime) colima setup is untouched.
 	case "{{container}}" in
-		colima*) colima status -p tickoni >/dev/null 2>&1 || colima start -p tickoni --runtime containerd ;;
+	colima*) colima status -p tickoni >/dev/null 2>&1 || colima start -p tickoni --runtime containerd ;;
 	esac
 	just _dev-image
 	{{container}} run --rm \
-		-v "{{justfile_directory()}}":/work -w /work \
-		{{dev_image}} \
-		bash -lc 'bash contrib/fd-build-lib.sh {{fd_tickoni_build}} && just {{recipe}}'
+	-v "{{justfile_directory()}}":/work -w /work \
+	{{dev_image}} \
+	bash -lc 'bash contrib/fd-build-lib.sh {{fd_tickoni_build}} && just {{recipe}}'
 
 # Build the Linux dev image once (just + Zig 0.16.0 + build toolchain). Idempotent.
 [private]
@@ -180,12 +180,12 @@ _dev-image:
 	ctx="$(mktemp -d "$HOME/.tickoni-devimg.XXXXXX")"  # under $HOME so colima/nerdctl can see the build context
 	trap 'rm -rf "$ctx"' EXIT
 	printf '%s\n' \
-		'FROM ubuntu:24.04' \
-		'ENV DEBIAN_FRONTEND=noninteractive' \
-		'RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl ca-certificates xz-utils pkg-config perl && rm -rf /var/lib/apt/lists/*' \
-		'RUN curl -sSfL https://just.systems/install.sh | bash -s -- --to /usr/local/bin' \
-		'RUN curl -sSfL https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz | tar -xJ -C /opt && ln -s /opt/zig-aarch64-linux-0.16.0/zig /usr/local/bin/zig' \
-		> "$ctx/Dockerfile"
+	'FROM ubuntu:24.04' \
+	'ENV DEBIAN_FRONTEND=noninteractive' \
+	'RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl ca-certificates xz-utils pkg-config perl && rm -rf /var/lib/apt/lists/*' \
+	'RUN curl -sSfL https://just.systems/install.sh | bash -s -- --to /usr/local/bin' \
+	'RUN curl -sSfL https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz | tar -xJ -C /opt && ln -s /opt/zig-aarch64-linux-0.16.0/zig /usr/local/bin/zig' \
+	> "$ctx/Dockerfile"
 	{{container}} build --platform linux/arm64 -t {{dev_image}} "$ctx"
 
 # ── Test ───────────────────────────────────────────────────────────────────
@@ -263,14 +263,14 @@ infra-ensure-llamacpp:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	if command -v nvidia-smi >/dev/null 2>&1; then
-		gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
-		if (( gpu_count > 0 )); then
-			bash contrib/test/ensure_llama_cpp.sh --gpu
-		else
-			bash contrib/test/ensure_llama_cpp.sh
-		fi
+	gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
+	if (( gpu_count > 0 )); then
+	bash contrib/test/ensure_llama_cpp.sh --gpu
 	else
-		bash contrib/test/ensure_llama_cpp.sh
+	bash contrib/test/ensure_llama_cpp.sh
+	fi
+	else
+	bash contrib/test/ensure_llama_cpp.sh
 	fi
 
 # Download the GGUF model for system tests (requires `hf` CLI).
@@ -284,10 +284,10 @@ infra-run-llamacpp:
 	llama_dir="$(tk_resolve_llama_cpp_dir)"
 	backend=cpu
 	if command -v nvidia-smi >/dev/null 2>&1; then
-		gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
-		if (( gpu_count > 0 )) && ldd "${llama_dir}/llama-server" 2>/dev/null | grep -qi 'cuda\|cublas'; then
-			backend=gpu
-		fi
+	gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
+	if (( gpu_count > 0 )) && ldd "${llama_dir}/llama-server" 2>/dev/null | grep -qi 'cuda\|cublas'; then
+	backend=gpu
+	fi
 	fi
 	[[ "$backend" == "gpu" ]] && bash contrib/test/ensure_llama_cpp.sh --gpu || bash contrib/test/ensure_llama_cpp.sh
 	bash contrib/test/ensure_hf_model.sh
