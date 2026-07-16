@@ -30,10 +30,10 @@ ifeq ($(UNAME), Darwin)
 FD_HAS_MACOS:=1
 CPPFLAGS+=-DFD_HAS_MACOS=1
 else
-  # Not macOS — skip
-  BUILDDIR?=native/$(notdir $(CC))
-  include config/machine/native.mk
-  $(eval $(filter-out %,$(BUILDDIR)))
+# Not macOS — skip
+BUILDDIR?=native/$(notdir $(CC))
+include config/machine/native.mk
+$(eval $(filter-out %,$(BUILDDIR)))
 endif
 
 # ARM vs Intel detection

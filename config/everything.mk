@@ -458,10 +458,10 @@ ifeq ($(OBJDIR),)
 	echo "No profile data found. Did you set OBJDIRS?" >&2 && exit 1
 endif
 	$(LLVM_COV) export                    \
-  -format=lcov                          \
-  $(addprefix -instr-profile=,$<)       \
-  $(OBJDIR)/cov/mappings.ar             \
-  --ignore-filename-regex="((test_|fuzz_).*\\.c|third_party/)" \
+	-format=lcov                          \
+	$(addprefix -instr-profile=,$<)       \
+	$(OBJDIR)/cov/mappings.ar             \
+	--ignore-filename-regex="((test_|fuzz_).*\\.c|third_party/)" \
 > $@
 
 # llvm-cov step 2.1
