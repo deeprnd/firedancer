@@ -43,7 +43,10 @@ runs:
     - name: Install gmake on macOS
       if: runner.os == 'macOS'
       shell: bash
-      run: brew install gmake
+      run: |
+        brew install gmake
+        # Add Homebrew bin dir to PATH — Intel runs under /usr/local, ARM under /opt/homebrew
+        echo "$HOMEBREW_PREFIX/bin" >> "$GITHUB_PATH"
 
     - name: Setup Zig
       if: inputs.zig == 'true'
