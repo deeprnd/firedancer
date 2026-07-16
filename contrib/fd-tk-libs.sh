@@ -109,12 +109,20 @@ fd_build_fd() {
   # Use gmake on macOS (GitHub Actions runners ship BSD make 3.81,
   # but Firedancer's GNUmakefile requires GNU make >= 3.82 for
   # the 'undefine' directive).
+  # Explicitly check both Homebrew prefixes since PATH may not include them.
   local MAKE
-  MAKE="$(command -v gmake 2>/dev/null || command -v make)"
-  [ "$MAKE" = "/usr/bin/make" ] && MAKE="$(command -v make)"  # fallback
-  # On macOS runners prefer gmake if available.
-  if command -v gmake >/dev/null 2>&1; then
+  MAKE=""
+  # Apple Silicon Homebrew prefix
+  if [ -x /opt/homebrew/bin/gmake ]; then
+    MAKE="/opt/homebrew/bin/gmake"
+  # Intel Homebrew prefix
+  elif [ -x /usr/local/bin/gmake ]; then
+    MAKE="/usr/local/bin/gmake"
+  # Fallback to PATH-based detection
+  elif command -v gmake >/dev/null 2>&1; then
     MAKE="$(command -v gmake)"
+  else
+    MAKE="$(command -v make)"
   fi
 
   local -a cmd=( "$MAKE" -j"$(fd_nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" )
