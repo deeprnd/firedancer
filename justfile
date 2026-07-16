@@ -431,8 +431,8 @@ security-sanitize-check-all:
 # ── Security: All ──────────────────────────────────────────────────────────
 
 security-engine-check-all:
-		 @just security-engine-check-changes
-		 @just security-engine-check-orchestration
+	 @just security-engine-check-changes
+	 @just security-engine-check-orchestration
 
 security-engine-check-changes:
 	python3 contrib/engine/engine_check_changes.py
