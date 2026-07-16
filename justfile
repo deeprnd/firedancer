@@ -50,34 +50,34 @@ fd_cov_lib       := "build/fd-cov/lib"
 container := `if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; elif command -v nerdctl >/dev/null 2>&1; then echo nerdctl; elif command -v colima >/dev/null 2>&1; then echo "colima nerdctl -p tickoni --"; else echo ""; fi`
 
 default:
-  @just --list
+	@just --list
 
 help:
-  @just --list
+	@just --list
 
 # ── Python ─────────────────────────────────────────────────────────────────
 
 python-dev-install extras="dev":
-  python3 -m venv .venv
-  .venv/bin/python -m pip install --upgrade pip
-  .venv/bin/python -m pip install ".[{{extras}}]"
+	python3 -m venv .venv
+	.venv/bin/python -m pip install --upgrade pip
+	.venv/bin/python -m pip install ".[{{extras}}]"
 
 python-dev-install-all:
-  @just python-dev-install "dev,protobuf,mathgen,sim,solana,agave-cluster"
+	@just python-dev-install "dev,protobuf,mathgen,sim,solana,agave-cluster"
 
 # ── All-in ──────────────────────────────────────────────────────────────────
 
 tests-all:
-  @just build-all
-  @just quality-check-all
-  @just security-check-all
-  @just security-engine-check-changes
-  @just test-all
+	@just build-all
+	@just quality-check-all
+	@just security-check-all
+	@just security-engine-check-changes
+	@just test-all
 
 # ── Build ──────────────────────────────────────────────────────────────────
 
 build-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}}
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}}
 
 # tickoni_fd machine profile: builds only the 5 Firedancer libraries
 # Tickoni reuses (tango, util, ballet, disco, waltz). Excludes
@@ -100,35 +100,35 @@ build-fd-tk-libs: build-fd
 # CI recipes below (build-fd-gcc, build-fd-clang, build-fd-arm, build-fd-macos-*)
 # are called directly with explicit values for reproducibility.
 build-fd:
-  exec bash contrib/fd-build-linux.sh
+	exec bash contrib/fd-build-linux.sh
 
 # Linux GCC (CI: maps to fd-gcc for test/quality/security compatibility)
 build-fd-gcc:
-  bash contrib/fd-build-lib.sh fd-gcc gcc-12
+	bash contrib/fd-build-lib.sh fd-gcc gcc-12
 
 # Linux Clang (CI: maps to fd-clang for test/quality/security compatibility)
 build-fd-clang:
-  bash contrib/fd-build-lib.sh fd-clang clang-18
+	bash contrib/fd-build-lib.sh fd-clang clang-18
 
 # Linux ARM (CI: maps to fd-arm for test/quality/security compatibility)
 build-fd-arm:
-  bash contrib/fd-build-lib.sh fd-arm gcc-14
+	bash contrib/fd-build-lib.sh fd-arm gcc-14
 
 # macOS Intel build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
 # EXTRAS="" prevents blst/zstd/lz4 from being built: their vendor sources
 # have path mismatches and platform-specific assembly that fails on macOS Intel.
 build-fd-macos-intel:
-  bash contrib/fd-build-lib.sh fd-tickoni-fd clang libs ""
+	bash contrib/fd-build-lib.sh fd-tickoni-fd clang libs ""
 
 # macOS ARM build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
 build-fd-macos-arm:
-  bash contrib/fd-build-lib.sh fd-tickoni-fd clang libs "lz4 blst zstd"
+	bash contrib/fd-build-lib.sh fd-tickoni-fd clang libs "lz4 blst zstd"
 
 build-fd-dev:
-  make -j"$(nproc)" all
+	make -j"$(nproc)" all
 
 build-all:
-  python3 contrib/readme/run-badged-command.py build bash -c "just build-fd && just build-tk"
+	python3 contrib/readme/run-badged-command.py build bash -c "just build-fd && just build-tk"
 
 # ── Clean ────────────────────────────────────────────────────────────────────
 
@@ -136,7 +136,7 @@ build-all:
 # Firedancer outputs live under `build/` (BUILDDIR variants).
 # Zig/Tickoni outputs live under `target/` and `zig-out/`.
 clean-all:
-  rm -rf build/ target/ zig-out/
+	rm -rf build/ target/ zig-out/
 
 # ── macOS: run any recipe in the Linux dev container ─────────────────────────
 # Firedancer/Tickoni build natively only on Linux. The `dock` recipe mounts the
@@ -146,329 +146,329 @@ clean-all:
 #
 # Run any recipe inside the Linux dev container, e.g. `just dock test-unit-tk`.
 dock +recipe:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  if [ "$(uname)" != "Darwin" ]; then exec just {{recipe}}; fi
-  if [ -z "{{container}}" ]; then
-    echo "No container runtime found (checked docker, podman, nerdctl, colima)." >&2
-    exit 1
-  fi
-  # colima's bundled nerdctl needs a VM with the containerd runtime; use a
-  # dedicated profile so an existing (docker-runtime) colima setup is untouched.
-  case "{{container}}" in
-    colima*) colima status -p tickoni >/dev/null 2>&1 || colima start -p tickoni --runtime containerd ;;
-  esac
-  just _dev-image
-  {{container}} run --rm \
-    -v "{{justfile_directory()}}":/work -w /work \
-    {{dev_image}} \
-    bash -lc 'bash contrib/fd-build-lib.sh {{fd_tickoni_build}} && just {{recipe}}'
+	#!/usr/bin/env bash
+	set -euo pipefail
+	if [ "$(uname)" != "Darwin" ]; then exec just {{recipe}}; fi
+	if [ -z "{{container}}" ]; then
+		echo "No container runtime found (checked docker, podman, nerdctl, colima)." >&2
+		exit 1
+	fi
+	# colima's bundled nerdctl needs a VM with the containerd runtime; use a
+	# dedicated profile so an existing (docker-runtime) colima setup is untouched.
+	case "{{container}}" in
+		colima*) colima status -p tickoni >/dev/null 2>&1 || colima start -p tickoni --runtime containerd ;;
+	esac
+	just _dev-image
+	{{container}} run --rm \
+		-v "{{justfile_directory()}}":/work -w /work \
+		{{dev_image}} \
+		bash -lc 'bash contrib/fd-build-lib.sh {{fd_tickoni_build}} && just {{recipe}}'
 
 # Build the Linux dev image once (just + Zig 0.16.0 + build toolchain). Idempotent.
 [private]
 _dev-image:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  if {{container}} image inspect {{dev_image}} >/dev/null 2>&1; then exit 0; fi
-  echo "Building {{dev_image}} (one-time, a few minutes)…" >&2
-  ctx="$(mktemp -d "$HOME/.tickoni-devimg.XXXXXX")"  # under $HOME so colima/nerdctl can see the build context
-  trap 'rm -rf "$ctx"' EXIT
-  printf '%s\n' \
-    'FROM ubuntu:24.04' \
-    'ENV DEBIAN_FRONTEND=noninteractive' \
-    'RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl ca-certificates xz-utils pkg-config perl && rm -rf /var/lib/apt/lists/*' \
-    'RUN curl -sSfL https://just.systems/install.sh | bash -s -- --to /usr/local/bin' \
-    'RUN curl -sSfL https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz | tar -xJ -C /opt && ln -s /opt/zig-aarch64-linux-0.16.0/zig /usr/local/bin/zig' \
-    > "$ctx/Dockerfile"
-  {{container}} build --platform linux/arm64 -t {{dev_image}} "$ctx"
+	#!/usr/bin/env bash
+	set -euo pipefail
+	if {{container}} image inspect {{dev_image}} >/dev/null 2>&1; then exit 0; fi
+	echo "Building {{dev_image}} (one-time, a few minutes)…" >&2
+	ctx="$(mktemp -d "$HOME/.tickoni-devimg.XXXXXX")"  # under $HOME so colima/nerdctl can see the build context
+	trap 'rm -rf "$ctx"' EXIT
+	printf '%s\n' \
+		'FROM ubuntu:24.04' \
+		'ENV DEBIAN_FRONTEND=noninteractive' \
+		'RUN apt-get update && apt-get install -y --no-install-recommends build-essential git curl ca-certificates xz-utils pkg-config perl && rm -rf /var/lib/apt/lists/*' \
+		'RUN curl -sSfL https://just.systems/install.sh | bash -s -- --to /usr/local/bin' \
+		'RUN curl -sSfL https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz | tar -xJ -C /opt && ln -s /opt/zig-aarch64-linux-0.16.0/zig /usr/local/bin/zig' \
+		> "$ctx/Dockerfile"
+	{{container}} build --platform linux/arm64 -t {{dev_image}} "$ctx"
 
 # ── Test ───────────────────────────────────────────────────────────────────
 
 test-all:
-  @just test-unit-all
-  @just test-integration-all
-  @just test-cov-all
-  @just test-system-all
-  @just test-e2e-all
+	@just test-unit-all
+	@just test-integration-all
+	@just test-cov-all
+	@just test-system-all
+	@just test-e2e-all
 
 # Build test binaries: libs + unit-test target.
 # Uses FD_TK_LIB_TEST_SRCS (extra: picohttpparser, blst, lz4, zstd, nanopb).
 test-unit-fd:
-  set timeout := 600
-  # Override LOCAL_MKS so everything.mk's ?= assignment is skipped.
-  # Only the 5 Tickoni dirs: tango, util, ballet, disco, waltz —
-  # minus subdirs not compiled into the 5 libs (disco/quic, ballet/zksdk,
-  # ballet/reedsol, waltz/quic, waltz/tls).
-  bash contrib/fd-build-lib.sh {{fd_tickoni_build}} gcc-12 test
-  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} run-unit-test TEST_OPTS="--page-sz normal"
+	set timeout := 600
+	# Override LOCAL_MKS so everything.mk's ?= assignment is skipped.
+	# Only the 5 Tickoni dirs: tango, util, ballet, disco, waltz —
+	# minus subdirs not compiled into the 5 libs (disco/quic, ballet/zksdk,
+	# ballet/reedsol, waltz/quic, waltz/tls).
+	bash contrib/fd-build-lib.sh {{fd_tickoni_build}} gcc-12 test
+	{{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} run-unit-test TEST_OPTS="--page-sz normal"
 
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.
 test-unit-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
 
 # Print computed hash and wire bytes for every audit fixture event, and emit audit JSONL.
 # Use the output to understand or snapshot the current encoding after intentional changes.
 gen-audit-fixtures:
-  TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build test 2>&1
-  TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build integration-test 2>&1
+	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build test 2>&1
+	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build integration-test 2>&1
 
 test-unit-all:
-  python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
+	python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
 
 test-e2e-fd:
-  {{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} integration-test && {{make}} MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} run-integration-test
+	{{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} integration-test && {{make}} MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} run-integration-test
 
 test-e2e-tk:
-  @true
+	@true
 
 test-e2e-all:
-  python3 contrib/readme/run-badged-command.py e2e bash -c "just test-e2e-fd && just test-e2e-tk"
+	python3 contrib/readme/run-badged-command.py e2e bash -c "just test-e2e-fd && just test-e2e-tk"
 
 test-integration-fd:
-  @true
+	@true
 
 # Tickoni integration lane: transport and boundary wiring against local mocks.
 test-integration-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} integration-test --summary all
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} integration-test --summary all
 
 # Deterministic offline investment demo — no llama.cpp required.
 demo-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build
-  zig-out/bin/tickoni demo investment --fixture --thesis "I want to invest USD 2,000 in AI infrastructure through US-listed ETFs and large-cap equities."
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build
+	zig-out/bin/tickoni demo investment --fixture --thesis "I want to invest USD 2,000 in AI infrastructure through US-listed ETFs and large-cap equities."
 
 # Tickoni system lane: opt-in real-LLM investment demo proof.
 test-system-tk:
-  bash contrib/test/run_system_model_tests.sh
+	bash contrib/test/run_system_model_tests.sh
 
 test-cli-tk:
-  bash contrib/test/run_cli_demo_tests.sh
+	bash contrib/test/run_cli_demo_tests.sh
 
 test-system-fd:
-  @true
+	@true
 
 test-system-all:
-  python3 contrib/readme/run-badged-command.py system bash -c "just test-system-tk && just test-system-fd"
+	python3 contrib/readme/run-badged-command.py system bash -c "just test-system-tk && just test-system-fd"
 
 # ── Infrastructure: ensure llama.cpp and model (for LLM system tests) ──────
 
 # Build llama.cpp (CPU or CUDA if detected).
 infra-ensure-llamacpp:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  if command -v nvidia-smi >/dev/null 2>&1; then
-    gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
-    if (( gpu_count > 0 )); then
-      bash contrib/test/ensure_llama_cpp.sh --gpu
-    else
-      bash contrib/test/ensure_llama_cpp.sh
-    fi
-  else
-    bash contrib/test/ensure_llama_cpp.sh
-  fi
+	#!/usr/bin/env bash
+	set -euo pipefail
+	if command -v nvidia-smi >/dev/null 2>&1; then
+		gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
+		if (( gpu_count > 0 )); then
+			bash contrib/test/ensure_llama_cpp.sh --gpu
+		else
+			bash contrib/test/ensure_llama_cpp.sh
+		fi
+	else
+		bash contrib/test/ensure_llama_cpp.sh
+	fi
 
 # Download the GGUF model for system tests (requires `hf` CLI).
 infra-ensure-model:
-  bash contrib/test/ensure_hf_model.sh
+	bash contrib/test/ensure_hf_model.sh
 
 infra-run-llamacpp:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  source contrib/test/llama_cpp_env.sh
-  llama_dir="$(tk_resolve_llama_cpp_dir)"
-  backend=cpu
-  if command -v nvidia-smi >/dev/null 2>&1; then
-    gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
-    if (( gpu_count > 0 )) && ldd "${llama_dir}/llama-server" 2>/dev/null | grep -qi 'cuda\|cublas'; then
-      backend=gpu
-    fi
-  fi
-  [[ "$backend" == "gpu" ]] && bash contrib/test/ensure_llama_cpp.sh --gpu || bash contrib/test/ensure_llama_cpp.sh
-  bash contrib/test/ensure_hf_model.sh
-  exec bash contrib/test/run_llm_server.sh "$backend"
+	#!/usr/bin/env bash
+	set -euo pipefail
+	source contrib/test/llama_cpp_env.sh
+	llama_dir="$(tk_resolve_llama_cpp_dir)"
+	backend=cpu
+	if command -v nvidia-smi >/dev/null 2>&1; then
+		gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
+		if (( gpu_count > 0 )) && ldd "${llama_dir}/llama-server" 2>/dev/null | grep -qi 'cuda\|cublas'; then
+			backend=gpu
+		fi
+	fi
+	[[ "$backend" == "gpu" ]] && bash contrib/test/ensure_llama_cpp.sh --gpu || bash contrib/test/ensure_llama_cpp.sh
+	bash contrib/test/ensure_hf_model.sh
+	exec bash contrib/test/run_llm_server.sh "$backend"
 
 test-integration-all:
-  python3 contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"
+	python3 contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"
 
 # ── Test: Coverage ─────────────────────────────────────────────────────────
 
 # Build coverage: libs (core + cjson) + unit-test target with llvm-cov.
 # Uses FD_TK_LIB_COV_SRCS (core dirs + cjson only).
 test-cov-fd:
-  set timeout := 600
-  # No hugepage/sudo allocation — matches test-unit-fd (consumer hardware, no root).
-  # Same LOCAL_MKS filter: core + cjson only (coverage).
-  # Halve parallelism vs unit-test because llvm-cov inflates per-job RSS.
-  mkdir -p {{fd_cov_dir}}/obj
-  bash contrib/fd-build-lib.sh {{fd_cov_build}} clang-18 cov
-  python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd
+	set timeout := 600
+	# No hugepage/sudo allocation — matches test-unit-fd (consumer hardware, no root).
+	# Same LOCAL_MKS filter: core + cjson only (coverage).
+	# Halve parallelism vs unit-test because llvm-cov inflates per-job RSS.
+	mkdir -p {{fd_cov_dir}}/obj
+	bash contrib/fd-build-lib.sh {{fd_cov_build}} clang-18 cov
+	python3 contrib/readme/run-badged-command.py cov-fd bash contrib/test/coverage.sh coverage-fd
 
 test-cov-tk:
-  ZIG_GLOBAL_CACHE_DIR=.zig-global-cache python3 contrib/readme/run-badged-command.py cov-tk bash contrib/test/coverage.sh coverage-tk
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache python3 contrib/readme/run-badged-command.py cov-tk bash contrib/test/coverage.sh coverage-tk
 
 test-cov-all:
-  @just test-cov-fd
-  @just test-cov-tk
+	@just test-cov-fd
+	@just test-cov-tk
 
 # ── Quality: Format ────────────────────────────────────────────────────────
 
 quality-format-check-fd:
-  bash contrib/quality.sh format-check-fd
+	bash contrib/quality.sh format-check-fd
 
 quality-format-fix-fd:
-  bash contrib/quality.sh format-fix-fd
+	bash contrib/quality.sh format-fix-fd
 
 quality-format-check-tk:
-  bash contrib/quality.sh format-check-tk
+	bash contrib/quality.sh format-check-tk
 
 quality-format-fix-tk:
-  bash contrib/quality.sh format-fix-tk
+	bash contrib/quality.sh format-fix-tk
 
 quality-format-check-all:
-  @just quality-format-check-fd
-  @just quality-format-check-tk
+	@just quality-format-check-fd
+	@just quality-format-check-tk
 
 quality-format-fix-all:
-  @just quality-format-fix-fd
-  @just quality-format-fix-tk
+	@just quality-format-fix-fd
+	@just quality-format-fix-tk
 
 # ── Quality: Lint ──────────────────────────────────────────────────────────
 
 quality-lint-check-fd:
-  bash contrib/quality.sh lint-check-fd
-  command -v shellcheck >/dev/null || exit 0; bash contrib/quality.sh lint-shellcheck-fd
+	bash contrib/quality.sh lint-check-fd
+	command -v shellcheck >/dev/null || exit 0; bash contrib/quality.sh lint-shellcheck-fd
 
 quality-lint-check-tk:
-  bash contrib/quality.sh lint-check-tk
+	bash contrib/quality.sh lint-check-tk
 
 quality-lint-check-all:
-  @just quality-lint-check-fd
-  @just quality-lint-check-tk
+	@just quality-lint-check-fd
+	@just quality-lint-check-tk
 
 # ── Quality: Proto ─────────────────────────────────────────────────────────
 
 quality-proto-check-fd:
-  bash -c "command -v buf >/dev/null || exit 0; buf lint src/disco/events/schema"
+	bash -c "command -v buf >/dev/null || exit 0; buf lint src/disco/events/schema"
 
 quality-proto-check-tk:
-  bash -c "command -v buf >/dev/null || exit 0; buf lint src/tickoni/schema"
+	bash -c "command -v buf >/dev/null || exit 0; buf lint src/tickoni/schema"
 
 quality-proto-check-all:
-  @just quality-proto-check-fd
-  @just quality-proto-check-tk
+	@just quality-proto-check-fd
+	@just quality-proto-check-tk
 
 # ── Quality: All ───────────────────────────────────────────────────────────
 
 quality-check-all:
-  python3 contrib/readme/run-badged-command.py quality bash -c "just quality-format-check-all && just quality-lint-check-all && just quality-proto-check-all"
+	python3 contrib/readme/run-badged-command.py quality bash -c "just quality-format-check-all && just quality-lint-check-all && just quality-proto-check-all"
 
 # ── Security: CodeQL ───────────────────────────────────────────────────────
 
 security-codeql-check-fd:
-  @true ## bash contrib/security.sh codeql-check-fd, opened issue https://github.com/firedancer-io/firedancer/issues/10058
+	@true ## bash contrib/security.sh codeql-check-fd, opened issue https://github.com/firedancer-io/firedancer/issues/10058
 
 security-codeql-check-tk:
-  @true
+	@true
 
 security-codeql-check-all:
-  @just security-codeql-check-fd
-  @just security-codeql-check-tk
+	@just security-codeql-check-fd
+	@just security-codeql-check-tk
 
 # ── Security: Gitleaks ─────────────────────────────────────────────────────
 
 security-gitleaks-check-fd:
-  bash contrib/security.sh gitleaks-check-fd
+	bash contrib/security.sh gitleaks-check-fd
 
 security-gitleaks-check-tk:
-  bash contrib/security.sh gitleaks-check-tk
+	bash contrib/security.sh gitleaks-check-tk
 
 security-gitleaks-check-all:
-  @just security-gitleaks-check-fd
-  @just security-gitleaks-check-tk
+	@just security-gitleaks-check-fd
+	@just security-gitleaks-check-tk
 
 # ── Security: SecComp ──────────────────────────────────────────────────────
 
 security-seccomp-check-fd:
-  @true # bash contrib/security.sh seccomp-check-fd
+	@true # bash contrib/security.sh seccomp-check-fd
 
 security-seccomp-check-tk:
-  @true
+	@true
 
 security-seccomp-check-all:
-  @just security-seccomp-check-fd
-  @just security-seccomp-check-tk
+	@just security-seccomp-check-fd
+	@just security-seccomp-check-tk
 
 # ── Security: Proof ────────────────────────────────────────────────────────
 
 security-proof-check-fd:
-  bash contrib/security.sh proof-check-fd
+	bash contrib/security.sh proof-check-fd
 
 security-proof-check-tk:
-  @true
+	@true
 
 security-proof-check-all:
-  @just security-proof-check-fd
-  @just security-proof-check-tk
+	@just security-proof-check-fd
+	@just security-proof-check-tk
 
 # ── Security: ASan/UBSan ───────────────────────────────────────────────────
 
 security-sanitize-check-fd:
-  bash contrib/security.sh sanitize-check-fd
+	bash contrib/security.sh sanitize-check-fd
 
 security-sanitize-check-tk:
-  bash contrib/security.sh sanitize-check-tk
+	bash contrib/security.sh sanitize-check-tk
 
 security-sanitize-check-all:
-  @just security-sanitize-check-fd
-  @just security-sanitize-check-tk
+	@just security-sanitize-check-fd
+	@just security-sanitize-check-tk
 
 # ── Security: All ──────────────────────────────────────────────────────────
 
 security-engine-check-all:
-     @just security-engine-check-changes
-     @just security-engine-check-orchestration
+		 @just security-engine-check-changes
+		 @just security-engine-check-orchestration
 
 security-engine-check-changes:
-  python3 contrib/engine/engine_check_changes.py
+	python3 contrib/engine/engine_check_changes.py
 
 security-engine-check-orchestration:
-  python3 contrib/engine/linter.py contrib/engine/checks/ --root {{justfile_directory()}} --severity ERROR
+	python3 contrib/engine/linter.py contrib/engine/checks/ --root {{justfile_directory()}} --severity ERROR
 
 # ── Security: All ──────────────────────────────────────────────────────────
 
 security-check-all:
-  python3 contrib/readme/run-badged-command.py security bash -c "just security-engine-check-all && just security-codeql-check-all && just security-gitleaks-check-all && just security-seccomp-check-all && just security-proof-check-all && just security-sanitize-check-all"
+	python3 contrib/readme/run-badged-command.py security bash -c "just security-engine-check-all && just security-codeql-check-all && just security-gitleaks-check-all && just security-seccomp-check-all && just security-proof-check-all && just security-sanitize-check-all"
 
 # ── Memory (hugepages) ─────────────────────────────────────────────────────
 
 mem-init mode="0700" user="":
-  #!/usr/bin/env bash
-  set -euo pipefail
-  owner="{{user}}"
-  if [ -z "$owner" ]; then owner="$USER"; fi
-  sudo src/util/shmem/fd_shmem_cfg init {{mode}} "$owner" ""
+	#!/usr/bin/env bash
+	set -euo pipefail
+	owner="{{user}}"
+	if [ -z "$owner" ]; then owner="$USER"; fi
+	sudo src/util/shmem/fd_shmem_cfg init {{mode}} "$owner" ""
 
 mem-query:
-  sudo src/util/shmem/fd_shmem_cfg query
+	sudo src/util/shmem/fd_shmem_cfg query
 
 mem-reset:
-  sudo src/util/shmem/fd_shmem_cfg reset
+	sudo src/util/shmem/fd_shmem_cfg reset
 
 mem-fini:
-  sudo src/util/shmem/fd_shmem_cfg fini
+	sudo src/util/shmem/fd_shmem_cfg fini
 
 mem-alloc pages="24" page_type="gigantic" numa="0":
-  sudo src/util/shmem/fd_shmem_cfg alloc {{pages}} {{page_type}} {{numa}}
+	sudo src/util/shmem/fd_shmem_cfg alloc {{pages}} {{page_type}} {{numa}}
 
 mem-alloc-auto numa="0":
-  pages="$(( ((( $(awk '/MemTotal:/ {print $2}' /proc/meminfo) * 1024 )) - (4 * 1024 * 1024 * 1024)) / (6 * 1024 * 1024 * 1024) * 6 ))"; \
-  if [ "$pages" -lt 0 ]; then pages=0; fi; \
-  echo "allocating $pages gigantic pages on NUMA {{numa}}"; \
-  sudo src/util/shmem/fd_shmem_cfg alloc "$pages" gigantic {{numa}}
+	pages="$(( ((( $(awk '/MemTotal:/ {print $2}' /proc/meminfo) * 1024 )) - (4 * 1024 * 1024 * 1024)) / (6 * 1024 * 1024 * 1024) * 6 ))"; \
+	if [ "$pages" -lt 0 ]; then pages=0; fi; \
+	echo "allocating $pages gigantic pages on NUMA {{numa}}"; \
+	sudo src/util/shmem/fd_shmem_cfg alloc "$pages" gigantic {{numa}}
 
 mem-free page_type="gigantic" numa="0":
-  sudo src/util/shmem/fd_shmem_cfg free {{page_type}} {{numa}}
-  just mem-drop-caches
+	sudo src/util/shmem/fd_shmem_cfg free {{page_type}} {{numa}}
+	just mem-drop-caches
 
 mem-drop-caches:
-  sync
+	sync
