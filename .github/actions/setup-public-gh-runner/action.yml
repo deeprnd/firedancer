@@ -43,7 +43,7 @@ runs:
     - name: Install gmake on macOS
       if: runner.os == 'macOS'
       shell: bash
-      run: brew install make
+      run: brew install gmake
 
     - name: Setup Zig
       if: inputs.zig == 'true'
