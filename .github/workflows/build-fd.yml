@@ -120,6 +120,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install gmake (GNU Make)
+        run: |
+          # Homebrew may mark gmake as "not usable" — force reinstall to fix
+          if brew info gmake 2>/dev/null | grep -q "not usable"; then
+            brew unlink gmake 2>/dev/null || true
+            brew reinstall gmake
+          else
+            brew install gmake
+          fi
+
+      - name: Verify gmake
+        run: |
+          echo "gmake version: $(gmake --version | head -1)"
+          gmake --version | grep -q 'GNU Make' || { echo "ERROR: gmake is not GNU make!"; exit 1; }
+
       - name: Setup deps
         uses: ./.github/actions/setup-public-gh-runner
         with:
