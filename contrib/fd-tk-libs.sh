@@ -112,14 +112,16 @@ fd_build_fd() {
   # Check all possible Homebrew prefixes since macOS runners vary.
   local MAKE
   MAKE=""
-  if [ -x /opt/homebrew/bin/gmake ]; then
+  # Check PATH first (via command -v) — this respects PATH modifications from setup actions
+  if command -v gmake >/dev/null 2>&1; then
+    MAKE="$(command -v gmake)"
+  # Hardcoded Homebrew fallbacks for when PATH isn't set
+  elif [ -x /opt/homebrew/bin/gmake ]; then
     MAKE="/opt/homebrew/bin/gmake"
   elif [ -x /usr/local/homebrew/bin/gmake ]; then
     MAKE="/usr/local/homebrew/bin/gmake"
   elif [ -x /usr/local/bin/gmake ]; then
     MAKE="/usr/local/bin/gmake"
-  elif command -v gmake >/dev/null 2>&1; then
-    MAKE="$(command -v gmake)"
   else
     MAKE="$(command -v make)"
   fi

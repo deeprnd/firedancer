@@ -118,7 +118,13 @@ build-fd-arm:
 # EXTRAS="" prevents blst/zstd/lz4 from being built: their vendor sources
 # have path mismatches and platform-specific assembly that fails on macOS Intel.
 build-fd-macos-intel:
-	bash contrib/fd-build-lib.sh fd-tickoni-fd clang libs ""
+	# macOS Intel: set PATH to Homebrew prefix before invoking build script
+	# GitHub Actions macOS 15 Intel runners use /usr/local/homebrew
+	# Each recipe line runs in a separate shell, so set PATH on each line
+	export PATH="/usr/local/homebrew/bin:/usr/local/bin:$PATH"
+	export JUST_GMAKE="/usr/local/homebrew/bin/gmake"
+	# Run build with PATH set
+	env PATH="/usr/local/homebrew/bin:/usr/local/bin:$PATH" bash contrib/fd-build-lib.sh fd-tickoni-fd clang libs ""
 
 # macOS ARM build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
 build-fd-macos-arm:
