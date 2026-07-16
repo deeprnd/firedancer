@@ -447,10 +447,10 @@ $(OBJDIR)/cov/cov.profdata: $(wildcard $(OBJDIR)/cov/raw/*.profraw)
 .PHONY: $(OBJDIR)/cov/mappings.ar
 $(OBJDIR)/cov/mappings.ar:
 	rm -f $(OBJDIR)/cov/mappings.ar &&                        \
-  $(MKDIR) $(dir $@) &&                                       \
-  $(FIND) $(addsuffix /obj,$(OBJDIR)) -name '*.o' -exec sh -c \
-    '[ -n "`llvm-objdump -h $$1 | $(GREP) llvm_covmap`" ]     \
-    && llvm-ar --thin q $@ $$1' sh {} \;
+	$(MKDIR) $(dir $@) &&                                       \
+	$(FIND) $(addsuffix /obj,$(OBJDIR)) -name '*.o' -exec sh -c \
+	'	[ -n "`llvm-objdump -h $$1 | $(GREP) llvm_covmap`" ]     \
+		&& llvm-ar --thin q $@ $$1' sh {} \;
 
 # llvm-cov step 1.5
 $(OBJDIR)/cov/cov.lcov: $(addsuffix /cov/cov.profdata,$(OBJDIR)) $(OBJDIR)/cov/mappings.ar

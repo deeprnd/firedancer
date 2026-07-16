@@ -39,7 +39,7 @@ UNAME?=$(shell uname)
 ifeq ($(UNAME), Darwin)
   include config/machine/macos_clang.mk
 else
-  include config/machine/native.mk
+include config/machine/native.mk
 endif
 include config/extra/with-hosted.mk
 
@@ -51,12 +51,12 @@ include config/extra/with-hosted.mk
 # override.
 UNAME?=$(shell uname)
 ifeq ($(UNAME), Linux)
-  CPPFLAGS+=-DFD_HAS_LINUX=1
-  FD_HAS_LINUX:=1
+CPPFLAGS+=-DFD_HAS_LINUX=1
+FD_HAS_LINUX:=1
 else ifeq ($(UNAME), Darwin)
-  CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_MACOS=1
-  FD_HAS_HOSTED:=1
-  FD_HAS_MACOS:=1
+CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_MACOS=1
+FD_HAS_HOSTED:=1
+FD_HAS_MACOS:=1
 endif
 
 # Parse EXTRAS from the command line to include corresponding with-*.mk files.

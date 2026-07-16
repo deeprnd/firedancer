@@ -27,8 +27,8 @@ ASFLAGS+=-no-integrated-as
 endif
 
 ifeq ($(UNAME), Darwin)
-  FD_HAS_MACOS:=1
-  CPPFLAGS+=-DFD_HAS_MACOS=1
+FD_HAS_MACOS:=1
+CPPFLAGS+=-DFD_HAS_MACOS=1
 else
   # Not macOS — skip
   BUILDDIR?=native/$(notdir $(CC))
@@ -38,31 +38,31 @@ endif
 
 # ARM vs Intel detection
 ifeq ($(UNAME), Darwin)
-  # Check architecture at build time
-  IS_ARM?=$(shell uname -m | grep -qE 'aarch64|arm64' && echo 1 || echo 0)
-  
-  ifeq ($(IS_ARM),1)
-    # Apple Silicon (ARM64)
-    FD_HAS_ARM64:=1
-    FD_HAS_INT128:=1
-    FD_HAS_DOUBLE:=1
-    FD_HAS_ALLOCA:=1
-    FD_HAS_THREADS:=1
-    CPPFLAGS+=-mcpu=apple-m1
-    CPPFLAGS+=-DFD_HAS_ARM64=1 -DFD_HAS_INT128=1 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1 -DFD_HAS_THREADS=1
-  else
-    # Intel x86_64
-    FD_HAS_INT128:=1
-    FD_HAS_DOUBLE:=1
-    FD_HAS_ALLOCA:=1
-    FD_HAS_THREADS:=1
-    FD_HAS_X86:=1
-    FD_HAS_SSE:=1
-    FD_HAS_AVX:=1
-    FD_HAS_AVX2:=1
-    FD_HAS_AVX512:=1
-    FD_IS_X86_64:=1
-    CPPFLAGS+=-march=icelake-server
-    CPPFLAGS+=-DFD_HAS_X86=1 -DFD_HAS_SSE=1 -DFD_HAS_AVX=1 -DFD_HAS_AVX2=1 -DFD_HAS_AVX512=1 -DFD_IS_X86_64=1 -DFD_HAS_INT128=1 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1 -DFD_HAS_THREADS=1
-  endif
+# Check architecture at build time
+IS_ARM?=$(shell uname -m | grep -qE 'aarch64|arm64' && echo 1 || echo 0)
+
+ifeq ($(IS_ARM),1)
+# Apple Silicon (ARM64)
+FD_HAS_ARM64:=1
+FD_HAS_INT128:=1
+FD_HAS_DOUBLE:=1
+FD_HAS_ALLOCA:=1
+FD_HAS_THREADS:=1
+CPPFLAGS+=-mcpu=apple-m1
+CPPFLAGS+=-DFD_HAS_ARM64=1 -DFD_HAS_INT128=1 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1 -DFD_HAS_THREADS=1
+else
+# Intel x86_64
+FD_HAS_INT128:=1
+FD_HAS_DOUBLE:=1
+FD_HAS_ALLOCA:=1
+FD_HAS_THREADS:=1
+FD_HAS_X86:=1
+FD_HAS_SSE:=1
+FD_HAS_AVX:=1
+FD_HAS_AVX2:=1
+FD_HAS_AVX512:=1
+FD_IS_X86_64:=1
+CPPFLAGS+=-march=icelake-server
+CPPFLAGS+=-DFD_HAS_X86=1 -DFD_HAS_SSE=1 -DFD_HAS_AVX=1 -DFD_HAS_AVX2=1 -DFD_HAS_AVX512=1 -DFD_IS_X86_64=1 -DFD_HAS_INT128=1 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1 -DFD_HAS_THREADS=1
+endif
 endif
