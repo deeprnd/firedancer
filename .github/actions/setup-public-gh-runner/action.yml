@@ -44,17 +44,9 @@ runs:
       if: runner.os == 'macOS'
       shell: bash
       run: |
-        brew install gmake
-        # Add Homebrew bin dir to PATH — Intel=usr/local, ARM=opt/homebrew, GitHub Intel=/usr/local/homebrew
-        local hb_prefix=""
-        if [ -d "/opt/homebrew" ]; then hb_prefix="/opt/homebrew";
-        elif [ -d "/usr/local/homebrew" ]; then hb_prefix="/usr/local/homebrew";
-        elif [ -d "/usr/local" ]; then hb_prefix="/usr/local";
-        fi
-        [ -n "$hb_prefix" ] && echo "$hb_prefix/bin" >> "$GITHUB_PATH"
-        echo "Homebrew prefix: $hb_prefix"
-        which gmake 2>/dev/null || echo "gmake not found in PATH"
-        ls -la "$hb_prefix/bin/gmake" 2>/dev/null || echo "gmake not at $hb_prefix/bin/gmake"
+        # Homebrew no longer has 'gmake' — 'make' IS GNU make, installed as 'gmake' in gnubin
+        brew install make
+        echo "$(brew --prefix)/opt/make/libexec/gnubin" >> "$GITHUB_PATH"
 
     - name: Setup Zig
       if: inputs.zig == 'true'
