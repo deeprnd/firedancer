@@ -122,7 +122,12 @@ fd_build_fd() {
     MAKE="/usr/local/homebrew/bin/gmake"
   elif [ -x /usr/local/bin/gmake ]; then
     MAKE="/usr/local/bin/gmake"
-  else
+  # GNU make may be installed as 'make' on newer Homebrew (gmake formula removed)
+  elif [ -x /opt/homebrew/bin/make ]; then
+    MAKE="/opt/homebrew/bin/make"
+  elif [ -x /usr/local/homebrew/bin/make ]; then
+    MAKE="/usr/local/homebrew/bin/make"
+  elif command -v make >/dev/null 2>&1; then
     MAKE="$(command -v make)"
   fi
 

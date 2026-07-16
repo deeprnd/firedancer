@@ -120,15 +120,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install gmake (GNU Make)
+      - name: Install GNU Make
         run: |
-          # Homebrew may mark gmake as "not usable" — force reinstall to fix
-          if brew info gmake 2>/dev/null | grep -q "not usable"; then
-            brew unlink gmake 2>/dev/null || true
-            brew reinstall gmake
-          else
-            brew install gmake
-          fi
+          # Homebrew no longer has 'gmake' formula — 'make' IS GNU make now
+          brew install make
+          # Create gmake symlink for build scripts that expect 'gmake'
+          ln -sf $(brew --prefix)/bin/make /usr/local/bin/gmake || true
+          # Ensure /usr/local/bin is in PATH for gmake symlink
+          echo "/usr/local/bin" >> "$GITHUB_PATH"
 
       - name: Verify gmake
         run: |
