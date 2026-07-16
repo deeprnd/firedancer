@@ -40,6 +40,11 @@ runs:
   steps:
     - uses: taiki-e/install-action@just
 
+    - name: Install gmake on macOS
+      if: runner.os == 'macOS'
+      shell: bash
+      run: brew install make
+
     - name: Setup Zig
       if: inputs.zig == 'true'
       uses: mlugg/setup-zig@v2
