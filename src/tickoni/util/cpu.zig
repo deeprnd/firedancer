@@ -18,7 +18,6 @@
 ///
 /// Link requirements: none beyond libc (glibc exposes sched_*affinity
 /// directly). On macOS no extra linking needed.
-
 const std = @import("std");
 
 /// Matches glibc's default cpu_set_t size (CPU_SETSIZE=1024 bits).
