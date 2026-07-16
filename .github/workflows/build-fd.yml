@@ -122,12 +122,10 @@ jobs:
 
       - name: Install GNU Make
         run: |
-          # Homebrew no longer has 'gmake' formula — 'make' IS GNU make now
+          # Homebrew no longer has 'gmake' formula — install 'make' which IS GNU make
           brew install make
-          # Create gmake symlink for build scripts that expect 'gmake'
-          ln -sf $(brew --prefix)/bin/make /usr/local/bin/gmake || true
-          # Ensure /usr/local/bin is in PATH for gmake symlink
-          echo "/usr/local/bin" >> "$GITHUB_PATH"
+          # Homebrew installs GNU make as 'gmake' in gnubin directory
+          echo "$(brew --prefix)/opt/make/libexec/gnubin" >> "$GITHUB_PATH"
 
       - name: Verify gmake
         run: |
