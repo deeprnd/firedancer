@@ -184,7 +184,7 @@ fd_topo_run_tile_t fd_tile_metric = {
   .name                     = "metric",
   .rlimit_file_cnt          = FD_HTTP_SERVER_METRICS_MAX_CONNS+5UL, /* pipefd, socket, stderr, logfile, and one spare for new accept() connections */
   .populate_allowed_seccomp = (
-#if defined(__linux__)
+#if FD_HAS_LINUX
     populate_allowed_seccomp
 #else
     NULL

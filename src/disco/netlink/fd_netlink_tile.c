@@ -422,7 +422,7 @@ after_frag( fd_netlink_tile_ctx_t * ctx,
 fd_topo_run_tile_t fd_tile_netlnk = {
   .name                     = "netlnk",
   .populate_allowed_seccomp = (
-#if defined(__linux__)
+#if FD_HAS_LINUX
     populate_allowed_seccomp
 #else
     NULL
