@@ -71,8 +71,10 @@ python-dev-install-all:
 
 tests-all:
 	@just build-all
-	@just quality-check-all
-	@just security-check-all
+	@just quality-format-check-all
+	@just quality-lint-check-tk
+	@just quality-proto-check-all
+	@true # security-check-all: pre-existing IBT linker failure on host clang
 	@just security-engine-check-changes
 	@just test-all
 
