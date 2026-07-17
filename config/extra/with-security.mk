@@ -11,7 +11,15 @@ LDFLAGS+=-fstack-protector-strong
 ifdef FD_HAS_X86
 ifdef FD_HAS_LINUX
 CPPFLAGS+=-fcf-protection=return
-LDFLAGS_EXE+=-Wl,-z,shstk -Wl,-z,cet-report=error
+LDFLAGS_EXE+=-Wl,-z,shstk
+# CET enforcement (IBT): only enabled when FD_CET is explicitly defined to 1.
+# When FD_CET is undefined or empty, skip cet-report=error to avoid ld.bfd
+# enforcing IBT properties on toolchains that don't support -mcet/-mno-cet.
+ifdef FD_CET
+ifeq ($(FD_CET),1)
+LDFLAGS_EXE+=-Wl,-z,cet-report=error
+endif
+endif
 endif
 endif
 
