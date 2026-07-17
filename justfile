@@ -211,14 +211,14 @@ test-unit-fd:
 	# ballet/reedsol, waltz/quic, waltz/tls).
 	# fd-build-lib.sh parses args as: BUILDDIR CC MODE EXTRAS LDFLAGS_EXE
 	# For test mode, EXTRAS is hardcoded internally (lz4 blst zstd), so we pass ""
-	# as $4 and the flag value as $5.
+	# as $4. LDFLAGS_EXE is passed as a make variable (not justfile export, which
+	# breaks with :: in shell expansion).
 	# Both the lib build (via fd_build_fd) and the unit-test link (via make run-unit-test)
-	# need the CET override. LDFLAGS_EXE must be exported to the shell environment so
-	# make inherits it, rather than passing it as a command-line argument (which justfile
-	# misinterprets as a make target).
-	export LDFLAGS_EXE := -Wl,-z,shstk
+	# need the CET override.
 	bash contrib/fd-build-lib.sh {{fd_tickoni_build}} gcc-12 test "" ""
-	{{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} run-unit-test TEST_OPTS="--page-sz normal"
+	{{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} \
+		LDFLAGS_EXE="-Wl,-z,shstk" \
+		run-unit-test TEST_OPTS="--page-sz normal"
 
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.
