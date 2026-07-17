@@ -1,4 +1,6 @@
 
+export PATH := `echo $PATH:/opt/zig`
+
 # Prefer GNU Make 4.x (Homebrew installs it as `gmake` on macOS); fall back to `make`.
 # Firedancer's GNUmakefile uses `undefine`, which needs GNU Make >= 3.82.
 make := `command -v gmake || command -v make`
