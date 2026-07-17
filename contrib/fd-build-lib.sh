@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Thin wrapper around fd_build_fd() from contrib/fd-tk-libs.sh.
-# Usage: contrib/fd-build-lib.sh <BUILDDIR> [CC] [MODE] [EXTRAS]
+# Usage: contrib/fd-build-lib.sh <BUILDDIR> [CC] [MODE] [EXTRAS] [LDFLAGS_EXE]
 #   BUILDDIR: Firedancer BUILDDIR name (no build/ prefix)
-#   CC:       compiler binary (default: gcc-12)
-#   MODE:     "libs" (default), "test", or "cov"
-#              libs = basic 5 libs, basic SRCS (tango util ballet disco waltz + cjson + s2n-bignum)
+#   CC: compiler binary (default: gcc-12)
+#   MODE: build mode — test, cov, or libs (default: libs)
+#   EXTRAS: extra make vars to pass (e.g. "asan ubsan blst zstd lz4")
+#   LDFLAGS_EXE: extra LDFLAGS_EXE to pass to make (e.g. "-Wl,-z,shstk")
 #              test = 5 libs + extras (blst/zstd/lz4/nanopb), build unit-test target
 #              cov  = coverage build (clang-18, llvm-cov, basic SRCS + cjson)
 #   EXTRAS:   space-separated list of extras to include (e.g. "lz4 blst zstd")
@@ -13,10 +14,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source contrib/fd-tk-libs.sh
 
-BUILDDIR="${1:?usage: fd-build-lib.sh <BUILDDIR> [CC] [MODE] [EXTRAS]}"
+BUILDDIR="${1:?usage: fd-build-lib.sh <BUILDDIR> [CC] [MODE] [EXTRAS] [LDFLAGS_EXE]}"
 CC="${2:-gcc-12}"
 MODE="${3:-libs}"
 EXTRAS="${4:-}"
+LDFLAGS_EXE="${5:-}"
 
 LIBDIR="build/${BUILDDIR}/lib"
 OBJDIR="build/${BUILDDIR}/obj"
@@ -67,9 +69,9 @@ if [ "$MODE" = "test" ]; then
   # Also delete empty extra-libs from a prior MODE=libs build — make
   # would consider them up-to-date and skip recompilation with EXTRAS.
   rm -f "${LIBDIR:?}/libfd_lz4.a" "${LIBDIR}/libfd_blst.a" "${LIBDIR}/libfd_zstd.a" "${LIBDIR}/libfd_ballet.a" "${LIBDIR}/libfd_waltz.a" "${LIBDIR}/libfd_disco.a" "${LIBDIR}/libfd_tango.a" "${LIBDIR}/libfd_util.a"
-  fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" EXTRAS="lz4 blst zstd" BUILD_TARGET="unit-test"
+  fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" EXTRAS="lz4 blst zstd" BUILD_TARGET="unit-test" ${LDFLAGS_EXE:+LDFLAGS_EXE="${LDFLAGS_EXE}"}
 else
-  [ -n "${EXTRAS}" ] && fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" "EXTRAS=${EXTRAS}" || fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}"
+  [ -n "${EXTRAS}" ] && fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" "EXTRAS=${EXTRAS}" ${LDFLAGS_EXE:+LDFLAGS_EXE="${LDFLAGS_EXE}"} || fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" ${LDFLAGS_EXE:+LDFLAGS_EXE="${LDFLAGS_EXE}"}
 fi
 
 # Post-build: cov mode runs unit-test with coverage after libs.
