@@ -67,3 +67,26 @@ endif
 ifneq ($(CROSS),)
 include config/cross/$(CROSS).mk
 endif
+
+# Platform detection — define FD_HAS_HOSTED/FD_HAS_LINUX/FD_HAS_MACOS/FD_HAS_WINDOWS
+# so source code can gate platform-specific implementations.
+# Uses ?= so MACHINE profiles can override if needed.
+# MUST come at end of base.mk because it uses += which appends after
+# CPPFLAGS reset on line 9.
+UNAME?=$(shell uname)
+ifeq ($(UNAME), Linux)
+  CPPFLAGS+=-DFD_HAS_LINUX=1
+  FD_HAS_LINUX:=1
+  FD_HAS_HOSTED:=1
+else ifeq ($(UNAME), Darwin)
+  CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_MACOS=1
+  FD_HAS_HOSTED:=1
+  FD_HAS_MACOS:=1
+else ifeq ($(UNAME), FreeBSD)
+  CPPFLAGS+=-DFD_HAS_HOSTED=1
+  FD_HAS_HOSTED:=1
+else
+  # Windows or unknown — default to hosted mode, no OS-specific features
+  CPPFLAGS+=-DFD_HAS_HOSTED=1
+  FD_HAS_HOSTED:=1
+endif

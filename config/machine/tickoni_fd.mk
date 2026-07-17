@@ -43,21 +43,10 @@ include config/machine/native.mk
 endif
 include config/extra/with-hosted.mk
 
-# Platform detection — define FD_HAS_HOSTED/FD_HAS_LINUX/FD_HAS_MACOS/FD_HAS_WINDOWS
-# so source code can gate platform-specific implementations.
-# MUST come after native.mk (which includes base.mk that does
-# CPPFLAGS:=...) because base.mk resets CPPFLAGS with :=, wiping
-# out any += we do before it.  Use ?= so command-line -D can still
-# override.
-UNAME?=$(shell uname)
-ifeq ($(UNAME), Linux)
-CPPFLAGS+=-DFD_HAS_LINUX=1
-FD_HAS_LINUX:=1
-else ifeq ($(UNAME), Darwin)
-CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_MACOS=1
-FD_HAS_HOSTED:=1
-FD_HAS_MACOS:=1
-endif
+# Platform-specific FD_HAS_* macros are now defined in base.mk for all
+# MACHINE profiles. The block below is intentionally removed — base.mk
+# already sets FD_HAS_LINUX/FD_HAS_HOSTED/FD_HAS_MACOS based on UNAME,
+# and adding it here would duplicate work. See base.mk for details.
 
 # Parse EXTRAS from the command line to include corresponding with-*.mk files.
 # This is necessary because tickoni_fd.mk overrides LOCAL_MKS and doesn't
