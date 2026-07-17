@@ -81,14 +81,12 @@ cmd_sanitize_check_fd() {
   # Always rebuild libs first (they depend on EXTRAS flags), then build unit tests.
   # Use -B to force rebuild: if EXTRAS changed the FD_HAS_* defs, stale .a files
   # from a previous build with different EXTRAS would silently link wrong code.
-  # Use MACHINE=tickoni_fd so FD_HAS_LINUX is defined (tickoni_fd.mk sets it;
-  # the default 'native' profile does not).
   run_step "clang asan+ubsan lib" \
-    make -B -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan blst zstd lz4" \
+    make -B -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan blst zstd lz4" \
       "LOCAL_MKS=$_local_mks" \
       lib
   run_step "clang asan+ubsan unit-test" \
-    make -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan blst zstd lz4" \
+    make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan blst zstd lz4" \
       "LOCAL_MKS=$_local_mks" \
       unit-test
 }
