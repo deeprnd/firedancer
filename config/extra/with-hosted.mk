@@ -3,7 +3,7 @@ LDFLAGS+=-z noexecstack -lrt
 
 FD_HAS_HOSTED:=1
 
-UNAME?=$(shell uname)
-ifeq ($(UNAME), Linux)
-FD_HAS_LINUX:=1
-endif
+# NOTE: FD_HAS_LINUX and other OS-specific FD_HAS_* macros are now
+# defined in config/base.mk based on MACHINE name or UNAME. The old
+# UNAME-based detection here is intentionally removed to prevent
+# cross-compile contamination (e.g. macos_clang on Linux host).

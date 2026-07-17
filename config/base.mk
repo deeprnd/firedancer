@@ -70,23 +70,43 @@ endif
 
 # Platform detection — define FD_HAS_HOSTED/FD_HAS_LINUX/FD_HAS_MACOS/FD_HAS_WINDOWS
 # so source code can gate platform-specific implementations.
-# Uses ?= so MACHINE profiles can override if needed.
-# MUST come at end of base.mk because it uses += which appends after
-# CPPFLAGS reset on line 9.
+# Only runs once (guarded by FD_PLATFORM_DETECTED) to handle re-includes from
+# sub-profiles (e.g. macos_clang -> native -> base).
+#
+# Detection order:
+#   1. MACHINE name → known cross-compile targets (macos_clang, freebsd_*)
+#   2. UNAME → native builds (native, tickoni_fd, linux_clang_zen2)
+#   3. Default → hosted mode (Windows/unknown)
+ifeq ($(FD_PLATFORM_DETECTED),)
+FD_PLATFORM_DETECTED:=1
+
 UNAME?=$(shell uname)
-ifeq ($(UNAME), Linux)
-  CPPFLAGS+=-DFD_HAS_LINUX=1
-  FD_HAS_LINUX:=1
-  FD_HAS_HOSTED:=1
-else ifeq ($(UNAME), Darwin)
+
+# Step 1: Cross-compile profiles detect target OS from MACHINE name
+ifneq (,$(filter $(MACHINE),macos_clang macos_clang_m1))
   CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_MACOS=1
   FD_HAS_HOSTED:=1
   FD_HAS_MACOS:=1
-else ifeq ($(UNAME), FreeBSD)
+else ifneq (,$(filter $(MACHINE),freebsd_clang_noarch128))
   CPPFLAGS+=-DFD_HAS_HOSTED=1
   FD_HAS_HOSTED:=1
 else
-  # Windows or unknown — default to hosted mode, no OS-specific features
-  CPPFLAGS+=-DFD_HAS_HOSTED=1
-  FD_HAS_HOSTED:=1
+  # Step 2: Native builds detect host OS from UNAME
+  ifeq ($(UNAME),Linux)
+    CPPFLAGS+=-DFD_HAS_LINUX=1
+    FD_HAS_LINUX:=1
+    FD_HAS_HOSTED:=1
+  else ifeq ($(UNAME),Darwin)
+    CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_MACOS=1
+    FD_HAS_HOSTED:=1
+    FD_HAS_MACOS:=1
+  else ifeq ($(UNAME),FreeBSD)
+    CPPFLAGS+=-DFD_HAS_HOSTED=1
+    FD_HAS_HOSTED:=1
+  else
+    # Step 3: Windows or unknown — hosted mode, no OS-specific features
+    CPPFLAGS+=-DFD_HAS_HOSTED=1
+    FD_HAS_HOSTED:=1
+  endif
+endif
 endif
