@@ -83,11 +83,11 @@ cmd_sanitize_check_fd() {
   # from a previous build with different EXTRAS would silently link wrong code.
   run_step "clang asan+ubsan lib" \
     make -B -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan blst zstd lz4" \
-      "LOCAL_MKS=$_local_mks" \
+      "LOCAL_MKS=$_local_mks" "LDFLAGS_EXE=-Wl,-z,shstk" \
       lib
   run_step "clang asan+ubsan unit-test" \
     make -j"$(nproc)" BUILDDIR=clang-asan-ubsan CC=clang EXTRAS="asan ubsan blst zstd lz4" \
-      "LOCAL_MKS=$_local_mks" \
+      "LOCAL_MKS=$_local_mks" "LDFLAGS_EXE=-Wl,-z,shstk" \
       unit-test
 }
 
