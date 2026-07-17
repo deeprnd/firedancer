@@ -209,8 +209,15 @@ test-unit-fd:
 	# Only the 5 Tickoni dirs: tango, util, ballet, disco, waltz —
 	# minus subdirs not compiled into the 5 libs (disco/quic, ballet/zksdk,
 	# ballet/reedsol, waltz/quic, waltz/tls).
-	bash contrib/fd-build-lib.sh {{fd_tickoni_build}} gcc-12 test "LDFLAGS_EXE=-Wl,-z,shstk"
-	{{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} run-unit-test TEST_OPTS="--page-sz normal"
+	# fd-build-lib.sh parses args as: BUILDDIR CC MODE EXTRAS LDFLAGS_EXE
+	# For test mode, EXTRAS is hardcoded internally (lz4 blst zstd), so we pass ""
+	# as $4 and the flag value as $5.
+	# Both the lib build (via fd_build_fd) and the unit-test link (via make run-unit-test)
+	# need the CET override, since both link with with-security.mk pulling in cet-report=error.
+	# NOTE: LDFLAGS_EXE must NOT be quoted — make treats quoted "KEY=VAL" as a target,
+	# not a variable assignment.
+	bash contrib/fd-build-lib.sh {{fd_tickoni_build}} gcc-12 test "" "LDFLAGS_EXE=-Wl,-z,shstk"
+	{{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} run-unit-test TEST_OPTS="--page-sz normal" LDFLAGS_EXE=-Wl,-z,shstk
 
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.
