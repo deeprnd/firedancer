@@ -66,6 +66,7 @@ fd_compute_mks() {
 # On failure, calls exit 1.
 fd_build_fd() {
   local BUILDDIR="" CC="gcc-12" EXTRAS="" TARGETS="" SRCS="" BUILD_TARGET=""
+  local LDFLAGS_EXE=""
   while [ $# -gt 0 ]; do
     case "$1" in
       BUILDDIR=*) BUILDDIR="${1#BUILDDIR=}"; shift ;;
@@ -74,6 +75,7 @@ fd_build_fd() {
       TARGETS=*) TARGETS="${1#TARGETS=}"; shift ;;
       SRCS=*) SRCS="${1#SRCS=}"; shift ;;
       BUILD_TARGET=*) BUILD_TARGET="${1#BUILD_TARGET=}"; shift ;;
+      LDFLAGS_EXE=*) LDFLAGS_EXE="${1#LDFLAGS_EXE=}"; shift ;;
       *) shift ;; # skip unrecognized args
     esac
   done
@@ -132,6 +134,7 @@ fd_build_fd() {
   fi
 
   local -a cmd=( "$MAKE" -j"$(fd_nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" )
+  [ -n "${LDFLAGS_EXE}" ] && cmd+=( "LDFLAGS_EXE=${LDFLAGS_EXE}" )
   [ -n "${EXTRAS}" ] && cmd+=( "EXTRAS=${EXTRAS}" )
   cmd+=( "CC=${CC}" )
   cmd+=( "LOCAL_MKS=${mks}" )
