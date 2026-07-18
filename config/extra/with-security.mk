@@ -23,7 +23,6 @@ endif
 endif
 endif
 endif
-endif
 
 # _FORTIFY_SOURCE only works when optimization is enabled
 ifeq ($(FD_DISABLE_OPTIMIZATION),)

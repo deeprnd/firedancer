@@ -47,7 +47,7 @@ fd_secp256k1_scalar_t *
 fd_secp256k1_scalar_invert( fd_secp256k1_scalar_t *       r,
                             fd_secp256k1_scalar_t const * a ) {
   ulong t[ 12 ];
-  bignum_modinv( 4, r->limbs, (uint64_t *)a->limbs, (uint64_t *)fd_secp256k1_const_n[ 0 ].limbs, t );
+  bignum_modinv( 4, r->limbs, (ulong *)a->limbs, (ulong *)fd_secp256k1_const_n[ 0 ].limbs, t );
   return r;
 }
 
@@ -56,7 +56,7 @@ static inline fd_secp256k1_scalar_t *
 fd_secp256k1_scalar_mul( fd_secp256k1_scalar_t *       restrict r,
                          fd_secp256k1_scalar_t const * restrict a,
                          fd_secp256k1_scalar_t const * restrict b ) {
-  bignum_montmul( 4, r->limbs, (uint64_t *)a->limbs, (uint64_t *)b->limbs, (uint64_t *)fd_secp256k1_const_n[0].limbs );
+  bignum_montmul( 4, r->limbs, (ulong *)a->limbs, (ulong *)b->limbs, (ulong *)fd_secp256k1_const_n[0].limbs );
   return r;
 }
 
@@ -73,7 +73,7 @@ fd_secp256k1_scalar_negate( fd_secp256k1_scalar_t *       r,
 
   /* t \in [0, n + 1). There is no carry-out, as a < n. */
   ulong t[4];
-  bignum_sub( 4, t, 4, (uint64_t *)fd_secp256k1_const_n[ 0 ].limbs, 4, (uint64_t *)a->limbs );
+  bignum_sub( 4, t, 4, (ulong *)fd_secp256k1_const_n[ 0 ].limbs, 4, (ulong *)a->limbs );
   bignum_mod_n256k1_4( r->limbs, t );
   return r;
 }
@@ -92,7 +92,7 @@ fd_secp256k1_scalar_tomont( fd_secp256k1_scalar_t *       r,
 static inline fd_secp256k1_scalar_t *
 fd_secp256k1_scalar_demont( fd_secp256k1_scalar_t *       r,
                             fd_secp256k1_scalar_t const * a ) {
-  bignum_demont( 4, r->limbs, (uint64_t *)a->limbs, (uint64_t *)fd_secp256k1_const_n[ 0 ].limbs );
+  bignum_demont( 4, r->limbs, (ulong *)a->limbs, (ulong *)fd_secp256k1_const_n[ 0 ].limbs );
   return r;
 }
 
@@ -120,7 +120,7 @@ static inline fd_secp256k1_fp_t *
 fd_secp256k1_fp_add( fd_secp256k1_fp_t *       r,
                      fd_secp256k1_fp_t const * a,
                      fd_secp256k1_fp_t const * b ) {
-  bignum_add_p256k1( r->limbs, (uint64_t *)a->limbs, (uint64_t *)b->limbs );
+  bignum_add_p256k1( r->limbs, (ulong *)a->limbs, (ulong *)b->limbs );
   return r;
 }
 
@@ -129,7 +129,7 @@ static inline fd_secp256k1_fp_t *
 fd_secp256k1_fp_sub( fd_secp256k1_fp_t *       r,
                      fd_secp256k1_fp_t const * a,
                      fd_secp256k1_fp_t const * b ) {
-  bignum_sub_p256k1( r->limbs, (uint64_t *)a->limbs, (uint64_t *)b->limbs );
+  bignum_sub_p256k1( r->limbs, (ulong *)a->limbs, (ulong *)b->limbs );
   return r;
 }
 
@@ -137,7 +137,7 @@ fd_secp256k1_fp_sub( fd_secp256k1_fp_t *       r,
 static inline fd_secp256k1_fp_t *
 fd_secp256k1_fp_dbl( fd_secp256k1_fp_t *       r,
                      fd_secp256k1_fp_t const * a ) {
-  bignum_double_p256k1( r->limbs, (uint64_t *)a->limbs );
+  bignum_double_p256k1( r->limbs, (ulong *)a->limbs );
   return r;
 }
 
@@ -146,7 +146,7 @@ static inline fd_secp256k1_fp_t *
 fd_secp256k1_fp_mul( fd_secp256k1_fp_t *       r,
                      fd_secp256k1_fp_t const * a,
                      fd_secp256k1_fp_t const * b ) {
-  bignum_montmul_p256k1( r->limbs, (uint64_t *)a->limbs, (uint64_t *)b->limbs );
+  bignum_montmul_p256k1( r->limbs, (ulong *)a->limbs, (ulong *)b->limbs );
   return r;
 }
 
@@ -154,7 +154,7 @@ fd_secp256k1_fp_mul( fd_secp256k1_fp_t *       r,
 static inline fd_secp256k1_fp_t *
 fd_secp256k1_fp_sqr( fd_secp256k1_fp_t *       r,
                      fd_secp256k1_fp_t const * a ) {
-  bignum_montsqr_p256k1( r->limbs, (uint64_t *)a->limbs );
+  bignum_montsqr_p256k1( r->limbs, (ulong *)a->limbs );
   return r;
 }
 
@@ -162,14 +162,14 @@ fd_secp256k1_fp_sqr( fd_secp256k1_fp_t *       r,
 static inline fd_secp256k1_fp_t *
 fd_secp256k1_fp_negate( fd_secp256k1_fp_t *       r,
                         fd_secp256k1_fp_t const * a ) {
-  bignum_neg_p256k1( r->limbs, (uint64_t *)a->limbs );
+  bignum_neg_p256k1( r->limbs, (ulong *)a->limbs );
   return r;
 }
 
 static inline int
 fd_secp256k1_fp_is_odd( fd_secp256k1_fp_t const *r ) {
   fd_secp256k1_fp_t scratch[1];
-  bignum_demont_p256k1( scratch->limbs, (uint64_t *)r->limbs );
+  bignum_demont_p256k1( scratch->limbs, (ulong *)r->limbs );
   return scratch->limbs[ 0 ] & 1;
 }
 
@@ -179,10 +179,10 @@ static inline fd_secp256k1_fp_t *
 fd_secp256k1_fp_invert( fd_secp256k1_fp_t *       r,
                         fd_secp256k1_fp_t const * a ) {
   fd_secp256k1_fp_t ad[1];
-  bignum_demont_p256k1( ad->limbs, (uint64_t *)a->limbs );
+  bignum_demont_p256k1( ad->limbs, (ulong *)a->limbs );
   ulong t[ 12 ];
-  bignum_modinv( 4, r->limbs, (uint64_t *)ad->limbs, (uint64_t *)fd_secp256k1_const_p[0].limbs, t );
-  bignum_tomont_p256k1( r->limbs, (uint64_t *)r->limbs );
+  bignum_modinv( 4, r->limbs, (ulong *)ad->limbs, (ulong *)fd_secp256k1_const_p[0].limbs, t );
+  bignum_tomont_p256k1( r->limbs, (ulong *)r->limbs );
   return r;
 }
 
@@ -190,7 +190,7 @@ static inline uchar *
 fd_secp256k1_fp_tobytes( uchar                    r[ 32 ],
                          fd_secp256k1_fp_t const *a ) {
   fd_secp256k1_fp_t swapped[1];
-  bignum_demont_p256k1( swapped->limbs, (uint64_t *)a->limbs );
+  bignum_demont_p256k1( swapped->limbs, (ulong *)a->limbs );
   fd_uint256_bswap( swapped, swapped );
   memcpy( r, swapped->buf, 32 );
   return r;
@@ -366,7 +366,7 @@ fd_secp256k1_point_add( fd_secp256k1_point_t *       r,
   fd_secp256k1_fp_sub( Y3, X3, Y3 );
 
   /* t0 = 3 * t0 */
-  bignum_triple_p256k1( t0->limbs, (uint64_t *)t0->limbs );
+  bignum_triple_p256k1( t0->limbs, (ulong *)t0->limbs );
 
   /* b3 = (2^2)^2 + 2^2 + 1 = 21 */
   fd_secp256k1_fp_t t2_4[ 1 ];

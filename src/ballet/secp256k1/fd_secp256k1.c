@@ -69,7 +69,7 @@ fd_secp256k1_recover( uchar        public_key[64],
   fd_uint256_bswap( msg, msg );
   /* The message scalar is unconditionally reduced to the scalar field.
      https://github.com/bitcoin-core/secp256k1/blob/v0.7.1/src/scalar_4x64_impl.h#L151 */
-  bignum_mod_n256k1_4( msg->limbs, (uint64_t *)msg->limbs );
+  bignum_mod_n256k1_4( msg->limbs, (ulong *)msg->limbs );
   fd_secp256k1_scalar_tomont( msg, msg );
 
   fd_secp256k1_scalar_t rn[1], u1[1], u2[1];
