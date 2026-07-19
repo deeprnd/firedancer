@@ -174,6 +174,7 @@ populate_allowed_fds( fd_topo_t const *      topo,
 }
 
 
+static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,

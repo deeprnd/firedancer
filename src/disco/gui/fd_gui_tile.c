@@ -756,6 +756,8 @@ unprivileged_init( fd_topo_t const *      topo,
 
 
 
+static ulong
+
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
@@ -773,7 +775,6 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
   return 0UL;
 #endif
 }
-#endif
 
 
 static ulong

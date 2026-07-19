@@ -474,6 +474,7 @@ unprivileged_init( fd_topo_t const *      topo,
 }
 
 
+static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo FD_PARAM_UNUSED,
                           fd_topo_tile_t const * tile FD_PARAM_UNUSED,
                           ulong                  out_cnt,
