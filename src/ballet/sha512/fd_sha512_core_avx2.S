@@ -22,17 +22,14 @@
 #if defined(__linux__)
 #define GNU_TYPE(name)     .type name,@function
 #define GNU_SIZE(name,end) .size name,end
-#define GNU_ALIGN(n)       .align n
+#define GNU_ALIGN(n)
 #define GNU_PALIGN(n)      .p2align n
-#define GNU_CFI(args...)   __VA_ARGS__
 #define GNU_DATA_TYPE(name) .type name,@object
 #else
-/* All GNU directives are no-ops on macOS */
 #define GNU_TYPE(name)
 #define GNU_SIZE(name,end)
 #define GNU_ALIGN(n)
 #define GNU_PALIGN(n)
-#define GNU_CFI(args...)
 #define GNU_DATA_TYPE(name) .type name,@function
 #endif
 
@@ -1602,4 +1599,3 @@ GNU_PALIGN(3)
 GNU_PALIGN(3)
 4:
 #endif
-
