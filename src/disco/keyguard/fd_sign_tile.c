@@ -1,9 +1,7 @@
 #define _GNU_SOURCE
 #include "../tiles.h"
 
-#if FD_HAS_LINUX
 #include "generated/fd_sign_tile_seccomp.h"
-#endif
 
 #include "../keyguard/fd_keyguard.h"
 #include "../keyguard/fd_keyload.h"
@@ -411,19 +409,23 @@ unprivileged_init( fd_topo_t const *      topo,
   unprivileged_init_sensitive( topo, tile );
 }
 
-#if FD_HAS_LINUX
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
+#if defined(__linux__)
   (void)topo;
   (void)tile;
 
   populate_sock_filter_policy_fd_sign_tile( out_cnt, out, (uint)fd_log_private_logfile_fd() );
   return sock_filter_policy_fd_sign_tile_instr_cnt;
-}
+#else
+  (void)topo; (void)tile;
+  (void)out_cnt; (void)out;
+  return 0UL;
 #endif
+}
 
 static ulong
 populate_allowed_fds( fd_topo_t const *      topo,
@@ -459,9 +461,7 @@ populate_allowed_fds( fd_topo_t const *      topo,
 
 fd_topo_run_tile_t fd_tile_sign = {
   .name                     = "sign",
-#if FD_HAS_LINUX
   .populate_allowed_seccomp = populate_allowed_seccomp,
-#endif
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,

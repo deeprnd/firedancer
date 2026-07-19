@@ -527,14 +527,11 @@ rlimit_file_cnt( fd_topo_t const *      topo FD_PARAM_UNUSED,
 }
 
 
-#if FD_HAS_LINUX
-static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
-#endif
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
-
+#if defined(__linux__)
   void * scratch = fd_topo_obj_laddr( topo, tile->tile_obj_id );
 
   FD_SCRATCH_ALLOC_INIT( l, scratch );
@@ -542,18 +539,23 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
 
   uint in_fd, out_fd, out_dir_fd;
   if( FD_LIKELY( -1!=ctx->in_fd ) ) {
-    in_fd      = (uint)ctx->in_fd;
-    out_fd     = (uint)-1;
-    out_dir_fd = (uint)-1;
+  in_fd      = (uint)ctx->in_fd;
+  out_fd     = (uint)-1;
+  out_dir_fd = (uint)-1;
   } else {
-    in_fd      = (uint)-1;
-    out_fd     = (uint)ctx->out_fd;
-    out_dir_fd = (uint)ctx->out_dir_fd;
+  in_fd      = (uint)-1;
+  out_fd     = (uint)ctx->out_fd;
+  out_dir_fd = (uint)ctx->out_dir_fd;
   }
 
   uint accounts_fd = !tile->genesi.entrypoints_cnt ? (uint)FD_ACCDB_FD_RW : (uint)-1;
   populate_sock_filter_policy_fd_genesi_tile( out_cnt, out, (uint)fd_log_private_logfile_fd(), in_fd, out_fd, out_dir_fd, accounts_fd );
   return sock_filter_policy_fd_genesi_tile_instr_cnt;
+#else
+  (void)topo; (void)tile;
+  (void)out_cnt; (void)out;
+  return 0UL;
+#endif
 }
 
 static ulong

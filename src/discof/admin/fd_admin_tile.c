@@ -765,16 +765,18 @@ after_credit( fd_admin_tile_ctx_t * ctx,
 }
 
 
-#if FD_HAS_LINUX
-static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo FD_PARAM_UNUSED,
-#endif
                           fd_topo_tile_t const * tile FD_PARAM_UNUSED,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
-
+#if defined(__linux__)
   populate_sock_filter_policy_fd_admin_tile( out_cnt, out, (uint)fd_log_private_logfile_fd() );
   return sock_filter_policy_fd_admin_tile_instr_cnt;
+#else
+  (void)topo; (void)tile;
+  (void)out_cnt; (void)out;
+  return 0UL;
+#endif
 }
 
 static ulong

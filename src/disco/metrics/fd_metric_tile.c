@@ -130,10 +130,6 @@ unprivileged_init( fd_topo_t const *      topo,
   FD_LOG_NOTICE(( "prometheus metrics endpoint listening at http://" FD_IP4_ADDR_FMT ":%u/metrics", FD_IP4_ADDR_FMT_ARGS( tile->metric.prometheus_listen_addr ), tile->metric.prometheus_listen_port ));
 }
 
-#if defined(__linux__)
-
-
-#if FD_HAS_LINUX
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
@@ -146,9 +142,6 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
   populate_sock_filter_policy_fd_metric_tile( out_cnt, out, (uint)fd_log_private_logfile_fd(), (uint)fd_http_server_fd( ctx->metrics_server ) );
   return sock_filter_policy_fd_metric_tile_instr_cnt;
 }
-#endif
-
-#endif /* __linux__ */
 
 static ulong
 populate_allowed_fds( fd_topo_t const *      topo,
@@ -183,13 +176,7 @@ populate_allowed_fds( fd_topo_t const *      topo,
 fd_topo_run_tile_t fd_tile_metric = {
   .name                     = "metric",
   .rlimit_file_cnt          = FD_HTTP_SERVER_METRICS_MAX_CONNS+5UL, /* pipefd, socket, stderr, logfile, and one spare for new accept() connections */
-  .populate_allowed_seccomp = (
-#if FD_HAS_LINUX
-    populate_allowed_seccomp
-#else
-    NULL
-#endif
-  ),
+  .populate_allowed_seccomp = populate_allowed_seccomp,
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,

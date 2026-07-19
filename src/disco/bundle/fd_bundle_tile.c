@@ -23,9 +23,7 @@
 #include "../../waltz/resolv/fd_netdb.h"
 #include "../../discof/replay/fd_replay_tile.h"
 
-#if FD_HAS_LINUX
 #include "generated/fd_bundle_tile_seccomp.h"
-#endif
 
 #define IN_KIND_REPLAY_OUT (1)
 
@@ -577,12 +575,12 @@ unprivileged_init( fd_topo_t const *      topo,
       FD_MHIST_MAX( BUNDLE, MESSAGE_RX_DELAY_NANOS ) );
 }
 
-#if FD_HAS_LINUX
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
+#if defined(__linux__)
   fd_bundle_tile_t * ctx = fd_topo_obj_laddr( topo, tile->tile_obj_id );
 
   populate_sock_filter_policy_fd_bundle_tile(
@@ -593,8 +591,12 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
       (uint)ctx->netdb_fds->etc_resolv_conf
   );
   return sock_filter_policy_fd_bundle_tile_instr_cnt;
-}
+#else
+  (void)topo; (void)tile;
+  (void)out_cnt; (void)out;
+  return 0UL;
 #endif
+}
 
 static ulong
 populate_allowed_fds( fd_topo_t const *      topo,
@@ -633,9 +635,7 @@ populate_allowed_fds( fd_topo_t const *      topo,
 
 fd_topo_run_tile_t fd_tile_bundle = {
   .name                     = "bundle",
-  #if FD_HAS_LINUX
 .populate_allowed_seccomp = populate_allowed_seccomp,
-#endif
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,

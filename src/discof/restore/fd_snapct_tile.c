@@ -429,14 +429,11 @@ rlimit_file_cnt( fd_topo_t const *      topo FD_PARAM_UNUSED,
 }
 
 
-#if FD_HAS_LINUX
-static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
-#endif
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
-
+#if defined(__linux__)
   void * scratch = fd_topo_obj_laddr( topo, tile->tile_obj_id );
 
   FD_SCRATCH_ALLOC_INIT( l, scratch );
@@ -445,12 +442,17 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
   int min_ping_fd = INT_MAX;
   int max_ping_fd = 0;
   if( download_enabled( tile ) ) {
-    min_ping_fd = FD_SSPING_FD_MIN;
-    max_ping_fd = FD_SSPING_FD_MIN + (int)FD_SSPING_FD_CNT - 1;
+  min_ping_fd = FD_SSPING_FD_MIN;
+  max_ping_fd = FD_SSPING_FD_MIN + (int)FD_SSPING_FD_CNT - 1;
   }
 
   populate_sock_filter_policy_fd_snapct_tile( out_cnt, out, (uint)fd_log_private_logfile_fd(), (uint)ctx->local_out.dir_fd, (uint)ctx->local_out.full_snapshot_fd, (uint)ctx->local_out.incremental_snapshot_fd, (uint)min_ping_fd, (uint)max_ping_fd );
   return sock_filter_policy_fd_snapct_tile_instr_cnt;
+#else
+  (void)topo; (void)tile;
+  (void)out_cnt; (void)out;
+  return 0UL;
+#endif
 }
 
 static ulong

@@ -1963,19 +1963,22 @@ unprivileged_init( fd_topo_t const *      topo,
 }
 
 
-#if FD_HAS_LINUX
-static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
-#endif
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
+#if defined(__linux__)
   void * scratch = fd_topo_obj_laddr( topo, tile->tile_obj_id );
   FD_SCRATCH_ALLOC_INIT( l, scratch );
   fd_tower_tile_t * ctx = FD_SCRATCH_ALLOC_APPEND( l, alignof(fd_tower_tile_t), sizeof(fd_tower_tile_t) );
 
   populate_sock_filter_policy_fd_tower_tile( out_cnt, out, (uint)fd_log_private_logfile_fd(), (uint)ctx->checkpt_fd, (uint)ctx->restore_fd, FD_ACCDB_FD_RW );
   return sock_filter_policy_fd_tower_tile_instr_cnt;
+#else
+  (void)topo; (void)tile;
+  (void)out_cnt; (void)out;
+  return 0UL;
+#endif
 }
 
 static ulong
