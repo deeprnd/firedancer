@@ -30,7 +30,7 @@
 #define GNU_SIZE(name,end)
 #define GNU_ALIGN(n)
 #define GNU_PALIGN(n)
-#define GNU_DATA_TYPE(name) .type name,@function
+#define GNU_DATA_TYPE(name)
 #endif
 
 #if defined(__linux__)
