@@ -128,9 +128,7 @@
 //      reduction.  For single-block processing, we use the x^64 optimization.
 
 /* ELF-specific sections — Mach-O has no GNU-stack or note.gnu.property */
-#if defined(__linux__)
 .section .note.GNU-stack,"",@progbits
-#endif
 
 /* GNU assembler directives:
  *   Linux  : emit as-is
@@ -140,11 +138,13 @@
 #if defined(__linux__)
 #define GNU_TYPE(name)     .type name,@function
 #define GNU_SIZE(name,end) .size name,end
-#define GNU_ALIGN(n)       .align n
+#define GNU_ALIGN(n)
+#define GNU_PALIGN(n)      .p2align n
 #else
 #define GNU_TYPE(name)
 #define GNU_SIZE(name,end)
 #define GNU_ALIGN(n)
+#define GNU_PALIGN(n)
 #endif
 
 #define SYM_FUNC_START(name)			\
@@ -778,9 +778,7 @@
 	// Encrypt the first 8 plaintext blocks.
 	_ctr_begin_8x
 	lea		16(KEY), %rsi
-#if defined(__linux__)
-	.p2align 4
-#endif
+GNU_PALIGN(4)
 1:
 	movdqa		(%rsi), TMP0
 	_aesenc_8x	TMP0
@@ -796,9 +794,7 @@
 	jl		.Lghash_last_ciphertext_8x\@
 .endif
 
-#if defined(__linux__)
-	.p2align 4
-#endif
+GNU_PALIGN(4)
 .Lcrypt_loop_8x\@:
 
 	// Generate the next set of 8 counter blocks and start encrypting them.
@@ -814,9 +810,7 @@
 
 	// Do 7 more rounds of AES, and continue the GHASH update by doing the
 	// unreduced multiplication for the remaining ciphertext blocks.
-#if defined(__linux__)
-	.p2align 4
-#endif
+GNU_PALIGN(4)
 1:
 	movdqa		(%rsi), TMP0
 	add		$16, %rsi
@@ -826,9 +820,7 @@
 	jne		1b
 
 	// Do the remaining AES rounds.
-#if defined(__linux__)
-	.p2align 4
-#endif
+GNU_PALIGN(4)
 1:
 	movdqa		(%rsi), TMP0
 	add		$16, %rsi
@@ -858,9 +850,7 @@
 .Lghash_last_ciphertext_8x\@:
 	// Update GHASH with the last set of 8 ciphertext blocks.
 	_ghash_update_begin_8x		\enc
-#if defined(__linux__)
-	.p2align 4
-#endif
+GNU_PALIGN(4)
 1:
 	_ghash_update_continue_8x	\enc
 	cmp		$7*8, %eax
@@ -1172,25 +1162,19 @@ SYM_FUNC_END(aes_gcm_dec_final_aesni_avx)
 /* Advertise IBT, SHSTK compliance — .note.gnu.property is ELF-only */
 #if defined(__linux__)
 .section ".note.gnu.property", "a"
-#if defined(__linux__)
-.p2align 3
-#endif
+GNU_PALIGN(3)
 .long 1f - 0f
 .long 4f - 1f
 .long 5
 0:
 .byte 0x47, 0x4e, 0x55, 0
 1:
-#if defined(__linux__)
-.p2align 3
-#endif
+GNU_PALIGN(3)
 .long 0xc0000002
 .long 3f - 2f
 2:
 .long 3
 3:
-#if defined(__linux__)
-.p2align 3
-#endif
+GNU_PALIGN(3)
 4:
 #endif

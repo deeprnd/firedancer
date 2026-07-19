@@ -85,9 +85,7 @@
 // 32, masking support, and new instructions such as vpternlogd (which can do a
 // three-argument XOR).  These features are very useful for AES-GCM.
 /* ELF-specific sections — Mach-O has no GNU-stack or note.gnu.property */
-#if defined(__linux__)
 .section .note.GNU-stack,"",@progbits
-#endif
 
 /* GNU assembler directives:
  *   Linux  : emit as-is
@@ -97,11 +95,13 @@
 #if defined(__linux__)
 #define GNU_TYPE(name)     .type name,@function
 #define GNU_SIZE(name,end) .size name,end
-#define GNU_ALIGN(n)       .align n
+#define GNU_ALIGN(n)
+#define GNU_PALIGN(n)      .p2align n
 #else
 #define GNU_TYPE(name)
 #define GNU_SIZE(name,end)
 #define GNU_ALIGN(n)
+#define GNU_PALIGN(n)
 #endif
 
 #define SYM_FUNC_START(name)	\
@@ -117,9 +117,7 @@
 	GNU_SIZE(name,.-name)
 
 .section .rodata
-#if defined(__linux__)
-.p2align 6
-#endif
+GNU_PALIGN(6)
 
 	// A shuffle mask that reflects the bytes of 16-byte blocks
 .Lbswap_mask:
@@ -1259,25 +1257,19 @@ SYM_FUNC_END(aes_gcm_dec_final_vaes_avx10)
 /* Advertise IBT, SHSTK compliance — .note.gnu.property is ELF-only */
 #if defined(__linux__)
 .section ".note.gnu.property", "a"
-#if defined(__linux__)
-.p2align 3
-#endif
+GNU_PALIGN(3)
 .long 1f - 0f
 .long 4f - 1f
 .long 5
 0:
 .byte 0x47, 0x4e, 0x55, 0
 1:
-#if defined(__linux__)
-.p2align 3
-#endif
+GNU_PALIGN(3)
 .long 0xc0000002
 .long 3f - 2f
 2:
 .long 3
 3:
-#if defined(__linux__)
-.p2align 3
-#endif
+GNU_PALIGN(3)
 4:
 #endif
