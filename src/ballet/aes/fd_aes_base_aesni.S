@@ -1735,7 +1735,9 @@ GNU_ALIGN(64)
 .byte	65,69,83,32,102,111,114,32,73,110,116,101,108,32,65,69,83,45,78,73,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
 GNU_ALIGN(64)
 	.section ".note.gnu.property", "a"
+#if defined(__linux__)
 	.p2align 3
+#endif
 	.long 1f - 0f
 	.long 4f - 1f
 	.long 5
@@ -1747,11 +1749,15 @@ GNU_ALIGN(64)
 	.byte 0x55
 	.byte 0
 1:
+#if defined(__linux__)
 	.p2align 3
+#endif
 	.long 0xc0000002
 	.long 3f - 2f
 2:
 	.long 3
 3:
+#if defined(__linux__)
 	.p2align 3
+#endif
 4:

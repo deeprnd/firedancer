@@ -778,7 +778,9 @@
 	// Encrypt the first 8 plaintext blocks.
 	_ctr_begin_8x
 	lea		16(KEY), %rsi
+#if defined(__linux__)
 	.p2align 4
+#endif
 1:
 	movdqa		(%rsi), TMP0
 	_aesenc_8x	TMP0
@@ -794,7 +796,9 @@
 	jl		.Lghash_last_ciphertext_8x\@
 .endif
 
+#if defined(__linux__)
 	.p2align 4
+#endif
 .Lcrypt_loop_8x\@:
 
 	// Generate the next set of 8 counter blocks and start encrypting them.
@@ -810,7 +814,9 @@
 
 	// Do 7 more rounds of AES, and continue the GHASH update by doing the
 	// unreduced multiplication for the remaining ciphertext blocks.
+#if defined(__linux__)
 	.p2align 4
+#endif
 1:
 	movdqa		(%rsi), TMP0
 	add		$16, %rsi
@@ -820,7 +826,9 @@
 	jne		1b
 
 	// Do the remaining AES rounds.
+#if defined(__linux__)
 	.p2align 4
+#endif
 1:
 	movdqa		(%rsi), TMP0
 	add		$16, %rsi
@@ -850,7 +858,9 @@
 .Lghash_last_ciphertext_8x\@:
 	// Update GHASH with the last set of 8 ciphertext blocks.
 	_ghash_update_begin_8x		\enc
+#if defined(__linux__)
 	.p2align 4
+#endif
 1:
 	_ghash_update_continue_8x	\enc
 	cmp		$7*8, %eax
@@ -1162,19 +1172,25 @@ SYM_FUNC_END(aes_gcm_dec_final_aesni_avx)
 /* Advertise IBT, SHSTK compliance — .note.gnu.property is ELF-only */
 #if defined(__linux__)
 .section ".note.gnu.property", "a"
+#if defined(__linux__)
 .p2align 3
+#endif
 .long 1f - 0f
 .long 4f - 1f
 .long 5
 0:
 .byte 0x47, 0x4e, 0x55, 0
 1:
+#if defined(__linux__)
 .p2align 3
+#endif
 .long 0xc0000002
 .long 3f - 2f
 2:
 .long 3
 3:
+#if defined(__linux__)
 .p2align 3
+#endif
 4:
 #endif

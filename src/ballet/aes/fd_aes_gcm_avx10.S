@@ -117,7 +117,9 @@
 	GNU_SIZE(name,.-name)
 
 .section .rodata
+#if defined(__linux__)
 .p2align 6
+#endif
 
 	// A shuffle mask that reflects the bytes of 16-byte blocks
 .Lbswap_mask:
@@ -1257,19 +1259,25 @@ SYM_FUNC_END(aes_gcm_dec_final_vaes_avx10)
 /* Advertise IBT, SHSTK compliance — .note.gnu.property is ELF-only */
 #if defined(__linux__)
 .section ".note.gnu.property", "a"
+#if defined(__linux__)
 .p2align 3
+#endif
 .long 1f - 0f
 .long 4f - 1f
 .long 5
 0:
 .byte 0x47, 0x4e, 0x55, 0
 1:
+#if defined(__linux__)
 .p2align 3
+#endif
 .long 0xc0000002
 .long 3f - 2f
 2:
 .long 3
 3:
+#if defined(__linux__)
 .p2align 3
+#endif
 4:
 #endif

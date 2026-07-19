@@ -30,7 +30,9 @@
 #endif
 
 .globl	fd_sha512_core_avx2
+#if defined(__linux__)
 .type	fd_sha512_core_avx2,@function
+#endif
 .p2align	6
 fd_sha512_core_avx2:
 .cfi_startproc
@@ -1408,7 +1410,9 @@ fd_sha512_core_avx2:
 .Lepilogue_avx2:
 	.byte	0xf3,0xc3
 .cfi_endproc
+#if defined(__linux__)
 .size	fd_sha512_core_avx2,.-fd_sha512_core_avx2
+#endif
 
 .align	128
 GNU_DATA_TYPE(fd_sha512_core_avx2_k)
@@ -1503,19 +1507,31 @@ fd_sha512_core_avx2_k:
 #if defined(__linux__)
 .section ".note.gnu.property", "a"
 .section ".note.gnu.property", "a"
+#if defined(__linux__)
+#if defined(__linux__)
 .p2align 3
+#endif
+#endif
 .long 1f - 0f
 .long 4f - 1f
 .long 5
 0:
 .byte 0x47, 0x4e, 0x55, 0
 1:
+#if defined(__linux__)
+#if defined(__linux__)
 .p2align 3
+#endif
+#endif
 .long 0xc0000002
 .long 3f - 2f
 2:
 .long 3
 3:
+#if defined(__linux__)
+#if defined(__linux__)
 .p2align 3
+#endif
+#endif
 4:
 #endif
