@@ -445,5 +445,6 @@ ret
 3:
 #if defined(__linux__)
 .p2align 3
-#endif4:
+#endif
+4:
 #endif
