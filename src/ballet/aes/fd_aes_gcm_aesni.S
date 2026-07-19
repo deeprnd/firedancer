@@ -127,22 +127,26 @@
 //      multi-block processing we use Karatsuba multiplication with a regular
 //      reduction.  For single-block processing, we use the x^64 optimization.
 
-# Make stack non-executable
-#if !defined(FD_HAS_MACOS)
+/* ELF-specific sections — Mach-O has no GNU-stack or note.gnu.property */
+#if defined(__linux__)
 .section .note.GNU-stack,"",@progbits
 #endif
 
-
-/* GNU assembler directives - no-op on macOS clang */
-#if !defined(FD_HAS_MACOS)
-#define GNU_TYPE(name)	.type name,@function
-#define GNU_SIZE(name,end)	.size name,end
-#define GNU_ALIGN(n)	.align n
+/* GNU assembler directives:
+ *   Linux  : emit as-is
+ *   macOS  : no-op (Mach-O handles alignment/function info differently;
+ *             .type @function and .size are ignored but harmless)
+ */
+#if defined(__linux__)
+#define GNU_TYPE(name)     .type name,@function
+#define GNU_SIZE(name,end) .size name,end
+#define GNU_ALIGN(n)       .align n
 #else
 #define GNU_TYPE(name)
 #define GNU_SIZE(name,end)
 #define GNU_ALIGN(n)
 #endif
+
 #define SYM_FUNC_START(name)			\
 	.globl name ;				\
 	.balign 16, 0x90 ;			\
@@ -150,13 +154,12 @@
 		.cfi_startproc; 		\
 		endbr64
 
-#define SYM_FUNC_END(name)			\
+#define SYM_FUNC_END(name)				\
 	.cfi_endproc; 				\
-GNU_TYPE(name) ;			\
-GNU_SIZE(name,.-name)
+	GNU_TYPE(name) ;				\
+	GNU_SIZE(name,.-name)
 
 .section .rodata
-.p2align 4
 .Lbswap_mask:
 	.octa   0x000102030405060708090a0b0c0d0e0f
 .Lgfpoly:
@@ -1156,8 +1159,8 @@ SYM_FUNC_START(aes_gcm_dec_final_aesni_avx)
 	_aes_gcm_final	0
 SYM_FUNC_END(aes_gcm_dec_final_aesni_avx)
 
-/* Advertise IBT, SHSTK compliance (GNU as specific; ignore on macOS) */
-#if !defined(FD_HAS_MACOS)
+/* Advertise IBT, SHSTK compliance — .note.gnu.property is ELF-only */
+#if defined(__linux__)
 .section ".note.gnu.property", "a"
 .p2align 3
 .long 1f - 0f

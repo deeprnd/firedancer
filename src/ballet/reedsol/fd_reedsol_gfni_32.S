@@ -4,17 +4,18 @@
 #                                  uchar       * const * parity_shred,  (rdx)
 #                                  uchar       *         _scratch )     (rcx)
 .section .rodata,"a",@progbits
-gfni_const_tbl:
-#if !defined(FD_HAS_MACOS)
-.align 32
+/* ELF-specific .note.GNU-stack section — Mach-O has no equivalent */
+#if defined(__linux__)
+.section .note.GNU-stack,"",@progbits
 #endif
+
+.text
+/* Data table alignment — .align works on macOS with -no-integrated-as */
+gfni_const_tbl:
+.align 32
 .incbin "src/ballet/reedsol/constants/gfni_constants.bin"
 .previous
 
-/* Make stack non-executable (GNU as specific; ignore on macOS) */
-#if !defined(FD_HAS_MACOS)
-.section .note.GNU-stack,"",@progbits
-#endif
 
 .text
 
@@ -418,7 +419,8 @@ ret
 
 .cfi_endproc
 
-# Advertise IBT, SHSTK compliance
+/* Advertise IBT, SHSTK compliance — .note.gnu.property is ELF-only */
+#if defined(__linux__)
 .section ".note.gnu.property", "a"
 .p2align 3
 .long 1f - 0f
@@ -435,3 +437,4 @@ ret
 3:
 .p2align 3
 4:
+#endif

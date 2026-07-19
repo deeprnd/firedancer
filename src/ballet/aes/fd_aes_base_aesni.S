@@ -1,13 +1,17 @@
-/* Make stack non-executable (GNU as specific; ignore on macOS) */
-#if !defined(FD_HAS_MACOS)
+/* ELF-specific sections — Mach-O has no GNU-stack or note.gnu.property */
+#if defined(__linux__)
 .section .note.GNU-stack,"",@progbits
 #endif
 
-/* GNU assembler directives - no-op on macOS clang */
-#if !defined(FD_HAS_MACOS)
-#define GNU_TYPE(name)	.type name,@function
-#define GNU_SIZE(name,end)	.size name,end
-#define GNU_ALIGN(n)	.align n
+/* GNU assembler directives:
+ *   Linux  : emit as-is
+ *   macOS  : no-op (Mach-O handles alignment/function info differently;
+ *             .type @function and .size are ignored but harmless)
+ */
+#if defined(__linux__)
+#define GNU_TYPE(name)     .type name,@function
+#define GNU_SIZE(name,end) .size name,end
+#define GNU_ALIGN(n)       .align n
 #else
 #define GNU_TYPE(name)
 #define GNU_SIZE(name,end)

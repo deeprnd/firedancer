@@ -84,17 +84,20 @@
 // the vector length: the increase in the number of SIMD registers from 16 to
 // 32, masking support, and new instructions such as vpternlogd (which can do a
 // three-argument XOR).  These features are very useful for AES-GCM.
-
-/* Make stack non-executable (GNU as specific; ignore on macOS) */
-#if !defined(FD_HAS_MACOS)
+/* ELF-specific sections — Mach-O has no GNU-stack or note.gnu.property */
+#if defined(__linux__)
 .section .note.GNU-stack,"",@progbits
 #endif
 
-/* GNU assembler directives - no-op on macOS clang */
-#if !defined(FD_HAS_MACOS)
-#define GNU_TYPE(name)	.type name,@function
-#define GNU_SIZE(name,end)	.size name,end
-#define GNU_ALIGN(n)	.align n
+/* GNU assembler directives:
+ *   Linux  : emit as-is
+ *   macOS  : no-op (Mach-O handles alignment/function info differently;
+ *             .type @function and .size are ignored but harmless)
+ */
+#if defined(__linux__)
+#define GNU_TYPE(name)     .type name,@function
+#define GNU_SIZE(name,end) .size name,end
+#define GNU_ALIGN(n)       .align n
 #else
 #define GNU_TYPE(name)
 #define GNU_SIZE(name,end)
@@ -110,8 +113,8 @@
 
 #define SYM_FUNC_END(name)				\
 	.cfi_endproc; 					\
-GNU_TYPE(name) ;			\
-GNU_SIZE(name,.-name)
+	GNU_TYPE(name) ;			\
+	GNU_SIZE(name,.-name)
 
 .section .rodata
 .p2align 6
@@ -1251,8 +1254,8 @@ SYM_FUNC_START(aes_gcm_dec_final_vaes_avx10)
 	_aes_gcm_final	0
 SYM_FUNC_END(aes_gcm_dec_final_vaes_avx10)
 
-/* Advertise IBT, SHSTK compliance (GNU as specific; ignore on macOS) */
-#if !defined(FD_HAS_MACOS)
+/* Advertise IBT, SHSTK compliance — .note.gnu.property is ELF-only */
+#if defined(__linux__)
 .section ".note.gnu.property", "a"
 .p2align 3
 .long 1f - 0f
