@@ -13,7 +13,8 @@
 gfni_const_tbl:
 #if defined(__linux__)
 .align 32
-#endif.incbin "src/ballet/reedsol/constants/gfni_constants.bin"
+#endif
+.incbin "src/ballet/reedsol/constants/gfni_constants.bin"
 .previous
 
 
@@ -111,7 +112,8 @@ mov $0, %rax # Init shred_position
 
 #if defined(__linux__)
 .align 16
-#endifouter_loop:
+#endif
+outer_loop:
   # First handle the ones that we don't need to load from data_shred
   vmovdqu64 (%r8 ,%rax,1),%ymm0
   vmovdqu64 (%r9 ,%rax,1),%ymm1
@@ -426,7 +428,8 @@ ret
 .section ".note.gnu.property", "a"
 #if defined(__linux__)
 .p2align 3
-#endif.long 1f - 0f
+#endif
+.long 1f - 0f
 .long 4f - 1f
 .long 5
 0:
@@ -434,7 +437,8 @@ ret
 1:
 #if defined(__linux__)
 .p2align 3
-#endif.long 0xc0000002
+#endif
+.long 0xc0000002
 .long 3f - 2f
 2:
 .long 3
