@@ -6,16 +6,23 @@
 
 /* ELF-specific .note.GNU-stack section — Mach-O has no equivalent */
 #if defined(__linux__)
+#if defined(__linux__)
+#if defined(__linux__)
 .section .note.GNU-stack,"",@progbits
 #endif
+#endif
+#endif
 
+#if defined(__linux__)
+#if defined(__linux__)
 .text
+#endif
+#endif
 
 
 /* GNU assembler directives:
  *   Linux  : emit as-is
- *   macOS  : no-op (Mach-O handles CFI info differently;
- *             .type @function and .size are ignored but harmless)
+ *   macOS  : no-op
  */
 #if defined(__linux__)
 #define GNU_TYPE(name)     .type name,@function
@@ -23,34 +30,59 @@
 #define GNU_ALIGN(n)       .align n
 #define GNU_DATA_TYPE(name) .type name,@object
 #else
+/* All GNU directives are no-ops on macOS */
 #define GNU_TYPE(name)
 #define GNU_SIZE(name,end)
 #define GNU_ALIGN(n)
-#define GNU_DATA_TYPE(name) .type name,@function
+#define GNU_DATA_TYPE(name)
 #endif
 
+#if defined(__linux__)
+#if defined(__linux__)
 .globl	fd_sha512_core_avx2
+#endif
+#endif
 #if defined(__linux__)
 .type	fd_sha512_core_avx2,@function
 #endif
+#if defined(__linux__)
+#if defined(__linux__)
 .p2align	6
+#endif
+#endif
 fd_sha512_core_avx2:
+#if defined(__linux__)
 .cfi_startproc
+#endif
 	endbr64
 	movq	%rsp,%rax
+#if defined(__linux__)
 .cfi_def_cfa_register	%rax
+#endif
 	pushq	%rbx
+#if defined(__linux__)
 .cfi_offset	%rbx,-16
+#endif
 	pushq	%rbp
+#if defined(__linux__)
 .cfi_offset	%rbp,-24
+#endif
 	pushq	%r12
+#if defined(__linux__)
 .cfi_offset	%r12,-32
+#endif
 	pushq	%r13
+#if defined(__linux__)
 .cfi_offset	%r13,-40
+#endif
 	pushq	%r14
+#if defined(__linux__)
 .cfi_offset	%r14,-48
+#endif
 	pushq	%r15
+#if defined(__linux__)
 .cfi_offset	%r15,-56
+#endif
 	subq	$1312,%rsp
 	shlq	$4,%rdx
 	andq	$-2048,%rsp
@@ -60,7 +92,9 @@ fd_sha512_core_avx2:
 	movq	%rsi,128+8(%rsp)
 	movq	%rdx,128+16(%rsp)
 	movq	%rax,152(%rsp)
+#if defined(__linux__)
 .cfi_escape	0x0f,0x06,0x77,0x98,0x01,0x06,0x23,0x08
+#endif
 .Lprologue_avx2:
 
 	vzeroupper
@@ -77,7 +111,11 @@ fd_sha512_core_avx2:
 	movq	48(%rdi),%r10
 	movq	56(%rdi),%r11
 	jmp	.Loop_avx2
+#if defined(__linux__)
+#if defined(__linux__)
 .p2align	4
+#endif
+#endif
 .Loop_avx2:
 	vmovdqu	-128(%rsi),%xmm0
 	vmovdqu	-128+16(%rsi),%xmm1
@@ -120,13 +158,17 @@ fd_sha512_core_avx2:
 	vmovdqa	%ymm11,96(%rsp)
 
 	movq	152(%rsp),%rdi
+#if defined(__linux__)
 .cfi_def_cfa	%rdi,8
+#endif
 	leaq	-128(%rsp),%rsp
 
 
 
 	movq	%rdi,-8(%rsp)
+#if defined(__linux__)
 .cfi_escape	0x0f,0x05,0x77,0x78,0x06,0x23,0x08
+#endif
 	vpaddq	96(%rbp),%ymm7,%ymm11
 	vmovdqa	%ymm8,0(%rsp)
 	xorq	%r14,%r14
@@ -138,15 +180,25 @@ fd_sha512_core_avx2:
 	movq	%r9,%r12
 	addq	$32*8,%rbp
 	jmp	.Lavx2_00_47
+#if defined(__linux__)
+#if defined(__linux__)
 .p2align	4
+#endif
+#endif
 .Lavx2_00_47:
 	leaq	-128(%rsp),%rsp
+#if defined(__linux__)
 .cfi_escape	0x0f,0x06,0x77,0xf8,0x00,0x06,0x23,0x08
+#endif
 
 	pushq	128-8(%rsp)
+#if defined(__linux__)
 .cfi_escape	0x0f,0x05,0x77,0x00,0x06,0x23,0x08
+#endif
 	leaq	8(%rsp),%rsp
+#if defined(__linux__)
 .cfi_escape	0x0f,0x05,0x77,0x78,0x06,0x23,0x08
+#endif
 	vpalignr	$8,%ymm0,%ymm1,%ymm8
 	addq	0+256(%rsp),%r11
 	andq	%r8,%r12
@@ -440,12 +492,18 @@ fd_sha512_core_avx2:
 	movq	%r9,%r12
 	vmovdqa	%ymm10,96(%rsp)
 	leaq	-128(%rsp),%rsp
+#if defined(__linux__)
 .cfi_escape	0x0f,0x06,0x77,0xf8,0x00,0x06,0x23,0x08
+#endif
 
 	pushq	128-8(%rsp)
+#if defined(__linux__)
 .cfi_escape	0x0f,0x05,0x77,0x00,0x06,0x23,0x08
+#endif
 	leaq	8(%rsp),%rsp
+#if defined(__linux__)
 .cfi_escape	0x0f,0x05,0x77,0x78,0x06,0x23,0x08
+#endif
 	vpalignr	$8,%ymm4,%ymm5,%ymm8
 	addq	0+256(%rsp),%r11
 	andq	%r8,%r12
@@ -1156,7 +1214,11 @@ fd_sha512_core_avx2:
 	xorq	%rcx,%rdi
 	movq	%r9,%r12
 	jmp	.Lower_avx2
+#if defined(__linux__)
+#if defined(__linux__)
 .align	16
+#endif
+#endif
 .Lower_avx2:
 	addq	0+16(%rbp),%r11
 	andq	%r8,%r12
@@ -1359,7 +1421,9 @@ fd_sha512_core_avx2:
 
 	leaq	1152(%rsp),%rsp
 
+#if defined(__linux__)
 .cfi_escape	0x0f,0x06,0x77,0x98,0x01,0x06,0x23,0x08
+#endif
 
 	addq	0(%rdi),%rax
 	addq	8(%rdi),%rbx
@@ -1387,34 +1451,58 @@ fd_sha512_core_avx2:
 	leaq	(%rsp),%rbp
 
 
+#if defined(__linux__)
 .cfi_escape	0x0f,0x06,0x76,0x98,0x01,0x06,0x23,0x08
+#endif
 
 .Ldone_avx2:
 	movq	152(%rbp),%rsi
+#if defined(__linux__)
 .cfi_def_cfa	%rsi,8
+#endif
 	vzeroupper
 	movq	-48(%rsi),%r15
+#if defined(__linux__)
 .cfi_restore	%r15
+#endif
 	movq	-40(%rsi),%r14
+#if defined(__linux__)
 .cfi_restore	%r14
+#endif
 	movq	-32(%rsi),%r13
+#if defined(__linux__)
 .cfi_restore	%r13
+#endif
 	movq	-24(%rsi),%r12
+#if defined(__linux__)
 .cfi_restore	%r12
+#endif
 	movq	-16(%rsi),%rbp
+#if defined(__linux__)
 .cfi_restore	%rbp
+#endif
 	movq	-8(%rsi),%rbx
+#if defined(__linux__)
 .cfi_restore	%rbx
+#endif
 	leaq	(%rsi),%rsp
+#if defined(__linux__)
 .cfi_def_cfa_register	%rsp
+#endif
 .Lepilogue_avx2:
 	.byte	0xf3,0xc3
+#if defined(__linux__)
 .cfi_endproc
+#endif
 #if defined(__linux__)
 .size	fd_sha512_core_avx2,.-fd_sha512_core_avx2
 #endif
 
+#if defined(__linux__)
+#if defined(__linux__)
 .align	128
+#endif
+#endif
 GNU_DATA_TYPE(fd_sha512_core_avx2_k)
 fd_sha512_core_avx2_k:
 .quad	0x428a2f98d728ae22,0x7137449123ef65cd
@@ -1505,8 +1593,16 @@ fd_sha512_core_avx2_k:
 # Advertise IBT, SHSTK compliance
 /* .note.gnu.property is ELF-only */
 #if defined(__linux__)
+#if defined(__linux__)
+#if defined(__linux__)
 .section ".note.gnu.property", "a"
+#endif
+#endif
+#if defined(__linux__)
+#if defined(__linux__)
 .section ".note.gnu.property", "a"
+#endif
+#endif
 #if defined(__linux__)
 GNU_PALIGN(3)
 #endif
