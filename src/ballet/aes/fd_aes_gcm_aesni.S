@@ -128,7 +128,8 @@
 //      reduction.  For single-block processing, we use the x^64 optimization.
 
 /* ELF-specific sections — Mach-O has no GNU-stack or note.gnu.property */
-#if defined(__linux__).section .note.GNU-stack,"",@progbits
+#if defined(__linux__)
+.section .note.GNU-stack,"",@progbits
 #endif
 /* GNU assembler directives:
  *   Linux  : emit as-is

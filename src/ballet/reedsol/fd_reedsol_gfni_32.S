@@ -5,12 +5,14 @@
 #                                  uchar       *         _scratch )     (rcx)
 .section .rodata,"a",@progbits
 /* ELF-specific .note.GNU-stack section — Mach-O has no equivalent */
-#if defined(__linux__).section .note.GNU-stack,"",@progbits
+#if defined(__linux__)
+.section .note.GNU-stack,"",@progbits
 #endif
 .text
 /* Data table alignment — .align works on macOS with -no-integrated-as */
 gfni_const_tbl:
-#if defined(__linux__).align 32
+#if defined(__linux__)
+.align 32
 #endif.incbin "src/ballet/reedsol/constants/gfni_constants.bin"
 .previous
 
@@ -107,7 +109,8 @@ mov    0x38(%rsi),%r15
 
 mov $0, %rax # Init shred_position
 
-#if defined(__linux__).align 16
+#if defined(__linux__)
+.align 16
 #endifouter_loop:
   # First handle the ones that we don't need to load from data_shred
   vmovdqu64 (%r8 ,%rax,1),%ymm0
@@ -413,26 +416,30 @@ popq    %r14
 popq    %r15
 .cfi_def_cfa_offset 8
 ret
-#if defined(__linux__).align 16
+#if defined(__linux__)
+.align 16
 #endif
 .cfi_endproc
 
 /* Advertise IBT, SHSTK compliance — .note.gnu.property is ELF-only */
 #if defined(__linux__)
 .section ".note.gnu.property", "a"
-#if defined(__linux__).p2align 3
+#if defined(__linux__)
+.p2align 3
 #endif.long 1f - 0f
 .long 4f - 1f
 .long 5
 0:
 .byte 0x47, 0x4e, 0x55, 0
 1:
-#if defined(__linux__).p2align 3
+#if defined(__linux__)
+.p2align 3
 #endif.long 0xc0000002
 .long 3f - 2f
 2:
 .long 3
 3:
-#if defined(__linux__).p2align 3
+#if defined(__linux__)
+.p2align 3
 #endif4:
 #endif
