@@ -5,7 +5,9 @@
 # interfacing the existing API and exposing for library use.
 
 /* ELF-specific .note.GNU-stack section — Mach-O has no equivalent */
+#if defined(__linux__)
 .section .note.GNU-stack,"",@progbits
+#endif
 
 .text
 
@@ -18,19 +20,19 @@
 #if defined(__linux__)
 #define GNU_TYPE(name)     .type name,@function
 #define GNU_SIZE(name,end) .size name,end
-#define GNU_ALIGN(n)
-#define GNU_PALIGN(n)      .p2align n
+#define GNU_ALIGN(n)       .align n
 #define GNU_DATA_TYPE(name) .type name,@object
 #else
 #define GNU_TYPE(name)
 #define GNU_SIZE(name,end)
 #define GNU_ALIGN(n)
-#define GNU_PALIGN(n)
 #define GNU_DATA_TYPE(name) .type name,@function
 #endif
 
 .globl	fd_sha512_core_avx2
+#if defined(__linux__)
 .type	fd_sha512_core_avx2,@function
+#endif
 .p2align	6
 fd_sha512_core_avx2:
 .cfi_startproc
@@ -1408,7 +1410,9 @@ fd_sha512_core_avx2:
 .Lepilogue_avx2:
 	.byte	0xf3,0xc3
 .cfi_endproc
+#if defined(__linux__)
 .size	fd_sha512_core_avx2,.-fd_sha512_core_avx2
+#endif
 
 .align	128
 GNU_DATA_TYPE(fd_sha512_core_avx2_k)
@@ -1503,19 +1507,25 @@ fd_sha512_core_avx2_k:
 #if defined(__linux__)
 .section ".note.gnu.property", "a"
 .section ".note.gnu.property", "a"
+#if defined(__linux__)
 GNU_PALIGN(3)
+#endif
 .long 1f - 0f
 .long 4f - 1f
 .long 5
 0:
 .byte 0x47, 0x4e, 0x55, 0
 1:
+#if defined(__linux__)
 GNU_PALIGN(3)
+#endif
 .long 0xc0000002
 .long 3f - 2f
 2:
 .long 3
 3:
+#if defined(__linux__)
 GNU_PALIGN(3)
+#endif
 4:
 #endif

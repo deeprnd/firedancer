@@ -85,8 +85,8 @@
 // 32, masking support, and new instructions such as vpternlogd (which can do a
 // three-argument XOR).  These features are very useful for AES-GCM.
 /* ELF-specific sections — Mach-O has no GNU-stack or note.gnu.property */
-.section .note.GNU-stack,"",@progbits
-
+#if defined(__linux__).section .note.GNU-stack,"",@progbits
+#endif
 /* GNU assembler directives:
  *   Linux  : emit as-is
  *   macOS  : no-op (Mach-O handles alignment/function info differently;

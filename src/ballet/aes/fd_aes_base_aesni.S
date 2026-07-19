@@ -1,6 +1,6 @@
 /* ELF-specific sections — Mach-O has no GNU-stack or note.gnu.property */
-.section .note.GNU-stack,"",@progbits
-
+#if defined(__linux__).section .note.GNU-stack,"",@progbits
+#endif
 /* GNU assembler directives:
  *   Linux  : emit as-is
  *   macOS  : no-op (Mach-O handles alignment/function info differently;
