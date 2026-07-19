@@ -555,10 +555,10 @@ before_credit( fd_diag_tile_t *    ctx,
 #endif
 }
 
-#if defined(__linux__)
 static void
 privileged_init( fd_topo_t const *      topo,
                  fd_topo_tile_t const * tile ) {
+#if defined(__linux__)
   void * scratch = fd_topo_obj_laddr( topo, tile->tile_obj_id );
 
   FD_SCRATCH_ALLOC_INIT( l, scratch );
@@ -623,6 +623,9 @@ privileged_init( fd_topo_t const *      topo,
 
   ctx->proc_stat_fd = open( "/proc/stat", O_RDONLY );
   if( FD_UNLIKELY( -1==ctx->proc_stat_fd       ) ) FD_LOG_ERR(( "open(/proc/stat) failed (%i-%s)",       errno, fd_io_strerror( errno ) ));
+#else
+  (void)topo; (void)tile;
+#endif
 }
 
 /* Read starttime (field 22) from stat file. Returns 0 on success, 1 if
@@ -666,7 +669,6 @@ read_starttime( int     fd,
   *out_starttime_nanos = starttime_ticks * ns_per_tick;
   return 0;
 }
-#endif /* __linux__ */
 
 static void
 unprivileged_init( fd_topo_t const *      topo,
@@ -761,11 +763,13 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
-  (void)topo;
-  (void)tile;
-
+  (void)topo; (void)tile; (void)out_cnt; (void)out;
+#if defined(__linux__)
   populate_sock_filter_policy_fd_diag_tile( out_cnt, out, (uint)fd_log_private_logfile_fd() );
   return sock_filter_policy_fd_diag_tile_instr_cnt;
+#else
+  return 0UL;
+#endif
 }
 
 
