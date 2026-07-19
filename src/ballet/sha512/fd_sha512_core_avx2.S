@@ -6,49 +6,44 @@
 
 /* ELF-specific .note.GNU-stack section — Mach-O has no equivalent */
 #if defined(__linux__)
-#if defined(__linux__)
-#if defined(__linux__)
 .section .note.GNU-stack,"",@progbits
-#endif
-#endif
 #endif
 
 #if defined(__linux__)
-#if defined(__linux__)
 .text
-#endif
 #endif
 
 
 /* GNU assembler directives:
  *   Linux  : emit as-is
- *   macOS  : no-op
+ *   macOS  : no-op (Mach-O handles CFI info differently;
+ *             .type @function and .size are ignored but harmless)
  */
 #if defined(__linux__)
 #define GNU_TYPE(name)     .type name,@function
 #define GNU_SIZE(name,end) .size name,end
 #define GNU_ALIGN(n)       .align n
+#define GNU_PALIGN(n)      .p2align n
+#define GNU_CFI(args...)   __VA_ARGS__
 #define GNU_DATA_TYPE(name) .type name,@object
 #else
 /* All GNU directives are no-ops on macOS */
 #define GNU_TYPE(name)
 #define GNU_SIZE(name,end)
 #define GNU_ALIGN(n)
-#define GNU_DATA_TYPE(name)
+#define GNU_PALIGN(n)
+#define GNU_CFI(args...)
+#define GNU_DATA_TYPE(name) .type name,@function
 #endif
 
 #if defined(__linux__)
-#if defined(__linux__)
 .globl	fd_sha512_core_avx2
-#endif
 #endif
 #if defined(__linux__)
 .type	fd_sha512_core_avx2,@function
 #endif
 #if defined(__linux__)
-#if defined(__linux__)
 .p2align	6
-#endif
 #endif
 fd_sha512_core_avx2:
 #if defined(__linux__)
@@ -112,9 +107,7 @@ fd_sha512_core_avx2:
 	movq	56(%rdi),%r11
 	jmp	.Loop_avx2
 #if defined(__linux__)
-#if defined(__linux__)
 .p2align	4
-#endif
 #endif
 .Loop_avx2:
 	vmovdqu	-128(%rsi),%xmm0
@@ -181,9 +174,7 @@ fd_sha512_core_avx2:
 	addq	$32*8,%rbp
 	jmp	.Lavx2_00_47
 #if defined(__linux__)
-#if defined(__linux__)
 .p2align	4
-#endif
 #endif
 .Lavx2_00_47:
 	leaq	-128(%rsp),%rsp
@@ -1215,9 +1206,7 @@ fd_sha512_core_avx2:
 	movq	%r9,%r12
 	jmp	.Lower_avx2
 #if defined(__linux__)
-#if defined(__linux__)
 .align	16
-#endif
 #endif
 .Lower_avx2:
 	addq	0+16(%rbp),%r11
@@ -1499,9 +1488,7 @@ fd_sha512_core_avx2:
 #endif
 
 #if defined(__linux__)
-#if defined(__linux__)
 .align	128
-#endif
 #endif
 GNU_DATA_TYPE(fd_sha512_core_avx2_k)
 fd_sha512_core_avx2_k:
@@ -1594,34 +1581,25 @@ fd_sha512_core_avx2_k:
 /* .note.gnu.property is ELF-only */
 #if defined(__linux__)
 #if defined(__linux__)
+.section ".note.gnu.property", "a"
+#endif
 #if defined(__linux__)
 .section ".note.gnu.property", "a"
 #endif
-#endif
-#if defined(__linux__)
-#if defined(__linux__)
-.section ".note.gnu.property", "a"
-#endif
-#endif
-#if defined(__linux__)
 GNU_PALIGN(3)
-#endif
 .long 1f - 0f
 .long 4f - 1f
 .long 5
 0:
 .byte 0x47, 0x4e, 0x55, 0
 1:
-#if defined(__linux__)
 GNU_PALIGN(3)
-#endif
 .long 0xc0000002
 .long 3f - 2f
 2:
 .long 3
 3:
-#if defined(__linux__)
 GNU_PALIGN(3)
-#endif
 4:
 #endif
+
