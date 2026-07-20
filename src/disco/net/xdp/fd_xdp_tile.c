@@ -1707,6 +1707,9 @@ unprivileged_init( fd_topo_t const *      topo,
   }
 }
 
+
+
+#if FD_HAS_LINUX
 FD_FN_UNUSED static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
@@ -1724,6 +1727,8 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
   populate_sock_filter_policy_fd_xdp_tile( out_cnt, out, (uint)fd_log_private_logfile_fd(), (uint)ctx->xsk[ 0 ].xsk_fd, (uint)allow_fd2 );
   return sock_filter_policy_fd_xdp_tile_instr_cnt;
 }
+#endif
+
 
 FD_FN_UNUSED static ulong
 populate_allowed_fds( fd_topo_t const *      topo,

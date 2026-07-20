@@ -5,7 +5,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <endian.h>
+#include "fd_resolv_endianness.h"
 #include "fd_lookup.h"
 #include "../../util/io/fd_io.h"
 

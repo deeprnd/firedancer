@@ -66,6 +66,7 @@ fd_compute_mks() {
 # On failure, calls exit 1.
 fd_build_fd() {
   local BUILDDIR="" CC="gcc-12" EXTRAS="" TARGETS="" SRCS="" BUILD_TARGET=""
+  local LDFLAGS_EXE=""
   while [ $# -gt 0 ]; do
     case "$1" in
       BUILDDIR=*) BUILDDIR="${1#BUILDDIR=}"; shift ;;
@@ -74,6 +75,7 @@ fd_build_fd() {
       TARGETS=*) TARGETS="${1#TARGETS=}"; shift ;;
       SRCS=*) SRCS="${1#SRCS=}"; shift ;;
       BUILD_TARGET=*) BUILD_TARGET="${1#BUILD_TARGET=}"; shift ;;
+      LDFLAGS_EXE=*) LDFLAGS_EXE="${1#LDFLAGS_EXE=}"; shift ;;
       *) shift ;; # skip unrecognized args
     esac
   done
@@ -85,12 +87,54 @@ fd_build_fd() {
     SRCS="${FD_TK_LIB_SRCS[*]}"
   fi
 
-  [ -z "${TARGETS}" ] && TARGETS=$(printf '%s\n' "${FD_TK_LIBS[@]}" "${FD_TK_LIBS_EXTRA[@]}" | tr '\n' ' ')
+  # When EXTRAS is set (e.g. "lz4 blst zstd"), the LOCAL_MKS must also
+  # include the corresponding third-party source dirs so their Local.mk
+  # files are found and compiled. Without this, FD_HAS_LZ4/BLST/ZSTD is
+  # defined but the .o files are never produced — ar gets empty lists.
+  if [ -n "${EXTRAS}" ]; then
+    for extra in ${EXTRAS}; do
+      SRCS="${SRCS} src/third_party/${extra}"
+    done
+  fi
+
+  [ -z "${TARGETS}" ] && {
+    if [ -n "${EXTRAS}" ]; then
+      TARGETS=$(printf '%s\n' "${FD_TK_LIBS[@]}" "${FD_TK_LIBS_EXTRA[@]}" | tr '\n' ' ')
+    else
+      TARGETS=$(printf '%s\n' "${FD_TK_LIBS[@]}" | tr '\n' ' ')
+    fi
+  }
 
   local mks
   mks=$(fd_compute_mks ${SRCS})
 
-  local -a cmd=( make -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" )
+  # Use gmake on macOS (GitHub Actions runners ship BSD make 3.81,
+  # but Firedancer's GNUmakefile requires GNU make >= 3.82 for
+  # the 'undefine' directive).
+  # Check all possible Homebrew prefixes since macOS runners vary.
+  local MAKE
+  MAKE=""
+  # Check PATH first (via command -v) — this respects PATH modifications from setup actions
+  if command -v gmake >/dev/null 2>&1; then
+    MAKE="$(command -v gmake)"
+  # Hardcoded Homebrew fallbacks for when PATH isn't set
+  elif [ -x /opt/homebrew/bin/gmake ]; then
+    MAKE="/opt/homebrew/bin/gmake"
+  elif [ -x /usr/local/homebrew/bin/gmake ]; then
+    MAKE="/usr/local/homebrew/bin/gmake"
+  elif [ -x /usr/local/bin/gmake ]; then
+    MAKE="/usr/local/bin/gmake"
+  # GNU make may be installed as 'make' on newer Homebrew (gmake formula removed)
+  elif [ -x /opt/homebrew/bin/make ]; then
+    MAKE="/opt/homebrew/bin/make"
+  elif [ -x /usr/local/homebrew/bin/make ]; then
+    MAKE="/usr/local/homebrew/bin/make"
+  elif command -v make >/dev/null 2>&1; then
+    MAKE="$(command -v make)"
+  fi
+
+  local -a cmd=( "$MAKE" -j"$(fd_nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" )
+  [ -n "${LDFLAGS_EXE}" ] && cmd+=( "LDFLAGS_EXE=${LDFLAGS_EXE}" )
   [ -n "${EXTRAS}" ] && cmd+=( "EXTRAS=${EXTRAS}" )
   cmd+=( "CC=${CC}" )
   cmd+=( "LOCAL_MKS=${mks}" )
@@ -109,4 +153,16 @@ fd_lib_prefix() {
     result+=("${prefix}/${lib}")
   done
   printf '%s\n' "${result[@]}"
+}
+
+# Portable nproc wrapper — macOS has no nproc.
+# Usage: local jobs; jobs=$(fd_nproc)
+fd_nproc() {
+  if command -v nproc >/dev/null 2>&1; then
+    nproc
+  elif command -v sysctl >/dev/null 2>&1; then
+    sysctl -n hw.ncpu
+  else
+    echo 1
+  fi
 }

@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#if FD_HAS_LINUX
 #include <features.h>
+#endif
 #include <netinet/in.h>
 #include "fd_netdb.h"
 

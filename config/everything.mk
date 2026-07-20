@@ -323,10 +323,10 @@ $(OBJDIR)/obj/%.check : src/%.c
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -fsyntax-only $<
 
 $(OBJDIR)/lib/%.a :
-	@echo -e "AR\t$(notdir $@)"
+	@echo -e "AR	$(notdir $@)"
 	$(Q)$(MKDIR) $(dir $@) && \
-$(RM) $@ && \
-$(AR) $(ARFLAGS) $@ $^
+	$(RM) $@ && \
+	if [ -n "$$^" ]; then $(AR) $(ARFLAGS) $@ $$(for _o in $^; do [ -s "$$_o" ] && echo "$$_o"; done); else touch $@; fi
 
 $(OBJDIR)/include/firedancer/% : src/%
 	$(Q)$(MKDIR) $(dir $@) && \
@@ -447,10 +447,10 @@ $(OBJDIR)/cov/cov.profdata: $(wildcard $(OBJDIR)/cov/raw/*.profraw)
 .PHONY: $(OBJDIR)/cov/mappings.ar
 $(OBJDIR)/cov/mappings.ar:
 	rm -f $(OBJDIR)/cov/mappings.ar &&                        \
-  $(MKDIR) $(dir $@) &&                                       \
-  $(FIND) $(addsuffix /obj,$(OBJDIR)) -name '*.o' -exec sh -c \
-    '[ -n "`llvm-objdump -h $$1 | $(GREP) llvm_covmap`" ]     \
-    && llvm-ar --thin q $@ $$1' sh {} \;
+	$(MKDIR) $(dir $@) &&                                       \
+	$(FIND) $(addsuffix /obj,$(OBJDIR)) -name '*.o' -exec sh -c \
+	'	[ -n "`llvm-objdump -h $$1 | $(GREP) llvm_covmap`" ]     \
+		&& llvm-ar --thin q $@ $$1' sh {} \;
 
 # llvm-cov step 1.5
 $(OBJDIR)/cov/cov.lcov: $(addsuffix /cov/cov.profdata,$(OBJDIR)) $(OBJDIR)/cov/mappings.ar
@@ -458,10 +458,10 @@ ifeq ($(OBJDIR),)
 	echo "No profile data found. Did you set OBJDIRS?" >&2 && exit 1
 endif
 	$(LLVM_COV) export                    \
-  -format=lcov                          \
-  $(addprefix -instr-profile=,$<)       \
-  $(OBJDIR)/cov/mappings.ar             \
-  --ignore-filename-regex="((test_|fuzz_).*\\.c|third_party/)" \
+	-format=lcov                          \
+	$(addprefix -instr-profile=,$<)       \
+	$(OBJDIR)/cov/mappings.ar             \
+	--ignore-filename-regex="((test_|fuzz_).*\\.c|third_party/)" \
 > $@
 
 # llvm-cov step 2.1

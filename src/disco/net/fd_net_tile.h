@@ -114,7 +114,7 @@ void
 fd_topos_net_tile_finish( fd_topo_t * topo,
                           ulong       net_kind_id );
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
 
 /* fd_topo_install_xdp installs XDP programs to all network devices used
    by the topology.  This creates a number of file descriptors which
@@ -148,7 +148,7 @@ fd_topo_install_xdp_simple( fd_topo_t const * topo,
   fd_topo_install_xdp( topo, fds, &fds_cnt, bind_addr, 0 );
 }
 
-#endif /* defined(__linux__) */
+#endif /* FD_HAS_LINUX */
 
 FD_PROTOTYPES_END
 

@@ -284,16 +284,23 @@ unprivileged_init( fd_topo_t const *      topo,
   fd_sleep_until_replay_started( topo );
 }
 
+
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
+#if FD_HAS_LINUX
   (void)topo;
   (void)tile;
 
   populate_sock_filter_policy_fd_poh_tile( out_cnt, out, (uint)fd_log_private_logfile_fd() );
   return sock_filter_policy_fd_poh_tile_instr_cnt;
+#else
+  (void)topo; (void)tile;
+  (void)out_cnt; (void)out;
+  return 0UL;
+#endif
 }
 
 static ulong

@@ -75,6 +75,22 @@ static void populate_sock_filter_policy_fd_verify_tile( ulong out_cnt, struct so
   fd_memcpy( out, filter, sizeof( filter ) );
 }
 
-#endif /* defined(__linux__) */
+
+#else /* !defined(__linux__) */
+
+/* Stub seccomp implementation for non-Linux platforms.
+   On macOS/Windows, seccomp filtering is not available.
+   These are no-op functions. */
+
+static const uint sock_filter_policy_fd_verify_tile_instr_cnt = 0;
+
+static void populate_sock_filter_policy_fd_verify_tile( ulong out_cnt, void *out, uint logfile_fd ) {
+  (void)out_cnt;
+  (void)out;
+  (void)logfile_fd;
+  /* On non-Linux, no seccomp filtering is applied */
+}
+
+#endif /* !defined(__linux__) */
 
 #endif /* HEADER_fd_src_disco_verify_generated_fd_verify_tile_seccomp_h */

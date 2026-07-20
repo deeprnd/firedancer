@@ -5,6 +5,25 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#if FD_HAS_MACOS
+#include <sys/ioctl.h>
+#endif
+
+/* fallocate is Linux-only. On macOS use fcntl(F_FULLSYNC) for sync,
+   or simply skip pre-allocation since the file grows naturally. */
+#if !FD_HAS_LINUX
+static inline int fd_shredb_fallocate( int fd, int mode, off_t offset, off_t len ) {
+  (void)mode; (void)offset; (void)len;
+  /* macOS: don't pre-allocate, file grows naturally via pwrite */
+  return 0;
+}
+#else
+#include <linux/falloc.h>
+static inline int fd_shredb_fallocate( int fd, int mode, off_t offset, off_t len ) {
+  return fallocate( fd, mode, offset, len );
+}
+#endif
+
 static inline ulong
 fd_shredb_max_shreds_for_gib( ulong max_size_gib ) {
   return (max_size_gib*1024UL*1024UL*1024UL) / sizeof(fd_shredb_entry_t);
@@ -97,7 +116,7 @@ fd_shredb_new( void       * shmem,
 
   ulong initial_shreds = 128UL;
   ulong initial_sz     = initial_shreds * sizeof(fd_shredb_entry_t);
-  if( FD_UNLIKELY( fallocate( fd, 0, 0, (off_t)initial_sz ) ) ) {
+  if( FD_UNLIKELY( fd_shredb_fallocate( fd, 0, 0, (off_t)initial_sz ) ) ) {
     FD_LOG_WARNING(( "fallocate failed (%i-%s)", errno, fd_io_strerror( errno ) ));
     close( fd );
     return NULL;
@@ -206,7 +225,7 @@ fd_shredb_insert( fd_shredb_t      * store,
     ulong old_file_sz     = store->file_shreds * sizeof(fd_shredb_entry_t);
     ulong new_file_shreds = fd_ulong_min( store->file_shreds * 2UL, store->max_shreds );
     ulong new_file_sz     = new_file_shreds * sizeof(fd_shredb_entry_t);
-    if( FD_UNLIKELY( fallocate( store->fd, 0, (off_t)old_file_sz, (off_t)(new_file_sz - old_file_sz) ) ) ) {
+    if( FD_UNLIKELY( fd_shredb_fallocate( store->fd, 0, (off_t)old_file_sz, (off_t)(new_file_sz - old_file_sz) ) ) ) {
       FD_LOG_ERR(( "fallocate failed (%i-%s)", errno, fd_io_strerror( errno ) ));
     }
     store->file_shreds = new_file_shreds;
