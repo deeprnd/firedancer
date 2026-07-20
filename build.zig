@@ -485,6 +485,12 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
             });
         const t = b.addTest(.{ .root_module = t_mod });
+        if (std.mem.eql(u8, path, "src/tickoni/util/tier.zig")) {
+            t.root_module.addCSourceFiles(.{
+                .files = &.{ "src/tickoni/util/compiler_version.c" },
+            });
+            t.root_module.link_libc = true;
+        }
         if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig") or
             std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline/mod.zig"))
         {
@@ -1384,6 +1390,9 @@ pub fn build(b: *std.Build) void {
     const cli_exe = b.addExecutable(.{
         .name = "tickoni",
         .root_module = cli_main_mod,
+    });
+    cli_exe.root_module.addCSourceFiles(.{
+        .files = &.{ "src/tickoni/util/compiler_version.c" },
     });
     cli_exe.root_module.addLibraryPath(b.path(fd_lib_dir));
     cli_exe.root_module.linkSystemLibrary("fd_util", .{});

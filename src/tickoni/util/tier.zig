@@ -59,6 +59,12 @@ pub fn detectArchString() []const u8 {
     };
 }
 
+/// Return the compiler version string (clang, gcc, etc.).
+pub extern "c" fn tickoni_compiler_version() [*:0]const u8;
+pub fn detectCompilerVersion() []const u8 {
+    return std.mem.sliceTo(tickoni_compiler_version(), 0);
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -118,27 +124,35 @@ test "detectArchString is non-empty" {
 
 test "version output format validates" {
     var buf: [256]u8 = undefined;
-    const line = std.fmt.bufPrint(&buf, "{s} {s} ({s} {s})\n", .{
+    const line = std.fmt.bufPrint(&buf, "{s} {s} ({s} {s} {s})\n", .{
         "0.1.1",
         tierName(detectTier()),
         detectOsString(),
         detectArchString(),
+        detectCompilerVersion(),
     }) catch unreachable;
 
-    // Format: "<ver> <tier> (<os> <arch>)<newline>"
+    // Format: "<ver> <tier> (<os> <arch> <compiler>)<newline>"
     try std.testing.expect(std.mem.startsWith(u8, line, "0.1.1 "));
     try std.testing.expect(std.mem.endsWith(u8, line, ")\n"));
 }
 
 test "version output ends with single newline" {
     var buf: [256]u8 = undefined;
-    const line = std.fmt.bufPrint(&buf, "{s} {s} ({s} {s})\n", .{
+    const line = std.fmt.bufPrint(&buf, "{s} {s} ({s} {s} {s})\n", .{
         "0.1.1",
         tierName(detectTier()),
         detectOsString(),
         detectArchString(),
+        detectCompilerVersion(),
     }) catch unreachable;
     try std.testing.expect(std.mem.endsWith(u8, line, "\n"));
+}
+
+test "detectCompilerVersion returns non-empty string" {
+    const cv = detectCompilerVersion();
+    try std.testing.expect(cv.len > 0);
+    try std.testing.expect(std.mem.indexOf(u8, cv, " ") != null or cv.len < 30);
 }
 
 test "detectTier returns a valid Tier" {
