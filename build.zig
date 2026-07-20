@@ -1365,6 +1365,11 @@ pub fn build(b: *std.Build) void {
     const live_model_step = b.step("integration-test-live-model", "Alias for the live V1.1 system/demo lane");
     live_model_step.dependOn(system_step);
 
+    const tier_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/util/tier.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const cli_main_mod = b.createModule(.{
         .root_source_file = b.path("src/app/tickoni_cli/main.zig"),
         .target = target,
@@ -1372,6 +1377,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "clap", .module = clap_mod },
             .{ .name = "investment_demo", .module = investment_demo_mod },
+            .{ .name = "tier", .module = tier_mod },
         },
     });
     const cli_exe = b.addExecutable(.{
