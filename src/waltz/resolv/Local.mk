@@ -15,7 +15,11 @@ $(call add-objs,fd_lookup_name fd_lookup_ipliteral,fd_waltz)
 # Platform-abstracted DNS send (algorithm + Linux/macos impls)
 $(call add-hdrs,fd_res_msend.h,fd_resolv_endianness.h)
 $(call add-objs,fd_res_msend,fd_waltz)
-$(call add-objs,fd_res_msend_linux fd_res_msend_macos,fd_waltz)
+ifdef FD_HAS_LINUX
+$(call add-objs,fd_res_msend_linux,fd_waltz)
+else
+$(call add-objs,fd_res_msend_macos,fd_waltz)
+endif
 
 # Low level DNS
 $(call add-hdrs,fd_resolv.h)
