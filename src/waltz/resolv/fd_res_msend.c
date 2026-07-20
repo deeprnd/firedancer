@@ -1,25 +1,15 @@
-#if FD_HAS_LINUX
-#define _GNU_SOURCE /* SYS_close */
-#else
-#define _DARWIN_C_SOURCE /* POSIX/C99 extensions on macOS */
-#endif
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <stdint.h>
 #include <string.h>
 #include <poll.h>
-#include <fcntl.h>
 #include <time.h>
-#include <unistd.h>
 #include <errno.h>
-#include <pthread.h>
-#if FD_HAS_LINUX
-#include <sys/syscall.h>
-#endif
+#include <unistd.h>
 #include "fd_lookup.h"
+#include "fd_res_msend.h"
 #include "../../util/fd_util.h"
 
 #pragma GCC diagnostic ignored "-Wconversion"
@@ -29,13 +19,8 @@
 static void
 cleanup( struct pollfd * pfd ) {
   for( int i=0; pfd[i].fd >= -1; i++ ) {
-    if( pfd[i].fd >= 0 ) {
-#if FD_HAS_LINUX
-      syscall( SYS_close, pfd[i].fd );
-#else
-      close( pfd[i].fd );
-#endif
-    }
+    if( pfd[i].fd >= 0 )
+      fd_close( pfd[i].fd );
   }
 }
 
@@ -46,54 +31,6 @@ mtime( void ) {
     clock_gettime( CLOCK_REALTIME, &ts );
   return (ulong)ts.tv_sec * 1000
     + ts.tv_nsec / 1000000;
-}
-
-static int
-start_tcp( struct pollfd * pfd,
-           int             family,
-           void const *    sa,
-           socklen_t       sl,
-           uchar const *   q,
-           int             ql ) {
-  struct msghdr mh = {
-    .msg_name    = (void *)sa,
-    .msg_namelen = sl,
-    .msg_iovlen  = 2,
-    .msg_iov = (struct iovec [2]){
-      { .iov_base = (uint8_t[]){ ql>>8, ql }, .iov_len = 2 },
-      { .iov_base = (void *)q, .iov_len = ql } },
-    .msg_control    = NULL,
-    .msg_controllen = 0,
-    .msg_flags      = 0
-  };
-#if FD_HAS_LINUX
-  int fd = socket( family, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0 );
-#else
-  int fd = socket( family, SOCK_STREAM, 0 );
-  if( fd >= 0 ) {
-    int flags = fcntl( fd, F_GETFL );
-    if( flags >= 0 ) fcntl( fd, F_SETFL, flags | O_NONBLOCK );
-  }
-#endif
-  pfd->fd = fd;
-  pfd->events = POLLOUT;
-
-#if FD_HAS_LINUX
-  /* TCP Fast Open (Linux only) */
-  if( !setsockopt( fd, IPPROTO_TCP, TCP_FASTOPEN_CONNECT,
-      &(int){1}, sizeof(int) ) ) {
-    int r = sendmsg( fd, &mh, MSG_FASTOPEN|MSG_NOSIGNAL );
-    if( r == ql+2 ) pfd->events = POLLIN;
-    if( r >= 0 ) return r;
-    if( errno == EINPROGRESS ) return 0;
-  }
-#endif
-
-  int r = connect( fd, sa, sl );
-  if( !r || errno == EINPROGRESS ) return 0;
-  close( fd );
-  pfd->fd = -1;
-  return -1;
 }
 
 static void
@@ -156,15 +93,7 @@ fd_res_msend_rc( int                     nqueries,
   }
 
   /* Get local address and open/bind a socket */
-#if FD_HAS_LINUX
-  fd = socket( family, SOCK_DGRAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0 );
-#else
-  fd = socket( family, SOCK_DGRAM, 0 );
-  if( fd >= 0 ) {
-    int flags = fcntl( fd, F_GETFL );
-    if( flags >= 0 ) fcntl( fd, F_SETFL, flags | O_NONBLOCK );
-  }
-#endif
+  fd = fd_socket_create( family, SOCK_DGRAM );
 
   /* Handle case where system lacks IPv6 support */
   if( fd < 0 && family == AF_INET6 && errno == EAFNOSUPPORT ) {
@@ -172,15 +101,7 @@ fd_res_msend_rc( int                     nqueries,
     if( i==nns ) {
       return -1;
     }
-#if FD_HAS_LINUX
-    fd = socket( AF_INET, SOCK_DGRAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0 );
-#else
-    fd = socket( AF_INET, SOCK_DGRAM, 0 );
-    if( fd >= 0 ) {
-      int flags = fcntl( fd, F_GETFL );
-      if( flags >= 0 ) fcntl( fd, F_SETFL, flags | O_NONBLOCK );
-    }
-#endif
+    fd = fd_socket_create( AF_INET, SOCK_DGRAM );
     family = AF_INET;
     sl = sizeof sa.sin;
   }
@@ -228,7 +149,7 @@ fd_res_msend_rc( int                     nqueries,
     if( i==nqueries ) break;
 
     if( t2-t1 >= retry_interval ) {
-      /* Query all configured namservers in parallel */
+      /* Query all configured nameservers in parallel */
       for( i=0; i<nqueries; i++ )
         if( !alens[i] )
           for( j=0; j<nns; j++ )
@@ -301,7 +222,7 @@ fd_res_msend_rc( int                     nqueries,
       /* If answer is truncated (TC bit), fallback to TCP */
       if( (answers[i][2] & 2) || (mh.msg_flags & MSG_TRUNC) ) {
         alens[i] = -1;
-        int r = start_tcp( pfd+i, family, ns+j, sl, queries[i], qlens[i] );
+        int r = fd_start_tcp( pfd+i, family, ns+j, sl, queries[i], qlens[i] );
         if( r >= 0 ) {
           qpos[i] = r;
           apos[i] = 0;
@@ -313,12 +234,12 @@ fd_res_msend_rc( int                     nqueries,
     for( i=0; i<nqueries; i++ ) if( pfd[i].revents & POLLOUT ) {
       struct msghdr mh = {
         .msg_iovlen = 2,
-        .msg_iov = (struct iovec [2]){
-          { .iov_base = (uint8_t[]){ qlens[i]>>8, qlens[i] }, .iov_len = 2 },
-          { .iov_base = (void *)queries[i], .iov_len = qlens[i] } },
-        .msg_control    = NULL,
-        .msg_controllen = 0,
-        .msg_flags      = 0
+        .msg_iov = (struct iovec [2]){\
+          { .iov_base = (uint8_t[]){ qlens[i]>>8, qlens[i] }, .iov_len = 2 },\
+          { .iov_base = (void *)queries[i], .iov_len = qlens[i] } },\
+        .msg_control    = NULL,\
+        .msg_controllen = 0,\
+        .msg_flags      = 0\
       };
       step_mh( &mh, qpos[i] );
       int r = sendmsg( pfd[i].fd, &mh, MSG_NOSIGNAL );
@@ -331,12 +252,12 @@ fd_res_msend_rc( int                     nqueries,
     for( i=0; i<nqueries; i++ ) if( pfd[i].revents & POLLIN ) {
       struct msghdr mh = {
         .msg_iovlen = 2,
-        .msg_iov = (struct iovec [2]){
-          { .iov_base = alen_buf[i], .iov_len = 2 },
-          { .iov_base = answers[i], .iov_len = asize } },
-        .msg_control    = NULL,
-        .msg_controllen = 0,
-        .msg_flags      = 0
+        .msg_iov = (struct iovec [2]){\
+          { .iov_base = alen_buf[i], .iov_len = 2 },\
+          { .iov_base = answers[i], .iov_len = asize } },\
+        .msg_control    = NULL,\
+        .msg_controllen = 0,\
+        .msg_flags      = 0\
       };
       step_mh( &mh, apos[i] );
       int r = recvmsg( pfd[i].fd, &mh, 0 );
@@ -355,11 +276,7 @@ fd_res_msend_rc( int                     nqueries,
          Immediately close TCP socket so as not to consume
          resources we no longer need. */
       alens[i] = alen;
-#if FD_HAS_LINUX
-      syscall( SYS_close, pfd[i].fd );
-#else
-      close( pfd[i].fd );
-#endif
+      fd_close( pfd[i].fd );
       pfd[i].fd = -1;
     }
   }

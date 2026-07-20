@@ -12,6 +12,7 @@
 #include <errno.h>
 #include "fd_resolv.h"
 #include "fd_lookup.h"
+#include "fd_res_msend.h"
 #include "fd_io_readline.h"
 #include "../../util/cstr/fd_cstr.h"
 #include "../../util/log/fd_log.h"
@@ -417,11 +418,7 @@ fd_lookup_name( struct address buf[ static MAXADDRS ],
     int dlabel = dpolicy->label;
     int dprec = dpolicy->prec;
     int prefixlen = 0;
-    int sock_flags = SOCK_DGRAM;
-#if FD_HAS_LINUX
-    sock_flags |= SOCK_CLOEXEC;
-#endif
-    int fd = socket( family, sock_flags, IPPROTO_UDP );
+    int fd = fd_socket_create( family, SOCK_DGRAM );
     if( fd >= 0 ) {
       if( !connect( fd, da, dalen ) ) {
         key |= DAS_USABLE;
