@@ -1,9 +1,19 @@
 const clap = @import("clap");
 const demo = @import("investment_demo");
 const std = @import("std");
+const tier = @import("tier");
+
+/// Return compiler version string (clang, gcc, etc.) via __VERSION__.
+pub extern "c" fn tickoni_compiler_version() [*:0]const u8;
+pub fn compilerVersion() []const u8 {
+    return std.mem.sliceTo(tickoni_compiler_version(), 0);
+}
+
+pub const version_str = "0.1.1";
 
 const MainCommand = enum {
     demo,
+    version,
 };
 
 const DemoCommand = enum {
@@ -67,6 +77,20 @@ pub fn main(init: std.process.Init) !void {
 
     switch (res.positionals[0].?) {
         .demo => try demoMain(gpa, init.io, &iter),
+        .version => {
+            var fmt_buf: [512]u8 = undefined;
+            const line = std.fmt.bufPrint(&fmt_buf, "{s} {s} ({s} {s} {s})\n", .{
+                version_str,
+                tier.tierName(tier.detectTier()),
+                tier.detectOsString(),
+                tier.detectArchString(),
+                compilerVersion(),
+            }) catch unreachable;
+            var write_buf: [256]u8 = undefined;
+            var sw = std.Io.File.stdout().writer(init.io, &write_buf);
+            try sw.interface.writeAll(line);
+            try sw.flush();
+        },
     }
 }
 

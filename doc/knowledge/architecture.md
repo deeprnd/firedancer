@@ -214,7 +214,8 @@ next runtime hardening step is to replace those spike rings with the selected
 shared-memory backing while keeping the same tile identities and link answers.
 
 That hardening step must use real Firedancer-style substrate, not just Zig
-workers named as tiles. In Linux full-runtime process mode:
+workers named as tiles. For tier scope, see
+[`platform-tiers.md`](platform-tiers.md). In Linux full-runtime process mode:
 
 - each configured tile runs as a supervisor-managed OS process with its own
   address space; a thread-only topology may remain for fast dev/unit tests but

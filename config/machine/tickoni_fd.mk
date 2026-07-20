@@ -31,9 +31,22 @@ LOCAL_MKS := $(filter src/tango/% src/util/% src/ballet/% src/disco/% src/waltz/
 LOCAL_MKS := $(filter-out src/discof/% src/disco/tickoni/% src/flamenco/% src/choreo/% src/app/platform/%,$(LOCAL_MKS))
 endif
 
-# Use native detection for compiler feature flags.
+# Platform-specific config.
+# On macOS, use the dedicated macOS build profile which auto-detects
+# architecture (Apple Silicon vs Intel) and sets correct flags.
+# On Linux, use native detection (native_config.sh).
+UNAME?=$(shell uname)
+ifeq ($(UNAME), Darwin)
+  include config/machine/macos_clang.mk
+else
 include config/machine/native.mk
+endif
 include config/extra/with-hosted.mk
+
+# Platform-specific FD_HAS_* macros are now defined in base.mk for all
+# MACHINE profiles. The block below is intentionally removed — base.mk
+# already sets FD_HAS_LINUX/FD_HAS_HOSTED/FD_HAS_MACOS based on UNAME,
+# and adding it here would duplicate work. See base.mk for details.
 
 # Parse EXTRAS from the command line to include corresponding with-*.mk files.
 # This is necessary because tickoni_fd.mk overrides LOCAL_MKS and doesn't

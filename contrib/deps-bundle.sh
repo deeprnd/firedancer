@@ -20,8 +20,12 @@ cd -- "$( dirname -- "${BASH_SOURCE[0]}" )"/..
 
 rm -f deps-bundle.tar.zst
 
-tar -Izstd -cf deps-bundle.tar.zst \
-  ./opt/{include,lib}
+# macOS system tar doesn't support -Izstd (no libzstd), so pipe through zstd.
+if tar --help 2>&1 | grep -q '\-I'; then
+  tar -Izstd -cf deps-bundle.tar.zst ./opt/{include,lib}
+else
+  tar -cf - ./opt/{include,lib} | zstd > deps-bundle.tar.zst
+fi
 
 echo "[+] Created deps-bundle.tar.zst"
 

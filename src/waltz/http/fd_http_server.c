@@ -16,6 +16,54 @@
 #include <strings.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#if defined(__APPLE__)
+/* macOS lacks Linux-specific socket features. We use fcntl() for non-blocking
+ * and close-on-exec, then define the flags as 0 so the caller-side code
+ * (SOCK_STREAM | SOCK_NONBLOCK) stays unchanged.
+ */
+#include <fcntl.h>
+#ifndef SOCK_NONBLOCK
+#define SOCK_NONBLOCK 0
+#endif
+#ifndef SOCK_CLOEXEC
+#define SOCK_CLOEXEC 0
+#endif
+
+/* macOS has no accept4() — provide a compat shim that calls accept() then
+ * sets O_NONBLOCK and/or FD_CLOEXEC via fcntl().
+ */
+static inline int
+accept4_compat( int            sockfd,
+                struct sockaddr *addr,
+                socklen_t      *addrlen,
+                int              flags ) {
+  int fd = accept( sockfd, addr, addrlen );
+  if( fd >= 0 ) {
+    if( flags & O_NONBLOCK ) {
+      int fl = fcntl( fd, F_GETFL );
+      if( fl >= 0 ) fcntl( fd, F_SETFL, fl | O_NONBLOCK );
+    }
+    if( flags & O_CLOEXEC ) {
+      int fl = fcntl( fd, F_GETFD );
+      if( fl >= 0 ) fcntl( fd, F_SETFD, fl | FD_CLOEXEC );
+    }
+  }
+  return fd;
+}
+#define accept4( s, a, b, f ) accept4_compat( s, a, b, f )
+
+/* macOS doesn't define these Linux-specific errno values. They are used
+ * only in is_expected_network_error() to decide whether to drop a conn;
+ * defining them as 0 means they'll never match an actual errno, which is
+ * safe — macOS simply never returns them.
+ */
+#ifndef EHOSTDOWN
+#define EHOSTDOWN 0
+#endif
+#ifndef ENONET
+#define ENONET 0
+#endif
+#endif
 
 #define FD_HTTP_SERVER_POLL_CHUNK_SZ 128UL
 

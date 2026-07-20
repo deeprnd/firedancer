@@ -12,6 +12,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#if FD_HAS_LINUX
+#define FD_SSPING_SOL_TCP SOL_TCP
+#else
+#define FD_SSPING_SOL_TCP IPPROTO_TCP
+#endif
 #include <poll.h>
 
 #define PEER_STATE_UNPINGED   0
@@ -183,8 +188,8 @@ fd_ssping_new( void *                 shmem,
     }
 
     int tcp_nodelay = 1;
-    if( FD_UNLIKELY( setsockopt( next_fd, SOL_TCP, TCP_NODELAY, &tcp_nodelay, sizeof(int) ) ) ) {
-      FD_LOG_ERR(( "setsockopt(SOL_TCP,TCP_NODELAY,1) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+    if( FD_UNLIKELY( setsockopt( next_fd, FD_SSPING_SOL_TCP, TCP_NODELAY, &tcp_nodelay, sizeof(int) ) ) ) {
+      FD_LOG_ERR(( "setsockopt(FD_SSPING_SOL_TCP,TCP_NODELAY,1) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
     }
     ssping->idle_fds[ i ] = next_fd;
 

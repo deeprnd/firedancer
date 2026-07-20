@@ -8,6 +8,9 @@
 #include "../../util/net/fd_ip4.h"
 #include "../../util/net/fd_udp.h"
 
+/* macOS doesn't support sendmmsg/recvmmsg - skip this file entirely */
+#if defined(__linux__)
+
 /* FD_UDPSOCK_FRAME_ALIGN is the alignment of a packet frame */
 
 #define FD_UDPSOCK_FRAME_ALIGN (16UL)
@@ -416,3 +419,4 @@ fd_udpsock_set_layer( fd_udpsock_t * sock,
   }
   return sock;
 }
+#endif /* defined(__linux__) */

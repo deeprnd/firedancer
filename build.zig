@@ -273,9 +273,151 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_exe.step);
 
     // ---------------------------------------------------------------------------
+    // Test / integration / system / coverage steps — gated behind --test flag
+    // so `zig build` alone never compiles test binaries (important for macOS
+    // CI where we only need the exe).  Use `zig build --test` to compile + run
+    // them.
+    // ---------------------------------------------------------------------------
+    const tkpoly_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/policy/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_mod },
+            .{ .name = "portfolio", .module = portfolio_mod },
+            .{ .name = "thesis", .module = thesis_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_mod },
+        },
+    });
+
+    const model_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "model_messages", .module = model_messages_mod },
+            .{ .name = "mock_model", .module = mock_model_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
+        },
+    });
+    const adapter_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/adapter/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_mod },
+            .{ .name = "portfolio", .module = portfolio_mod },
+            .{ .name = "fixture_portfolio", .module = fixture_portfolio_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_mod },
+            .{ .name = "adapter_messages", .module = adapter_messages_mod },
+        },
+    });
+    const tool_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/tool/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "adapter", .module = adapter_int_mod },
+            .{ .name = "basket", .module = basket_mod },
+            .{ .name = "portfolio", .module = portfolio_mod },
+            .{ .name = "fixture_portfolio", .module = fixture_portfolio_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_mod },
+        },
+    });
+    const case_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/case/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const disp_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/disp/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const agent_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/agent/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "adapter", .module = adapter_int_mod },
+            .{ .name = "mock_adapter", .module = mock_adapter_mod },
+            .{ .name = "basket", .module = basket_mod },
+            .{ .name = "disp", .module = disp_int_mod },
+            .{ .name = "model", .module = model_int_mod },
+            .{ .name = "mock_model", .module = mock_model_mod },
+            .{ .name = "portfolio", .module = portfolio_mod },
+            .{ .name = "tkpoly", .module = tkpoly_int_mod },
+            .{ .name = "tool", .module = tool_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_mod },
+            .{ .name = "capability", .module = capability_mod },
+        },
+    });
+    const replay_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/tiles/replay/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "adapter", .module = adapter_int_mod },
+            .{ .name = "basket", .module = basket_mod },
+            .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "drift", .module = drift_mod },
+            .{ .name = "model", .module = model_int_mod },
+            .{ .name = "portfolio", .module = portfolio_mod },
+            .{ .name = "tkpoly", .module = tkpoly_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_mod },
+        },
+    });
+    const investment_audit_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test/demo/investment/audit_trace.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "audit_tile", .module = audit_tile_mod },
+            .{ .name = "basket", .module = basket_mod },
+            .{ .name = "drift", .module = drift_mod },
+            .{ .name = "model", .module = model_int_mod },
+            .{ .name = "portfolio", .module = portfolio_mod },
+            .{ .name = "replay", .module = replay_int_mod },
+            .{ .name = "thesis", .module = thesis_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_mod },
+        },
+    });
+    const investment_support_int_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test/demo/investment/support.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "basket", .module = basket_mod },
+            .{ .name = "thesis", .module = thesis_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_mod },
+        },
+    });
+    const investment_demo_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/test/demo/investment/mod.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "adapter", .module = adapter_int_mod },
+            .{ .name = "basket", .module = basket_mod },
+            .{ .name = "cards", .module = cards_mod },
+            .{ .name = "drift", .module = drift_mod },
+            .{ .name = "impact", .module = impact_mod },
+            .{ .name = "investment_support", .module = investment_support_int_mod },
+            .{ .name = "model", .module = model_int_mod },
+            .{ .name = "portfolio", .module = portfolio_mod },
+            .{ .name = "replay", .module = replay_int_mod },
+            .{ .name = "thesis", .module = thesis_mod },
+            .{ .name = "tkpoly", .module = tkpoly_int_mod },
+            .{ .name = "tool", .module = tool_int_mod },
+            .{ .name = "trade_ticket", .module = trade_ticket_mod },
+        },
+    });
+    const investment_demo_test = b.addTest(.{ .root_module = investment_demo_mod });
+
+    // ---------------------------------------------------------------------------
     // Test step — offline Tickoni unit tests only.
     // Pure logic and fixture/mock-backed proofs belong here; no running servers.
-    // Run with: zig build test
+    // Run with: zig build --test test
     // ---------------------------------------------------------------------------
     const test_step = b.step("test", "Run offline Tickoni unit tests");
 
@@ -285,6 +427,7 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/runtime/tile.zig",
         "src/tickoni/util/cpu.zig",
         "src/tickoni/util/process.zig",
+        "src/tickoni/util/tier.zig",
         "src/tickoni/util/linux_ids.zig",
         "src/tickoni/util/sizes.zig",
         "src/tickoni/util/sandbox_defaults.zig",
@@ -342,6 +485,12 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
             });
         const t = b.addTest(.{ .root_module = t_mod });
+        if (std.mem.eql(u8, path, "src/tickoni/util/tier.zig")) {
+            t.root_module.addCSourceFiles(.{
+                .files = &.{ "src/tickoni/util/compiler_version.c" },
+            });
+            t.root_module.link_libc = true;
+        }
         if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig") or
             std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline/mod.zig"))
         {
@@ -910,141 +1059,6 @@ pub fn build(b: *std.Build) void {
     // Schema modules are shared (thesis_mod, basket_mod, portfolio_mod, etc.).
     // Integration tile modules are fresh instances so they don't inherit any
     // C source additions from the unit test lane.
-    const tkpoly_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/tiles/policy/mod.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "basket", .module = basket_mod },
-            .{ .name = "portfolio", .module = portfolio_mod },
-            .{ .name = "thesis", .module = thesis_mod },
-            .{ .name = "trade_ticket", .module = trade_ticket_mod },
-        },
-    });
-
-    const model_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/tiles/model/mod.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "model_messages", .module = model_messages_mod },
-            .{ .name = "mock_model", .module = mock_model_mod },
-            .{ .name = "c_abi", .module = c_abi_mod },
-        },
-    });
-    const adapter_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/tiles/adapter/mod.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "basket", .module = basket_mod },
-            .{ .name = "portfolio", .module = portfolio_mod },
-            .{ .name = "fixture_portfolio", .module = fixture_portfolio_mod },
-            .{ .name = "trade_ticket", .module = trade_ticket_mod },
-            .{ .name = "adapter_messages", .module = adapter_messages_mod },
-        },
-    });
-    const tool_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/tiles/tool/mod.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "adapter", .module = adapter_int_mod },
-            .{ .name = "basket", .module = basket_mod },
-            .{ .name = "portfolio", .module = portfolio_mod },
-            .{ .name = "fixture_portfolio", .module = fixture_portfolio_mod },
-            .{ .name = "trade_ticket", .module = trade_ticket_mod },
-        },
-    });
-    const case_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/tiles/case/mod.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    const disp_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/tiles/disp/mod.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    const agent_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/tiles/agent/mod.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "adapter", .module = adapter_int_mod },
-            .{ .name = "mock_adapter", .module = mock_adapter_mod },
-            .{ .name = "basket", .module = basket_mod },
-            .{ .name = "disp", .module = disp_int_mod },
-            .{ .name = "model", .module = model_int_mod },
-            .{ .name = "mock_model", .module = mock_model_mod },
-            .{ .name = "portfolio", .module = portfolio_mod },
-            .{ .name = "tkpoly", .module = tkpoly_int_mod },
-            .{ .name = "tool", .module = tool_int_mod },
-            .{ .name = "trade_ticket", .module = trade_ticket_mod },
-            .{ .name = "capability", .module = capability_mod },
-        },
-    });
-    const replay_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/tiles/replay/mod.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "adapter", .module = adapter_int_mod },
-            .{ .name = "basket", .module = basket_mod },
-            .{ .name = "c_abi", .module = c_abi_mod },
-            .{ .name = "drift", .module = drift_mod },
-            .{ .name = "model", .module = model_int_mod },
-            .{ .name = "portfolio", .module = portfolio_mod },
-            .{ .name = "tkpoly", .module = tkpoly_int_mod },
-            .{ .name = "trade_ticket", .module = trade_ticket_mod },
-        },
-    });
-    const investment_audit_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/test/demo/investment/audit_trace.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "audit_tile", .module = audit_tile_mod },
-            .{ .name = "basket", .module = basket_mod },
-            .{ .name = "drift", .module = drift_mod },
-            .{ .name = "model", .module = model_int_mod },
-            .{ .name = "portfolio", .module = portfolio_mod },
-            .{ .name = "replay", .module = replay_int_mod },
-            .{ .name = "thesis", .module = thesis_mod },
-            .{ .name = "trade_ticket", .module = trade_ticket_mod },
-        },
-    });
-    const investment_support_int_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/test/demo/investment/support.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "basket", .module = basket_mod },
-            .{ .name = "thesis", .module = thesis_mod },
-            .{ .name = "trade_ticket", .module = trade_ticket_mod },
-        },
-    });
-    const investment_demo_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/test/demo/investment/mod.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "adapter", .module = adapter_int_mod },
-            .{ .name = "basket", .module = basket_mod },
-            .{ .name = "cards", .module = cards_mod },
-            .{ .name = "drift", .module = drift_mod },
-            .{ .name = "impact", .module = impact_mod },
-            .{ .name = "investment_support", .module = investment_support_int_mod },
-            .{ .name = "model", .module = model_int_mod },
-            .{ .name = "portfolio", .module = portfolio_mod },
-            .{ .name = "replay", .module = replay_int_mod },
-            .{ .name = "thesis", .module = thesis_mod },
-            .{ .name = "tkpoly", .module = tkpoly_int_mod },
-            .{ .name = "tool", .module = tool_int_mod },
-            .{ .name = "trade_ticket", .module = trade_ticket_mod },
-        },
-    });
-    const investment_demo_test = b.addTest(.{ .root_module = investment_demo_mod });
     linkTickoniCodec(b, investment_demo_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(investment_demo_test).step);
     for ([_][]const u8{
@@ -1358,6 +1372,11 @@ pub fn build(b: *std.Build) void {
     const live_model_step = b.step("integration-test-live-model", "Alias for the live V1.1 system/demo lane");
     live_model_step.dependOn(system_step);
 
+    const tier_mod = b.createModule(.{
+        .root_source_file = b.path("src/tickoni/util/tier.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const cli_main_mod = b.createModule(.{
         .root_source_file = b.path("src/app/tickoni_cli/main.zig"),
         .target = target,
@@ -1365,11 +1384,15 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "clap", .module = clap_mod },
             .{ .name = "investment_demo", .module = investment_demo_mod },
+            .{ .name = "tier", .module = tier_mod },
         },
     });
     const cli_exe = b.addExecutable(.{
         .name = "tickoni",
         .root_module = cli_main_mod,
+    });
+    cli_exe.root_module.addCSourceFiles(.{
+        .files = &.{ "src/tickoni/util/compiler_version.c" },
     });
     cli_exe.root_module.addLibraryPath(b.path(fd_lib_dir));
     cli_exe.root_module.linkSystemLibrary("fd_util", .{});
@@ -1661,8 +1684,8 @@ pub fn build(b: *std.Build) void {
     cov_step.dependOn(&b.addInstallArtifact(topologies_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
-}
 
+}
 /// b.addRunArtifact on a test binary always enables Zig's test-server
 /// protocol (--listen=- plus .stdio = .zig_test), which communicates with
 /// the build runner over the test binary's own stdin/stdout. A test that

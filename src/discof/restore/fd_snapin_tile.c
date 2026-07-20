@@ -1391,14 +1391,21 @@ populate_allowed_fds( fd_topo_t      const * topo FD_PARAM_UNUSED,
   return out_cnt;
 }
 
+
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
+#if FD_HAS_LINUX
   (void)topo; (void)tile;
   populate_sock_filter_policy_fd_snapin_tile( out_cnt, out, (uint)fd_log_private_logfile_fd(), FD_ACCDB_FD_RW );
   return sock_filter_policy_fd_snapin_tile_instr_cnt;
+#else
+  (void)topo; (void)tile;
+  (void)out_cnt; (void)out;
+  return 0UL;
+#endif
 }
 
 static void

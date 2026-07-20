@@ -1,4 +1,14 @@
-#define _GNU_SOURCE /* inet_aton */
+/* macOS: inet_aton is deprecated/removed, provide a fallback using inet_pton.
+   On Linux we keep _GNU_SOURCE for the native inet_aton declaration. */
+#if FD_HAS_MACOS
+#include <arpa/inet.h>
+#ifndef inet_aton
+static int inet_aton(char const *cp, struct in_addr *addr) {
+  return inet_pton(AF_INET, cp, addr);
+}
+#endif
+#endif
+#define _GNU_SOURCE /* inet_aton on Linux */
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>

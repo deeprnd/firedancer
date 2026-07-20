@@ -1,3 +1,8 @@
+/* fd_topo_run_tile and fd_topo_run_single_process are Linux-only
+   (they use seccomp, prctl, futex, sched_setaffinity, etc.).
+   Provide stubs for non-Linux platforms so the same topo/run pipeline
+   compiles on both. */
+
 #define _GNU_SOURCE
 #include "fd_topo.h"
 
@@ -5,6 +10,8 @@
 #include "../events/fd_event_report.h"
 #include "../../util/tile/fd_tile_private.h"
 
+/* Linux-only includes */
+#if FD_HAS_LINUX
 #include <unistd.h>
 #include <errno.h>
 #include <pthread.h>
@@ -15,6 +22,9 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <net/if.h>
+#endif
+
+#if FD_HAS_LINUX
 
 static void
 initialize_logging( char const * tile_name,
@@ -344,3 +354,46 @@ fd_topo_run_single_process( fd_topo_t *       topo,
   if( FD_UNLIKELY( fd_cpuset_setaffinity( 0, floating_cpu_set ) ) )
     FD_LOG_ERR(( "sched_setaffinity failed (%i-%s)", errno, fd_io_strerror( errno ) ));
 }
+
+#else /* non-Linux: stubs */
+
+#include <stdlib.h>
+#include <stdio.h>
+
+void
+fd_topo_run_tile( fd_topo_t *          topo,
+                  fd_topo_tile_t *     tile,
+                  int                  sandbox,
+                  int                  keep_controlling_terminal,
+                  int                  core_dump_level,
+                  uint                 uid,
+                  uint                 gid,
+                  int                  allow_fd,
+                  fd_topo_run_tile_t * tile_run ) {
+  (void)topo; (void)tile; (void)sandbox; (void)keep_controlling_terminal;
+  (void)core_dump_level; (void)uid; (void)gid; (void)allow_fd; (void)tile_run;
+  fprintf( stderr, "fd_topo_run_tile: stubbed on non-Linux\n" );
+  abort();
+}
+
+void *
+fd_topo_tile_stack_join( char const * app_name,
+                         char const * tile_name,
+                         ulong        tile_kind_id ) {
+  (void)app_name; (void)tile_name; (void)tile_kind_id;
+  fprintf( stderr, "fd_topo_tile_stack_join: stubbed on non-Linux\n" );
+  return NULL;
+}
+
+void
+fd_topo_run_single_process( fd_topo_t *       topo,
+                            int               agave,
+                            uint              uid,
+                            uint              gid,
+                            fd_topo_run_tile_t (* tile_run )( fd_topo_tile_t const * tile ) ) {
+  (void)topo; (void)agave; (void)uid; (void)gid; (void)tile_run;
+  fprintf( stderr, "fd_topo_run_single_process: stubbed on non-Linux\n" );
+  abort();
+}
+
+#endif /* __linux__ */

@@ -754,18 +754,28 @@ unprivileged_init( fd_topo_t const *      topo,
     FD_LOG_ERR(( "scratch overflow %lu %lu %lu", scratch_top - (ulong)scratch - scratch_footprint( tile ), scratch_top, (ulong)scratch + scratch_footprint( tile ) ));
 }
 
+
+
 static ulong
+
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
+#if FD_HAS_LINUX
   void * scratch = fd_topo_obj_laddr( topo, tile->tile_obj_id );
   FD_SCRATCH_ALLOC_INIT( l, scratch );
   fd_gui_ctx_t * ctx = FD_SCRATCH_ALLOC_APPEND( l, alignof( fd_gui_ctx_t ), sizeof( fd_gui_ctx_t ) );
 
   populate_sock_filter_policy_fd_gui_tile( out_cnt, out, (uint)fd_log_private_logfile_fd(), (uint)fd_http_server_fd( ctx->gui_server ) );
   return sock_filter_policy_fd_gui_tile_instr_cnt;
+#else
+  (void)topo; (void)tile;
+  (void)out_cnt; (void)out;
+  return 0UL;
+#endif
 }
+
 
 static ulong
 populate_allowed_fds( fd_topo_t const *      topo,
@@ -814,7 +824,7 @@ rlimit_file_cnt( fd_topo_t const *      topo FD_PARAM_UNUSED,
 fd_topo_run_tile_t fd_tile_gui = {
   .name                     = "gui",
   .rlimit_file_cnt_fn       = rlimit_file_cnt,
-  .populate_allowed_seccomp = populate_allowed_seccomp,
+.populate_allowed_seccomp = populate_allowed_seccomp,
   .populate_allowed_fds     = populate_allowed_fds,
   .scratch_align            = scratch_align,
   .scratch_footprint        = scratch_footprint,

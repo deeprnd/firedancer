@@ -21,7 +21,15 @@ $(OBJDIR)/obj/third_party/blst/assembly.o : src/third_party/blst/build/assembly.
 	$(Q)$(MKDIR) $(dir $@) && \
 $(CC) $(BLST_CFLAGS_NOWARN) -c $< -o $@
 
-$(OBJDIR)/lib/libfd_blst.a: $(OBJDIR)/obj/third_party/blst/server.o $(OBJDIR)/obj/third_party/blst/assembly.o
+# On macOS ARM (FD_HAS_ARM64=1), assembly.S produces 0-byte .o
+# (mach-o/*.S files don't exist in vendor tree for Apple Silicon).
+# Exclude it from the dependency list when FD_HAS_ARM64 is set.
+ifeq ($(FD_HAS_ARM64),1)
+BLST_OBJS := $(OBJDIR)/obj/third_party/blst/server.o
+else
+BLST_OBJS := $(OBJDIR)/obj/third_party/blst/server.o $(OBJDIR)/obj/third_party/blst/assembly.o
+endif
+$(OBJDIR)/lib/libfd_blst.a: $(BLST_OBJS)
 
 lib: $(OBJDIR)/lib/libfd_blst.a
 

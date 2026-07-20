@@ -1,5 +1,8 @@
-#ifndef _GNU_SOURCE
+#if !defined(_GNU_SOURCE) && !defined(__MACH__)
 #define _GNU_SOURCE
+#endif
+#if defined(__MACH__)
+#define _DARWIN_C_SOURCE
 #endif
 
 #include <ctype.h>
@@ -7,12 +10,19 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sched.h>
+#if defined(__linux__)
 #include <syscall.h>
+#include <sys/prctl.h>
+#endif
 #include <sys/resource.h>
 #include <sys/mman.h>
-#include <sys/prctl.h>
+
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
 
 #include "../sanitize/fd_sanitize.h"
+#include "../fd_util_base.h"
 #include "fd_tile_private.h"
 
 /* Operating system shims ********************************************/
@@ -270,7 +280,13 @@ fd_tile_private_manager( void * _args ) {
 
   char thread_name[ 20 ];
   FD_TEST( fd_cstr_printf_check( thread_name, sizeof( thread_name ), NULL, "tile:%lu", idx ) );
+#if defined(__linux__)
   if( FD_UNLIKELY( prctl( PR_SET_NAME, thread_name, 0, 0, 0 ) ) ) FD_LOG_ERR(( "prctl(PR_SET_NAME) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+#elif defined(__MACH__)
+  pthread_setname_np( thread_name );
+#else
+  (void)thread_name;
+#endif
 
   if( FD_UNLIKELY( !( (id ==fd_log_thread_id()                                       ) &
                       (idx==(id-fd_tile_private_id0)                                 ) &
@@ -298,10 +314,14 @@ fd_tile_private_manager( void * _args ) {
     fd_tile_private_stack0 = (ulong)stack;
     fd_tile_private_stack1 = (ulong)stack + stack_sz;
 
-    /* Prevent another fork() from smashing the stack */
+    /* Prevent another fork() from smashing the stack (Linux only) */
+#if defined(__linux__)
     if( FD_UNLIKELY( madvise( stack, FD_TILE_PRIVATE_STACK_SZ, MADV_DONTFORK ) ) ) {
       FD_LOG_ERR(( "madvise(stack,MADV_DONTFORK) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
     }
+#else
+    (void)stack; /* madvise(MADV_DONTFORK) not available on this platform */
+#endif
 
   } else { /* Pthread provided stack */
     fd_log_private_stack_discover( stack_sz, &fd_tile_private_stack0, &fd_tile_private_stack1 ); /* logs details */

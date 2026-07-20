@@ -40,6 +40,14 @@ runs:
   steps:
     - uses: taiki-e/install-action@just
 
+    - name: Install gmake on macOS
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        # Homebrew no longer has 'gmake' — 'make' IS GNU make, installed as 'gmake' in gnubin
+        brew install make
+        echo "$(brew --prefix)/opt/make/libexec/gnubin" >> "$GITHUB_PATH"
+
     - name: Setup Zig
       if: inputs.zig == 'true'
       uses: mlugg/setup-zig@v2

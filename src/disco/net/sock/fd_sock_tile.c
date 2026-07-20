@@ -28,6 +28,9 @@
    Must be aligned by alignof(struct cmsghdr) */
 #define FD_SOCK_CMSG_MAX (64UL)
 
+
+
+#if FD_HAS_LINUX
 static ulong
 populate_allowed_seccomp( fd_topo_t const *      topo,
                           fd_topo_tile_t const * tile,
@@ -39,6 +42,8 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
   populate_sock_filter_policy_fd_sock_tile( out_cnt, out, (uint)fd_log_private_logfile_fd(), (uint)ctx->tx_sock, RX_SOCK_FD_MIN, RX_SOCK_FD_MIN+(uint)ctx->sock_cnt );
   return sock_filter_policy_fd_sock_tile_instr_cnt;
 }
+#endif
+
 
 static ulong
 populate_allowed_fds( fd_topo_t const *      topo,
@@ -132,7 +137,7 @@ create_udp_socket( int    sock_fd,
     FD_LOG_ERR(( "bind(0.0.0.0:%i) failed (%i-%s)", udp_port, errno, fd_io_strerror( errno ) ));
   }
 
-# if defined(__linux__)
+# if FD_HAS_LINUX
   int dup_res = dup3( orig_fd, sock_fd, O_CLOEXEC );
 # else
   int dup_res = dup2( orig_fd, sock_fd );

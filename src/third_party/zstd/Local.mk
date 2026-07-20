@@ -47,13 +47,20 @@ $(OBJDIR)/obj/third_party/zstd/lib/decompress/zstd_decompress_block.o : src/thir
 	$(Q)$(MKDIR) $(dir $@) && \
 $(CC) $(ZSTD_CFLAGS_NOWARN) -fno-tree-vectorize -c $< -o $@
 
-# self-gated on __x86_64__/ZSTD_ASM_SUPPORTED; empty object elsewhere
+# self-gated on __x86_64__/ZSTD_ASM_SUPPORTED; empty object elsewhere.
+# On ARM, ZSTD_ENABLE_ASM_X86_64_BMI2 is 0 → produces 0-byte .o.
+# Exclude from dependency list when FD_HAS_ARM64=1.
+ifeq ($(FD_HAS_ARM64),1)
+ZSTD_ASM_OBJS :=
+else
+ZSTD_ASM_OBJS := $(OBJDIR)/obj/third_party/zstd/lib/decompress/huf_decompress_amd64.o
+endif
 $(OBJDIR)/obj/third_party/zstd/lib/decompress/huf_decompress_amd64.o : src/third_party/zstd/lib/decompress/huf_decompress_amd64.S
-	@echo -e "AS\t$(notdir $@)"
+	@echo -e "AS	$(notdir $@)"
 	$(Q)$(MKDIR) $(dir $@) && \
 $(CC) $(ZSTD_CFLAGS_NOWARN) -c $< -o $@
 
-$(OBJDIR)/lib/libfd_zstd.a: $(patsubst %,$(OBJDIR)/obj/third_party/zstd/lib/%.o,$(ZSTD_OBJS)) $(OBJDIR)/obj/third_party/zstd/lib/decompress/huf_decompress_amd64.o
+$(OBJDIR)/lib/libfd_zstd.a: $(patsubst %,$(OBJDIR)/obj/third_party/zstd/lib/%.o,$(ZSTD_OBJS)) $(ZSTD_ASM_OBJS)
 
 lib: $(OBJDIR)/lib/libfd_zstd.a
 
