@@ -137,7 +137,7 @@ create_udp_socket( int    sock_fd,
     FD_LOG_ERR(( "bind(0.0.0.0:%i) failed (%i-%s)", udp_port, errno, fd_io_strerror( errno ) ));
   }
 
-# if defined(__linux__)
+# if FD_HAS_LINUX
   int dup_res = dup3( orig_fd, sock_fd, O_CLOEXEC );
 # else
   int dup_res = dup2( orig_fd, sock_fd );

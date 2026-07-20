@@ -11,7 +11,7 @@
 
 /* Forward-declare struct sock_filter on non-Linux platforms (Linux-only from <linux/seccomp.h>).
    It's only ever used as a pointer in function types, so a forward declaration suffices. */
-#if !defined(__linux__)
+#if FD_HAS_LINUX
 struct sock_filter;
 #endif
 
