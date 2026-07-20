@@ -106,7 +106,10 @@ test "detectOsString is a recognized OS name" {
     const known = [_][]const u8{ "Linux", "macOS", "Windows", "Unknown" };
     var found = false;
     for (known) |k| {
-        if (std.mem.eql(u8, os, k)) { found = true; break; }
+        if (std.mem.eql(u8, os, k)) {
+            found = true;
+            break;
+        }
     }
     try std.testing.expect(found);
 }
