@@ -2,7 +2,7 @@
 #ifndef HEADER_fd_src_discof_ipecho_generated_fd_ipecho_tile_seccomp_h
 #define HEADER_fd_src_discof_ipecho_generated_fd_ipecho_tile_seccomp_h
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
 
 #include "../../../../src/util/fd_util_base.h"
 #include <linux/audit.h>
@@ -188,7 +188,7 @@ static void populate_sock_filter_policy_fd_ipecho_tile( ulong out_cnt, struct so
 }
 
 
-#else /* !defined(__linux__) */
+#else /* !FD_HAS_LINUX */
 
 /* Stub seccomp implementation for non-Linux platforms.
    On macOS/Windows, seccomp filtering is not available.
@@ -203,6 +203,6 @@ static void populate_sock_filter_policy_fd_ipecho_tile( ulong out_cnt, void *out
   /* On non-Linux, no seccomp filtering is applied */
 }
 
-#endif /* !defined(__linux__) */
+#endif /* !FD_HAS_LINUX */
 
 #endif /* HEADER_fd_src_discof_ipecho_generated_fd_ipecho_tile_seccomp_h */
