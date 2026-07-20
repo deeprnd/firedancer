@@ -228,7 +228,7 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
   (void)topo;
   (void)tile;
 

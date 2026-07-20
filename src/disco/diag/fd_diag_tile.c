@@ -13,7 +13,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
 #include "fd_proc_interrupts.h"
 #include "generated/fd_diag_tile_seccomp.h"
 #endif
@@ -41,7 +41,7 @@ struct fd_diag_tile {
   int stat_fds[ FD_TILE_MAX ];
   int sched_fds[ FD_TILE_MAX ];
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
   ulong       irq_cnt[ FD_METRICS_ENUM_SOFTIRQ_CNT ][ FD_TILE_MAX ];
   fd_cpuset_t cpu_has_tile[ fd_cpuset_word_cnt ];
   int         proc_interrupts_fd;
@@ -85,7 +85,7 @@ scratch_footprint( fd_topo_tile_t const * tile ) {
   return sizeof(fd_diag_tile_t);
 }
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
 static int
 read_stat_file( int              fd,
                 ulong            ns_per_tick,
@@ -234,7 +234,7 @@ read_sched_file( int              fd,
 
   return 0;
 }
-#endif /* __linux__ */
+#endif /* FD_HAS_LINUX */
 
 static void
 check_engine_metric( fd_diag_tile_t * ctx, long now ) {
@@ -367,7 +367,7 @@ check_engine_metric( fd_diag_tile_t * ctx, long now ) {
   FD_MGAUGE_SET( DIAG, TURBINE_STATUS, turbine_status );
 }
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
 static void
 irq_metrics( fd_diag_tile_t * ctx ) {
   if( FD_UNLIKELY( -1==lseek( ctx->proc_softirqs_fd, 0, SEEK_SET ) ) ) FD_LOG_ERR(( "lseek failed (%i-%s)", errno, strerror( errno ) ));
@@ -462,7 +462,7 @@ interrupt_metrics( fd_diag_tile_t * ctx ) {
     }
   }
 }
-#endif /* __linux__ */
+#endif /* FD_HAS_LINUX */
 
 static void
 before_credit( fd_diag_tile_t *    ctx,
@@ -478,7 +478,7 @@ before_credit( fd_diag_tile_t *    ctx,
       .tv_sec  = diff / (long)1e9,
       .tv_nsec = diff % (long)1e9
     };
-#if defined(__linux__)
+#if FD_HAS_LINUX
     clock_nanosleep( CLOCK_REALTIME, 0, &ts, NULL );
 #else
     nanosleep( &ts, NULL );
@@ -490,14 +490,14 @@ before_credit( fd_diag_tile_t *    ctx,
   *charge_busy = 1;
 
   struct timespec boottime;
-#if defined(__linux__)
+#if FD_HAS_LINUX
   if( FD_UNLIKELY( -1==clock_gettime( CLOCK_BOOTTIME, &boottime ) ) ) FD_LOG_ERR(( "clock_gettime(CLOCK_BOOTTIME) failed (%i-%s)", errno, strerror( errno ) ));
 #else
   if( FD_UNLIKELY( -1==clock_gettime( CLOCK_MONOTONIC, &boottime ) ) ) FD_LOG_ERR(( "clock_gettime(CLOCK_MONOTONIC) failed (%i-%s)", errno, strerror( errno ) ));
 #endif
   ulong now_since_boot_nanos = (ulong)boottime.tv_sec*1000000000UL + (ulong)boottime.tv_nsec;
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
   interrupt_metrics( ctx ); /* before idle computation below, which subtracts it */
 
   for( ulong i=0UL; i<ctx->tile_cnt; i++ ) {
@@ -550,7 +550,7 @@ before_credit( fd_diag_tile_t *    ctx,
 #endif
 
   check_engine_metric( ctx, now );
-#if defined(__linux__)
+#if FD_HAS_LINUX
   irq_metrics( ctx );
 #endif
 }
@@ -558,7 +558,7 @@ before_credit( fd_diag_tile_t *    ctx,
 static void
 privileged_init( fd_topo_t const *      topo,
                  fd_topo_tile_t const * tile ) {
-#if defined(__linux__)
+#if FD_HAS_LINUX
   void * scratch = fd_topo_obj_laddr( topo, tile->tile_obj_id );
 
   FD_SCRATCH_ALLOC_INIT( l, scratch );
@@ -678,7 +678,7 @@ unprivileged_init( fd_topo_t const *      topo,
   memset( ctx->first_seen_died, 0, sizeof( ctx->first_seen_died ) );
   ctx->next_report_nanos = fd_log_wallclock();
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
   /* Snapshot the cumulative-since-boot /proc interrupt/softirq counters
      so the metrics we report are counted since process startup. */
   memset( ctx->softirq_baseline,    0, sizeof( ctx->softirq_baseline    ) );
@@ -732,13 +732,13 @@ unprivileged_init( fd_topo_t const *      topo,
   ctx->tiles.tower_idx  = fd_topo_find_tile( topo, "tower",  0UL );
   ctx->tiles.replay_idx = fd_topo_find_tile( topo, "replay", 0UL );
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
   fd_cpuset_new( &ctx->cpu_has_tile );
 #endif
   for( ulong i=0UL; i<(topo->tile_cnt); i++ ) {
     ulong cpu_idx = topo->tiles[ i ].cpu_idx;
     if( cpu_idx>=FD_TILE_MAX ) continue;
-#if defined(__linux__)
+#if FD_HAS_LINUX
     fd_cpuset_insert( ctx->cpu_has_tile, cpu_idx );
 #endif
   }
@@ -764,7 +764,7 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
   (void)topo; (void)tile; (void)out_cnt; (void)out;
-#if defined(__linux__)
+#if FD_HAS_LINUX
   populate_sock_filter_policy_fd_diag_tile( out_cnt, out, (uint)fd_log_private_logfile_fd() );
   return sock_filter_policy_fd_diag_tile_instr_cnt;
 #else
@@ -778,7 +778,7 @@ populate_allowed_fds( fd_topo_t const *      topo,
                       fd_topo_tile_t const * tile,
                       ulong                  out_fds_cnt,
                       int *                  out_fds ) {
-#if defined(__linux__)
+#if FD_HAS_LINUX
   fd_diag_tile_t * ctx = fd_topo_obj_laddr( topo, tile->tile_obj_id );
 
   if( FD_UNLIKELY( out_fds_cnt<5UL+2UL*ctx->tile_cnt ) ) FD_LOG_ERR(( "out_fds_cnt %lu", out_fds_cnt ));

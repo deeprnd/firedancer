@@ -1,4 +1,4 @@
-#if !defined(__linux__)
+#if !FD_HAS_LINUX
 #error "This test requires Linux"
 #endif
 

@@ -11,7 +11,7 @@
 #include "../../util/tile/fd_tile_private.h"
 
 /* Linux-only includes */
-#if defined(__linux__)
+#if FD_HAS_LINUX
 #include <unistd.h>
 #include <errno.h>
 #include <pthread.h>
@@ -24,7 +24,7 @@
 #include <net/if.h>
 #endif
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
 
 static void
 initialize_logging( char const * tile_name,

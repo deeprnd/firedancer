@@ -98,7 +98,7 @@ populate_allowed_seccomp( fd_topo_t const *      topo,
                           ulong                  out_cnt,
                           struct sock_filter *   out ) {
 
-#if defined(__linux__)
+#if FD_HAS_LINUX
   fd_netlink_tile_ctx_t * ctx = fd_topo_obj_laddr( topo, tile->tile_obj_id );
   FD_TEST( ctx->magic==FD_NETLINK_TILE_CTX_MAGIC );
   populate_sock_filter_policy_netlink( out_cnt, out, (uint)fd_log_private_logfile_fd(), (uint)ctx->nl_monitor->fd, (uint)ctx->nl_req->fd, (uint)ctx->prober->sock_fd );
