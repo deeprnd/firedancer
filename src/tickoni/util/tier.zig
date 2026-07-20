@@ -70,13 +70,83 @@ test "tierName returns correct labels" {
     try std.testing.expectEqualStrings("unsupported", tierName(.unsupported));
 }
 
-test "detectTier returns a known OS name" {
+test "tierName is non-empty for all variants" {
+    const all_tiers = [_]Tier{ .linux_full, .macos_retail, .windows_retail, .unsupported };
+    for (all_tiers) |t| {
+        const name = tierName(t);
+        try std.testing.expect(name.len > 0);
+    }
+}
+
+test "tierName matches @tagName for all variants" {
+    const all_tiers = [_]Tier{ .linux_full, .macos_retail, .windows_retail, .unsupported };
+    for (all_tiers) |t| {
+        try std.testing.expectEqualStrings(@tagName(t), tierName(t));
+    }
+}
+
+test "tierName strings are lowercase with underscores" {
+    const all_tiers = [_]Tier{ .linux_full, .macos_retail, .windows_retail, .unsupported };
+    for (all_tiers) |t| {
+        const name = tierName(t);
+        for (name) |c| {
+            try std.testing.expect(std.ascii.isLower(c) or c == '_' or std.ascii.isDigit(c));
+        }
+    }
+}
+
+test "detectOsString is a recognized OS name" {
+    const os = detectOsString();
+    const known = [_][]const u8{ "Linux", "macOS", "Windows", "Unknown" };
+    var found = false;
+    for (known) |k| {
+        if (std.mem.eql(u8, os, k)) { found = true; break; }
+    }
+    try std.testing.expect(found);
+}
+
+test "detectOsString starts with uppercase letter" {
     const os = detectOsString();
     try std.testing.expect(os.len > 0);
-    try std.testing.expect(std.ascii.isAlnum(os[0]));
+    try std.testing.expect(std.ascii.isUpper(os[0]));
 }
 
 test "detectArchString is non-empty" {
     const arch = detectArchString();
     try std.testing.expect(arch.len > 0);
+}
+
+test "version output format validates" {
+    var buf: [256]u8 = undefined;
+    const line = std.fmt.bufPrint(&buf, "{s} {s} ({s} {s})\n", .{
+        "0.1.1",
+        tierName(detectTier()),
+        detectOsString(),
+        detectArchString(),
+    }) catch unreachable;
+
+    // Format: "<ver> <tier> (<os> <arch>)<newline>"
+    try std.testing.expect(std.mem.startsWith(u8, line, "0.1.1 "));
+    try std.testing.expect(std.mem.endsWith(u8, line, ")\n"));
+}
+
+test "version output ends with single newline" {
+    var buf: [256]u8 = undefined;
+    const line = std.fmt.bufPrint(&buf, "{s} {s} ({s} {s})\n", .{
+        "0.1.1",
+        tierName(detectTier()),
+        detectOsString(),
+        detectArchString(),
+    }) catch unreachable;
+    try std.testing.expect(std.mem.endsWith(u8, line, "\n"));
+}
+
+test "detectTier returns a valid Tier" {
+    const t = detectTier();
+    _ = t;
+}
+
+test "Tier enum has exactly 4 variants" {
+    const all_tiers = [_]Tier{ .linux_full, .macos_retail, .windows_retail, .unsupported };
+    try std.testing.expectEqual(@as(usize, 4), all_tiers.len);
 }

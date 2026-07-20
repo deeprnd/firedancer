@@ -427,6 +427,7 @@ pub fn build(b: *std.Build) void {
         "src/tickoni/runtime/tile.zig",
         "src/tickoni/util/cpu.zig",
         "src/tickoni/util/process.zig",
+        "src/tickoni/util/tier.zig",
         "src/tickoni/util/linux_ids.zig",
         "src/tickoni/util/sizes.zig",
         "src/tickoni/util/sandbox_defaults.zig",
