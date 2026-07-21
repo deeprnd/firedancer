@@ -322,12 +322,9 @@ pub fn deinit(result: PreflightResult, allocator: std.mem.Allocator) void {
 
 /// Load a manifest JSON file from disk.
 pub fn loadManifest(allocator: Allocator, io: Io, cwd: std.Io.Dir, path: []const u8) ManifestLoadError!*Manifest {
-    var file = cwd.openFile(io, path, .{}) catch return ManifestLoadError.FileNotFound;
-    defer file.close();
-
-    const size = file.getPos() catch return ManifestLoadError.FileNotFound;
-    const content = try file.readToEndAlloc(allocator, size);
-    defer allocator.free(content);
+    const raw = cwd.readFileAlloc(io, path, allocator, .limited(64 * 1024)) catch return ManifestLoadError.FileNotFound;
+    defer allocator.free(raw);
+    const content = raw;
 
     return try parseManifestJson(allocator, content);
 }
@@ -337,69 +334,56 @@ pub fn deinitManifest(m: *Manifest) void {
     _ = m;
 }
 
+/// Internal JSON-compatible struct for manifest deserialization.
+const ManifestJson = struct {
+    min_tickoni_version: []const u8 = "0.0.0",
+    supported_runtime_tiers: []const []const u8 = &[_][]const u8{},
+    required_isolation_tier: []const u8 = "retail",
+    expected_no_live_effect: bool = true,
+    replay_schema_version: []const u8 = "0.0.0",
+    policy_schema_version: []const u8 = "0.0.0",
+    required_fixtures: []const []const u8 = &[_][]const u8{},
+};
+
 /// Parse a Manifest from JSON text.
 fn parseManifestJson(allocator: Allocator, text: []const u8) ManifestLoadError!*Manifest {
+    const j = std.json.parseFromSlice(
+        ManifestJson,
+        allocator,
+        text,
+        .{ .ignore_unknown_fields = true },
+    ) catch return ManifestLoadError.InvalidJson;
+    defer j.deinit();
+
     const m = try allocator.create(Manifest);
     errdefer allocator.destroy(m);
 
-    const gop = std.json.parseFromUtf8(allocator, text, .{}) catch |err| {
-        _ = err;
-        return ManifestLoadError.InvalidJson;
-    };
-    defer gop.deinit();
-
-    const root = gop.value;
-    const obj = root.asObject() orelse return ManifestLoadError.InvalidJson;
-
-    const min_ver_val = obj.get("min_tickoni_version") orelse return ManifestLoadError.MissingField;
-    const min_ver = min_ver_val.getString() orelse return ManifestLoadError.InvalidJson;
-
-    const tiers_val = obj.get("supported_runtime_tiers") orelse return ManifestLoadError.MissingField;
-    const tiers_arr = tiers_val.getAs(std.json.Array) orelse return ManifestLoadError.InvalidJson;
-
-    const iso_val = obj.get("required_isolation_tier") orelse return ManifestLoadError.MissingField;
-    const iso = iso_val.getString() orelse return ManifestLoadError.InvalidJson;
-
-    const nle_val = obj.get("expected_no_live_effect") orelse return ManifestLoadError.MissingField;
-    const nle = nle_val.getBool() orelse return ManifestLoadError.InvalidJson;
-
-    const replay_val = obj.get("replay_schema_version") orelse return ManifestLoadError.MissingField;
-    const replay = replay_val.getString() orelse return ManifestLoadError.InvalidJson;
-
-    const policy_val = obj.get("policy_schema_version") orelse return ManifestLoadError.MissingField;
-    const policy = policy_val.getString() orelse return ManifestLoadError.InvalidJson;
-
-    const fixtures_val = obj.get("required_fixtures") orelse return ManifestLoadError.MissingField;
-    const fixtures_arr = fixtures_val.getAs(std.json.Array) orelse return ManifestLoadError.InvalidJson;
-
-    var tiers_list: std.ArrayList([]const u8) = .empty;
+    var tiers: std.ArrayList([]const u8) = .empty;
     errdefer {
-        for (tiers_list.items) |t| allocator.free(t);
-        tiers_list.deinit(allocator);
+        for (tiers.items) |t| allocator.free(t);
+        tiers.deinit(allocator);
     }
-    for (tiers_arr.items) |item| {
-        const t = item.getString() orelse return ManifestLoadError.InvalidJson;
-        try tiers_list.append(t);
+    for (j.value.supported_runtime_tiers) |t| {
+        try tiers.append(allocator, try allocator.dupe(u8, t));
     }
 
-    var fixtures_list: std.ArrayList([]const u8) = .empty;
+    var fixtures: std.ArrayList([]const u8) = .empty;
     errdefer {
-        for (fixtures_list.items) |f| allocator.free(f);
-        fixtures_list.deinit(allocator);
+        for (fixtures.items) |f| allocator.free(f);
+        fixtures.deinit(allocator);
     }
-    for (fixtures_arr.items) |item| {
-        const f = item.getString() orelse return ManifestLoadError.InvalidJson;
-        try fixtures_list.append(f);
+    for (j.value.required_fixtures) |f| {
+        try fixtures.append(allocator, try allocator.dupe(u8, f));
     }
 
     m.* = Manifest{
-        .min_tickoni_version = try allocator.dupe(u8, min_ver),
-        .supported_runtime_tiers = try tiers_list.toOwnedSlice(allocator),
-        .required_isolation_tier = try allocator.dupe(u8, iso),
-        .expected_no_live_effect = nle,
-        .replay_schema_version = try allocator.dupe(u8, replay),
-        .policy_schema_version = try allocator.dupe(u8, policy),
-        .required_fixtures = try fixtures_list.toOwnedSlice(allocator),
+        .min_tickoni_version = try allocator.dupe(u8, j.value.min_tickoni_version),
+        .supported_runtime_tiers = try tiers.toOwnedSlice(allocator),
+        .required_isolation_tier = try allocator.dupe(u8, j.value.required_isolation_tier),
+        .expected_no_live_effect = j.value.expected_no_live_effect,
+        .replay_schema_version = try allocator.dupe(u8, j.value.replay_schema_version),
+        .policy_schema_version = try allocator.dupe(u8, j.value.policy_schema_version),
+        .required_fixtures = try fixtures.toOwnedSlice(allocator),
     };
     errdefer deinitManifest(m);
 
