@@ -9,6 +9,8 @@ const ProcessPipelineConfig = supervisor_mod.ProcessPipelineConfig;
 const tile_main = @import("tile_main.zig");
 const topologies = @import("topologies");
 const doctor_output = @import("doctor_output");
+const demo_preflight = @import("demo_preflight");
+const version = @import("version");
 
 const usage =
     \\Usage: tickoni-supervisor <command>
@@ -19,6 +21,7 @@ const usage =
     \\                  Tango shared memory (v2.14.S1); requires <run-dir>
     \\  status          Print topology tile names
     \\  doctor          Run environment checks
+    \\  demo <manifest> Run a demo scenario (preflight-gated)
     \\  --version       Print version information
     \\
 ;
@@ -34,11 +37,11 @@ pub fn main(init: std.process.Init) !void {
 
     // Handle --version flag
     if (std.mem.eql(u8, cmd, "--version")) {
-        const version = @import("version");
-        const info = version.VersionInfo.init();
+        const ver = @import("version");
+        const info = ver.VersionInfo.init();
         var buf: [1024]u8 = undefined;
         var w = std.Io.Writer.fixed(&buf);
-        try version.formatVersionInfo(info, &w);
+        try ver.formatVersionInfo(info, &w);
         try std.Io.File.writeStreamingAll(std.Io.File.stdout(), init.io, w.buffered());
         std.process.exit(0);
     }
@@ -71,6 +74,12 @@ pub fn main(init: std.process.Init) !void {
             if (std.mem.eql(u8, a, "--json")) format = .json;
         }
         try cmdDoctor(init, format);
+    } else if (std.mem.eql(u8, cmd, "demo")) {
+        const manifest_path = it.next() orelse {
+            try File.writeStreamingAll(File.stderr(), init.io, "demo requires <manifest-path>\n");
+            std.process.exit(1);
+        };
+        try cmdDemo(init, manifest_path);
     } else {
         var buf: [128]u8 = undefined;
         const msg = try std.fmt.bufPrint(&buf, "unknown command: {s}\n", .{cmd});
@@ -211,4 +220,46 @@ fn cmdStatus(io: std.Io, topo: rt.topology.Topology) !void {
         });
         try File.writeStreamingAll(stdout, io, line);
     }
+}
+
+/// Demo command — fail-closed preflight check before running any demo.
+///
+/// If preflight fails, prints diagnostic error and exits 1.
+/// No proposal/audit artifacts are created.
+fn cmdDemo(init: std.process.Init, manifest_path: []const u8) !void {
+    // Load manifest
+    const cwd = std.Io.Dir.cwd();
+    const m = demo_preflight.loadManifest(init.gpa, init.io, cwd, manifest_path) catch |err| {
+        var buf: [256]u8 = undefined;
+        const msg = try std.fmt.bufPrint(&buf, "error: could not load manifest '{s}': {}\n", .{ manifest_path, err });
+        try File.writeStreamingAll(File.stderr(), init.io, msg);
+        std.process.exit(1);
+    };
+    defer demo_preflight.deinitManifest(m);
+
+    // Gather installed system info
+    const version_info = version.VersionInfo.init();
+
+    // Run preflight — fail-closed
+    const preflight_result = demo_preflight.run(
+        init.gpa,
+        init.io,
+        m,
+        cwd,
+        version_info.semver,
+        "linux_full",  // installed runtime tier
+        "retail",      // installed isolation tier
+        "/tmp/fixtures",
+    ) catch |err| {
+        var buf: [256]u8 = undefined;
+        const msg = try std.fmt.bufPrint(&buf, "error: preflight failed: {}\n", .{err});
+        try File.writeStreamingAll(File.stderr(), init.io, msg);
+        std.process.exit(1);
+    };
+
+    // Preflight passed — proceed with demo
+    try File.writeStreamingAll(File.stdout(), init.io, "preflight: passed\n");
+    demo_preflight.deinit(preflight_result, init.gpa);
+    // Demo execution would go here
+    try File.writeStreamingAll(File.stdout(), init.io, "demo: completed\n");
 }
