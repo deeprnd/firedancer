@@ -18,6 +18,14 @@ pub const Header = extern struct {
     timestamp_ns: u64,
     prev_hash: u64,
     record_hash: u64,
+    // Runtime metadata: identifies the exact build/tier/manifest that produced
+    // this event. Carried through audit and replay so the entire lineage is
+    // verifiable.
+    version: [64]u8,
+    platform_tier: [64]u8,
+    isolation_tier: [64]u8,
+    release_digest: [64]u8,
+    demo_manifest_id: [64]u8,
 };
 
 pub const SourceEventPayload = extern struct {
@@ -157,6 +165,11 @@ pub fn toWireEvent(event: schema.AuditEvent) Event {
             .timestamp_ns = event.header.timestamp_ns,
             .prev_hash = event.header.prev_hash,
             .record_hash = event.header.record_hash,
+            .version = event.header.version,
+            .platform_tier = event.header.platform_tier,
+            .isolation_tier = event.header.isolation_tier,
+            .release_digest = event.header.release_digest,
+            .demo_manifest_id = event.header.demo_manifest_id,
         },
         .record_type = @intFromEnum(std.meta.activeTag(event.payload)),
         .payload = toWirePayload(event.payload),
@@ -183,6 +196,11 @@ pub fn fromWireEvent(
             .timestamp_ns = event.header.timestamp_ns,
             .prev_hash = event.header.prev_hash,
             .record_hash = event.header.record_hash,
+            .version = event.header.version,
+            .platform_tier = event.header.platform_tier,
+            .isolation_tier = event.header.isolation_tier,
+            .release_digest = event.header.release_digest,
+            .demo_manifest_id = event.header.demo_manifest_id,
         },
         .payload = payload,
     };

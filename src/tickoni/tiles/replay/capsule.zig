@@ -23,6 +23,13 @@ pub const ReplayCapsuleWire = struct {
     catalog_schema_version: u16,
     taxonomy_version: u16,
     policy_version: []const u8,
+    // T9 metadata: build/tier/manifest identity carried through replay so
+    // replay output can be traced back to the exact build that produced it.
+    version: ?[]const u8 = null,
+    platform_tier: ?[]const u8 = null,
+    isolation_tier: ?[]const u8 = null,
+    release_digest: ?[]const u8 = null,
+    demo_manifest_id: ?[]const u8 = null,
     expected_basket_id: ?u64 = null,
     expected_proposal_hash: ?u64 = null,
     expected_rebalance_hash: ?u64 = null,
