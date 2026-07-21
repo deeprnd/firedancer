@@ -79,13 +79,14 @@ pub fn formatJson(results: []const Result, platform_tier: []const u8, w: anytype
 
 /// Get the platform tier string for reports.
 pub fn getPlatformTier() []const u8 {
-    const tier_mod = @import("tier");
-    return switch (tier_mod.detectTier()) {
-        .linux_full => "linux_full",
-        .macos_retail => "macos_retail",
-        .windows_retail => "windows_retail",
-        .unsupported => "unsupported",
-    };
+    const builtin = @import("builtin");
+    const os_tag = builtin.target.os.tag;
+    const arch = builtin.target.cpu.arch;
+    if (os_tag == .macos) return "macos_retail";
+    if (os_tag == .windows) return "windows_retail";
+    if (os_tag == .linux and arch == .x86_64) return "linux_full";
+    if (os_tag == .linux and arch == .aarch64) return "linux_retail";
+    return "unsupported";
 }
 
 /// Format modes for doctor output.
