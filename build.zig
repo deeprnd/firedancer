@@ -154,13 +154,18 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const demo_semver_mod = b.addModule("demo_semver", .{
+        .root_source_file = b.path("src/tickoni/demo/semver.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const demo_preflight_mod = b.addModule("demo_preflight", .{
         .root_source_file = b.path("src/tickoni/demo/preflight.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "demo_manifest", .module = demo_manifest_mod },
-            .{ .name = "tier", .module = tier_mod },
+            .{ .name = "demo_semver", .module = demo_semver_mod },
         },
     });
 
@@ -338,6 +343,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "topologies", .module = topologies_named_mod },
             .{ .name = "doctor_checks", .module = doctor_checks_mod },
             .{ .name = "doctor_output", .module = doctor_output_mod },
+            .{ .name = "demo_preflight", .module = demo_preflight_mod },
         },
     });
     const exe = b.addExecutable(.{
@@ -656,7 +662,7 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(demo_manifest_test).step);
 
-    // demo/preflight.zig imports: demo_manifest, tier
+    // demo/preflight.zig imports: demo_manifest, demo_semver, tier
     const demo_preflight_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/demo/preflight.zig"),
@@ -664,6 +670,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "demo_manifest", .module = demo_manifest_mod },
+                .{ .name = "demo_semver", .module = demo_semver_mod },
                 .{ .name = "tier", .module = tier_mod },
             },
         }),
