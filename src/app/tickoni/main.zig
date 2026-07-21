@@ -17,12 +17,30 @@ const usage =
     \\  start-process   Run the Phase 0 pipeline as isolated OS processes over
     \\                  Tango shared memory (v2.14.S1); requires <run-dir>
     \\  status          Print topology tile names
+    \\  --version       Print version information
     \\
 ;
 
 pub fn main(init: std.process.Init) !void {
     var it = init.minimal.args.iterate();
     _ = it.skip(); // skip program name
+
+    // Handle --version flag before command parsing
+    if (it.next()) |cmd| {
+        if (std.mem.eql(u8, cmd, "--version")) {
+            const version = @import("version");
+            const info = version.VersionInfo.init();
+            var buf: [1024]u8 = undefined;
+            var w = std.Io.Writer.fixed(&buf);
+            try version.formatVersionInfo(info, &w);
+            try std.Io.File.writeStreamingAll(std.Io.File.stdout(), init.io, w.buffered());
+            std.process.exit(0);
+        }
+        // Not --version, use as the command
+    } else {
+        try File.writeStreamingAll(File.stderr(), init.io, usage);
+        std.process.exit(1);
+    }
 
     const cmd = it.next() orelse {
         try File.writeStreamingAll(File.stderr(), init.io, usage);

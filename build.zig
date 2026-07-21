@@ -329,6 +329,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
+            .{ .name = "version", .module = version_mod },
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "tiles", .module = tiles_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
@@ -600,7 +601,7 @@ pub fn build(b: *std.Build) void {
     // Each has its own test binary with its own import graph.
     // ---------------------------------------------------------------------------
 
-    // version.zig imports: tier, audit_schema
+    // version.zig imports: tier, audit_schema, build_options
     const version_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/version.zig"),
@@ -609,6 +610,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "tier", .module = tier_mod },
                 .{ .name = "audit_schema", .module = audit_schema_mod },
+                .{ .name = "build_options", .module = version_opts.createModule() },
             },
         }),
     });
