@@ -8,6 +8,7 @@ const Supervisor = supervisor_mod.Supervisor;
 const ProcessPipelineConfig = supervisor_mod.ProcessPipelineConfig;
 const tile_main = @import("tile_main.zig");
 const topologies = @import("topologies");
+const doctor_output = @import("doctor_output");
 
 const usage =
     \\Usage: tickoni-supervisor <command>
@@ -17,6 +18,7 @@ const usage =
     \\  start-process   Run the Phase 0 pipeline as isolated OS processes over
     \\                  Tango shared memory (v2.14.S1); requires <run-dir>
     \\  status          Print topology tile names
+    \\  doctor          Run environment checks
     \\  --version       Print version information
     \\
 ;
@@ -25,30 +27,29 @@ pub fn main(init: std.process.Init) !void {
     var it = init.minimal.args.iterate();
     _ = it.skip(); // skip program name
 
-    // Handle --version flag before command parsing
-    if (it.next()) |cmd| {
-        if (std.mem.eql(u8, cmd, "--version")) {
-            const version = @import("version");
-            const info = version.VersionInfo.init();
-            var buf: [1024]u8 = undefined;
-            var w = std.Io.Writer.fixed(&buf);
-            try version.formatVersionInfo(info, &w);
-            try std.Io.File.writeStreamingAll(std.Io.File.stdout(), init.io, w.buffered());
-            std.process.exit(0);
-        }
-        // Not --version, use as the command
-    } else {
-        try File.writeStreamingAll(File.stderr(), init.io, usage);
-        std.process.exit(1);
-    }
-
     const cmd = it.next() orelse {
         try File.writeStreamingAll(File.stderr(), init.io, usage);
         std.process.exit(1);
     };
 
-    // Internal supervisor-to-child handoff for v2.14.S1 process mode, not
-    // part of the advertised command surface: `__tile-run <spec-file>`.
+    // Handle --version flag
+    if (std.mem.eql(u8, cmd, "--version")) {
+        const version = @import("version");
+        const info = version.VersionInfo.init();
+        var buf: [1024]u8 = undefined;
+        var w = std.Io.Writer.fixed(&buf);
+        try version.formatVersionInfo(info, &w);
+        try std.Io.File.writeStreamingAll(std.Io.File.stdout(), init.io, w.buffered());
+        std.process.exit(0);
+    }
+
+    // Handle --help flag
+    if (std.mem.eql(u8, cmd, "--help") or std.mem.eql(u8, cmd, "-h")) {
+        try File.writeStreamingAll(File.stderr(), init.io, usage);
+        std.process.exit(0);
+    }
+
+    // Internal supervisor-to-child handoff for v2.14.S1 process mode
     if (std.mem.eql(u8, cmd, "__tile-run")) {
         const spec_path = it.next() orelse std.process.exit(1);
         std.process.exit(tile_main.run(init.io, init.gpa, spec_path));
@@ -64,6 +65,12 @@ pub fn main(init: std.process.Init) !void {
         try cmdStartProcess(init, topologies.paymentPipelineProcess(), run_dir);
     } else if (std.mem.eql(u8, cmd, "status")) {
         try cmdStatus(init.io, topologies.paymentPipeline());
+    } else if (std.mem.eql(u8, cmd, "doctor")) {
+        var format: doctor_output.Format = .text;
+        while (it.next()) |a| {
+            if (std.mem.eql(u8, a, "--json")) format = .json;
+        }
+        try cmdDoctor(init, format);
     } else {
         var buf: [128]u8 = undefined;
         const msg = try std.fmt.bufPrint(&buf, "unknown command: {s}\n", .{cmd});
@@ -71,6 +78,24 @@ pub fn main(init: std.process.Init) !void {
         try File.writeStreamingAll(File.stderr(), init.io, usage);
         std.process.exit(1);
     }
+}
+
+fn cmdDoctor(init: std.process.Init, format: doctor_output.Format) !void {
+    var buf: [8192]u8 = undefined;
+    var w = std.Io.Writer.fixed(&buf);
+    try doctor_output.runAndFormat(init.io, init.gpa, format, &w);
+    const output = w.buffered();
+    try std.Io.File.writeStreamingAll(std.Io.File.stdout(), init.io, output);
+
+    // Exit code: 0 for pass/warn, 1 for fail
+    const doctor_checks = @import("doctor_checks");
+    var results: [20]doctor_checks.Result = undefined;
+    const count = doctor_checks.runAll(&results, init.io, init.gpa);
+    var fail_count: usize = 0;
+    for (results[0..count]) |r| {
+        if (r.status == .fail) fail_count += 1;
+    }
+    std.process.exit(if (fail_count > 0) 1 else 0);
 }
 
 fn cmdStart(init: std.process.Init, topo: rt.topology.Topology) !void {
@@ -151,10 +176,6 @@ fn cmdStartProcess(init: std.process.Init, topo: rt.topology.Topology, run_dir: 
     }
 
     // Poll for pipeline completion (audited count reaches event_count)
-    // instead of an arbitrary fixed sleep, matching thread-mode start's
-    // run-to-completion behavior. Process-mode tiles keep heartbeating
-    // after finishing their bounded work until asked to halt, so this
-    // is the deterministic completion signal.
     const poll_interval_ns: u64 = 5 * std.time.ns_per_ms;
     const max_polls: u32 = 2000; // 10s bound
     var poll: u32 = 0;

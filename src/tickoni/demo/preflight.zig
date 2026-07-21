@@ -225,7 +225,7 @@ test "isAllPassed returns false if any check fails" {
 
 test "run returns PreflightFailed on scaffold (tier mismatch)" {
     var m = Manifest{
-        .supported_runtime_tiers = &.{ "linux_full" },
+        .supported_runtime_tiers = &.{"linux_full"},
         .required_isolation_tier = "full",
     };
     const gpa = std.testing.allocator;
@@ -235,7 +235,7 @@ test "run returns PreflightFailed on scaffold (tier mismatch)" {
 
 test "run returns PreflightFailed on scaffold (version check)" {
     var m = Manifest{
-        .supported_runtime_tiers = &.{ "macos_retail" },
+        .supported_runtime_tiers = &.{"macos_retail"},
         .required_isolation_tier = "retail",
     };
     const gpa = std.testing.allocator;

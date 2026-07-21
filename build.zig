@@ -146,6 +146,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .imports = &.{
             .{ .name = "doctor_checks", .module = doctor_checks_mod },
+            .{ .name = "tier", .module = tier_mod },
         },
     });
     const demo_manifest_mod = b.addModule("demo_manifest", .{
@@ -335,6 +336,8 @@ pub fn build(b: *std.Build) void {
             .{ .name = "c_abi", .module = c_abi_mod },
             .{ .name = "util", .module = util_mod },
             .{ .name = "topologies", .module = topologies_named_mod },
+            .{ .name = "doctor_checks", .module = doctor_checks_mod },
+            .{ .name = "doctor_output", .module = doctor_output_mod },
         },
     });
     const exe = b.addExecutable(.{
