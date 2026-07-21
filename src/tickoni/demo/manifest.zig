@@ -63,7 +63,8 @@ pub const Manifest = struct {
         var valid_tier = false;
         if (std.mem.eql(u8, self.required_isolation_tier, "full") or
             std.mem.eql(u8, self.required_isolation_tier, "retail") or
-            std.mem.eql(u8, self.required_isolation_tier, "degraded")) {
+            std.mem.eql(u8, self.required_isolation_tier, "degraded"))
+        {
             valid_tier = true;
         }
         if (!valid_tier) return Error.InvalidTier;

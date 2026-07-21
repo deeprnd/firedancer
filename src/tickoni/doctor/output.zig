@@ -1,14 +1,16 @@
 /// Doctor output formatting — text and JSON modes.
-///
-/// Scaffold only — formats hardcoded Result values. T6 implements real logic.
 const std = @import("std");
-const checks = @import("checks.zig");
+const checks = @import("doctor_checks");
 const Result = checks.Result;
 const Status = checks.Status;
+const runAll = checks.runAll;
 
 /// Format doctor results as text output.
-pub fn formatText(results: []const Result, platform_tier: []const u8, w: *std.Io.Writer) !void {
+pub fn formatText(results: []const Result, platform_tier: []const u8, w: anytype) !void {
     try w.print("tickoni doctor — host report\n", .{});
+    try w.print("Platform tier: {s}\n", .{platform_tier});
+    try w.print("---\n", .{});
+
     var pass_count: usize = 0;
     var warn_count: usize = 0;
     var fail_count: usize = 0;
@@ -20,16 +22,42 @@ pub fn formatText(results: []const Result, platform_tier: []const u8, w: *std.Io
             .fail => fail_count += 1,
         }
     }
-    try w.print("Platform tier: {s}\n", .{platform_tier});
+    try w.print("---\n", .{});
     try w.print("Checks: {d} pass, {d} warn, {d} fail\n", .{
         pass_count, warn_count, fail_count,
     });
+    if (fail_count > 0) {
+        try w.print("RESULT: FAIL\n", .{});
+    } else if (warn_count > 0) {
+        try w.print("RESULT: WARN\n", .{});
+    } else {
+        try w.print("RESULT: PASS\n", .{});
+    }
 }
 
 /// Format doctor results as JSON output.
-pub fn formatJson(results: []const Result, platform_tier: []const u8, w: *std.Io.Writer) !void {
+pub fn formatJson(results: []const Result, platform_tier: []const u8, w: anytype) !void {
+    var pass_count: usize = 0;
+    var warn_count: usize = 0;
+    var fail_count: usize = 0;
+    for (results) |r| {
+        switch (r.status) {
+            .pass => pass_count += 1,
+            .warn => warn_count += 1,
+            .fail => fail_count += 1,
+        }
+    }
+
     try w.writeAll("{\n");
     try w.print("  \"platform_tier\": \"{s}\",\n", .{platform_tier});
+    try w.print("  \"result\": \"{s}\",\n", .{
+        if (fail_count > 0) "FAIL"
+        else if (warn_count > 0) "WARN"
+        else "PASS",
+    });
+    try w.print("  \"counts\": {{\"pass\": {d}, \"warn\": {d}, \"fail\": {d}}},\n", .{
+        pass_count, warn_count, fail_count,
+    });
     try w.writeAll("  \"checks\": [\n");
     for (results, 0..) |r, i| {
         const status_str = switch (r.status) {
@@ -49,46 +77,30 @@ pub fn formatJson(results: []const Result, platform_tier: []const u8, w: *std.Io
     try w.writeAll("}\n");
 }
 
-/// Run doctor and output in the specified format.
-pub fn runAndFormat(
-    gpa: std.mem.Allocator,
-    fmt: enum { text, json },
-    writer: anytype,
-) !void {
-    // Scaffold: run checks, collect results, format output
-    var results_list = std.ArrayList(Result).initCapacity(gpa, 0) catch unreachable;
-    defer results_list.deinit(gpa);
+/// Get the platform tier string for reports.
+pub fn getPlatformTier() []const u8 {
+    const tier_mod = @import("tier");
+    return switch (tier_mod.detectTier()) {
+        .linux_full => "linux_full",
+        .macos_retail => "macos_retail",
+        .windows_retail => "windows_retail",
+        .unsupported => "unsupported",
+    };
+}
 
-    for (0..11) |i| {
-        // Scaffold: create placeholder results
-        var r = Result{
-            .name = "placeholder",
-            .status = .warn,
-            .message = "scaffold — not implemented",
-        };
-        switch (i) {
-            0 => r.name = "os",
-            1 => r.name = "architecture",
-            2 => r.name = "environment",
-            3 => r.name = "zig",
-            4 => r.name = "git",
-            5 => r.name = "make",
-            6 => r.name = "fixtures",
-            7 => r.name = "model_mode",
-            8 => r.name = "storage",
-            9 => r.name = "live_execution",
-            10 => r.name = "source_build",
-            else => break,
-        }
-        try results_list.append(gpa, r);
-    }
+/// Format modes for doctor output.
+pub const Format = enum { text, json };
 
-    const results = results_list.items;
-    const platform_tier = "macos_retail"; // TODO: wire to detectTier() in T6
+/// Run doctor checks and output in the specified format.
+pub fn runAndFormat(io: std.Io, gpa: std.mem.Allocator, fmt: Format, writer: anytype) !void {
+    var results: [20]Result = undefined;
+    const count = runAll(&results, io, gpa);
+    const checked_results = results[0..count];
+    const platform_tier = getPlatformTier();
 
     switch (fmt) {
-        .text => try formatText(results, platform_tier, writer),
-        .json => try formatJson(results, platform_tier, writer),
+        .text => try formatText(checked_results, platform_tier, writer),
+        .json => try formatJson(checked_results, platform_tier, writer),
     }
 }
 
@@ -137,20 +149,44 @@ test "formatJson produces valid JSON structure" {
     try std.testing.expect(std.mem.indexOf(u8, output, "\"name\": \"os\"") != null);
 }
 
-test "runAndFormat text mode produces output" {
-    var buf: [2048]u8 = undefined;
+test "formatText with failures shows FAIL result" {
+    var buf: [1024]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
-    try runAndFormat(std.testing.allocator, .text, &w);
+    const results: []const Result = &.{
+        .{ .name = "os", .status = .pass, .message = "Linux" },
+        .{ .name = "zig", .status = .fail, .message = "not found" },
+        .{ .name = "git", .status = .pass, .message = "git 2.45" },
+    };
+    try formatText(results, "linux_full", &w);
+    const output = w.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, output, "RESULT: FAIL") != null);
+}
+
+test "runAndFormat text mode produces output" {
+    var buf: [4096]u8 = undefined;
+    var w = std.Io.Writer.fixed(&buf);
+    try runAndFormat(std.testing.io, std.testing.allocator, .text, &w);
     const output = w.buffered();
     try std.testing.expect(output.len > 0);
     try std.testing.expect(std.mem.startsWith(u8, output, "tickoni doctor"));
 }
 
 test "runAndFormat json mode produces output" {
-    var buf: [2048]u8 = undefined;
+    var buf: [4096]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
-    try runAndFormat(std.testing.allocator, .json, &w);
+    try runAndFormat(std.testing.io, std.testing.allocator, .json, &w);
     const output = w.buffered();
     try std.testing.expect(output.len > 0);
     try std.testing.expect(std.mem.startsWith(u8, output, "{"));
+}
+
+test "formatJson contains result field" {
+    var buf: [1024]u8 = undefined;
+    var w = std.Io.Writer.fixed(&buf);
+    const results: []const Result = &.{
+        .{ .name = "os", .status = .pass, .message = "macOS" },
+    };
+    try formatJson(results, "macos_retail", &w);
+    const output = w.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, output, "\"result\":") != null);
 }
