@@ -34,6 +34,11 @@ pub fn computeWireRecordHash(event: wire.Event) u64 {
     c_abi.ballet.siphashAppend(&sip, &h.policy_version);
     c_abi.ballet.siphashAppend(&sip, &h.capability_envelope_id_le);
     c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&h.prev_hash));
+    c_abi.ballet.siphashAppend(&sip, &h.version);
+    c_abi.ballet.siphashAppend(&sip, &h.platform_tier);
+    c_abi.ballet.siphashAppend(&sip, &h.isolation_tier);
+    c_abi.ballet.siphashAppend(&sip, &h.release_digest);
+    c_abi.ballet.siphashAppend(&sip, &h.demo_manifest_id);
     c_abi.ballet.siphashAppend(&sip, std.mem.asBytes(&event.record_type));
 
     switch (event.record_type) {

@@ -162,6 +162,14 @@ pub const Header = struct {
     timestamp_ns: u64,
     prev_hash: u64,
     record_hash: u64,
+    // Runtime metadata: identifies the exact build/tier/manifest that produced
+    // this event. Carried through audit and replay so the entire lineage is
+    // verifiable.
+    version: [64]u8,           // semver string, null-terminated
+    platform_tier: [64]u8,    // e.g. "linux_full", "macos_retail"
+    isolation_tier: [64]u8,   // e.g. "retail", "full"
+    release_digest: [64]u8,   // git SHA or build digest
+    demo_manifest_id: [64]u8, // which manifest was loaded (empty if none)
 };
 
 pub const AuditEvent = struct {

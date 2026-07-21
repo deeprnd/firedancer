@@ -16,6 +16,11 @@ pub fn formatJsonLine(event: schema.AuditEvent, writer: anytype) !void {
     try writer.print("\"timestamp_ns\":{d},", .{h.timestamp_ns});
     try writer.print("\"prev_hash\":{d},", .{h.prev_hash});
     try writer.print("\"record_hash\":{d},", .{h.record_hash});
+    try writer.print("\"version\":\"{s}\",", .{std.mem.sliceTo(&h.version, 0)});
+    try writer.print("\"platform_tier\":\"{s}\",", .{std.mem.sliceTo(&h.platform_tier, 0)});
+    try writer.print("\"isolation_tier\":\"{s}\",", .{std.mem.sliceTo(&h.isolation_tier, 0)});
+    try writer.print("\"release_digest\":\"{s}\",", .{std.mem.sliceTo(&h.release_digest, 0)});
+    try writer.print("\"demo_manifest_id\":\"{s}\",", .{std.mem.sliceTo(&h.demo_manifest_id, 0)});
     try writer.print("\"record_type\":\"{s}\",", .{@tagName(std.meta.activeTag(event.payload))});
     try writer.writeAll("\"payload\":");
     try writePayloadJson(event.payload, writer);
@@ -162,6 +167,11 @@ test "jsonl formatJsonLine produces valid JSON with hash-chain fields" {
             .timestamp_ns = 1_000_000_000,
             .prev_hash = 0,
             .record_hash = 0xDEADBEEF,
+            .version = "0.1.0",
+            .platform_tier = "linux_full",
+            .isolation_tier = "retail",
+            .release_digest = "abc123",
+            .demo_manifest_id = "",
         },
         .payload = .{
             .source_event = .{
@@ -192,6 +202,11 @@ test "jsonl formatJsonLine produces valid JSON with hash-chain fields" {
     try std.testing.expectEqual(event.header.record_hash, try obj.get("record_hash").?.number());
     try std.testing.expectEqual(0, try obj.get("seq").?.number());
     try std.testing.expectEqual(@as(u16, schema.audit_schema_version), @intCast(try obj.get("schema_version").?.number()));
+    // T9: Verify metadata fields are present in JSONL output
+    try std.testing.expectEqualSlices(u8, "0.1.0", obj.get("version").?.string());
+    try std.testing.expectEqualSlices(u8, "linux_full", obj.get("platform_tier").?.string());
+    try std.testing.expectEqualSlices(u8, "retail", obj.get("isolation_tier").?.string());
+    try std.testing.expectEqualSlices(u8, "abc123", obj.get("release_digest").?.string());
 }
 
 test "jsonl formatJsonLine produces consistent hash for same event" {
@@ -210,6 +225,11 @@ test "jsonl formatJsonLine produces consistent hash for same event" {
             .timestamp_ns = 0,
             .prev_hash = 0,
             .record_hash = 0,
+            .version = "0.1.0",
+            .platform_tier = "linux_full",
+            .isolation_tier = "retail",
+            .release_digest = "abc123",
+            .demo_manifest_id = "",
         },
         .payload = .{
             .source_event = .{
