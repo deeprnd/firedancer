@@ -107,7 +107,7 @@ test "tierName strings are lowercase with underscores" {
 
 test "detectOsString is a recognized OS name" {
     const os = detectOsString();
-    const known = [_][]const u8{ "Linux", "macOS", "Windows", "Unknown" };
+    const known = [_][]const u8{ "Linux", "MacOS", "Windows", "Unknown" };
     var found = false;
     for (known) |k| {
         if (std.mem.eql(u8, os, k)) {
