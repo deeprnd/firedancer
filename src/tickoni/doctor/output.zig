@@ -51,9 +51,7 @@ pub fn formatJson(results: []const Result, platform_tier: []const u8, w: anytype
     try w.writeAll("{\n");
     try w.print("  \"platform_tier\": \"{s}\",\n", .{platform_tier});
     try w.print("  \"result\": \"{s}\",\n", .{
-        if (fail_count > 0) "FAIL"
-        else if (warn_count > 0) "WARN"
-        else "PASS",
+        if (fail_count > 0) "FAIL" else if (warn_count > 0) "WARN" else "PASS",
     });
     try w.print("  \"counts\": {{\"pass\": {d}, \"warn\": {d}, \"fail\": {d}}},\n", .{
         pass_count, warn_count, fail_count,

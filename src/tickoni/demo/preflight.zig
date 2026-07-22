@@ -420,7 +420,7 @@ test "isAllPassed returns false if any check fails" {
 
 test "runtime tier check fails on mismatch" {
     var m = demo_manifest.Manifest{
-        .supported_runtime_tiers = &.{ "linux_full" },
+        .supported_runtime_tiers = &.{"linux_full"},
         .required_isolation_tier = "retail",
         .expected_no_live_effect = true,
         .required_fixtures = &[_][]const u8{},
@@ -449,7 +449,7 @@ test "runtime tier check passes on match" {
 test "version check fails when installed < min" {
     var m = demo_manifest.Manifest{
         .min_tickoni_version = "0.2.0",
-        .supported_runtime_tiers = &.{ "linux_full" },
+        .supported_runtime_tiers = &.{"linux_full"},
         .required_isolation_tier = "retail",
         .expected_no_live_effect = true,
         .required_fixtures = &[_][]const u8{},
@@ -462,7 +462,7 @@ test "version check fails when installed < min" {
 
 test "isolation tier mismatch fails" {
     var m = demo_manifest.Manifest{
-        .supported_runtime_tiers = &.{ "linux_full" },
+        .supported_runtime_tiers = &.{"linux_full"},
         .required_isolation_tier = "full",
         .expected_no_live_effect = true,
         .required_fixtures = &[_][]const u8{},
@@ -475,7 +475,7 @@ test "isolation tier mismatch fails" {
 
 test "no_live_effect=false fails" {
     var m = demo_manifest.Manifest{
-        .supported_runtime_tiers = &.{ "linux_full" },
+        .supported_runtime_tiers = &.{"linux_full"},
         .required_isolation_tier = "retail",
         .expected_no_live_effect = false,
         .required_fixtures = &[_][]const u8{},
@@ -513,10 +513,10 @@ test "formatFailure includes check details" {
 test "fixtures check detects missing fixtures" {
     var m = demo_manifest.Manifest{
         .min_tickoni_version = "0.1.0",
-        .supported_runtime_tiers = &.{ "linux_full" },
+        .supported_runtime_tiers = &.{"linux_full"},
         .required_isolation_tier = "retail",
         .expected_no_live_effect = true,
-        .required_fixtures = &[_][]const u8{ "nonexistent_fixture" },
+        .required_fixtures = &[_][]const u8{"nonexistent_fixture"},
     };
     const gpa = std.testing.allocator;
     const io = std.testing.io;
