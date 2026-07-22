@@ -38,12 +38,17 @@ pub fn main(init: std.process.Init) !void {
     // Handle --version flag
     if (std.mem.eql(u8, cmd, "--version")) {
         const ver = @import("version");
-        const info = ver.VersionInfo.init();
+        const info = ver.VersionInfo.init(init.gpa) catch |err| {
+            var buf: [256]u8 = undefined;
+            const msg = try std.fmt.bufPrint(&buf, "version info init: {}\n", .{err});
+            try File.writeStreamingAll(File.stderr(), init.io, msg);
+            std.process.exit(1);
+        };
         var buf: [1024]u8 = undefined;
         var w = std.Io.Writer.fixed(&buf);
         try ver.formatVersionInfo(info, &w);
         try std.Io.File.writeStreamingAll(std.Io.File.stdout(), init.io, w.buffered());
-        std.process.exit(0);
+        return;
     }
 
     // Handle --help flag
@@ -238,7 +243,13 @@ fn cmdDemo(init: std.process.Init, manifest_path: []const u8) !void {
     defer demo_preflight.deinitManifest(m);
 
     // Gather installed system info
-    const version_info = version.VersionInfo.init();
+    var version_info = version.VersionInfo.init(init.gpa) catch |err| {
+        var buf: [256]u8 = undefined;
+        const msg = try std.fmt.bufPrint(&buf, "error: version info init failed: {}\n", .{err});
+        try File.writeStreamingAll(File.stderr(), init.io, msg);
+        std.process.exit(1);
+    };
+    defer version_info.deinit(init.gpa);
 
     // Run preflight — fail-closed
     const preflight_result = demo_preflight.run(

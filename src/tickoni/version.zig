@@ -17,33 +17,31 @@ pub const build_git_sha: []const u8 = build_opts.BUILD_GIT_SHA;
 pub const build_id: []const u8 = build_opts.BUILD_ID;
 
 /// Semver release string (no prerelease on stable releases).
-/// Returns a statically allocated string for the default case.
-/// For custom version injection, callers should use init() on VersionInfo.
-pub fn semver() []const u8 {
-    if (build_version_major == 0 and build_version_minor == 0 and build_version_patch == 0)
-        return "0.0.0-dev";
-    return if (std.mem.eql(u8, build_version_pre, ""))
-        semverFmt(build_version_major, build_version_minor, build_version_patch, "")
-    else
-        semverFmt(build_version_major, build_version_minor, build_version_patch, build_version_pre);
-}
-
-fn semverFmt(major: u16, minor: u16, patch: u16, pre: []const u8) []const u8 {
-    var buf: [64]u8 = undefined;
-    if (std.mem.eql(u8, pre, "")) {
-        return std.fmt.bufPrint(&buf, "{d}.{d}.{d}", .{ major, minor, patch }) catch "0.0.0";
+/// Writes to the caller's buffer and returns the resulting string.
+pub fn semver(buf: []u8) ![]const u8 {
+    if (buf.len < 16) return error.NoSpace;
+    if (build_version_major == 0 and build_version_minor == 0 and build_version_patch == 0) {
+        const s = "0.0.0-dev";
+        @memcpy(buf[0..s.len], s);
+        return buf[0..s.len];
     }
-    return std.fmt.bufPrint(&buf, "{d}.{d}.{d}-{s}", .{
-        major,
-        minor,
-        patch,
+    const pre = build_version_pre;
+    if (std.mem.eql(u8, pre, "")) {
+        return std.fmt.bufPrint(buf, "{d}.{d}.{d}", .{
+            build_version_major, build_version_minor, build_version_patch,
+        });
+    }
+    return std.fmt.bufPrint(buf, "{d}.{d}.{d}-{s}", .{
+        build_version_major,
+        build_version_minor,
+        build_version_patch,
         pre,
-    }) catch "0.0.0";
+    });
 }
 
 /// Full human-readable version line (for --version output).
-pub fn versionLine() []const u8 {
-    return semver();
+pub fn versionLine(buf: []u8) ![]const u8 {
+    return semver(buf);
 }
 
 /// Git revision (full SHA).
@@ -70,11 +68,13 @@ pub const VersionInfo = struct {
     demo_manifest_version: u16 = 0,
     compiler: []const u8 = "unknown",
 
-    pub fn init() VersionInfo {
+    pub fn init(gpa: std.mem.Allocator) !VersionInfo {
+        var buf: [64]u8 = undefined;
+        const sv = try semver(&buf);
         const tier_mod = @import("tier");
         const audit_mod = @import("audit_schema");
         return VersionInfo{
-            .semver = semver(),
+            .semver = try gpa.dupe(u8, sv),
             .build_id = buildId(),
             .git_sha = gitRevision(),
             .os = tier_mod.detectOsString(),
@@ -85,6 +85,13 @@ pub const VersionInfo = struct {
             .replay_schema_version = audit_mod.audit_schema_version,
             .compiler = tier_mod.detectCompilerVersion(),
         };
+    }
+
+    pub fn deinit(self: *VersionInfo, gpa: std.mem.Allocator) void {
+        if (self.semver.len > 0) {
+            gpa.free(self.semver);
+        }
+        self.semver = "";
     }
 };
 
@@ -162,7 +169,8 @@ test "VersionInfo fields are non-empty" {
 }
 
 test "semver format validates major.minor.patch" {
-    const sv = semver();
+    var buf: [64]u8 = undefined;
+    const sv = try semver(&buf);
     try std.testing.expect(sv.len >= 5); // "0.0.0"
     // Should contain exactly 2 dots for base semver
     var dot_count: usize = 0;
@@ -171,11 +179,6 @@ test "semver format validates major.minor.patch" {
     }
     try std.testing.expect(dot_count >= 2);
 }
-
-// semverFmt is tested via semver() production path above.
-// Direct calls to semverFmt return a pointer to a stack-local buffer
-// which becomes invalid after the function returns (Zig UB).
-// The production semver() caller uses the result immediately, avoiding the issue.
 
 test "git_sha truncation for short SHA" {
     const short_sha = "abc";
