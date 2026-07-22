@@ -19,10 +19,10 @@ include config/extra/with-threads.mk
 # Platform detection (MUST come before any platform-specific settings)
 UNAME?=$(shell uname)
 
-# Use system GAS assembler on macOS — clang's integrated assembler rejects
-# .cfi_escape / .cfi_restore directives that are valid GAS but fail on
-# macOS clang 16 with "invalid CFI advance_loc expression".
-ifeq ($(UNAME), Darwin)
+# Use system GAS assembler on macOS ARM only — clang's integrated assembler
+# rejects .cfi_escape / .cfi_restore directives on Apple Silicon.
+# On Intel, clang's integrated assembler handles CFI correctly.
+ifeq ($(IS_ARM),1)
 ASFLAGS+=-no-integrated-as
 endif
 
