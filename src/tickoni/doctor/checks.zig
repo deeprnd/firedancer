@@ -220,18 +220,26 @@ pub const ToolChecks = struct {
             .stderr = .pipe,
         };
         var child = std.process.spawn(io, opts) catch return .{
-            .name = name, .status = .fail, .message = "not found",
+            .name = name,
+            .status = .fail,
+            .message = "not found",
         };
         const result = child.wait(io) catch return .{
-            .name = name, .status = .fail, .message = "not found",
+            .name = name,
+            .status = .fail,
+            .message = "not found",
         };
         if (!isExitedZero(result)) return .{
-            .name = name, .status = .fail, .message = "not found",
+            .name = name,
+            .status = .fail,
+            .message = "not found",
         };
         if (child.stdout) |stdout| {
             var buf: [1024]u8 = undefined;
             const len = std.Io.File.readPositionalAll(stdout, io, &buf, 0) catch return .{
-                .name = name, .status = .fail, .message = "no output",
+                .name = name,
+                .status = .fail,
+                .message = "no output",
             };
             const version = std.mem.trim(u8, buf[0..len], " \n\r");
             const clipped = if (version.len > 80) version[0..80] else version;
@@ -307,10 +315,14 @@ pub const ModeChecks = struct {
             .stderr = .pipe,
         };
         var child = std.process.spawn(io, opts) catch return .{
-            .name = "source_build", .status = .warn, .message = "git not available",
+            .name = "source_build",
+            .status = .warn,
+            .message = "git not available",
         };
         const result = child.wait(io) catch return .{
-            .name = "source_build", .status = .warn, .message = "git error",
+            .name = "source_build",
+            .status = .warn,
+            .message = "git error",
         };
         if (!isExitedZero(result)) return .{
             .name = "source_build",
@@ -320,7 +332,9 @@ pub const ModeChecks = struct {
         if (child.stdout) |stdout| {
             var buf: [256]u8 = undefined;
             const len = std.Io.File.readPositionalAll(stdout, io, &buf, 0) catch return .{
-                .name = "source_build", .status = .warn, .message = "git error",
+                .name = "source_build",
+                .status = .warn,
+                .message = "git error",
             };
             const tag = std.mem.trim(u8, buf[0..len], " \n\r");
             return .{

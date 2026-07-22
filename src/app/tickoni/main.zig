@@ -247,8 +247,8 @@ fn cmdDemo(init: std.process.Init, manifest_path: []const u8) !void {
         m,
         cwd,
         version_info.semver,
-        "linux_full",  // installed runtime tier
-        "retail",      // installed isolation tier
+        "linux_full", // installed runtime tier
+        "retail", // installed isolation tier
         "/tmp/fixtures",
     ) catch |err| {
         var buf: [256]u8 = undefined;
