@@ -305,7 +305,7 @@ test "Manifest rejects unknown isolation tier" {
 test "Manifest rejects invalid semver in min_tickoni_version" {
     var m = Manifest{
         .min_tickoni_version = "not-a-version",
-        .supported_runtime_tiers = &.{ "linux_full" },
+        .supported_runtime_tiers = &.{"linux_full"},
         .required_isolation_tier = "retail",
     };
     try std.testing.expectError(Error.InvalidSemver, m.validate());
@@ -314,7 +314,7 @@ test "Manifest rejects invalid semver in min_tickoni_version" {
 test "Manifest rejects invalid semver in replay_schema_version" {
     var m = Manifest{
         .min_tickoni_version = "0.1.0",
-        .supported_runtime_tiers = &.{ "linux_full" },
+        .supported_runtime_tiers = &.{"linux_full"},
         .required_isolation_tier = "retail",
         .replay_schema_version = "bad",
     };
@@ -345,7 +345,7 @@ test "Manifest accepts valid semver versions" {
 test "Manifest accepts default 0.0.0 semver fields (skip validation)" {
     var m = Manifest{
         .min_tickoni_version = "0.1.0",
-        .supported_runtime_tiers = &.{ "linux_full" },
+        .supported_runtime_tiers = &.{"linux_full"},
         .required_isolation_tier = "retail",
         .replay_schema_version = "0.0.0",
         .policy_schema_version = "0.0.0",
@@ -380,8 +380,7 @@ test "Manifest.deinit zeroes all fields" {
 test "loadManifest parses valid JSON manifest" {
     const gpa = std.testing.allocator;
     const cwd = std.Io.Dir.cwd();
-    const result = loadManifest(gpa, cwd, std.testing.io,
-        "/home/vicgenin/work/git/tickoni/src/tickoni/demo/fixtures/demo.manifest.json") catch |err| {
+    const result = loadManifest(gpa, cwd, std.testing.io, "/home/vicgenin/work/git/tickoni/src/tickoni/demo/fixtures/demo.manifest.json") catch |err| {
         // Skip if file not found (e.g. in CI)
         if (err == Error.FileError) return;
         return err;
@@ -398,8 +397,7 @@ test "loadManifest parses valid JSON manifest" {
 test "loadManifest rejects non-existent file" {
     const gpa = std.testing.allocator;
     const cwd = std.Io.Dir.cwd();
-    const result = loadManifest(gpa, cwd, std.testing.io,
-        "/nonexistent/manifest.json") catch |err| {
+    const result = loadManifest(gpa, cwd, std.testing.io, "/nonexistent/manifest.json") catch |err| {
         try std.testing.expect(err == Error.FileError);
         return;
     };

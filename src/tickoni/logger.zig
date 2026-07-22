@@ -12,7 +12,6 @@
 ///   log.enter("module", "func") catch {};
 ///   defer log.exit("module", "func") catch {};
 ///   log.debug("module", "message") catch {};
-
 const std = @import("std");
 
 /// Log severity levels — matches OpenTelemetry/SLF4J.

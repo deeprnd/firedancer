@@ -582,7 +582,7 @@ pub fn build(b: *std.Build) void {
         const t = b.addTest(.{ .root_module = t_mod });
         if (std.mem.eql(u8, path, "src/tickoni/util/tier.zig")) {
             t.root_module.addCSourceFiles(.{
-                .files = &.{ "src/tickoni/util/compiler_version.c" },
+                .files = &.{"src/tickoni/util/compiler_version.c"},
             });
             t.root_module.link_libc = true;
         }
@@ -630,7 +630,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     version_test.root_module.addCSourceFiles(.{
-        .files = &.{ "src/tickoni/util/compiler_version.c" },
+        .files = &.{"src/tickoni/util/compiler_version.c"},
     });
     version_test.root_module.link_libc = true;
     test_step.dependOn(&b.addRunArtifact(version_test).step);
@@ -1561,7 +1561,7 @@ pub fn build(b: *std.Build) void {
         .root_module = cli_main_mod,
     });
     cli_exe.root_module.addCSourceFiles(.{
-        .files = &.{ "src/tickoni/util/compiler_version.c" },
+        .files = &.{"src/tickoni/util/compiler_version.c"},
     });
     cli_exe.root_module.addLibraryPath(b.path(fd_lib_dir));
     cli_exe.root_module.linkSystemLibrary("fd_util", .{});
@@ -1853,7 +1853,6 @@ pub fn build(b: *std.Build) void {
     cov_step.dependOn(&b.addInstallArtifact(topologies_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
-
 }
 /// b.addRunArtifact on a test binary always enables Zig's test-server
 /// protocol (--listen=- plus .stdio = .zig_test), which communicates with
