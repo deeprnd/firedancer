@@ -53,6 +53,8 @@ pub const AuditLog = struct {
     }
 };
 
+/// Build an audit event with default (zero) metadata.
+/// For production use, fill metadata via fillEventMetadata before serialization.
 pub fn buildPolicyDecisionEvent(
     seq: u64,
     source_offset: u64,
@@ -79,6 +81,11 @@ pub fn buildPolicyDecisionEvent(
         .timestamp_ns = 0,
         .prev_hash = prev_hash,
         .record_hash = 0,
+        .version = [_]u8{0} ** 64,
+        .platform_tier = [_]u8{0} ** 64,
+        .isolation_tier = [_]u8{0} ** 64,
+        .release_digest = [_]u8{0} ** 64,
+        .demo_manifest_id = [_]u8{0} ** 64,
     }, .{
         .policy_decision = .{
             .outcome = outcome,
@@ -91,4 +98,13 @@ pub fn buildPolicyDecisionEvent(
             .classification_code = [_]u8{0} ** 32,
         },
     });
+}
+
+/// Fill event metadata with the runtime's version/tier/digest info.
+pub fn fillEventMetadata(event: *audit.AuditEvent, version: []const u8, platform_tier: []const u8, isolation_tier: []const u8, release_digest: []const u8, demo_manifest_id: []const u8) void {
+    @memcpy(event.header.version[0..version.len], version);
+    @memcpy(event.header.platform_tier[0..platform_tier.len], platform_tier);
+    @memcpy(event.header.isolation_tier[0..isolation_tier.len], isolation_tier);
+    @memcpy(event.header.release_digest[0..release_digest.len], release_digest);
+    @memcpy(event.header.demo_manifest_id[0..demo_manifest_id.len], demo_manifest_id);
 }
