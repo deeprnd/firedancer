@@ -85,6 +85,96 @@ pub fn build(b: *std.Build) void {
         },
     });
     // ---------------------------------------------------------------------------
+    // Version / doctor / demo modules — T2 scaffolding for V2.21.S3.
+    // ---------------------------------------------------------------------------
+    const tier_mod = b.addModule("tier", .{
+        .root_source_file = b.path("src/tickoni/util/tier.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    // Build-time version injection via options (V1: build-time env var + git SHA)
+    // Version is set via: zig build -Dversion=1.2.3-beta
+    // Default is 0.1.0-dev
+    const build_version_option = b.option([]const u8, "version", "Build version string") orelse "0.1.0";
+    var bv_major: u16 = 0;
+    var bv_minor: u16 = 0;
+    var bv_patch: u16 = 0;
+    var bv_pre: []const u8 = "dev";
+    {
+        const parts = std.mem.splitScalar(u8, build_version_option, '.');
+        var parts_it = parts;
+        if (parts_it.next()) |s| bv_major = std.fmt.parseInt(u16, s, 10) catch 0;
+        if (parts_it.next()) |s| bv_minor = std.fmt.parseInt(u16, s, 10) catch 0;
+        if (parts_it.next()) |s| {
+            if (std.mem.indexOf(u8, s, "-")) |dash| {
+                bv_patch = std.fmt.parseInt(u16, s[0..dash], 10) catch 0;
+                bv_pre = s[dash + 1 ..];
+            } else {
+                bv_patch = std.fmt.parseInt(u16, s, 10) catch 0;
+            }
+        }
+    }
+
+    // Git SHA from current repo HEAD
+    const version_opts = b.addOptions();
+    version_opts.addOption([]const u8, "BUILD_VERSION", build_version_option);
+    version_opts.addOption(u16, "BUILD_VERSION_MAJOR", bv_major);
+    version_opts.addOption(u16, "BUILD_VERSION_MINOR", bv_minor);
+    version_opts.addOption(u16, "BUILD_VERSION_PATCH", bv_patch);
+    version_opts.addOption([]const u8, "BUILD_VERSION_PRE", bv_pre);
+    version_opts.addOption([]const u8, "BUILD_GIT_SHA", "unknown");
+    version_opts.addOption([]const u8, "BUILD_ID", "dev-unknown");
+
+    const version_mod = b.addModule("version", .{
+        .root_source_file = b.path("src/tickoni/version.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "tier", .module = tier_mod },
+            .{ .name = "audit_schema", .module = audit_schema_mod },
+            .{ .name = "build_options", .module = version_opts.createModule() },
+        },
+    });
+    const doctor_checks_mod = b.addModule("doctor_checks", .{
+        .root_source_file = b.path("src/tickoni/doctor/checks.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const doctor_output_mod = b.addModule("doctor_output", .{
+        .root_source_file = b.path("src/tickoni/doctor/output.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "doctor_checks", .module = doctor_checks_mod },
+            .{ .name = "tier", .module = tier_mod },
+        },
+    });
+    const demo_manifest_mod = b.addModule("demo_manifest", .{
+        .root_source_file = b.path("src/tickoni/demo/manifest.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const demo_semver_mod = b.addModule("demo_semver", .{
+        .root_source_file = b.path("src/tickoni/demo/semver.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const demo_preflight_mod = b.addModule("demo_preflight", .{
+        .root_source_file = b.path("src/tickoni/demo/preflight.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "demo_manifest", .module = demo_manifest_mod },
+            .{ .name = "demo_semver", .module = demo_semver_mod },
+        },
+    });
+    const logger_mod = b.addModule("logger", .{
+        .root_source_file = b.path("src/tickoni/logger.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // ---------------------------------------------------------------------------
     // Shared schema modules — single instances used across all test lanes.
     // All cross-module imports use named imports (@import("name")) so each
     // source file belongs to exactly one module instance, eliminating the
@@ -250,11 +340,16 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .imports = &.{
+            .{ .name = "version", .module = version_mod },
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "tiles", .module = tiles_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
             .{ .name = "util", .module = util_mod },
             .{ .name = "topologies", .module = topologies_named_mod },
+            .{ .name = "doctor_checks", .module = doctor_checks_mod },
+            .{ .name = "doctor_output", .module = doctor_output_mod },
+            .{ .name = "demo_preflight", .module = demo_preflight_mod },
+            .{ .name = "logger", .module = logger_mod },
         },
     });
     const exe = b.addExecutable(.{
@@ -487,7 +582,7 @@ pub fn build(b: *std.Build) void {
         const t = b.addTest(.{ .root_module = t_mod });
         if (std.mem.eql(u8, path, "src/tickoni/util/tier.zig")) {
             t.root_module.addCSourceFiles(.{
-                .files = &.{ "src/tickoni/util/compiler_version.c" },
+                .files = &.{"src/tickoni/util/compiler_version.c"},
             });
             t.root_module.link_libc = true;
         }
@@ -515,6 +610,81 @@ pub fn build(b: *std.Build) void {
         const t_run = b.addRunArtifact(t);
         test_step.dependOn(&t_run.step);
     }
+
+    // ---------------------------------------------------------------------------
+    // V2.21.S3 modules — version, doctor, demo manifest, preflight (T2 scaffolding).
+    // Each has its own test binary with its own import graph.
+    // ---------------------------------------------------------------------------
+
+    // version.zig imports: tier, audit_schema, build_options
+    const version_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/version.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "tier", .module = tier_mod },
+                .{ .name = "audit_schema", .module = audit_schema_mod },
+                .{ .name = "build_options", .module = version_opts.createModule() },
+            },
+        }),
+    });
+    version_test.root_module.addCSourceFiles(.{
+        .files = &.{"src/tickoni/util/compiler_version.c"},
+    });
+    version_test.root_module.link_libc = true;
+    test_step.dependOn(&b.addRunArtifact(version_test).step);
+
+    // doctor/checks.zig — standalone (no imports beyond std)
+    const doctor_checks_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/doctor/checks.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(doctor_checks_test).step);
+
+    // doctor/output.zig imports: doctor_checks
+    const doctor_output_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/doctor/output.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "doctor_checks", .module = doctor_checks_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(doctor_output_test).step);
+
+    // demo/manifest.zig — standalone (no cross-module imports)
+    const demo_manifest_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/demo/manifest.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "logger", .module = logger_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(demo_manifest_test).step);
+
+    // demo/preflight.zig imports: demo_manifest, demo_semver, tier
+    const demo_preflight_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/demo/preflight.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "demo_manifest", .module = demo_manifest_mod },
+                .{ .name = "demo_semver", .module = demo_semver_mod },
+                .{ .name = "tier", .module = tier_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(demo_preflight_test).step);
 
     // src/tickoni/codec/thesis.zig: dedicated wrapper tests over the canonical
     // consumer-money schema hash APIs.
@@ -1372,11 +1542,6 @@ pub fn build(b: *std.Build) void {
     const live_model_step = b.step("integration-test-live-model", "Alias for the live V1.1 system/demo lane");
     live_model_step.dependOn(system_step);
 
-    const tier_mod = b.createModule(.{
-        .root_source_file = b.path("src/tickoni/util/tier.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
     const cli_main_mod = b.createModule(.{
         .root_source_file = b.path("src/app/tickoni_cli/main.zig"),
         .target = target,
@@ -1385,6 +1550,10 @@ pub fn build(b: *std.Build) void {
             .{ .name = "clap", .module = clap_mod },
             .{ .name = "investment_demo", .module = investment_demo_mod },
             .{ .name = "tier", .module = tier_mod },
+            .{ .name = "doctor_output", .module = doctor_output_mod },
+            .{ .name = "demo_manifest", .module = demo_manifest_mod },
+            .{ .name = "demo_preflight", .module = demo_preflight_mod },
+            .{ .name = "version", .module = version_mod },
         },
     });
     const cli_exe = b.addExecutable(.{
@@ -1392,7 +1561,7 @@ pub fn build(b: *std.Build) void {
         .root_module = cli_main_mod,
     });
     cli_exe.root_module.addCSourceFiles(.{
-        .files = &.{ "src/tickoni/util/compiler_version.c" },
+        .files = &.{"src/tickoni/util/compiler_version.c"},
     });
     cli_exe.root_module.addLibraryPath(b.path(fd_lib_dir));
     cli_exe.root_module.linkSystemLibrary("fd_util", .{});
@@ -1684,7 +1853,6 @@ pub fn build(b: *std.Build) void {
     cov_step.dependOn(&b.addInstallArtifact(topologies_cov_test, .{
         .dest_dir = .{ .override = .{ .custom = "cov" } },
     }).step);
-
 }
 /// b.addRunArtifact on a test binary always enables Zig's test-server
 /// protocol (--listen=- plus .stdio = .zig_test), which communicates with

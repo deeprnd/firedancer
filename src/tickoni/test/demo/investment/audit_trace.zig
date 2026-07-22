@@ -78,19 +78,19 @@ fn header(
     run_id: u64,
     prev_hash: u64,
 ) audit.Header {
-    return .{
-        .schema_version = audit.audit_schema_version,
-        .run_id = run_id,
-        .seq = seq,
-        .source_offset = seq + 1,
-        .tile_id = parseFixedAsciiBytes(6, tile_id),
-        .logical_actor_id = logical_actor_id,
-        .policy_version = parseFixedAsciiBytes(32, policy_version),
-        .capability_envelope_id = capability_envelope_id,
-        .timestamp_ns = 0,
-        .prev_hash = prev_hash,
-        .record_hash = 0,
-    };
+    var hdr = std.mem.zeroes(audit.Header);
+    hdr.schema_version = audit.audit_schema_version;
+    hdr.run_id = run_id;
+    hdr.seq = seq;
+    hdr.source_offset = seq + 1;
+    hdr.tile_id = parseFixedAsciiBytes(6, tile_id);
+    hdr.logical_actor_id = logical_actor_id;
+    hdr.policy_version = parseFixedAsciiBytes(32, policy_version);
+    hdr.capability_envelope_id = capability_envelope_id;
+    hdr.timestamp_ns = 0;
+    hdr.prev_hash = prev_hash;
+    hdr.record_hash = 0;
+    return hdr;
 }
 
 pub fn buildAllowedTradeChain(

@@ -23,19 +23,19 @@ fn fixtureHeader(
     prev_hash: u64,
     run_id: u64,
 ) schema.Header {
-    return .{
-        .schema_version = schema.audit_schema_version,
-        .run_id = run_id,
-        .seq = seq,
-        .source_offset = source_offset,
-        .tile_id = parseFixedAsciiBytes(6, tile_id) catch unreachable,
-        .logical_actor_id = logical_actor_id,
-        .policy_version = parseFixedAsciiBytes(32, policy_version) catch unreachable,
-        .capability_envelope_id = capability_envelope_id,
-        .timestamp_ns = timestamp_ns,
-        .prev_hash = prev_hash,
-        .record_hash = 0,
-    };
+    var hdr = std.mem.zeroes(schema.Header);
+    hdr.schema_version = schema.audit_schema_version;
+    hdr.run_id = run_id;
+    hdr.seq = seq;
+    hdr.source_offset = source_offset;
+    hdr.tile_id = parseFixedAsciiBytes(6, tile_id) catch unreachable;
+    hdr.logical_actor_id = logical_actor_id;
+    hdr.policy_version = parseFixedAsciiBytes(32, policy_version) catch unreachable;
+    hdr.capability_envelope_id = capability_envelope_id;
+    hdr.timestamp_ns = timestamp_ns;
+    hdr.prev_hash = prev_hash;
+    hdr.record_hash = 0;
+    return hdr;
 }
 
 pub fn makeFixtures() [12]schema.AuditEvent {
