@@ -2,7 +2,6 @@
 ///
 /// T7 implementation: real JSON parsing from file, semver/tier/schema validation.
 const std = @import("std");
-
 /// Manifest error types.
 pub const Error = error{
     /// JSON syntax error.
