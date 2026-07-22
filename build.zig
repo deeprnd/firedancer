@@ -168,6 +168,11 @@ pub fn build(b: *std.Build) void {
             .{ .name = "demo_semver", .module = demo_semver_mod },
         },
     });
+    const logger_mod = b.addModule("logger", .{
+        .root_source_file = b.path("src/tickoni/logger.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     // ---------------------------------------------------------------------------
     // Shared schema modules — single instances used across all test lanes.
@@ -344,6 +349,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "doctor_checks", .module = doctor_checks_mod },
             .{ .name = "doctor_output", .module = doctor_output_mod },
             .{ .name = "demo_preflight", .module = demo_preflight_mod },
+            .{ .name = "logger", .module = logger_mod },
         },
     });
     const exe = b.addExecutable(.{
@@ -658,6 +664,9 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/tickoni/demo/manifest.zig"),
             .target = target,
             .optimize = optimize,
+            .imports = &.{
+                .{ .name = "logger", .module = logger_mod },
+            },
         }),
     });
     test_step.dependOn(&b.addRunArtifact(demo_manifest_test).step);
