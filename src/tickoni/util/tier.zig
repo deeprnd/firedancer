@@ -42,7 +42,7 @@ pub fn detectTier() Tier {
 /// Return the detected OS name string for display.
 pub fn detectOsString() []const u8 {
     return switch (builtin.target.os.tag) {
-        .macos => "macOS",
+        .macos => "MacOS",
         .windows => "Windows",
         .linux => "Linux",
         else => "Unknown",
