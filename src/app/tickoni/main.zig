@@ -240,7 +240,7 @@ fn cmdDemo(init: std.process.Init, manifest_path: []const u8) !void {
         try File.writeStreamingAll(File.stderr(), init.io, msg);
         std.process.exit(1);
     };
-    defer demo_preflight.deinitManifest(m);
+    defer demo_preflight.deinitManifest(m, init.gpa);
 
     // Gather installed system info
     var version_info = version.VersionInfo.init(init.gpa) catch |err| {

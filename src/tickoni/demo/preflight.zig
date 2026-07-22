@@ -103,45 +103,48 @@ pub fn run(
 
     // 2. Version check (semver >= min)
     {
-        if (m.min_tickoni_version.len > 0 and std.mem.eql(u8, m.min_tickoni_version, "0.0.0") == false) {
-            const installed_sv = Semver.parse(installed_version) catch {
+        if (m.min_tickoni_version) |min_ver| {
+            if (std.mem.eql(u8, min_ver, "0.0.0") == false) {
+                const installed_sv = Semver.parse(installed_version) catch {
+                    try checks.append(allocator, Check{
+                        .name = "version",
+                        .passed = false,
+                        .required = min_ver,
+                        .found = installed_version,
+                        .detail = "could not parse installed version as semver",
+                    });
+                    return PreflightError.PreflightFailed;
+                };
+                const required_sv = Semver.parse(min_ver) catch {
+                    try checks.append(allocator, Check{
+                        .name = "version",
+                        .passed = false,
+                        .required = min_ver,
+                        .found = installed_version,
+                        .detail = "could not parse manifest min version as semver",
+                    });
+                    return PreflightError.PreflightFailed;
+                };
+                const ver_passed = installed_sv.gte(required_sv);
                 try checks.append(allocator, Check{
                     .name = "version",
-                    .passed = false,
-                    .required = m.min_tickoni_version,
+                    .passed = ver_passed,
+                    .required = min_ver,
                     .found = installed_version,
-                    .detail = "could not parse installed version as semver",
+                    .detail = if (!ver_passed) "installed version is below minimum required" else "",
                 });
-                return PreflightError.PreflightFailed;
-            };
-            const required_sv = Semver.parse(m.min_tickoni_version) catch {
-                try checks.append(allocator, Check{
-                    .name = "version",
-                    .passed = false,
-                    .required = m.min_tickoni_version,
-                    .found = installed_version,
-                    .detail = "could not parse manifest min version as semver",
-                });
-                return PreflightError.PreflightFailed;
-            };
-            const ver_passed = installed_sv.gte(required_sv);
-            try checks.append(allocator, Check{
-                .name = "version",
-                .passed = ver_passed,
-                .required = m.min_tickoni_version,
-                .found = installed_version,
-                .detail = if (!ver_passed) "installed version is below minimum required" else "",
-            });
+            }
         }
     }
 
     // 3. Isolation tier check
     {
-        const matches = std.mem.eql(u8, installed_isolation_tier, m.required_isolation_tier);
+        const iso = if (m.required_isolation_tier) |t| t else "retail";
+        const matches = std.mem.eql(u8, installed_isolation_tier, iso);
         try checks.append(allocator, Check{
             .name = "isolation_tier",
             .passed = matches,
-            .required = m.required_isolation_tier,
+            .required = iso,
             .found = installed_isolation_tier,
             .detail = if (!matches) "isolation tier does not match manifest requirement" else "",
         });
@@ -161,35 +164,37 @@ pub fn run(
 
     // 5. Replay schema version check
     {
-        if (std.mem.eql(u8, m.replay_schema_version, "0.0.0") == false and m.replay_schema_version.len > 0) {
-            const required_schema = parseSchemaVersion(m.replay_schema_version);
-            if (required_schema == null) {
-                try checks.append(allocator, Check{
-                    .name = "replay_schema",
-                    .passed = false,
-                    .required = m.replay_schema_version,
-                    .found = "(unparseable)",
-                    .detail = "could not parse replay schema version",
-                });
-            } else {
-                const installed_schema = parseSchemaVersion("2");
-                if (installed_schema == null) {
+        if (m.replay_schema_version) |rv| {
+            if (std.mem.eql(u8, rv, "0.0.0") == false) {
+                const required_schema = parseSchemaVersion(rv);
+                if (required_schema == null) {
                     try checks.append(allocator, Check{
                         .name = "replay_schema",
                         .passed = false,
-                        .required = m.replay_schema_version,
+                        .required = rv,
                         .found = "(unparseable)",
-                        .detail = "could not parse installed replay schema version",
+                        .detail = "could not parse replay schema version",
                     });
                 } else {
-                    const pass = installed_schema.? == required_schema.?;
-                    try checks.append(allocator, Check{
-                        .name = "replay_schema",
-                        .passed = pass,
-                        .required = m.replay_schema_version,
-                        .found = if (installed_schema) |v| std.fmt.allocPrint(allocator, "{d}", .{v}) catch "0" else "0",
-                        .detail = if (!pass) "replay schema version mismatch" else "",
-                    });
+                    const installed_schema = parseSchemaVersion("2");
+                    if (installed_schema == null) {
+                        try checks.append(allocator, Check{
+                            .name = "replay_schema",
+                            .passed = false,
+                            .required = rv,
+                            .found = "(unparseable)",
+                            .detail = "could not parse installed replay schema version",
+                        });
+                    } else {
+                        const pass = installed_schema.? == required_schema.?;
+                        try checks.append(allocator, Check{
+                            .name = "replay_schema",
+                            .passed = pass,
+                            .required = rv,
+                            .found = if (installed_schema) |v| std.fmt.allocPrint(allocator, "{d}", .{v}) catch "0" else "0",
+                            .detail = if (!pass) "replay schema version mismatch" else "",
+                        });
+                    }
                 }
             }
         }
@@ -197,35 +202,37 @@ pub fn run(
 
     // 6. Policy schema version check
     {
-        if (std.mem.eql(u8, m.policy_schema_version, "0.0.0") == false and m.policy_schema_version.len > 0) {
-            const required_schema = parseSchemaVersion(m.policy_schema_version);
-            if (required_schema == null) {
-                try checks.append(allocator, Check{
-                    .name = "policy_schema",
-                    .passed = false,
-                    .required = m.policy_schema_version,
-                    .found = "(unparseable)",
-                    .detail = "could not parse policy schema version",
-                });
-            } else {
-                const installed_schema = parseSchemaVersion("2");
-                if (installed_schema == null) {
+        if (m.policy_schema_version) |pv| {
+            if (std.mem.eql(u8, pv, "0.0.0") == false) {
+                const required_schema = parseSchemaVersion(pv);
+                if (required_schema == null) {
                     try checks.append(allocator, Check{
                         .name = "policy_schema",
                         .passed = false,
-                        .required = m.policy_schema_version,
+                        .required = pv,
                         .found = "(unparseable)",
-                        .detail = "could not parse installed policy schema version",
+                        .detail = "could not parse policy schema version",
                     });
                 } else {
-                    const pass = installed_schema.? == required_schema.?;
-                    try checks.append(allocator, Check{
-                        .name = "policy_schema",
-                        .passed = pass,
-                        .required = m.policy_schema_version,
-                        .found = if (installed_schema) |v| std.fmt.allocPrint(allocator, "{d}", .{v}) catch "0" else "0",
-                        .detail = if (!pass) "policy schema version mismatch" else "",
-                    });
+                    const installed_schema = parseSchemaVersion("2");
+                    if (installed_schema == null) {
+                        try checks.append(allocator, Check{
+                            .name = "policy_schema",
+                            .passed = false,
+                            .required = pv,
+                            .found = "(unparseable)",
+                            .detail = "could not parse installed policy schema version",
+                        });
+                    } else {
+                        const pass = installed_schema.? == required_schema.?;
+                        try checks.append(allocator, Check{
+                            .name = "policy_schema",
+                            .passed = pass,
+                            .required = pv,
+                            .found = if (installed_schema) |v| std.fmt.allocPrint(allocator, "{d}", .{v}) catch "0" else "0",
+                            .detail = if (!pass) "policy schema version mismatch" else "",
+                        });
+                    }
                 }
             }
         }
@@ -330,8 +337,8 @@ pub fn loadManifest(allocator: Allocator, io: Io, cwd: std.Io.Dir, path: []const
 }
 
 /// Free a parsed Manifest.
-pub fn deinitManifest(m: *Manifest) void {
-    _ = m;
+pub fn deinitManifest(m: *Manifest, gpa: Allocator) void {
+    m.deinit(gpa);
 }
 
 /// Internal JSON-compatible struct for manifest deserialization.
