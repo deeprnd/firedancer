@@ -156,9 +156,9 @@
 
 
 #if defined(__linux__)
-#define SYM_FUNC_END(name) .cfi_endproc GNU_TYPE(name) GNU_SIZE(name,.-name)
+#define SYM_FUNC_END(name) .cfi_endproc ; GNU_TYPE(name) ; GNU_SIZE(name,.-name)
 #else
-#define SYM_FUNC_END(name) GNU_TYPE(name) GNU_SIZE(name,.-name)
+#define SYM_FUNC_END(name) GNU_TYPE(name) ; GNU_SIZE(name,.-name)
 #endif
 
 
