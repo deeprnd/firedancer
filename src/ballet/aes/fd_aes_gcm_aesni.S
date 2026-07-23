@@ -148,21 +148,19 @@
 #define GNU_PALIGN(n)
 #endif
 
-#define SYM_FUNC_START(name)			\
-	.globl name ;				\
-	.balign 16, 0x90 ;			\
-	name: ;					\
 #if defined(__linux__)
-		.cfi_startproc; 		\
+#define SYM_FUNC_START(name) 	.globl name ; 	.balign 16, 0x90 ; 	name: ; 	.cfi_startproc; 		endbr64
+#else
+#define SYM_FUNC_START(name) 	.globl name ; 	.balign 16, 0x90 ; 	name: ; 		endbr64
 #endif
-		endbr64
 
-#define SYM_FUNC_END(name)				\
+
 #if defined(__linux__)
-	.cfi_endproc; 				\
+#define SYM_FUNC_END(name) .cfi_endproc GNU_TYPE(name) GNU_SIZE(name,.-name)
+#else
+#define SYM_FUNC_END(name) GNU_TYPE(name) GNU_SIZE(name,.-name)
 #endif
-	GNU_TYPE(name) ;				\
-	GNU_SIZE(name,.-name)
+
 
 .section .rodata
 .Lbswap_mask:
