@@ -191,6 +191,26 @@
 
 // Do a vpclmulqdq, or fall back to a movdqa and a pclmulqdq.  The fallback
 // assumes that all operands are distinct and that any mem operand is aligned.
+	.set FD_IMM_0d, 0
+	.set FD_IMM_00, 0
+	.set FD_IMM_1d, 1
+	.set FD_IMM_01, 1
+	.set FD_IMM_2d, 2
+	.set FD_IMM_3d, 3
+	.set FD_IMM_4d, 4
+	.set FD_IMM_6d, 6
+	.set FD_IMM_7d, 7
+	.set FD_IMM_8d, 8
+	.set FD_IMM_e, 14
+	.set FD_IMM_10, 16
+	.set FD_IMM_16d, 16
+	.set FD_IMM_11, 17
+	.set FD_IMM_24d, 24
+	.set FD_IMM_31d, 31
+	.set FD_IMM_64d, 64
+	.set FD_IMM_4e, 78
+	.set FD_IMM_96, 150
+	.set FD_IMM_d3, 211
 .macro	_vpclmulqdq	imm, src1, src2, dst
 .if USE_AVX
 	vpclmulqdq	\imm, \src1, \src2, \dst
@@ -247,20 +267,20 @@
 // Load 1 <= %ecx <= 15 bytes from the pointer \src into the xmm register \dst
 // and zeroize any remaining bytes.  Clobbers %rax, %rcx, and \tmp{64,32}.
 .macro	_load_partial_block	src, dst, tmp64, tmp32
-	sub		$8, %ecx		// LEN - 8
+	sub		$FD_IMM_8d, %ecx		// LEN - 8
 	jle		.Lle8\@
 
 	// Load 9 <= LEN <= 15 bytes.
 	movq		(\src), \dst		// Load first 8 bytes
 	mov		(\src, %rcx), %rax	// Load last 8 bytes
 	neg		%ecx
-	shl		$3, %ecx
+	shl		$FD_IMM_3d, %ecx
 	shr		%cl, %rax		// Discard overlapping bytes
-	pinsrq		$1, %rax, \dst
+	pinsrq		$FD_IMM_1d, %rax, \dst
 	jmp		.Ldone\@
 
 .Lle8\@:
-	add		$4, %ecx		// LEN - 4
+	add		$FD_IMM_4d, %ecx		// LEN - 4
 	jl		.Llt4\@
 
 	// Load 4 <= LEN <= 8 bytes.
@@ -270,12 +290,12 @@
 
 .Llt4\@:
 	// Load 1 <= LEN <= 3 bytes.
-	add		$2, %ecx		// LEN - 2
+	add		$FD_IMM_2d, %ecx		// LEN - 2
 	movzbl		(\src), %eax		// Load first byte
 	jl		.Lmovq\@
 	movzwl		(\src, %rcx), \tmp32	// Load last 2 bytes
 .Lcombine\@:
-	shl		$3, %ecx
+	shl		$FD_IMM_3d, %ecx
 	shl		%cl, \tmp64
 	or		\tmp64, %rax		// Combine the two parts
 .Lmovq\@:
@@ -286,26 +306,26 @@
 // Store 1 <= %ecx <= 15 bytes from the xmm register \src to the pointer \dst.
 // Clobbers %rax, %rcx, and %rsi.
 .macro	_store_partial_block	src, dst
-	sub		$8, %ecx		// LEN - 8
+	sub		$FD_IMM_8d, %ecx		// LEN - 8
 	jl		.Llt8\@
 
 	// Store 8 <= LEN <= 15 bytes.
-	pextrq		$1, \src, %rax
+	pextrq		$FD_IMM_1d, \src, %rax
 	mov		%ecx, %esi
-	shl		$3, %ecx
+	shl		$FD_IMM_3d, %ecx
 	ror		%cl, %rax
 	mov		%rax, (\dst, %rsi)	// Store last LEN - 8 bytes
 	movq		\src, (\dst)		// Store first 8 bytes
 	jmp		.Ldone\@
 
 .Llt8\@:
-	add		$4, %ecx		// LEN - 4
+	add		$FD_IMM_4d, %ecx		// LEN - 4
 	jl		.Llt4\@
 
 	// Store 4 <= LEN <= 7 bytes.
-	pextrd		$1, \src, %eax
+	pextrd		$FD_IMM_1d, \src, %eax
 	mov		%ecx, %esi
-	shl		$3, %ecx
+	shl		$FD_IMM_3d, %ecx
 	ror		%cl, %eax
 	mov		%eax, (\dst, %rsi)	// Store last LEN - 4 bytes
 	movd		\src, (\dst)		// Store first 4 bytes
@@ -313,12 +333,12 @@
 
 .Llt4\@:
 	// Store 1 <= LEN <= 3 bytes.
-	pextrb		$0, \src, 0(\dst)
+	pextrb		$FD_IMM_0d, \src, 0(\dst)
 	cmp		$-2, %ecx		// LEN - 4 == -2, i.e. LEN == 2?
 	jl		.Ldone\@
-	pextrb		$1, \src, 1(\dst)
+	pextrb		$FD_IMM_1d, \src, 1(\dst)
 	je		.Ldone\@
-	pextrb		$2, \src, 2(\dst)
+	pextrb		$FD_IMM_2d, \src, 2(\dst)
 .Ldone\@:
 .endm
 
@@ -330,25 +350,25 @@
 
 	// MI = (a_L * b_H) + ((a*x^64)_L * b_L)
 .if \i == 0
-	_vpclmulqdq	$0x01, \a, \b, \t0
+	_vpclmulqdq	$FD_IMM_01, \a, \b, \t0
 .elseif \i == 1
-	_vpclmulqdq	$0x00, \a_times_x64, \b, \t1
+	_vpclmulqdq	$FD_IMM_00, \a_times_x64, \b, \t1
 .elseif \i == 2
 	pxor		\t1, \t0
 
 	// HI = (a_H * b_H) + ((a*x^64)_H * b_L)
 .elseif \i == 3
-	_vpclmulqdq	$0x11, \a, \b, \t1
+	_vpclmulqdq	$FD_IMM_11, \a, \b, \t1
 .elseif \i == 4
-	pclmulqdq	$0x10, \a_times_x64, \b
+	pclmulqdq	$FD_IMM_10, \a_times_x64, \b
 .elseif \i == 5
 	pxor		\t1, \b
 .elseif \i == 6
 
 	// Fold MI into HI.
-	pshufd		$0x4e, \t0, \t1		// Swap halves of MI
+	pshufd		$FD_IMM_4e, \t0, \t1		// Swap halves of MI
 .elseif \i == 7
-	pclmulqdq	$0x00, \gfpoly, \t0	// MI_L*(x^63 + x^62 + x^57)
+	pclmulqdq	$FD_IMM_00, \gfpoly, \t0	// MI_L*(x^63 + x^62 + x^57)
 .elseif \i == 8
 	pxor		\t1, \b
 .elseif \i == 9
@@ -371,19 +391,19 @@
 .macro	_ghash_mul_noreduce	a, a_xored, b, lo, mi, hi, t0
 
 	// LO += a_L * b_L
-	_vpclmulqdq	$0x00, \a, \b, \t0
+	_vpclmulqdq	$FD_IMM_00, \a, \b, \t0
 	pxor		\t0, \lo
 
 	// b_L + b_H
-	pshufd		$0x4e, \b, \t0
+	pshufd		$FD_IMM_4e, \b, \t0
 	pxor		\b, \t0
 
 	// HI += a_H * b_H
-	pclmulqdq	$0x11, \a, \b
+	pclmulqdq	$FD_IMM_11, \a, \b
 	pxor		\b, \hi
 
 	// MI += (a_L + a_H) * (b_L + b_H)
-	pclmulqdq	$0x00, \a_xored, \t0
+	pclmulqdq	$FD_IMM_00, \a_xored, \t0
 	pxor		\t0, \mi
 .endm
 
@@ -398,14 +418,14 @@
 	pxor		\hi, \mi
 
 	// Fold LO into MI.
-	pshufd		$0x4e, \lo, \dst
-	pclmulqdq	$0x00, \t0, \lo
+	pshufd		$FD_IMM_4e, \lo, \dst
+	pclmulqdq	$FD_IMM_00, \t0, \lo
 	pxor		\dst, \mi
 	pxor		\lo, \mi
 
 	// Fold MI into HI.
-	pshufd		$0x4e, \mi, \dst
-	pclmulqdq	$0x00, \t0, \mi
+	pshufd		$FD_IMM_4e, \mi, \dst
+	pclmulqdq	$FD_IMM_00, \t0, \mi
 	pxor		\hi, \dst
 	pxor		\mi, \dst
 .endm
@@ -452,24 +472,24 @@
 	pxor		TMP1, GHASH_ACC
 
 	// b_L + b_H
-	pshufd		$0x4e, GHASH_ACC, MI
+	pshufd		$FD_IMM_4e, GHASH_ACC, MI
 	pxor		GHASH_ACC, MI
 
 	// LO = a_L * b_L
-	_vpclmulqdq	$0x00, TMP0, GHASH_ACC, LO
+	_vpclmulqdq	$FD_IMM_00, TMP0, GHASH_ACC, LO
 
 	// HI = a_H * b_H
-	pclmulqdq	$0x11, TMP0, GHASH_ACC
+	pclmulqdq	$FD_IMM_11, TMP0, GHASH_ACC
 
 	// MI = (a_L + a_H) * (b_L + b_H)
-	pclmulqdq	$0x00, OFFSETOF_H_POWERS_XORED(KEY), MI
+	pclmulqdq	$FD_IMM_00, OFFSETOF_H_POWERS_XORED(KEY), MI
 .endm
 
 // Continue the GHASH update of 8 ciphertext blocks as described above by doing
 // an unreduced multiplication of the next ciphertext block by the next lowest
 // key power and accumulating the result into LO, MI, and GHASH_ACC a.k.a. HI.
 .macro	_ghash_update_continue_8x enc
-	add		$8, %eax
+	add		$FD_IMM_8d, %eax
 
 	// Load the next lowest key power.
 	movdqa		OFFSETOF_H_POWERS(KEY,%rax,2), TMP0
@@ -483,20 +503,20 @@
 	pshufb		BSWAP_MASK, TMP1
 
 	// LO += a_L * b_L
-	_vpclmulqdq	$0x00, TMP0, TMP1, TMP2
+	_vpclmulqdq	$FD_IMM_00, TMP0, TMP1, TMP2
 	pxor		TMP2, LO
 
 	// b_L + b_H
-	pshufd		$0x4e, TMP1, TMP2
+	pshufd		$FD_IMM_4e, TMP1, TMP2
 	pxor		TMP1, TMP2
 
 	// HI += a_H * b_H
-	pclmulqdq	$0x11, TMP0, TMP1
+	pclmulqdq	$FD_IMM_11, TMP0, TMP1
 	pxor		TMP1, GHASH_ACC
 
 	// MI += (a_L + a_H) * (b_L + b_H)
 	movq		OFFSETOF_H_POWERS_XORED(KEY,%rax), TMP1
-	pclmulqdq	$0x00, TMP1, TMP2
+	pclmulqdq	$FD_IMM_00, TMP1, TMP2
 	pxor		TMP2, MI
 .endm
 
@@ -513,13 +533,13 @@
 	movq		.Lgfpoly(%rip), TMP1
 	pxor		LO, MI
 	pxor		GHASH_ACC, MI
-	pshufd		$0x4e, LO, TMP2
-	pclmulqdq	$0x00, TMP1, LO
+	pshufd		$FD_IMM_4e, LO, TMP2
+	pclmulqdq	$FD_IMM_00, TMP1, LO
 	pxor		TMP2, MI
 	pxor		LO, MI
 .elseif \i == 1
-	pshufd		$0x4e, MI, TMP2
-	pclmulqdq	$0x00, TMP1, MI
+	pshufd		$FD_IMM_4e, MI, TMP2
+	pclmulqdq	$FD_IMM_00, TMP1, MI
 	pxor		TMP2, GHASH_ACC
 	pxor		MI, GHASH_ACC
 .endif
@@ -549,7 +569,7 @@
 	lea		16(KEY), %rax
 1:
 	aesenc		(%rax), H_POW1
-	add		$16, %rax
+	add		$FD_IMM_16d, %rax
 	cmp		%rax, RNDKEYLAST_PTR
 	jne		1b
 	aesenclast	(RNDKEYLAST_PTR), H_POW1
@@ -561,8 +581,8 @@
 	// natural interpretation of polynomial coefficients).
 	pshufb		.Lbswap_mask(%rip), H_POW1
 	movdqa		H_POW1, %xmm0
-	pshufd		$0xd3, %xmm0, %xmm0
-	psrad		$31, %xmm0
+	pshufd		$FD_IMM_d3, %xmm0, %xmm0
+	psrad		$FD_IMM_31d, %xmm0
 	paddq		H_POW1, H_POW1
 	pand		.Lgfpoly_and_internal_carrybit(%rip), %xmm0
 	pxor		%xmm0, H_POW1
@@ -572,8 +592,8 @@
 
 	// Compute and store H^1 * x^64.
 	movq		.Lgfpoly(%rip), GFPOLY
-	pshufd		$0x4e, H_POW1, %xmm0
-	_vpclmulqdq	$0x00, H_POW1, GFPOLY, H_POW1_X64
+	pshufd		$FD_IMM_4e, H_POW1, %xmm0
+	_vpclmulqdq	$FD_IMM_00, H_POW1, GFPOLY, H_POW1_X64
 	pxor		%xmm0, H_POW1_X64
 	movdqa		H_POW1_X64, OFFSETOF_H_TIMES_X64(KEY)
 
@@ -583,17 +603,17 @@
 
 	// Compute and store the remaining key powers H^2 through H^8.
 	movdqa		H_POW1, H_CUR
-	mov		$6*8, %eax
+	mov		$FD_IMM_6d*8, %eax
 .Lprecompute_next\@:
 	// Compute H^i = H^{i-1} * H^1.
 	_ghash_mul	H_POW1, H_POW1_X64, H_CUR, GFPOLY, %xmm0, %xmm1
 	// Store H^i.
 	movdqa		H_CUR, OFFSETOF_H_POWERS(KEY,%rax,2)
 	// Compute and store the halves of H^i XOR'd together.
-	pshufd		$0x4e, H_CUR, %xmm0
+	pshufd		$FD_IMM_4e, H_CUR, %xmm0
 	pxor		H_CUR, %xmm0
 	movq		%xmm0, OFFSETOF_H_POWERS_XORED(KEY,%rax)
-	sub		$8, %eax
+	sub		$FD_IMM_8d, %eax
 	jge		.Lprecompute_next\@
 
 	RET
@@ -631,19 +651,19 @@
 	movq		.Lgfpoly(%rip), GFPOLY
 
 	// Process the AAD one full block at a time.
-	sub		$16, AADLEN
+	sub		$FD_IMM_16d, AADLEN
 	jl		.Laad_loop_1x_done\@
 .Laad_loop_1x\@:
 	movdqu		(AAD), %xmm0
 	pshufb		BSWAP_MASK, %xmm0
 	pxor		%xmm0, GHASH_ACC
 	_ghash_mul	H_POW1, H_POW1_X64, GHASH_ACC, GFPOLY, %xmm0, %xmm1
-	add		$16, AAD
-	sub		$16, AADLEN
+	add		$FD_IMM_16d, AAD
+	sub		$FD_IMM_16d, AADLEN
 	jge		.Laad_loop_1x\@
 .Laad_loop_1x_done\@:
 	// Check whether there is a partial block at the end.
-	add		$16, AADLEN
+	add		$FD_IMM_16d, AADLEN
 	jz		.Laad_done\@
 
 	// Process a partial block of length 1 <= AADLEN <= 15.
@@ -789,7 +809,7 @@ GNU_PALIGN(4)
 1:
 	movdqa		(%rsi), TMP0
 	_aesenc_8x	TMP0
-	add		$16, %rsi
+	add		$FD_IMM_16d, %rsi
 	cmp		%rsi, RNDKEYLAST_PTR
 	jne		1b
 	movdqa		(%rsi), TMP0
@@ -811,7 +831,7 @@ GNU_PALIGN(4)
 	// Do a round of AES, and start the GHASH update of 8 ciphertext blocks
 	// by doing the unreduced multiplication for the first ciphertext block.
 	movdqa		(%rsi), TMP0
-	add		$16, %rsi
+	add		$FD_IMM_16d, %rsi
 	_aesenc_8x	TMP0
 	_ghash_update_begin_8x \enc
 
@@ -820,17 +840,17 @@ GNU_PALIGN(4)
 GNU_PALIGN(4)
 1:
 	movdqa		(%rsi), TMP0
-	add		$16, %rsi
+	add		$FD_IMM_16d, %rsi
 	_aesenc_8x	TMP0
 	_ghash_update_continue_8x \enc
-	cmp		$7*8, %eax
+	cmp		$FD_IMM_7d*8, %eax
 	jne		1b
 
 	// Do the remaining AES rounds.
 GNU_PALIGN(4)
 1:
 	movdqa		(%rsi), TMP0
-	add		$16, %rsi
+	add		$FD_IMM_16d, %rsi
 	_aesenc_8x	TMP0
 	cmp		%rsi, RNDKEYLAST_PTR
 	jne		1b
@@ -860,7 +880,7 @@ GNU_PALIGN(4)
 GNU_PALIGN(4)
 1:
 	_ghash_update_continue_8x	\enc
-	cmp		$7*8, %eax
+	cmp		$FD_IMM_7d*8, %eax
 	jne		1b
 	_ghash_update_end_8x_step	0
 	_ghash_update_end_8x_step	1
@@ -896,10 +916,10 @@ GNU_PALIGN(4)
 	mov		DATALEN, %eax
 	neg		%eax
 	and		$~15, %eax
-	sar		$1, %eax
-	add		$64, %eax
+	sar		$FD_IMM_1d, %eax
+	add		$FD_IMM_64d, %eax
 
-	sub		$16, DATALEN
+	sub		$FD_IMM_16d, DATALEN
 	jl		.Lcrypt_loop_1x_done\@
 
 	// Process the data one full block at a time.
@@ -910,7 +930,7 @@ GNU_PALIGN(4)
 	paddd		ONE, LE_CTR
 	pxor		(KEY), TMP0
 	lea		-6*16(RNDKEYLAST_PTR), %rsi	// Reduce code size
-	cmp		$24, AESKEYLEN
+	cmp		$FD_IMM_24d, AESKEYLEN
 	jl		128f	// AES-128?
 	je		192f	// AES-192?
 	// AES-256
@@ -951,14 +971,14 @@ GNU_PALIGN(4)
 	_ghash_mul_noreduce	H_POW, H_POW_XORED, GHASH_ACC, LO, MI, HI, TMP0
 	pxor		GHASH_ACC, GHASH_ACC
 
-	add		$8, %eax
-	add		$16, SRC
-	add		$16, DST
-	sub		$16, DATALEN
+	add		$FD_IMM_8d, %eax
+	add		$FD_IMM_16d, SRC
+	add		$FD_IMM_16d, DST
+	sub		$FD_IMM_16d, DATALEN
 	jge		.Lcrypt_loop_1x\@
 .Lcrypt_loop_1x_done\@:
 	// Check whether there is a partial block at the end.
-	add		$16, DATALEN
+	add		$FD_IMM_16d, DATALEN
 	jz		.Lghash_reduce\@
 
 	// Process a partial block of length 1 <= DATALEN <= 15.
@@ -969,7 +989,7 @@ GNU_PALIGN(4)
 	lea		16(KEY), %rsi
 1:
 	aesenc		(%rsi), LE_CTR
-	add		$16, %rsi
+	add		$FD_IMM_16d, %rsi
 	cmp		%rsi, RNDKEYLAST_PTR
 	jne		1b
 	aesenclast	(RNDKEYLAST_PTR), LE_CTR
@@ -1062,13 +1082,13 @@ GNU_PALIGN(4)
 	// Set up a counter block with 1 in the low 32-bit word.  This is the
 	// counter that produces the ciphertext needed to encrypt the auth tag.
 	movdqu		(LE_CTR_PTR), %xmm0
-	mov		$1, %eax
-	pinsrd		$0, %eax, %xmm0
+	mov		$FD_IMM_1d, %eax
+	pinsrd		$FD_IMM_0d, %eax, %xmm0
 
 	// Build the lengths block and XOR it into the GHASH accumulator.
 	movq		TOTAL_DATALEN, GHASH_ACC
-	pinsrq		$1, TOTAL_AADLEN, GHASH_ACC
-	psllq		$3, GHASH_ACC	// Bytes to bits
+	pinsrq		$FD_IMM_1d, TOTAL_AADLEN, GHASH_ACC
+	psllq		$FD_IMM_3d, GHASH_ACC	// Bytes to bits
 	_xor_mem_to_reg	(GHASH_ACC_PTR), GHASH_ACC, %xmm1
 
 	movdqa		OFFSETOF_H_POWERS+7*16(KEY), H_POW1
@@ -1083,7 +1103,7 @@ GNU_PALIGN(4)
 	// Interleave the AES and GHASH instructions to improve performance.
 	pshufb		BSWAP_MASK, %xmm0
 	pxor		(KEY), %xmm0
-	cmp		$24, AESKEYLEN
+	cmp		$FD_IMM_24d, AESKEYLEN
 	jl		128f	// AES-128?
 	je		192f	// AES-192?
 	// AES-256

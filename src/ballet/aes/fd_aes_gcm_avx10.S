@@ -179,6 +179,26 @@ GNU_PALIGN(6)
 
 // Set the vector length in bytes.  This sets the VL variable and defines
 // register aliases V0-V31 that map to the ymm or zmm registers.
+	.set FD_IMM_0d, 0
+	.set FD_IMM_00, 0
+	.set FD_IMM_1d, 1
+	.set FD_IMM_01, 1
+	.set FD_IMM_2d, 2
+	.set FD_IMM_3d, 3
+	.set FD_IMM_4d, 4
+	.set FD_IMM_6d, 6
+	.set FD_IMM_7d, 7
+	.set FD_IMM_8d, 8
+	.set FD_IMM_e, 14
+	.set FD_IMM_10, 16
+	.set FD_IMM_16d, 16
+	.set FD_IMM_11, 17
+	.set FD_IMM_24d, 24
+	.set FD_IMM_31d, 31
+	.set FD_IMM_64d, 64
+	.set FD_IMM_4e, 78
+	.set FD_IMM_96, 150
+	.set FD_IMM_d3, 211
 .macro	_set_veclen	vl
 	.set	VL,	\vl
 .irp i, 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15, \
@@ -298,26 +318,26 @@ GNU_PALIGN(6)
 // similarly would save a vpclmulqdq but does not seem to be worth it.
 .macro	_ghash_mul_step	i, a, b, dst, gfpoly, t0, t1, t2
 .if \i == 0
-	vpclmulqdq	$0x00, \a, \b, \t0	  // LO = a_L * b_L
-	vpclmulqdq	$0x01, \a, \b, \t1	  // MI_0 = a_L * b_H
+	vpclmulqdq	$FD_IMM_00, \a, \b, \t0	  // LO = a_L * b_L
+	vpclmulqdq	$FD_IMM_01, \a, \b, \t1	  // MI_0 = a_L * b_H
 .elseif \i == 1
-	vpclmulqdq	$0x10, \a, \b, \t2	  // MI_1 = a_H * b_L
+	vpclmulqdq	$FD_IMM_10, \a, \b, \t2	  // MI_1 = a_H * b_L
 .elseif \i == 2
 	vpxord		\t2, \t1, \t1		  // MI = MI_0 + MI_1
 .elseif \i == 3
-	vpclmulqdq	$0x01, \t0, \gfpoly, \t2  // LO_L*(x^63 + x^62 + x^57)
+	vpclmulqdq	$FD_IMM_01, \t0, \gfpoly, \t2  // LO_L*(x^63 + x^62 + x^57)
 .elseif \i == 4
-	vpshufd		$0x4e, \t0, \t0		  // Swap halves of LO
+	vpshufd		$FD_IMM_4e, \t0, \t0		  // Swap halves of LO
 .elseif \i == 5
-	vpternlogd	$0x96, \t2, \t0, \t1	  // Fold LO into MI
+	vpternlogd	$FD_IMM_96, \t2, \t0, \t1	  // Fold LO into MI
 .elseif \i == 6
-	vpclmulqdq	$0x11, \a, \b, \dst	  // HI = a_H * b_H
+	vpclmulqdq	$FD_IMM_11, \a, \b, \dst	  // HI = a_H * b_H
 .elseif \i == 7
-	vpclmulqdq	$0x01, \t1, \gfpoly, \t0  // MI_L*(x^63 + x^62 + x^57)
+	vpclmulqdq	$FD_IMM_01, \t1, \gfpoly, \t0  // MI_L*(x^63 + x^62 + x^57)
 .elseif \i == 8
-	vpshufd		$0x4e, \t1, \t1		  // Swap halves of MI
+	vpshufd		$FD_IMM_4e, \t1, \t1		  // Swap halves of MI
 .elseif \i == 9
-	vpternlogd	$0x96, \t0, \t1, \dst	  // Fold MI into HI
+	vpternlogd	$FD_IMM_96, \t0, \t1, \dst	  // Fold MI into HI
 .endif
 .endm
 
@@ -332,24 +352,24 @@ GNU_PALIGN(6)
 // GHASH-multiply the 128-bit lanes of \a by the 128-bit lanes of \b and add the
 // *unreduced* products to \lo, \mi, and \hi.
 .macro	_ghash_mul_noreduce	a, b, lo, mi, hi, t0, t1, t2, t3
-	vpclmulqdq	$0x00, \a, \b, \t0	// a_L * b_L
-	vpclmulqdq	$0x01, \a, \b, \t1	// a_L * b_H
-	vpclmulqdq	$0x10, \a, \b, \t2	// a_H * b_L
-	vpclmulqdq	$0x11, \a, \b, \t3	// a_H * b_H
+	vpclmulqdq	$FD_IMM_00, \a, \b, \t0	// a_L * b_L
+	vpclmulqdq	$FD_IMM_01, \a, \b, \t1	// a_L * b_H
+	vpclmulqdq	$FD_IMM_10, \a, \b, \t2	// a_H * b_L
+	vpclmulqdq	$FD_IMM_11, \a, \b, \t3	// a_H * b_H
 	vpxord		\t0, \lo, \lo
-	vpternlogd	$0x96, \t2, \t1, \mi
+	vpternlogd	$FD_IMM_96, \t2, \t1, \mi
 	vpxord		\t3, \hi, \hi
 .endm
 
 // Reduce the unreduced products from \lo, \mi, and \hi and store the 128-bit
 // reduced products in \hi.  See _ghash_mul_step for explanation of reduction.
 .macro	_ghash_reduce	lo, mi, hi, gfpoly, t0
-	vpclmulqdq	$0x01, \lo, \gfpoly, \t0
-	vpshufd		$0x4e, \lo, \lo
-	vpternlogd	$0x96, \t0, \lo, \mi
-	vpclmulqdq	$0x01, \mi, \gfpoly, \t0
-	vpshufd		$0x4e, \mi, \mi
-	vpternlogd	$0x96, \t0, \mi, \hi
+	vpclmulqdq	$FD_IMM_01, \lo, \gfpoly, \t0
+	vpshufd		$FD_IMM_4e, \lo, \lo
+	vpternlogd	$FD_IMM_96, \t0, \lo, \mi
+	vpclmulqdq	$FD_IMM_01, \mi, \gfpoly, \t0
+	vpshufd		$FD_IMM_4e, \mi, \mi
+	vpternlogd	$FD_IMM_96, \t0, \mi, \hi
 .endm
 
 // void aes_gcm_precompute_##suffix(struct aes_gcm_key_avx10 *key);
@@ -390,10 +410,10 @@ GNU_PALIGN(6)
 	movl		OFFSETOF_AESKEYLEN(KEY), %eax
 	lea		6*16(KEY,%rax,4), RNDKEYLAST_PTR
 	vmovdqu		(KEY), %xmm0  // Zero-th round key XOR all-zeroes block
-	add		$16, KEY
+	add		$FD_IMM_16d, KEY
 1:
 	vaesenc		(KEY), %xmm0, %xmm0
-	add		$16, KEY
+	add		$FD_IMM_16d, KEY
 	cmp		KEY, RNDKEYLAST_PTR
 	jne		1b
 	vaesenclast	(RNDKEYLAST_PTR), %xmm0, %xmm0
@@ -421,8 +441,8 @@ GNU_PALIGN(6)
 	// << 120) | 1 if a 1 bit was carried out.  However, there's no 128-bit
 	// wide shift instruction, so instead double each of the two 64-bit
 	// halves and incorporate the internal carry bit into the value XOR'd.
-	vpshufd		$0xd3, H_CUR_XMM, %xmm0
-	vpsrad		$31, %xmm0, %xmm0
+	vpshufd		$FD_IMM_d3, H_CUR_XMM, %xmm0
+	vpsrad		$FD_IMM_31d, %xmm0, %xmm0
 	vpaddq		H_CUR_XMM, H_CUR_XMM, H_CUR_XMM
 	vpand		.Lgfpoly_and_internal_carrybit(%rip), %xmm0, %xmm0
 	vpxor		%xmm0, H_CUR_XMM, H_CUR_XMM
@@ -441,15 +461,15 @@ GNU_PALIGN(6)
 			%xmm0, %xmm1, %xmm2
 
 	// Create H_CUR_YMM = [H^2, H^1] and H_INC_YMM = [H^2, H^2].
-	vinserti128	$1, H_CUR_XMM, H_INC_YMM, H_CUR_YMM
-	vinserti128	$1, H_INC_XMM, H_INC_YMM, H_INC_YMM
+	vinserti128	$FD_IMM_1d, H_CUR_XMM, H_INC_YMM, H_CUR_YMM
+	vinserti128	$FD_IMM_1d, H_INC_XMM, H_INC_YMM, H_INC_YMM
 
 .if VL == 64
 	// Create H_CUR = [H^4, H^3, H^2, H^1] and H_INC = [H^4, H^4, H^4, H^4].
 	_ghash_mul	H_INC_YMM, H_CUR_YMM, H_INC_YMM, GFPOLY_YMM, \
 			%ymm0, %ymm1, %ymm2
-	vinserti64x4	$1, H_CUR_YMM, H_INC, H_CUR
-	vshufi64x2	$0, H_INC, H_INC, H_INC
+	vinserti64x4	$FD_IMM_1d, H_CUR_YMM, H_INC, H_CUR
+	vshufi64x2	$FD_IMM_0d, H_INC, H_INC, H_INC
 .endif
 
 	// Store the lowest set of key powers.
@@ -474,14 +494,14 @@ GNU_PALIGN(6)
 // XOR together the 128-bit lanes of \src (whose low lane is \src_xmm) and store
 // the result in \dst_xmm.  This implicitly zeroizes the other lanes of dst.
 .macro	_horizontal_xor	src, src_xmm, dst_xmm, t0_xmm, t1_xmm, t2_xmm
-	vextracti32x4	$1, \src, \t0_xmm
+	vextracti32x4	$FD_IMM_1d, \src, \t0_xmm
 .if VL == 32
 	vpxord		\t0_xmm, \src_xmm, \dst_xmm
 .elseif VL == 64
-	vextracti32x4	$2, \src, \t1_xmm
-	vextracti32x4	$3, \src, \t2_xmm
+	vextracti32x4	$FD_IMM_2d, \src, \t1_xmm
+	vextracti32x4	$FD_IMM_3d, \src, \t2_xmm
 	vpxord		\t0_xmm, \src_xmm, \dst_xmm
-	vpternlogd	$0x96, \t1_xmm, \t2_xmm, \dst_xmm
+	vpternlogd	$FD_IMM_96, \t1_xmm, \t2_xmm, \dst_xmm
 .else
 	.error "Unsupported vector length"
 .endif
@@ -529,43 +549,43 @@ GNU_PALIGN(6)
 	vpshufb		BSWAP_MASK, GHASHDATA2, GHASHDATA2
 .elseif \i == 1
 	vpshufb		BSWAP_MASK, GHASHDATA3, GHASHDATA3
-	vpclmulqdq	$0x00, H_POW4, GHASHDATA0, GHASH_ACC	// LO_0
-	vpclmulqdq	$0x00, H_POW3, GHASHDATA1, GHASHTMP0	// LO_1
-	vpclmulqdq	$0x00, H_POW2, GHASHDATA2, GHASHTMP1	// LO_2
+	vpclmulqdq	$FD_IMM_00, H_POW4, GHASHDATA0, GHASH_ACC	// LO_0
+	vpclmulqdq	$FD_IMM_00, H_POW3, GHASHDATA1, GHASHTMP0	// LO_1
+	vpclmulqdq	$FD_IMM_00, H_POW2, GHASHDATA2, GHASHTMP1	// LO_2
 .elseif \i == 2
 	vpxord		GHASHTMP0, GHASH_ACC, GHASH_ACC		// sum(LO_{1,0})
-	vpclmulqdq	$0x00, H_POW1, GHASHDATA3, GHASHTMP2	// LO_3
-	vpternlogd	$0x96, GHASHTMP2, GHASHTMP1, GHASH_ACC	// LO = sum(LO_{3,2,1,0})
-	vpclmulqdq	$0x01, H_POW4, GHASHDATA0, GHASHTMP0	// MI_0
+	vpclmulqdq	$FD_IMM_00, H_POW1, GHASHDATA3, GHASHTMP2	// LO_3
+	vpternlogd	$FD_IMM_96, GHASHTMP2, GHASHTMP1, GHASH_ACC	// LO = sum(LO_{3,2,1,0})
+	vpclmulqdq	$FD_IMM_01, H_POW4, GHASHDATA0, GHASHTMP0	// MI_0
 .elseif \i == 3
-	vpclmulqdq	$0x01, H_POW3, GHASHDATA1, GHASHTMP1	// MI_1
-	vpclmulqdq	$0x01, H_POW2, GHASHDATA2, GHASHTMP2	// MI_2
-	vpternlogd	$0x96, GHASHTMP2, GHASHTMP1, GHASHTMP0	// sum(MI_{2,1,0})
-	vpclmulqdq	$0x01, H_POW1, GHASHDATA3, GHASHTMP1	// MI_3
+	vpclmulqdq	$FD_IMM_01, H_POW3, GHASHDATA1, GHASHTMP1	// MI_1
+	vpclmulqdq	$FD_IMM_01, H_POW2, GHASHDATA2, GHASHTMP2	// MI_2
+	vpternlogd	$FD_IMM_96, GHASHTMP2, GHASHTMP1, GHASHTMP0	// sum(MI_{2,1,0})
+	vpclmulqdq	$FD_IMM_01, H_POW1, GHASHDATA3, GHASHTMP1	// MI_3
 .elseif \i == 4
-	vpclmulqdq	$0x10, H_POW4, GHASHDATA0, GHASHTMP2	// MI_4
-	vpternlogd	$0x96, GHASHTMP2, GHASHTMP1, GHASHTMP0	// sum(MI_{4,3,2,1,0})
-	vpclmulqdq	$0x10, H_POW3, GHASHDATA1, GHASHTMP1	// MI_5
-	vpclmulqdq	$0x10, H_POW2, GHASHDATA2, GHASHTMP2	// MI_6
+	vpclmulqdq	$FD_IMM_10, H_POW4, GHASHDATA0, GHASHTMP2	// MI_4
+	vpternlogd	$FD_IMM_96, GHASHTMP2, GHASHTMP1, GHASHTMP0	// sum(MI_{4,3,2,1,0})
+	vpclmulqdq	$FD_IMM_10, H_POW3, GHASHDATA1, GHASHTMP1	// MI_5
+	vpclmulqdq	$FD_IMM_10, H_POW2, GHASHDATA2, GHASHTMP2	// MI_6
 .elseif \i == 5
-	vpternlogd	$0x96, GHASHTMP2, GHASHTMP1, GHASHTMP0	// sum(MI_{6,5,4,3,2,1,0})
-	vpclmulqdq	$0x01, GHASH_ACC, GFPOLY, GHASHTMP2	// LO_L*(x^63 + x^62 + x^57)
-	vpclmulqdq	$0x10, H_POW1, GHASHDATA3, GHASHTMP1	// MI_7
+	vpternlogd	$FD_IMM_96, GHASHTMP2, GHASHTMP1, GHASHTMP0	// sum(MI_{6,5,4,3,2,1,0})
+	vpclmulqdq	$FD_IMM_01, GHASH_ACC, GFPOLY, GHASHTMP2	// LO_L*(x^63 + x^62 + x^57)
+	vpclmulqdq	$FD_IMM_10, H_POW1, GHASHDATA3, GHASHTMP1	// MI_7
 	vpxord		GHASHTMP1, GHASHTMP0, GHASHTMP0		// MI = sum(MI_{7,6,5,4,3,2,1,0})
 .elseif \i == 6
-	vpshufd		$0x4e, GHASH_ACC, GHASH_ACC		// Swap halves of LO
-	vpclmulqdq	$0x11, H_POW4, GHASHDATA0, GHASHDATA0	// HI_0
-	vpclmulqdq	$0x11, H_POW3, GHASHDATA1, GHASHDATA1	// HI_1
-	vpclmulqdq	$0x11, H_POW2, GHASHDATA2, GHASHDATA2	// HI_2
+	vpshufd		$FD_IMM_4e, GHASH_ACC, GHASH_ACC		// Swap halves of LO
+	vpclmulqdq	$FD_IMM_11, H_POW4, GHASHDATA0, GHASHDATA0	// HI_0
+	vpclmulqdq	$FD_IMM_11, H_POW3, GHASHDATA1, GHASHDATA1	// HI_1
+	vpclmulqdq	$FD_IMM_11, H_POW2, GHASHDATA2, GHASHDATA2	// HI_2
 .elseif \i == 7
-	vpternlogd	$0x96, GHASHTMP2, GHASH_ACC, GHASHTMP0	// Fold LO into MI
-	vpclmulqdq	$0x11, H_POW1, GHASHDATA3, GHASHDATA3	// HI_3
-	vpternlogd	$0x96, GHASHDATA2, GHASHDATA1, GHASHDATA0 // sum(HI_{2,1,0})
-	vpclmulqdq	$0x01, GHASHTMP0, GFPOLY, GHASHTMP1	// MI_L*(x^63 + x^62 + x^57)
+	vpternlogd	$FD_IMM_96, GHASHTMP2, GHASH_ACC, GHASHTMP0	// Fold LO into MI
+	vpclmulqdq	$FD_IMM_11, H_POW1, GHASHDATA3, GHASHDATA3	// HI_3
+	vpternlogd	$FD_IMM_96, GHASHDATA2, GHASHDATA1, GHASHDATA0 // sum(HI_{2,1,0})
+	vpclmulqdq	$FD_IMM_01, GHASHTMP0, GFPOLY, GHASHTMP1	// MI_L*(x^63 + x^62 + x^57)
 .elseif \i == 8
 	vpxord		GHASHDATA3, GHASHDATA0, GHASH_ACC	// HI = sum(HI_{3,2,1,0})
-	vpshufd		$0x4e, GHASHTMP0, GHASHTMP0		// Swap halves of MI
-	vpternlogd	$0x96, GHASHTMP1, GHASHTMP0, GHASH_ACC	// Fold MI into HI
+	vpshufd		$FD_IMM_4e, GHASHTMP0, GHASHTMP0		// Swap halves of MI
+	vpternlogd	$FD_IMM_96, GHASHTMP1, GHASHTMP0, GHASH_ACC	// Fold MI into HI
 .elseif \i == 9
 	_horizontal_xor	GHASH_ACC, GHASH_ACC_XMM, GHASH_ACC_XMM, \
 			GHASHDATA0_XMM, GHASHDATA1_XMM, GHASHDATA2_XMM
@@ -753,7 +773,7 @@ GNU_PALIGN(6)
 	// Pre-subtracting 4*VL from DATALEN saves an instruction from the main
 	// loop and also ensures that at least one write always occurs to
 	// DATALEN, zero-extending it and allowing DATALEN64 to be used later.
-	sub		$4*VL, DATALEN
+	sub		$FD_IMM_4d*VL, DATALEN
 	jl		.Lcrypt_loop_4x_done\@
 
 	// Load powers of the hash key.
@@ -785,7 +805,7 @@ GNU_PALIGN(6)
 1:
 	vbroadcasti32x4	(%rax), RNDKEY
 	_vaesenc_4x	RNDKEY
-	add		$16, %rax
+	add		$FD_IMM_16d, %rax
 	cmp		%rax, RNDKEYLAST_PTR
 	jne		1b
 	vpxord		0*VL(SRC), RNDKEYLAST, RNDKEYLAST0
@@ -800,9 +820,9 @@ GNU_PALIGN(6)
 	vmovdqu8	GHASHDATA1, 1*VL(DST)
 	vmovdqu8	GHASHDATA2, 2*VL(DST)
 	vmovdqu8	GHASHDATA3, 3*VL(DST)
-	add		$4*VL, SRC
-	add		$4*VL, DST
-	sub		$4*VL, DATALEN
+	add		$FD_IMM_4d*VL, SRC
+	add		$FD_IMM_4d*VL, DST
+	sub		$FD_IMM_4d*VL, DATALEN
 	jl		.Lghash_last_ciphertext_4x\@
 .endif
 
@@ -824,7 +844,7 @@ GNU_PALIGN(6)
 
 	// Start the AES encryption of the counter blocks.
 	_ctr_begin_4x
-	cmp		$24, AESKEYLEN
+	cmp		$FD_IMM_24d, AESKEYLEN
 	jl		128f	// AES-128?
 	je		192f	// AES-192?
 	// AES-256
@@ -880,9 +900,9 @@ GNU_PALIGN(6)
 	vmovdqu8	GHASHDATA2, 2*VL(DST)
 	vmovdqu8	GHASHDATA3, 3*VL(DST)
 
-	add		$4*VL, SRC
-	add		$4*VL, DST
-	sub		$4*VL, DATALEN
+	add		$FD_IMM_4d*VL, SRC
+	add		$FD_IMM_4d*VL, DST
+	sub		$FD_IMM_4d*VL, DATALEN
 	jge		.Lcrypt_loop_4x\@
 
 .if \enc
@@ -896,7 +916,7 @@ GNU_PALIGN(6)
 .Lcrypt_loop_4x_done\@:
 
 	// Undo the extra subtraction by 4*VL and check whether data remains.
-	add		$4*VL, DATALEN
+	add		$FD_IMM_4d*VL, DATALEN
 	jz		.Ldone\@
 
 	// The data length isn't a multiple of 4*VL.  Process the remaining data
@@ -958,7 +978,7 @@ GNU_PALIGN(6)
 1:
 	vbroadcasti32x4	(%rax), RNDKEY
 	vaesenc		RNDKEY, V0, V0
-	add		$16, %rax
+	add		$FD_IMM_16d, %rax
 	cmp		%rax, RNDKEYLAST_PTR
 	jne		1b
 	vaesenclast	RNDKEYLAST, V0, V0
@@ -1058,7 +1078,7 @@ GNU_PALIGN(6)
 	// Set up a counter block with 1 in the low 32-bit word.  This is the
 	// counter that produces the ciphertext needed to encrypt the auth tag.
 	// GFPOLY has 1 in the low word, so grab the 1 from there using a blend.
-	vpblendd	$0xe, (LE_CTR_PTR), GFPOLY, LE_CTR
+	vpblendd	$FD_IMM_e, (LE_CTR_PTR), GFPOLY, LE_CTR
 
 	// Build the lengths block and XOR it with the GHASH accumulator.
 	// Although the lengths block is defined as the AAD length followed by
@@ -1067,8 +1087,8 @@ GNU_PALIGN(6)
 	// GHASH (see _ghash_mul_step).  By using little-endian values in the
 	// opposite order, we avoid having to reflect any bytes here.
 	vmovq		TOTAL_DATALEN, %xmm0
-	vpinsrq		$1, TOTAL_AADLEN, %xmm0, %xmm0
-	vpsllq		$3, %xmm0, %xmm0	// Bytes to bits
+	vpinsrq		$FD_IMM_1d, TOTAL_AADLEN, %xmm0, %xmm0
+	vpsllq		$FD_IMM_3d, %xmm0, %xmm0	// Bytes to bits
 	vpxor		(GHASH_ACC_PTR), %xmm0, GHASH_ACC
 
 	// Load the first hash key power (H^1), which is stored last.
@@ -1092,7 +1112,7 @@ GNU_PALIGN(6)
 
 	// Complete the AES encryption and multiply GHASH_ACC by H^1.
 	// Interleave the AES and GHASH instructions to improve performance.
-	cmp		$24, AESKEYLEN
+	cmp		$FD_IMM_24d, AESKEYLEN
 	jl		128f	// AES-128?
 	je		192f	// AES-192?
 	// AES-256
@@ -1133,7 +1153,7 @@ GNU_PALIGN(6)
 	vmovdqu		GHASH_ACC, (GHASH_ACC_PTR)
 .else
 	vmovdqu		(TAG), %xmm1
-	vpternlogd	$0x96, (%rax), GHASH_ACC, %xmm1
+	vpternlogd	$FD_IMM_96, (%rax), GHASH_ACC, %xmm1
 	vaesenclast	%xmm1, %xmm0, %xmm0
 	xor		%eax, %eax
 	vmovdqu8	%xmm0, %xmm0{%k1}{z}	// Truncate to TAGLEN bytes
