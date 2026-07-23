@@ -162,7 +162,11 @@
 #endif
 
 
+#if defined(__linux__)
 .section .rodata
+#else
+	.section __TEXT,__const
+#endif
 .Lbswap_mask:
 	.octa   0x000102030405060708090a0b0c0d0e0f
 .Lgfpoly:

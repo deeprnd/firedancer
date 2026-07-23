@@ -119,7 +119,11 @@
 #endif
 
 
+#if defined(__linux__)
 .section .rodata
+#else
+	.section __TEXT,__const
+#endif
 GNU_PALIGN(6)
 
 	// A shuffle mask that reflects the bytes of 16-byte blocks
