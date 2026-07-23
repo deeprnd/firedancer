@@ -44,7 +44,11 @@
 #endif
 fd_sha512_core_avx2:
 #if defined(__linux__)
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
 #endif
 	endbr64
 	movq	%rsp,%rax
@@ -1478,7 +1482,11 @@ fd_sha512_core_avx2:
 .Lepilogue_avx2:
 	.byte	0xf3,0xc3
 #if defined(__linux__)
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
 #endif
 #if defined(__linux__)
 .size	fd_sha512_core_avx2,.-fd_sha512_core_avx2

@@ -25,7 +25,13 @@
 GNU_TYPE(fd_aesni_encrypt)
 GNU_ALIGN(16)
 fd_aesni_encrypt:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 .byte	243,15,30,250
 	movups	(%rdi),%xmm2
 	movl	240(%rdx),%eax
@@ -45,14 +51,26 @@ fd_aesni_encrypt:
 	movups	%xmm2,(%rsi)
 	pxor	%xmm2,%xmm2
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(fd_aesni_encrypt,.-fd_aesni_encrypt)
 
 .globl	fd_aesni_decrypt
 GNU_TYPE(fd_aesni_decrypt)
 GNU_ALIGN(16)
 fd_aesni_decrypt:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 .byte	243,15,30,250
 	movups	(%rdi),%xmm2
 	movl	240(%rdx),%eax
@@ -72,12 +90,24 @@ fd_aesni_decrypt:
 	movups	%xmm2,(%rsi)
 	pxor	%xmm2,%xmm2
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(fd_aesni_decrypt,.-fd_aesni_decrypt)
 GNU_TYPE(_aesni_encrypt2)
 GNU_ALIGN(16)
 _aesni_encrypt2:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 	movups	(%rcx),%xmm0
 	shll	$4,%eax
 	movups	16(%rcx),%xmm1
@@ -103,12 +133,24 @@ _aesni_encrypt2:
 .byte	102,15,56,221,208
 .byte	102,15,56,221,216
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(_aesni_encrypt2,.-_aesni_encrypt2)
 GNU_TYPE(_aesni_decrypt2)
 GNU_ALIGN(16)
 _aesni_decrypt2:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 	movups	(%rcx),%xmm0
 	shll	$4,%eax
 	movups	16(%rcx),%xmm1
@@ -134,12 +176,24 @@ _aesni_decrypt2:
 .byte	102,15,56,223,208
 .byte	102,15,56,223,216
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(_aesni_decrypt2,.-_aesni_decrypt2)
 GNU_TYPE(_aesni_encrypt3)
 GNU_ALIGN(16)
 _aesni_encrypt3:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 	movups	(%rcx),%xmm0
 	shll	$4,%eax
 	movups	16(%rcx),%xmm1
@@ -170,12 +224,24 @@ _aesni_encrypt3:
 .byte	102,15,56,221,216
 .byte	102,15,56,221,224
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(_aesni_encrypt3,.-_aesni_encrypt3)
 GNU_TYPE(_aesni_decrypt3)
 GNU_ALIGN(16)
 _aesni_decrypt3:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 	movups	(%rcx),%xmm0
 	shll	$4,%eax
 	movups	16(%rcx),%xmm1
@@ -206,12 +272,24 @@ _aesni_decrypt3:
 .byte	102,15,56,223,216
 .byte	102,15,56,223,224
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(_aesni_decrypt3,.-_aesni_decrypt3)
 GNU_TYPE(_aesni_encrypt4)
 GNU_ALIGN(16)
 _aesni_encrypt4:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 	movups	(%rcx),%xmm0
 	shll	$4,%eax
 	movups	16(%rcx),%xmm1
@@ -248,12 +326,24 @@ _aesni_encrypt4:
 .byte	102,15,56,221,224
 .byte	102,15,56,221,232
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(_aesni_encrypt4,.-_aesni_encrypt4)
 GNU_TYPE(_aesni_decrypt4)
 GNU_ALIGN(16)
 _aesni_decrypt4:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 	movups	(%rcx),%xmm0
 	shll	$4,%eax
 	movups	16(%rcx),%xmm1
@@ -290,12 +380,24 @@ _aesni_decrypt4:
 .byte	102,15,56,223,224
 .byte	102,15,56,223,232
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(_aesni_decrypt4,.-_aesni_decrypt4)
 GNU_TYPE(_aesni_encrypt6)
 GNU_ALIGN(16)
 _aesni_encrypt6:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 	movups	(%rcx),%xmm0
 	shll	$4,%eax
 	movups	16(%rcx),%xmm1
@@ -346,12 +448,24 @@ GNU_ALIGN(16)
 .byte	102,15,56,221,240
 .byte	102,15,56,221,248
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(_aesni_encrypt6,.-_aesni_encrypt6)
 GNU_TYPE(_aesni_decrypt6)
 GNU_ALIGN(16)
 _aesni_decrypt6:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 	movups	(%rcx),%xmm0
 	shll	$4,%eax
 	movups	16(%rcx),%xmm1
@@ -402,12 +516,24 @@ GNU_ALIGN(16)
 .byte	102,15,56,223,240
 .byte	102,15,56,223,248
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(_aesni_decrypt6,.-_aesni_decrypt6)
 GNU_TYPE(_aesni_encrypt8)
 GNU_ALIGN(16)
 _aesni_encrypt8:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 	movups	(%rcx),%xmm0
 	shll	$4,%eax
 	movups	16(%rcx),%xmm1
@@ -468,12 +594,24 @@ GNU_ALIGN(16)
 .byte	102,68,15,56,221,192
 .byte	102,68,15,56,221,200
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(_aesni_encrypt8,.-_aesni_encrypt8)
 GNU_TYPE(_aesni_decrypt8)
 GNU_ALIGN(16)
 _aesni_decrypt8:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 	movups	(%rcx),%xmm0
 	shll	$4,%eax
 	movups	16(%rcx),%xmm1
@@ -534,13 +672,25 @@ GNU_ALIGN(16)
 .byte	102,68,15,56,223,192
 .byte	102,68,15,56,223,200
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(_aesni_decrypt8,.-_aesni_decrypt8)
 .globl	fd_aesni_ecb_encrypt
 GNU_TYPE(fd_aesni_ecb_encrypt)
 GNU_ALIGN(16)
 fd_aesni_ecb_encrypt:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 .byte	243,15,30,250
 	andq	$-16,%rdx
 	jz	.Lecb_ret
@@ -879,14 +1029,26 @@ GNU_ALIGN(16)
 	xorps	%xmm0,%xmm0
 	pxor	%xmm1,%xmm1
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(fd_aesni_ecb_encrypt,.-fd_aesni_ecb_encrypt)
 
 .globl	fd_aesni_ctr32_encrypt_blocks
 GNU_TYPE(fd_aesni_ctr32_encrypt_blocks)
 GNU_ALIGN(16)
 fd_aesni_ctr32_encrypt_blocks:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 .byte	243,15,30,250
 	cmpq	$1,%rdx
 	jne	.Lctr32_bulk
@@ -1363,14 +1525,26 @@ GNU_ALIGN(32)
 .cfi_def_cfa_register	%rsp
 .Lctr32_epilogue:
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(fd_aesni_ctr32_encrypt_blocks,.-fd_aesni_ctr32_encrypt_blocks)
 
 .globl	fd_aesni_set_decrypt_key
 GNU_TYPE(fd_aesni_set_decrypt_key)
 GNU_ALIGN(16)
 fd_aesni_set_decrypt_key:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 .byte	0x48,0x83,0xEC,0x08
 .cfi_adjust_cfa_offset	8
 	call	__aesni_set_encrypt_key
@@ -1407,7 +1581,13 @@ fd_aesni_set_decrypt_key:
 	addq	$8,%rsp
 .cfi_adjust_cfa_offset	-8
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 .LSEH_end_set_decrypt_key:
 GNU_SIZE(fd_aesni_set_decrypt_key,.-fd_aesni_set_decrypt_key)
 .globl	fd_aesni_set_encrypt_key
@@ -1415,7 +1595,13 @@ GNU_TYPE(fd_aesni_set_encrypt_key)
 GNU_ALIGN(16)
 fd_aesni_set_encrypt_key:
 __aesni_set_encrypt_key:
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
+.endif
 .byte	0x48,0x83,0xEC,0x08
 .cfi_adjust_cfa_offset	8
 	movq	$-1,%rax
@@ -1712,7 +1898,13 @@ GNU_ALIGN(16)
 	shufps	$170,%xmm1,%xmm1
 	xorps	%xmm1,%xmm2
 	.byte	0xf3,0xc3
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
+.endif
 GNU_SIZE(fd_aesni_set_encrypt_key,.-fd_aesni_set_encrypt_key)
 GNU_SIZE(__aesni_set_encrypt_key,.-__aesni_set_encrypt_key)
 GNU_ALIGN(64)
