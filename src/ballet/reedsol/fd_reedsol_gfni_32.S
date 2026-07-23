@@ -22,7 +22,11 @@ gfni_const_tbl:
 
 fd_reedsol_private_encode_32_32:
 .globl fd_reedsol_private_encode_32_32
-.cfi_startproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_startproc
+.endif
+.endif
 endbr64
 
 # This file implements the FFT-like O(n log n) algorithm for computing Reed
@@ -421,7 +425,11 @@ ret
 #if defined(__linux__)
 .align 16
 #endif
-.cfi_endproc
+.if defined(__linux__)
+	.if defined(__linux__)
+	.cfi_endproc
+.endif
+.endif
 
 /* Advertise IBT, SHSTK compliance — .note.gnu.property is ELF-only */
 #if defined(__linux__)
