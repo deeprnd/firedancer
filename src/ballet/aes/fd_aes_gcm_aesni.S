@@ -155,7 +155,9 @@
 		.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif; 		\
@@ -165,7 +167,9 @@
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif; 				\
