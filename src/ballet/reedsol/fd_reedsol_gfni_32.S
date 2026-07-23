@@ -25,7 +25,9 @@ fd_reedsol_private_encode_32_32:
 .if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -90,38 +92,58 @@ endbr64
 # Push registers we clobber
 pushq   %r15
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_def_cfa_offset 16
 #endif
+#endif
+#if defined(__linux__)
 #if defined(__linux__)
 .cfi_offset 15, -16
 #endif
+#endif
 pushq   %r14
+#if defined(__linux__)
 #if defined(__linux__)
 .cfi_def_cfa_offset 24
 #endif
+#endif
+#if defined(__linux__)
 #if defined(__linux__)
 .cfi_offset 14, -24
 #endif
+#endif
 pushq   %r13
+#if defined(__linux__)
 #if defined(__linux__)
 .cfi_def_cfa_offset 32
 #endif
+#endif
+#if defined(__linux__)
 #if defined(__linux__)
 .cfi_offset 13, -32
 #endif
+#endif
 pushq   %r12
+#if defined(__linux__)
 #if defined(__linux__)
 .cfi_def_cfa_offset 40
 #endif
+#endif
+#if defined(__linux__)
 #if defined(__linux__)
 .cfi_offset 12, -40
 #endif
+#endif
 pushq   %rbx
+#if defined(__linux__)
 #if defined(__linux__)
 .cfi_def_cfa_offset 48
 #endif
+#endif
+#if defined(__linux__)
 #if defined(__linux__)
 .cfi_offset 3, -48
+#endif
 #endif
 
 # Load some values from data_shred into scalar registers to save loads later on
@@ -435,23 +457,33 @@ outer_loop:
 done:
 popq    %rbx
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_def_cfa_offset 40
+#endif
 #endif
 popq    %r12
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_def_cfa_offset 32
+#endif
 #endif
 popq    %r13
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_def_cfa_offset 24
+#endif
 #endif
 popq    %r14
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_def_cfa_offset 16
+#endif
 #endif
 popq    %r15
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_def_cfa_offset 8
+#endif
 #endif
 ret
 #if defined(__linux__)
@@ -460,7 +492,9 @@ ret
 .if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif

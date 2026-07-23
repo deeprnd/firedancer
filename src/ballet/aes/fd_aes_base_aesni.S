@@ -29,7 +29,9 @@ fd_aesni_encrypt:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -57,7 +59,9 @@ fd_aesni_encrypt:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -72,7 +76,9 @@ fd_aesni_decrypt:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -100,7 +106,9 @@ fd_aesni_decrypt:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -113,7 +121,9 @@ _aesni_encrypt2:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -147,7 +157,9 @@ _aesni_encrypt2:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -160,7 +172,9 @@ _aesni_decrypt2:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -194,7 +208,9 @@ _aesni_decrypt2:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -207,7 +223,9 @@ _aesni_encrypt3:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -246,7 +264,9 @@ _aesni_encrypt3:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -259,7 +279,9 @@ _aesni_decrypt3:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -298,7 +320,9 @@ _aesni_decrypt3:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -311,7 +335,9 @@ _aesni_encrypt4:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -356,7 +382,9 @@ _aesni_encrypt4:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -369,7 +397,9 @@ _aesni_decrypt4:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -414,7 +444,9 @@ _aesni_decrypt4:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -427,7 +459,9 @@ _aesni_encrypt6:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -486,7 +520,9 @@ GNU_ALIGN(16)
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -499,7 +535,9 @@ _aesni_decrypt6:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -558,7 +596,9 @@ GNU_ALIGN(16)
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -571,7 +611,9 @@ _aesni_encrypt8:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -640,7 +682,9 @@ GNU_ALIGN(16)
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -653,7 +697,9 @@ _aesni_decrypt8:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -722,7 +768,9 @@ GNU_ALIGN(16)
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -736,7 +784,9 @@ fd_aesni_ecb_encrypt:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -1083,7 +1133,9 @@ GNU_ALIGN(16)
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -1098,7 +1150,9 @@ fd_aesni_ctr32_encrypt_blocks:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
@@ -1135,11 +1189,15 @@ GNU_ALIGN(16)
 .Lctr32_bulk:
 	leaq	(%rsp),%r11
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_def_cfa_register	%r11
+#endif
 #endif
 	pushq	%rbp
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_offset	%rbp,-16
+#endif
 #endif
 	subq	$128,%rsp
 	andq	$-16,%rsp
@@ -1579,11 +1637,15 @@ GNU_ALIGN(32)
 	pxor	%xmm15,%xmm15
 	movq	-8(%r11),%rbp
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_restore	%rbp
+#endif
 #endif
 	leaq	(%r11),%rsp
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_def_cfa_register	%rsp
+#endif
 #endif
 .Lctr32_epilogue:
 	.byte	0xf3,0xc3
@@ -1591,7 +1653,9 @@ GNU_ALIGN(32)
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -1606,14 +1670,18 @@ fd_aesni_set_decrypt_key:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
 .endif
 .byte	0x48,0x83,0xEC,0x08
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_adjust_cfa_offset	8
+#endif
 #endif
 	call	__aesni_set_encrypt_key
 	shll	$4,%esi
@@ -1648,14 +1716,18 @@ fd_aesni_set_decrypt_key:
 .Ldec_key_ret:
 	addq	$8,%rsp
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_adjust_cfa_offset	-8
+#endif
 #endif
 	.byte	0xf3,0xc3
 .if defined(__linux__)
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
@@ -1671,14 +1743,18 @@ __aesni_set_encrypt_key:
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 #endif
 .endif
 .endif
 .endif
 .byte	0x48,0x83,0xEC,0x08
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_adjust_cfa_offset	8
+#endif
 #endif
 	movq	$-1,%rax
 	testq	%rdi,%rdi
@@ -1903,7 +1979,9 @@ GNU_ALIGN(16)
 	pxor	%xmm5,%xmm5
 	addq	$8,%rsp
 #if defined(__linux__)
+#if defined(__linux__)
 .cfi_adjust_cfa_offset	-8
+#endif
 #endif
 	.byte	0xf3,0xc3
 .LSEH_end_set_encrypt_key:
@@ -1980,7 +2058,9 @@ GNU_ALIGN(16)
 	.if defined(__linux__)
 	.if defined(__linux__)
 #if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 #endif
 .endif
 .endif
