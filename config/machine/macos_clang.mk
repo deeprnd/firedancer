@@ -21,18 +21,17 @@ UNAME?=$(shell uname)
 
 ifeq ($(UNAME), Darwin)
 
-# macOS-specific assembler fix: use system GAS only on ARM.
-# clang's integrated assembler on ARM rejects .cfi_escape / .cfi_restore
-# directives that are valid GAS. On Intel, integrated assembler works fine.
-IS_ARM?=$(shell uname -m | grep -qE 'aarch64|arm64' && echo 1 || echo 0)
-ifeq ($(IS_ARM),1)
+# Use system GAS assembler on all macOS.
+# macOS clang's integrated assembler rejects .cfi_escape / .cfi_restore
+# directives that are valid GAS. Both Intel and ARM need system GAS.
 ASFLAGS+=-no-integrated-as
-endif
 
 FD_HAS_MACOS:=1
 CPPFLAGS+=-DFD_HAS_MACOS=1
 
 # ARM vs Intel detection
+IS_ARM?=$(shell uname -m | grep -qE 'aarch64|arm64' && echo 1 || echo 0)
+
 ifeq ($(IS_ARM),1)
 # Apple Silicon (ARM64)
 FD_HAS_ARM64:=1
