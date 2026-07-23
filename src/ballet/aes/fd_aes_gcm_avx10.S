@@ -109,27 +109,15 @@
 	.globl name ;			\
 	.balign 16, 0x90 ;		\
 	name: ;				\
-		.if defined(__linux__)
-	.if defined(__linux__)
 #if defined(__linux__)
-#if defined(__linux__)
-	.cfi_startproc
+		.cfi_startproc;	\
 #endif
-#endif
-.endif
-.endif;	\
 		endbr64
 
 #define SYM_FUNC_END(name)				\
-	.if defined(__linux__)
-	.if defined(__linux__)
 #if defined(__linux__)
-#if defined(__linux__)
-	.cfi_endproc
+	.cfi_endproc; 					\
 #endif
-#endif
-.endif
-.endif; 					\
 	GNU_TYPE(name) ;			\
 	GNU_SIZE(name,.-name)
 
