@@ -154,7 +154,9 @@
 	name: ;					\
 		.if defined(__linux__)
 	.if defined(__linux__)
+#if defined(__linux__)
 	.cfi_startproc
+#endif
 .endif
 .endif; 		\
 		endbr64
@@ -162,7 +164,9 @@
 #define SYM_FUNC_END(name)				\
 	.if defined(__linux__)
 	.if defined(__linux__)
+#if defined(__linux__)
 	.cfi_endproc
+#endif
 .endif
 .endif; 				\
 	GNU_TYPE(name) ;				\
