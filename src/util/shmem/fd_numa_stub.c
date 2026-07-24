@@ -46,7 +46,7 @@ fd_numa_get_mempolicy( int *   mode,
                        void *  addr,
                        uint    flags ) {
   (void)nodemask; (void)maxnode; (void)addr; (void)flags;
-  if (mode) *mode = MPOL_DEFAULT;
+  if (mode) *mode = 0;
   return 0;
 }
 
