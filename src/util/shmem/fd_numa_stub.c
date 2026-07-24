@@ -3,7 +3,7 @@
 ulong
 fd_numa_node_cnt( void ) {
   FD_LOG_WARNING(( "no numa support for this build target" ));
-  return 0UL;
+  return 1UL;
 }
 
 ulong
@@ -16,7 +16,7 @@ ulong
 fd_numa_node_idx( ulong cpu_idx ) {
   (void)cpu_idx;
   FD_LOG_WARNING(( "no numa support for this build target" ));
-  return ULONG_MAX;
+  return 0UL;
 }
 
 #include <errno.h>
