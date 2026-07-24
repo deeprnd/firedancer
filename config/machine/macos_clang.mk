@@ -21,10 +21,10 @@ UNAME?=$(shell uname)
 
 ifeq ($(UNAME), Darwin)
 
-# Use system GAS assembler on all macOS.
-# macOS clang's integrated assembler rejects .cfi_escape / .cfi_restore
-# directives that are valid GAS. Both Intel and ARM need system GAS.
-ASFLAGS+=-no-integrated-as
+# Use LLVM integrated AS on macOS.
+# LLVM integrated AS supports all .cfi_* and Mach-O section directives
+# used in Firedancer's .S files (guarded by #if defined(__linux__) for ELF-only parts).
+# macOS clang's integrated assembler handles .cfi_escape / .cfi_restore correctly.
 
 FD_HAS_MACOS:=1
 CPPFLAGS+=-DFD_HAS_MACOS=1
