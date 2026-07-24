@@ -9,7 +9,7 @@ fd_numa_node_cnt( void ) {
 ulong
 fd_numa_cpu_cnt ( void ) {
   FD_LOG_WARNING(( "no numa support for this build target" ));
-  return 0UL;
+  return 1UL;
 }
 
 ulong
