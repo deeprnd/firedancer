@@ -25,6 +25,7 @@
 const std = @import("std");
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
+const util = @import("util");
 const payment_runtime = @import("runtime.zig");
 const audit_sink = @import("audit_sink.zig");
 
@@ -85,11 +86,7 @@ pub fn readProcessConfig(io: std.Io, dir: std.Io.Dir, sub_path: []const u8) !Pro
 }
 
 fn sleepNanos(ns: u64) void {
-    const req = std.os.linux.timespec{
-        .sec = @intCast(ns / std.time.ns_per_s),
-        .nsec = @intCast(ns % std.time.ns_per_s),
-    };
-    _ = std.os.linux.nanosleep(&req, null);
+    util.os_api.sleepNanos(ns);
 }
 
 fn maybeBlockForTest(process_cfg: ProcessRuntimeConfig, tile_idx: u32, completed_messages: u64) void {

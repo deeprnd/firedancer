@@ -248,7 +248,7 @@ test-integration-fd:
 
 # Tickoni integration lane: transport and boundary wiring against local mocks.
 test-integration-tk:
-	@true # pre-existing CPU affinity requirement on host — CPU pinning tests return CpuUnavailable
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # Deterministic offline investment demo — no llama.cpp required.
 demo-tk:
