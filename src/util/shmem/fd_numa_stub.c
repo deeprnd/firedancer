@@ -21,22 +21,22 @@ fd_numa_node_idx( ulong cpu_idx ) {
 
 #include <errno.h>
 
+/* Stub NUMA functions for non-Linux platforms.
+ * These are no-ops that succeed silently, since NUMA is not available
+ * but Firedancer's workspace creation code expects the calls to succeed. */
+
 int
 fd_numa_mlock( void const * addr,
                ulong        len ) {
   (void)addr; (void)len;
-  FD_LOG_WARNING(( "no numa support for this build target" ));
-  errno = EINVAL;
-  return -1;
+  return 0;
 }
 
 int
 fd_numa_munlock( void const * addr,
                  ulong        len ) {
   (void)addr; (void)len;
-  FD_LOG_WARNING(( "no numa support for this build target" ));
-  errno = EINVAL;
-  return -1;
+  return 0;
 }
 
 long
@@ -45,10 +45,9 @@ fd_numa_get_mempolicy( int *   mode,
                        ulong   maxnode,
                        void *  addr,
                        uint    flags ) {
-  (void)mode; (void)nodemask; (void)maxnode; (void)addr; (void)flags;
-  FD_LOG_WARNING(( "no numa support for this build target" ));
-  errno = EINVAL;
-  return -1L;
+  (void)nodemask; (void)maxnode; (void)addr; (void)flags;
+  if (mode) *mode = MPOL_DEFAULT;
+  return 0;
 }
 
 long
@@ -56,9 +55,7 @@ fd_numa_set_mempolicy( int           mode,
                        ulong const * nodemask,
                        ulong         maxnode ) {
   (void)mode; (void)nodemask; (void)maxnode;
-  FD_LOG_WARNING(( "no numa support for this build target" ));
-  errno = EINVAL;
-  return -1L;
+  return 0;
 }
 
 long
@@ -69,9 +66,7 @@ fd_numa_mbind( void *        addr,
                ulong         maxnode,
                uint          flags ) {
   (void)addr; (void)len; (void)mode; (void)nodemask; (void)maxnode; (void)flags;
-  FD_LOG_WARNING(( "no numa support for this build target" ));
-  errno = EINVAL;
-  return -1L;
+  return 0;
 }
 
 long
@@ -82,7 +77,5 @@ fd_numa_move_pages( int         pid,
                     int *       status,
                     int         flags ) {
   (void)pid; (void)count; (void)pages; (void)nodes; (void)status; (void)flags;
-  FD_LOG_WARNING(( "no numa support for this build target" ));
-  errno = EINVAL;
-  return -1L;
+  return 0;
 }
