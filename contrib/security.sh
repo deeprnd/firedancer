@@ -66,6 +66,11 @@ cmd_gitleaks_check_tk() {
 
 cmd_seccomp_check_fd() {
   run_step "seccomp policies" "${MAKE_RUNNER[@]}" seccomp-policies
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "Generated seccomp files are out of date. Please run 'just security-seccomp-check-fd' and commit the changes." >&2
+    git --no-pager diff
+    exit 1
+  fi
 }
 
 cmd_proof_check_fd() {
