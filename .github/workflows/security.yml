@@ -48,6 +48,15 @@ jobs:
             apt_packages: ''
             compiler: gcc
             compiler_version: system
+          - name: SecComp
+            timeout_minutes: 10
+            command: just security-seccomp-check-fd
+            gitleaks: 'false'
+            fd_deps: 'false'
+            zig: 'false'
+            apt_packages: ''
+            compiler: gcc
+            compiler_version: system
           - name: Sanitizers
             timeout_minutes: 45
             command: just security-sanitize-check-all

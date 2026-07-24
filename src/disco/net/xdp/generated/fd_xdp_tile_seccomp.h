@@ -161,24 +161,6 @@ static void populate_sock_filter_policy_fd_xdp_tile( ulong out_cnt, struct sock_
   fd_memcpy( out, filter, sizeof( filter ) );
 }
 
-
-#else /* !defined(__linux__) */
-
-/* Stub seccomp implementation for non-Linux platforms.
-   On macOS/Windows, seccomp filtering is not available.
-   These are no-op functions. */
-
-static const uint sock_filter_policy_fd_xdp_tile_instr_cnt = 0;
-
-static void populate_sock_filter_policy_fd_xdp_tile( ulong out_cnt, void *out, uint logfile_fd, uint xsk_fd, uint lo_xsk_fd ) {
-  (void)out_cnt;
-  (void)out;
-  (void)logfile_fd;
-  (void)xsk_fd;
-  (void)lo_xsk_fd;
-  /* On non-Linux, no seccomp filtering is applied */
-}
-
-#endif /* !defined(__linux__) */
+#endif /* defined(__linux__) */
 
 #endif /* HEADER_fd_src_disco_net_xdp_generated_fd_xdp_tile_seccomp_h */

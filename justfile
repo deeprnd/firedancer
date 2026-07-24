@@ -401,7 +401,7 @@ security-gitleaks-check-all:
 # ── Security: SecComp ──────────────────────────────────────────────────────
 
 security-seccomp-check-fd:
-	@true # bash contrib/security.sh seccomp-check-fd
+	@bash contrib/security.sh seccomp-check-fd
 
 security-seccomp-check-tk:
 	@true

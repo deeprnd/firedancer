@@ -75,22 +75,6 @@ static void populate_sock_filter_policy_fd_sign_tile( ulong out_cnt, struct sock
   fd_memcpy( out, filter, sizeof( filter ) );
 }
 
-
-#else /* !defined(__linux__) */
-
-/* Stub seccomp implementation for non-Linux platforms.
-   On macOS/Windows, seccomp filtering is not available.
-   These are no-op functions. */
-
-static const uint sock_filter_policy_fd_sign_tile_instr_cnt = 0;
-
-static void populate_sock_filter_policy_fd_sign_tile( ulong out_cnt, void *out, uint logfile_fd ) {
-  (void)out_cnt;
-  (void)out;
-  (void)logfile_fd;
-  /* On non-Linux, no seccomp filtering is applied */
-}
-
-#endif /* !defined(__linux__) */
+#endif /* defined(__linux__) */
 
 #endif /* HEADER_fd_src_disco_keyguard_generated_fd_sign_tile_seccomp_h */
