@@ -76,6 +76,8 @@ fd_numa_move_pages( int         pid,
                     int const * nodes,
                     int *       status,
                     int         flags ) {
-  (void)pid; (void)count; (void)pages; (void)nodes; (void)status; (void)flags;
+  (void)pid; (void)pages; (void)nodes; (void)flags;
+  for( ulong i = 0UL; i < count; i++ )
+    status[ i ] = 0;  // All pages on NUMA node 0 (no NUMA on this platform)
   return 0;
 }
