@@ -31,6 +31,9 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/tickoni/util/util.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "c_abi", .module = c_abi_mod },
+        },
     });
     const runtime_mod = b.addModule("runtime", .{
         .root_source_file = b.path("src/tickoni/runtime/mod.zig"),
@@ -172,6 +175,9 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/tickoni/logger.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "util", .module = util_mod },
+        },
     });
 
     // ---------------------------------------------------------------------------
@@ -331,6 +337,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "audit_tile", .module = audit_tile_mod },
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "util", .module = util_mod },
         },
     });
 
@@ -1885,6 +1892,7 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
             "src/tickoni/c_abi/shim/util.c",
             "src/tickoni/c_abi/shim/wksp.c",
             "src/tickoni/c_abi/shim/sandbox.c",
+            "src/tickoni/c_abi/shim/os.c",
         },
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
     });

@@ -4,38 +4,20 @@
 /// fail-closed configuration checks that don't need real shared memory to
 /// exercise (heap_dev-backed channel, missing workspace name).
 const std = @import("std");
-const rt = @import("runtime");
 const c_abi = @import("c_abi");
+const rt = @import("runtime");
 const supervisor_mod = @import("supervisor");
-const util = @import("util");
 const topologies = @import("topologies");
+const util = @import("util");
 
 const Supervisor = supervisor_mod.Supervisor;
 const TileId = rt.topology.TileId;
 
-/// readFileAlloc-style helpers size their buffer from fstat, which
-/// reports 0 for /proc pseudo-files and hangs waiting for a size that
-/// never arrives. Read positionally into a fixed buffer instead — pread
-/// against /proc/<pid>/status returns 0 (real EOF) once its actual
-/// (non-zero) content is exhausted, same as any other file.
-fn parentPidOf(io: std.Io, pid: std.process.Child.Id) !c_int {
-    var path_buf: [64]u8 = undefined;
-    const path = try std.fmt.bufPrint(&path_buf, "/proc/{d}/status", .{pid});
-    var file = try std.Io.Dir.cwd().openFile(io, path, .{});
-    defer file.close(io);
-
-    var buf: [4096]u8 = undefined;
-    const n = try file.readPositionalAll(io, &buf, 0);
-    const contents = buf[0..n];
-
-    var lines = std.mem.splitScalar(u8, contents, '\n');
-    while (lines.next()) |line| {
-        if (std.mem.startsWith(u8, line, "PPid:")) {
-            const value = std.mem.trim(u8, line["PPid:".len..], " \t");
-            return std.fmt.parseInt(c_int, value, 10);
-        }
-    }
-    return error.PPidNotFound;
+/// Get parent PID of a process — cross-platform via os.c shim.
+/// Linux: /proc/<pid>/status
+/// macOS: sysctl(KERN_PROC, KERN_PROC_PID, pid) → kinfo_proc
+fn parentPidOf(pid: std.process.Child.Id) !c_int {
+    return util.os_api.parentPid(pid);
 }
 
 test "process_topology_integration: every tile is a distinct OS process parented by the supervisor" {
@@ -67,7 +49,7 @@ test "process_topology_integration: every tile is a distinct OS process parented
         for (seen_pids[0..i]) |other| try std.testing.expect(other != pid);
         seen_pids[i] = pid;
 
-        const ppid = try parentPidOf(std.testing.io, pid);
+        const ppid = try parentPidOf(pid);
         try std.testing.expectEqual(supervisor_pid, ppid);
     }
 
@@ -172,8 +154,7 @@ test "process_topology_integration: SIGKILL on one tile is reported by identity 
     try std.testing.expectEqualStrings("tkrepl", topo.tiles[tkrepl_idx].id.slice());
     const tkrepl_pid = sup.monitor()[tkrepl_idx].pid orelse return error.MissingPid;
 
-    const linux = std.os.linux;
-    _ = linux.kill(tkrepl_pid, linux.SIG.KILL);
+    _ = std.posix.kill(tkrepl_pid, std.posix.SIG.KILL) catch {};
 
     // Poll for the pipeline's real completion signal on the surviving
     // tiles while tkrepl's death is reaped in the background by
