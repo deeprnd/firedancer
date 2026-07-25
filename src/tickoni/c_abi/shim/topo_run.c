@@ -28,13 +28,18 @@ tk_topo_fill_tile( void * topo, void * tile ) {
 }
 
 #if !FD_HAS_LINUX
+/* Retail/non-Linux runner: preserve Firedancer's launch ordering but keep the
+   sandbox tier at explicit `none`. macOS must not require sudo, capabilities,
+   or namespaces. */
 static void
 tk_topo_set_thread_name( fd_topo_tile_t const * tile ) {
   char thread_name[ 20 ];
   if( FD_UNLIKELY( !fd_cstr_printf_check( thread_name, sizeof( thread_name ), NULL, "%s:%lu", tile->name, tile->kind_id ) ) ) return;
 
-#if FD_HAS_MACOS
+#if FD_HAS_MACOS && defined(__APPLE__)
   (void)pthread_setname_np( thread_name );
+#else
+  (void)tile;
 #endif
 }
 

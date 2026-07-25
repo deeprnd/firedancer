@@ -35,11 +35,12 @@ extern void tk_topo_run_tile( void * topo,
                               int    allow_fd,
                               void * tile_run );
 
-/* sandbox=0-mode defaults throughout (V1.14.S8.T5 wires real sandbox
-   entry later): keep_host_networking/allow_connect/allow_renameat/rlimit_*
-   are only read inside fd_sandbox_enter, which only runs when sandbox=1
-   (see fd_topo_run.c line ~102's `if (FD_LIKELY(sandbox))` branch), so
-   leaving them 0 here is inert, not a real policy choice yet. */
+static int const TK_PROCESS_MODE_SANDBOX_NONE = 0;
+static int const TK_KEEP_CONTROLLING_TERMINAL = 1;
+
+/* Phase 3 retail policy: process mode remains explicit sandbox=none on macOS
+   and every other non-Linux target. This matches the product rule that the
+   consumer tier must not depend on sudo, capabilities, or namespaces. */
 static fd_topo_run_tile_t TK_TILE_RUN = {
   .name                     = "tickoni",
   .keep_host_networking     = 0,
@@ -65,14 +66,14 @@ static fd_topo_run_tile_t TK_TILE_RUN = {
 };
 
 /* Simplified entry point for Tickoni's one-tile-per-process model:
-   sandbox=0 (T5 wires real sandbox entry), keep_controlling_terminal=1,
-   regular core dumps, current process's real uid/gid (no user switch —
-   fd_sandbox_switch_uid_gid still runs when sandbox=0, so passing the
-   process's own identity makes that a no-op), no extra allowed fd. */
+   explicit sandbox=none, keep_controlling_terminal=1, regular core dumps,
+   current process's real uid/gid, no extra allowed fd. The non-Linux branch
+   in topo_run.c mirrors the Firedancer launch order while intentionally
+   skipping namespace/seccomp sandbox entry. */
 void
 tk_topo_run_tile_simple( void * topo, void * tile ) {
   tk_topo_run_tile( topo, tile,
-                    /* sandbox */ 0, /* keep_controlling_terminal */ 1,
+                    TK_PROCESS_MODE_SANDBOX_NONE, TK_KEEP_CONTROLLING_TERMINAL,
                     FD_TOPO_CORE_DUMP_LEVEL_REGULAR,
                     (uint)getuid(), (uint)getgid(), /* allow_fd */ -1,
                     &TK_TILE_RUN );
