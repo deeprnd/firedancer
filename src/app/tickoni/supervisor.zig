@@ -232,8 +232,8 @@ pub const Supervisor = struct {
         // passes this name straight to fd_shmem_create_multi/fd_shmem_join
         // with no prefix/suffix of its own, so both sides resolve to the
         // same named region as long as the string matches.
-        var workspace_name_z_buf: [64]u8 = undefined;
-        const workspace_name_z = try std.fmt.bufPrintZ(&workspace_name_z_buf, "{s}_{s}.wksp", .{ rt.topo_build.app_name, workspace_name_slice });
+        var workspace_name_z_buf: [rt.topo_build.concrete_workspace_name_cap]u8 = undefined;
+        const workspace_name_z = try rt.topo_build.concreteWorkspaceName(&workspace_name_z_buf, workspace_name_slice);
         // Best-effort cleanup of a stale workspace left behind by a prior
         // crashed or killed supervisor; fd_wksp_new_named uses O_EXCL and
         // would otherwise fail closed forever on the same run_dir/name.
