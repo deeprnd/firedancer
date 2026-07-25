@@ -80,7 +80,7 @@ pub fn main(init: std.process.Init) !void {
 
     // Internal supervisor-to-child handoff for v2.14.S1 process mode
     if (std.mem.eql(u8, cmd, "__tile-run")) {
-        const spec_path = it.next() orelse std.process.exit(1);
+        const spec_path = if (arg_count > 1) args[1] else std.process.exit(1);
         std.process.exit(tile_main.run(init.io, init.gpa, spec_path));
     }
 

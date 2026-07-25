@@ -10,6 +10,7 @@
 #include "../../../disco/events/fd_event_report.h"
 #include "../../../disco/metrics/fd_metrics.h"
 #include "../../../disco/topo/fd_topo.h"
+#include "../../../util/wksp/fd_wksp.h"
 
 #include <unistd.h>
 
@@ -27,16 +28,15 @@ tk_topo_fill_tile( void * topo, void * tile ) {
   fd_topo_fill_tile( (fd_topo_t *)topo, (fd_topo_tile_t *)tile );
 }
 
-#if !FD_HAS_LINUX
-/* Retail/non-Linux runner: preserve Firedancer's launch ordering but keep the
-   sandbox tier at explicit `none`. macOS must not require sudo, capabilities,
-   or namespaces. */
 static void
 tk_topo_set_thread_name( fd_topo_tile_t const * tile ) {
   char thread_name[ 20 ];
   if( FD_UNLIKELY( !fd_cstr_printf_check( thread_name, sizeof( thread_name ), NULL, "%s:%lu", tile->name, tile->kind_id ) ) ) return;
 
-#if FD_HAS_MACOS && defined(__APPLE__)
+#if FD_HAS_LINUX
+  if( FD_UNLIKELY( prctl( PR_SET_NAME, thread_name, 0, 0, 0 ) ) )
+    FD_LOG_ERR(( "prctl(PR_SET_NAME) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
+#elif FD_HAS_MACOS && defined(__APPLE__)
   (void)pthread_setname_np( thread_name );
 #else
   (void)tile;
@@ -44,13 +44,32 @@ tk_topo_set_thread_name( fd_topo_tile_t const * tile ) {
 }
 
 static void
-tk_topo_run_tile_portable( fd_topo_t *          topo,
-                           fd_topo_tile_t *     tile,
-                           int                  core_dump_level,
-                           fd_topo_run_tile_t * tile_run ) {
-  tk_topo_set_thread_name( tile );
+tk_topo_attach_workspaces( fd_topo_t * topo ) {
+  char workspace_name[ 272 ];
+  for( ulong i = 0UL; i < topo->wksp_cnt; i++ ) {
+    fd_topo_wksp_t * wksp = &topo->workspaces[ i ];
+    if( FD_LIKELY( wksp->wksp ) ) continue;
+    if( FD_UNLIKELY( !fd_cstr_printf_check( workspace_name, sizeof( workspace_name ), NULL,
+                                            "%s_%s.wksp", topo->app_name, wksp->name ) ) )
+      FD_LOG_ERR(( "workspace name too long for %s:%s", topo->app_name, wksp->name ));
+    wksp->wksp = fd_wksp_attach( workspace_name );
+    if( FD_UNLIKELY( !wksp->wksp ) )
+      FD_LOG_ERR(( "fd_wksp_attach failed for workspace %s", workspace_name ));
+  }
+}
 
-  fd_topo_join_tile_workspaces( topo, tile, core_dump_level );
+/* Tickoni process mode uses normal-page workspaces created via wkspNewNamed,
+   not Firedancer's huge/gigantic-page fd_topo_join_tile_workspaces path.
+   Reattach the deterministic "<app>_<wksp>.wksp" regions directly, then
+   preserve Firedancer's remaining launch order. */
+static void
+tk_topo_run_tile_no_sandbox( fd_topo_t *          topo,
+                             fd_topo_tile_t *     tile,
+                             int                  core_dump_level,
+                             fd_topo_run_tile_t * tile_run ) {
+  (void)core_dump_level;
+  tk_topo_set_thread_name( tile );
+  tk_topo_attach_workspaces( topo );
 
   if( FD_UNLIKELY( tile_run->privileged_init ) )
     tile_run->privileged_init( topo, tile );
@@ -73,7 +92,6 @@ tk_topo_run_tile_portable( fd_topo_t *          topo,
 
   FD_MGAUGE_SET( TILE, STATUS, 2UL );
 }
-#endif
 
 void
 tk_topo_run_tile( void * topo,
@@ -86,16 +104,19 @@ tk_topo_run_tile( void * topo,
                   int    allow_fd,
                   void * tile_run ) {
 #if FD_HAS_LINUX
-  fd_topo_run_tile( (fd_topo_t *)topo, (fd_topo_tile_t *)tile, sandbox,
-                    keep_controlling_terminal, core_dump_level, uid, gid,
-                    allow_fd, (fd_topo_run_tile_t *)tile_run );
+  if( FD_LIKELY( sandbox ) ) {
+    fd_topo_run_tile( (fd_topo_t *)topo, (fd_topo_tile_t *)tile, sandbox,
+                      keep_controlling_terminal, core_dump_level, uid, gid,
+                      allow_fd, (fd_topo_run_tile_t *)tile_run );
+    return;
+  }
 #else
-  (void)sandbox;
   (void)keep_controlling_terminal;
   (void)uid;
   (void)gid;
   (void)allow_fd;
-  tk_topo_run_tile_portable( (fd_topo_t *)topo, (fd_topo_tile_t *)tile,
-                             core_dump_level, (fd_topo_run_tile_t *)tile_run );
 #endif
+  (void)sandbox;
+  tk_topo_run_tile_no_sandbox( (fd_topo_t *)topo, (fd_topo_tile_t *)tile,
+                               core_dump_level, (fd_topo_run_tile_t *)tile_run );
 }
