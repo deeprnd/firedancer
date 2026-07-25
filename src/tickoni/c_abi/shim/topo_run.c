@@ -7,7 +7,15 @@
    feature-test macros). */
 #define _GNU_SOURCE
 #include "../../../util/fd_util.h"
+#include "../../../disco/events/fd_event_report.h"
+#include "../../../disco/metrics/fd_metrics.h"
 #include "../../../disco/topo/fd_topo.h"
+
+#include <unistd.h>
+
+#if FD_HAS_MACOS
+#include <pthread.h>
+#endif
 
 void
 tk_topo_join_tile_workspaces( void * topo, void * tile, int core_dump_level ) {
@@ -19,6 +27,49 @@ tk_topo_fill_tile( void * topo, void * tile ) {
   fd_topo_fill_tile( (fd_topo_t *)topo, (fd_topo_tile_t *)tile );
 }
 
+#if !FD_HAS_LINUX
+static void
+tk_topo_set_thread_name( fd_topo_tile_t const * tile ) {
+  char thread_name[ 20 ];
+  if( FD_UNLIKELY( !fd_cstr_printf_check( thread_name, sizeof( thread_name ), NULL, "%s:%lu", tile->name, tile->kind_id ) ) ) return;
+
+#if FD_HAS_MACOS
+  (void)pthread_setname_np( thread_name );
+#endif
+}
+
+static void
+tk_topo_run_tile_portable( fd_topo_t *          topo,
+                           fd_topo_tile_t *     tile,
+                           int                  core_dump_level,
+                           fd_topo_run_tile_t * tile_run ) {
+  tk_topo_set_thread_name( tile );
+
+  fd_topo_join_tile_workspaces( topo, tile, core_dump_level );
+
+  if( FD_UNLIKELY( tile_run->privileged_init ) )
+    tile_run->privileged_init( topo, tile );
+
+  fd_topo_fill_tile( topo, tile );
+
+  FD_TEST( tile->metrics );
+  fd_metrics_register( tile->metrics );
+  fd_event_register( topo, tile );
+
+  ulong pid = (ulong)getpid();
+  FD_MGAUGE_SET( TILE, PID, pid );
+  FD_MGAUGE_SET( TILE, TID, pid );
+
+  if( FD_UNLIKELY( tile_run->unprivileged_init ) )
+    tile_run->unprivileged_init( topo, tile );
+
+  tile_run->run( topo, tile );
+  if( FD_UNLIKELY( !tile->allow_shutdown ) ) FD_LOG_ERR(( "tile %s:%lu run loop returned", tile->name, tile->kind_id ));
+
+  FD_MGAUGE_SET( TILE, STATUS, 2UL );
+}
+#endif
+
 void
 tk_topo_run_tile( void * topo,
                   void * tile,
@@ -29,7 +80,17 @@ tk_topo_run_tile( void * topo,
                   uint   gid,
                   int    allow_fd,
                   void * tile_run ) {
+#if FD_HAS_LINUX
   fd_topo_run_tile( (fd_topo_t *)topo, (fd_topo_tile_t *)tile, sandbox,
                     keep_controlling_terminal, core_dump_level, uid, gid,
                     allow_fd, (fd_topo_run_tile_t *)tile_run );
+#else
+  (void)sandbox;
+  (void)keep_controlling_terminal;
+  (void)uid;
+  (void)gid;
+  (void)allow_fd;
+  tk_topo_run_tile_portable( (fd_topo_t *)topo, (fd_topo_tile_t *)tile,
+                             core_dump_level, (fd_topo_run_tile_t *)tile_run );
+#endif
 }
