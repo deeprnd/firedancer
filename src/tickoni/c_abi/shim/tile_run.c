@@ -25,6 +25,15 @@
    because Tickoni runs exactly one tile per process. */
 extern void tk_tile_privileged_init( void * topo, void * tile );
 extern void tk_tile_run( void * topo, void * tile );
+extern void tk_topo_run_tile( void * topo,
+                              void * tile,
+                              int    sandbox,
+                              int    keep_controlling_terminal,
+                              int    core_dump_level,
+                              uint   uid,
+                              uint   gid,
+                              int    allow_fd,
+                              void * tile_run );
 
 /* sandbox=0-mode defaults throughout (V1.14.S8.T5 wires real sandbox
    entry later): keep_host_networking/allow_connect/allow_renameat/rlimit_*
@@ -62,7 +71,7 @@ static fd_topo_run_tile_t TK_TILE_RUN = {
    process's own identity makes that a no-op), no extra allowed fd. */
 void
 tk_topo_run_tile_simple( void * topo, void * tile ) {
-  fd_topo_run_tile( (fd_topo_t *)topo, (fd_topo_tile_t *)tile,
+  tk_topo_run_tile( topo, tile,
                     /* sandbox */ 0, /* keep_controlling_terminal */ 1,
                     FD_TOPO_CORE_DUMP_LEVEL_REGULAR,
                     (uint)getuid(), (uint)getgid(), /* allow_fd */ -1,

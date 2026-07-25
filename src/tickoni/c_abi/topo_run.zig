@@ -1,8 +1,8 @@
 /// Narrow Zig bindings over src/disco/topo/fd_topo.h's per-process tile
-/// launcher: fd_topo_run_tile (join workspaces -> privileged_init ->
+/// launcher: on Linux, fd_topo_run_tile (join workspaces -> privileged_init ->
 /// sandbox -> fill links -> register metrics/events -> unprivileged_init
-/// -> run -> enforce shutdown) and the two steps it composes on their own
-/// (fd_topo_join_tile_workspaces, fd_topo_fill_tile). This file and
+/// -> run -> enforce shutdown); on non-Linux, Tickoni's shim mirrors the same
+/// workflow minus the Linux-only sandbox/user-switch path. This file and
 /// shim/topo_run.c are the only places fd_topo_t/fd_topo_tile_t exist in
 /// Tickoni, even by name — Topo/TopoTile below are opaque; nothing outside
 /// this file may construct or introspect them.
