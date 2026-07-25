@@ -26,6 +26,16 @@ const Topo = c_abi.topob.Topo;
 /// naming — see supervisor.zig's workspace_name_z construction — to find
 /// the same region both sides look up).
 pub const app_name: []const u8 = "tickoni";
+pub const concrete_workspace_name_cap: usize = 64;
+
+/// Firedancer joins workspace files by the concrete `"<app>_<wksp>.wksp"`
+/// region name, not by Tickoni's short workspace label alone. The
+/// supervisor must create exactly this filename so child-side
+/// `fd_topo_join_workspace()` resolves the same region after rebuilding the
+/// topology.
+pub fn concreteWorkspaceName(buf: []u8, workspace_name: []const u8) ![:0]const u8 {
+    return std.fmt.bufPrintZ(buf, "{s}_{s}.wksp", .{ app_name, workspace_name });
+}
 
 /// fd_topo_t's real alignment isn't knowable from Zig (opaque type) but is
 /// small in practice (char-array/ulong/union-of-ulongs fields only) — 128
@@ -198,4 +208,10 @@ test "build produces a topology for the linear Phase 0 chain" {
     var name_buf: [8]u8 = undefined;
     const tkaudt_id = c_abi.topob.topoFindTile(built.topo, toZ(&name_buf, "tkaudt"), 0);
     try std.testing.expect(tkaudt_id != c_abi.topob.not_found);
+}
+
+test "concreteWorkspaceName matches Firedancer join naming" {
+    var buf: [concrete_workspace_name_cap]u8 = undefined;
+    const name = try concreteWorkspaceName(&buf, "tkpay0");
+    try std.testing.expectEqualStrings("tickoni_tkpay0.wksp", name);
 }
