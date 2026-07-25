@@ -2,6 +2,11 @@
 
 #include "../../../util/fd_util.h"
 
+/* Process-mode sandbox policy: Linux may use real Firedancer sandbox entry in a
+   future support tier, but the current retail/consumer path keeps macOS and
+   every other non-Linux target on explicit sandbox=none: no sudo, no
+   capabilities, and no namespace dependency. */
+
 /* Sandbox functions are Linux-only (seccomp, user namespaces). */
 #if FD_HAS_LINUX
 

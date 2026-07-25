@@ -2,7 +2,8 @@
 ///
 /// Extern declarations here; C substrate is linked only in the supervisor
 /// binary build. Sandbox policy defaults (SandboxConfig) live in
-/// src/tickoni/runtime/sandbox.zig.
+/// src/tickoni/runtime/sandbox.zig. Current process-mode policy keeps macOS
+/// and every other non-Linux target at explicit sandbox=none.
 ///
 /// Link requirements: -lfd_util (built by GNUmakefile).
 // ---------------------------------------------------------------------------
