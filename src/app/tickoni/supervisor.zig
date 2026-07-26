@@ -583,23 +583,28 @@ pub const Supervisor = struct {
             for (self.handles, 0..) |h, i| snapshot[i] = h.state == .stale;
             break :blk snapshot;
         };
+        const had_stale_before_stop = for (stale_before_stop) |was_stale| {
+            if (was_stale) break true;
+        } else false;
         for (state.cncs) |maybe_cnc| {
             if (maybe_cnc) |cnc| c_abi.cnc.signal(cnc, c_abi.cnc.signal_halt);
         }
 
-        const grace_deadline = util.process.monotonicNanos() + @as(i64, @intCast(state.stop_grace_ns));
-        while (util.process.monotonicNanos() < grace_deadline) {
+        if (had_stale_before_stop) {
+            const grace_deadline = util.process.monotonicNanos() + @as(i64, @intCast(state.stop_grace_ns));
+            while (util.process.monotonicNanos() < grace_deadline) {
+                self.reapExitedChildrenNoHang();
+                util.process.sleepNanos(5 * std.time.ns_per_ms);
+            }
             self.reapExitedChildrenNoHang();
-            util.process.sleepNanos(5 * std.time.ns_per_ms);
-        }
-        self.reapExitedChildrenNoHang();
 
-        for (stale_before_stop, 0..) |was_stale, i| {
-            if (!was_stale) continue;
-            const maybe_child = &state.children[i];
-            const child = maybe_child.* orelse continue;
-            const pid = child.id orelse continue;
-            std.posix.kill(pid, std.posix.SIG.KILL) catch {};
+            for (stale_before_stop, 0..) |was_stale, i| {
+                if (!was_stale) continue;
+                const maybe_child = &state.children[i];
+                const child = maybe_child.* orelse continue;
+                const pid = child.id orelse continue;
+                std.posix.kill(pid, std.posix.SIG.KILL) catch {};
+            }
         }
         self.waitProcess(io);
         state.deinit(io, self.allocator);
