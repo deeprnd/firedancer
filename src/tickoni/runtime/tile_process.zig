@@ -155,7 +155,15 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8, work
         std.debug.print("tile_process: bootWithSyntheticArgv failed for tile {d}: {t}\n", .{ spec.tile_idx, err });
         return 1;
     };
-    defer c_abi.boot.halt();
+    var built_opt: ?topo_build.BuiltTopo = null;
+    defer {
+        // On the non-Linux shim path, fd_halt() can still walk tile/runtime
+        // state derived from the rebuilt fd_topo_t during shutdown. Halt
+        // before freeing that backing storage to avoid use-after-free during
+        // tile teardown on macOS.
+        c_abi.boot.halt();
+        if (built_opt) |*built| built.deinit(allocator);
+    }
 
     var topology_spec_path_buf: [launch_spec.shmem_path_cap + 32]u8 = undefined;
     const topology_spec_path = std.fmt.bufPrint(&topology_spec_path_buf, "{s}/topology.spec", .{spec.shmemPath()}) catch {
@@ -170,11 +178,11 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8, work
     var channels_buf: [topology_spec.max_channels]link_mod.Channel = undefined;
     const topo_desc = topo_spec.toTopology(&tiles_buf, &channels_buf);
 
-    var built = topo_build.build(allocator, topo_desc, spec.workspace_name.slice()) catch |err| {
+    const built = topo_build.build(allocator, topo_desc, spec.workspace_name.slice()) catch |err| {
         std.debug.print("tile_process: failed to rebuild topology for tile {d}: {t}\n", .{ spec.tile_idx, err });
         return 1;
     };
-    defer built.deinit(allocator);
+    built_opt = built;
 
     var tile_id_buf: [7]u8 = undefined;
     const id_slice = spec.tile_id.slice();
