@@ -5,7 +5,10 @@
 /// once before using it and fd_halt once at shutdown; fd_boot is what reads
 /// --shmem-path/FD_SHMEM_PATH and brings the shared-memory subsystem online
 /// (src/util/shmem/fd_shmem_admin.c). Synthetic-argv boot policy lives in
-/// src/tickoni/runtime/boot.zig, which calls boot() below.
+/// src/tickoni/runtime/boot.zig, which calls boot() below. Tile-process
+/// teardown uses haltForTileProcess() so non-Linux quirks stay hidden behind
+/// this ABI boundary instead of leaking into runtime orchestration code.
+const builtin = @import("builtin");
 extern fn tk_boot(pargc: *c_int, pargv: *[*][*:0]u8) void;
 extern fn tk_halt() void;
 
@@ -15,6 +18,14 @@ pub fn boot(pargc: *c_int, pargv: *[*][*:0]u8) void {
 
 pub fn halt() void {
     tk_halt();
+}
+
+/// Platform-neutral tile-process teardown hook. Linux keeps the explicit
+/// fd_boot/fd_halt pairing; non-Linux process-mode child tiles exit
+/// immediately after their one tile returns, so skip tk_halt() there and let
+/// process teardown reclaim process-local state.
+pub fn haltForTileProcess() void {
+    if (builtin.os.tag == .linux) tk_halt();
 }
 
 /// Wraps FD_SPIN_PAUSE (src/util/fd_util_base.h): yields the calling logical
