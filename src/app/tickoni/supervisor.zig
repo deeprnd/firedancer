@@ -412,10 +412,14 @@ pub const Supervisor = struct {
             };
             switch (term) {
                 .exited => |code| {
-                    if (self.handles[i].state == .stale) {
-                        self.handles[i].crashed_because = .stale;
-                    } else if (code == 0) {
+                    if (code == 0) {
+                        // A clean exit after stopProcess() should be treated as a
+                        // normal stop even if refreshProcessHealth() transiently
+                        // marked the tile stale before the halt/reap completed.
                         self.handles[i].state = .stopped;
+                        self.handles[i].crashed_because = .none;
+                    } else if (self.handles[i].state == .stale) {
+                        self.handles[i].crashed_because = .stale;
                     } else {
                         self.handles[i].state = .crashed;
                         self.handles[i].exit_code = code;
