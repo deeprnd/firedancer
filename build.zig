@@ -1331,6 +1331,28 @@ pub fn build(b: *std.Build) void {
     run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_cpu_placement_test.step);
 
+    if (target.result.os.tag == .linux) {
+        const process_cpu_placement_linux_test = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/tickoni/test/integration/test_process_cpu_placement_linux.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "runtime", .module = runtime_mod },
+                    .{ .name = "util", .module = util_mod },
+                    .{ .name = "supervisor", .module = supervisor_named_mod },
+                    .{ .name = "topologies", .module = topologies_named_mod },
+                },
+            }),
+        });
+        linkTickoniCodec(b, process_cpu_placement_linux_test, fd_lib_dir);
+        linkTickoniFiredancer(b, process_cpu_placement_linux_test, fd_lib_dir);
+        linkTickoniTopoRun(b, process_cpu_placement_linux_test, fd_lib_dir);
+        const run_process_cpu_placement_linux_test = addPlainTestRun(b, process_cpu_placement_linux_test);
+        run_process_cpu_placement_linux_test.step.dependOn(&process_mode_exe_install.step);
+        integration_step.dependOn(&run_process_cpu_placement_linux_test.step);
+    }
+
     // v2.14.S1 M6: process isolation (T13: one OS process per tile,
     // parented by the supervisor), crash isolation (T12: SIGKILL one
     // tile, siblings unaffected), and the remaining process-mode
@@ -1355,6 +1377,29 @@ pub fn build(b: *std.Build) void {
     const run_process_topology_test = addPlainTestRun(b, process_topology_test);
     run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_topology_test.step);
+
+    if (target.result.os.tag == .linux) {
+        const process_topology_linux_test = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/tickoni/test/integration/test_process_topology_linux.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "runtime", .module = runtime_mod },
+                    .{ .name = "c_abi", .module = c_abi_mod },
+                    .{ .name = "util", .module = util_mod },
+                    .{ .name = "supervisor", .module = supervisor_named_mod },
+                    .{ .name = "topologies", .module = topologies_named_mod },
+                },
+            }),
+        });
+        linkTickoniCodec(b, process_topology_linux_test, fd_lib_dir);
+        linkTickoniFiredancer(b, process_topology_linux_test, fd_lib_dir);
+        linkTickoniTopoRun(b, process_topology_linux_test, fd_lib_dir);
+        const run_process_topology_linux_test = addPlainTestRun(b, process_topology_linux_test);
+        run_process_topology_linux_test.step.dependOn(&process_mode_exe_install.step);
+        integration_step.dependOn(&run_process_topology_linux_test.step);
+    }
 
     // v2.14.S1 M6: demo/replay parity — floating vs. explicit shared-core
     // CPU placement must reach identical final pipeline metrics through the
