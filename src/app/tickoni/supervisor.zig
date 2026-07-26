@@ -525,7 +525,8 @@ pub const Supervisor = struct {
             const maybe_child = &state.children[i];
             if (h.state != .stale) continue;
             const child = maybe_child.* orelse continue;
-            _ = std.os.linux.kill(child.id.?, std.os.linux.SIG.KILL);
+            const pid = child.id orelse continue;
+            std.posix.kill(pid, std.posix.SIG.KILL) catch {};
         }
         self.waitProcess(io);
         state.deinit(io, self.allocator);
