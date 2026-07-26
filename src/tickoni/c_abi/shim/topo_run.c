@@ -76,6 +76,7 @@ tk_topo_run_tile( void * topo,
                                                       allow_fds+allow_fds_offset );
   }
 
+#if FD_HAS_LINUX
   struct sock_filter seccomp_filter[ 256UL ];
   ulong seccomp_filter_cnt = 0UL;
   if( FD_LIKELY( tile_run_c->populate_allowed_seccomp ) ) {
@@ -84,6 +85,10 @@ tk_topo_run_tile( void * topo,
                                                                sizeof(seccomp_filter)/sizeof( seccomp_filter[ 0 ] ),
                                                                seccomp_filter );
   }
+#else
+  struct sock_filter * seccomp_filter = NULL;
+  ulong seccomp_filter_cnt = 0UL;
+#endif
 
   ulong rlimit_file_cnt = tile_run_c->rlimit_file_cnt;
   if( tile_run_c->rlimit_file_cnt_fn ) {
