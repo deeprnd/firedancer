@@ -175,11 +175,15 @@ test "process_topology_integration: a self-exiting tile is reported crashed via 
         .event_count = 100_000,
         .crash_after_heartbeats = crash_after_heartbeats,
         .heartbeat_interval_ns = 10 * std.time.ns_per_ms,
-        .heartbeat_stale_after_ns = 5 * std.time.ns_per_s,
+        .heartbeat_stale_after_ns = 15 * std.time.ns_per_s,
         .tile_exe_path = "zig-out/bin/tickoni-supervisor",
     });
 
-    const max_polls: u32 = 400;
+    // CI macOS runners can take materially longer than local Linux to observe
+    // the crash transition and reap the exited child. Give the supervisor a
+    // real window to see the non-zero exit before stopProcess() requests a
+    // clean halt, otherwise the test can falsely observe .stopped.
+    const max_polls: u32 = 2000;
     var poll: u32 = 0;
     while (poll < max_polls) : (poll += 1) {
         sup.refreshProcessHealth();
