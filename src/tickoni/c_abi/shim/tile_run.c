@@ -1,6 +1,9 @@
 /* V1.14.S8.T4: builds Tickoni's fd_topo_run_tile_t and exposes the
    simplified per-process entry point tile_process.zig calls.
 
+   Linux process mode must stay on upstream fd_topo_run_tile(); only
+   non-Linux targets fall back to Tickoni's tk_topo_run_tile() shim.
+
    Deliberately a separate file from topo_run.c: this file's static
    TK_TILE_RUN struct references tk_tile_privileged_init/tk_tile_run,
    which are Zig `export fn`s defined only in
@@ -67,14 +70,33 @@ static fd_topo_run_tile_t TK_TILE_RUN = {
 
 /* Simplified entry point for Tickoni's one-tile-per-process model:
    explicit sandbox=none, keep_controlling_terminal=1, regular core dumps,
-   current process's real uid/gid, no extra allowed fd. The non-Linux branch
-   in topo_run.c mirrors the Firedancer launch order while intentionally
-   skipping namespace/seccomp sandbox entry. */
+   current process's real uid/gid, no extra allowed fd. Linux must dispatch
+   directly to upstream fd_topo_run_tile() so process mode stays on
+   Firedancer's canonical runtime path; non-Linux targets fall back to
+   tk_topo_run_tile(), which mirrors the same launch order where upstream's
+   Linux-only implementation is unavailable. */
+int
+ tk_topo_run_tile_simple_uses_upstream( void ) {
+#if defined(__linux__)
+  return 1;
+#else
+  return 0;
+#endif
+}
+
 void
 tk_topo_run_tile_simple( void * topo, void * tile ) {
+#if defined(__linux__)
+  fd_topo_run_tile( (fd_topo_t *)topo, (fd_topo_tile_t *)tile,
+                    TK_PROCESS_MODE_SANDBOX_NONE, TK_KEEP_CONTROLLING_TERMINAL,
+                    FD_TOPO_CORE_DUMP_LEVEL_REGULAR,
+                    (uint)getuid(), (uint)getgid(), /* allow_fd */ -1,
+                    &TK_TILE_RUN );
+#else
   tk_topo_run_tile( topo, tile,
                     TK_PROCESS_MODE_SANDBOX_NONE, TK_KEEP_CONTROLLING_TERMINAL,
                     FD_TOPO_CORE_DUMP_LEVEL_REGULAR,
                     (uint)getuid(), (uint)getgid(), /* allow_fd */ -1,
                     &TK_TILE_RUN );
+#endif
 }
