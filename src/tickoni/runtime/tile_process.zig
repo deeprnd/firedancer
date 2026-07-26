@@ -11,9 +11,10 @@
 /// Lifecycle: read the launch spec and the shared topology spec -> rebuild
 /// an identical topology (topo_build.build — see topo_build.zig's module
 /// doc, "topology handoff" finding: every process rebuilds rather than
-/// reattaching a serialized fd_topo_t) -> find this tile in it -> call
-/// fd_topo_run_tile via c_abi.topo_run.runTileSimple. That harness call
-/// drives three Tickoni-owned callbacks below (privileged_init joins cnc
+/// reattaching a serialized fd_topo_t) -> find this tile in it -> call the
+/// simple launcher entrypoint in c_abi.topo_run. On Linux that entrypoint
+/// dispatches straight to upstream fd_topo_run_tile; on non-Linux it falls
+/// back to Tickoni's shim. That harness call drives three Tickoni-owned
 /// and signals RUN, run calls `work` then heartbeats until HALT, checking
 /// crash_after_heartbeats each iteration exactly like before this
 /// migration). fd_topo_run_tile_t's callbacks have a fixed C signature

@@ -1,8 +1,11 @@
+const std = @import("std");
+
 /// Narrow Zig bindings over src/disco/topo/fd_topo.h's per-process tile
-/// launcher: on Linux, fd_topo_run_tile (join workspaces -> privileged_init ->
-/// sandbox -> fill links -> register metrics/events -> unprivileged_init
-/// -> run -> enforce shutdown); on non-Linux, Tickoni's shim mirrors the same
-/// workflow minus the Linux-only sandbox/user-switch path. This file and
+/// launcher: on Linux, process mode must stay on upstream fd_topo_run_tile
+/// (join workspaces -> privileged_init -> sandbox/user switch -> fill links
+/// -> register metrics/events -> unprivileged_init -> run -> enforce
+/// shutdown); on non-Linux, Tickoni's shim mirrors the same workflow where
+/// upstream's Linux-only implementation is unavailable. This file and
 /// shim/topo_run.c are the only places fd_topo_t/fd_topo_tile_t exist in
 /// Tickoni, even by name — Topo/TopoTile below are opaque; nothing outside
 /// this file may construct or introspect them.
@@ -44,13 +47,13 @@ extern fn tk_topo_run_tile(
 ) void;
 
 /// v2.14.S8.T4: simplified entry point wired to Tickoni's own
-/// fd_topo_run_tile_t (built entirely inside shim/topo_run.c from three
+/// fd_topo_run_tile_t (built entirely inside shim/tile_run.c from two
 /// Zig `export fn` callbacks — see tile_process.zig's
-/// tk_tile_privileged_init/tk_tile_unprivileged_init/tk_tile_run).
-/// sandbox=0, current process's own uid/gid, regular core dumps — see
-/// shim/topo_run.c's TK_TILE_RUN doc comment for what's still a
-/// placeholder pending v2.14.S8.T5.
+/// tk_tile_privileged_init/tk_tile_run). Linux dispatches directly to
+/// upstream fd_topo_run_tile(); non-Linux dispatches to Tickoni's shim.
+/// sandbox=0, current process's own uid/gid, regular core dumps.
 extern fn tk_topo_run_tile_simple(topo: *Topo, tile: *TopoTile) void;
+extern fn tk_topo_run_tile_simple_uses_upstream() c_int;
 
 // ---------------------------------------------------------------------------
 // Public Zig wrappers.
@@ -90,4 +93,12 @@ pub fn topoRunTile(
 
 pub fn runTileSimple(topo: *Topo, tile: *TopoTile) void {
     tk_topo_run_tile_simple(topo, tile);
+}
+
+pub fn runTileSimpleUsesUpstream() bool {
+    return tk_topo_run_tile_simple_uses_upstream() != 0;
+}
+
+test "runTileSimple dispatch stays on the canonical Linux launcher" {
+    try std.testing.expectEqual(@import("builtin").os.tag == .linux, runTileSimpleUsesUpstream());
 }

@@ -890,10 +890,11 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(topology_spec_test).step);
 
-    // topo_run.zig (v2.14.S8.T3): fd_topo_run_tile adapter. No test {}
-    // blocks yet (Topo/TopoTile are opaque and nothing builds a real one
-    // until v2.14.S8.T4) — this target's only job is to prove the shim
-    // compiles and links against the real Firedancer archives.
+    // topo_run.zig (v2.14.S8.T3/T4): fd_topo_run_tile adapter plus the
+    // simple process-mode launcher dispatch contract. Tests assert Linux
+    // stays on upstream fd_topo_run_tile while non-Linux falls back to the
+    // Tickoni shim, so this target links both topo_run.c and tile_run.c
+    // plus a tiny C file providing no-op callback stubs for TK_TILE_RUN.
     const topo_run_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/c_abi/topo_run.zig"),
@@ -901,8 +902,13 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+    topo_run_test.root_module.addCSourceFiles(.{
+        .files = &.{"src/tickoni/c_abi/shim/tile_run_test_stubs.c"},
+        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+    });
     linkTickoniFiredancer(b, topo_run_test, fd_lib_dir);
     linkTickoniTopoRun(b, topo_run_test, fd_lib_dir);
+    linkTickoniTileRun(b, topo_run_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(topo_run_test).step);
 
     // topob.zig (v2.14.S8.T12): fd_topob topology builder. Same
