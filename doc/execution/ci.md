@@ -24,6 +24,8 @@ This document describes the GitHub Actions CI workflows for Tickoni.
 
 All seven Tickoni workflows trigger on pull requests targeting `main` and are also dispatchable manually via `workflow_dispatch`. Every workflow uses GitHub-hosted runners only — no self-hosted infrastructure is required.
 
+This CI surface is intentionally **not** a coexist-with-upstream layout. Tickoni replaces the broad upstream Firedancer workflow set with a smaller Tickoni-owned workflow surface that keeps the PR lanes relevant to the harness, removes Firedancer-only/self-hosted jobs, and rewrites duplicated checks into the Tickoni workflow files below. In other words: macOS support here was added alongside an intentional shrink/re-shape of the upstream CI surface, not while retaining the full upstream workflow topology unchanged.
+
 Optional workflows (`benchmark.yml`, `book.yml`) are callable via `workflow_call` but do not run on every PR.
 
 ---
@@ -226,7 +228,7 @@ Two workflows are callable via `workflow_call` but do not run on every PR:
 
 ## Deleted Upstream Workflows
 
-The following upstream Firedancer workflows were removed from Tickoni as they are either duplicated by Tickoni CI, require self-hosted infrastructure, or are FD-specific:
+The following upstream Firedancer workflows were removed from Tickoni intentionally. This is not a temporary compatibility hack and it does not preserve the upstream Firedancer workflow shape unchanged: Tickoni's CI model explicitly replaces or drops upstream jobs that are duplicated by the Tickoni-owned workflow set below, depend on Firedancer validator infrastructure, or require self-hosted/GCS/CodeQL-specific environments that Tickoni does not carry in its default PR surface.
 
 | Deleted file | Reason |
 |-------------|--------|
