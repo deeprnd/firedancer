@@ -25,6 +25,7 @@
 /// through c_abi.topob's opaque Topo/TopoTile only when they need to call
 /// back into the adapter (e.g. to resolve this tile's cnc address).
 const std = @import("std");
+const builtin = @import("builtin");
 const c_abi = @import("c_abi");
 const util = @import("util");
 const launch_spec = @import("launch_spec.zig");
@@ -157,11 +158,14 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8, work
     };
     var built_opt: ?topo_build.BuiltTopo = null;
     defer {
-        // On the non-Linux shim path, fd_halt() can still walk tile/runtime
-        // state derived from the rebuilt fd_topo_t during shutdown. Halt
-        // before freeing that backing storage to avoid use-after-free during
-        // tile teardown on macOS.
-        c_abi.boot.halt();
+        // Linux keeps the explicit fd_boot/fd_halt pairing. On the non-Linux
+        // shim path, child tiles are single-process launchers that exit
+        // immediately after runTileSimple returns; macOS CI shows fd_halt()
+        // crashing in fd_tile_private_halt during that final teardown, so
+        // let normal process exit reclaim process-local state instead.
+        if (builtin.os.tag == .linux) {
+            c_abi.boot.halt();
+        }
         if (built_opt) |*built| built.deinit(allocator);
     }
 
