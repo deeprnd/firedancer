@@ -62,17 +62,22 @@ test "process_topology_integration: supervisor marks a truly stuck tile stale wh
     var sup = try Supervisor.init(std.testing.allocator, topo);
     defer sup.deinit();
 
+    // CI macOS runners show materially higher scheduling jitter than local
+    // Linux, so this lane needs a real heartbeat window rather than a
+    // near-zero threshold. The contract under test is topology-health
+    // classification (only the intentionally frozen upstream tile goes stale),
+    // not sub-100ms reaction time.
     try sup.startPaymentPipelineProcess(std.testing.io, .{
         .run_dir = run_dir,
         .event_count = 16,
-        .heartbeat_interval_ns = 10 * std.time.ns_per_ms,
-        .heartbeat_stale_after_ns = 60 * std.time.ns_per_ms,
+        .heartbeat_interval_ns = 50 * std.time.ns_per_ms,
+        .heartbeat_stale_after_ns = 2 * std.time.ns_per_s,
         .stuck_tile_idx = 0,
         .stuck_after_messages = 0,
         .tile_exe_path = "zig-out/bin/tickoni-supervisor",
     });
 
-    const max_polls: u32 = 200;
+    const max_polls: u32 = 600;
     var poll: u32 = 0;
     while (poll < max_polls) : (poll += 1) {
         sup.refreshProcessHealth();
