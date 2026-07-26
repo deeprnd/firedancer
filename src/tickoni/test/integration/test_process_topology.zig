@@ -175,17 +175,16 @@ test "process_topology_integration: a self-exiting tile is reported crashed via 
         .event_count = 100_000,
         .crash_after_heartbeats = crash_after_heartbeats,
         .heartbeat_interval_ns = 10 * std.time.ns_per_ms,
-        .heartbeat_stale_after_ns = 15 * std.time.ns_per_s,
+        .heartbeat_stale_after_ns = 60 * std.time.ns_per_s,
         .tile_exe_path = "zig-out/bin/tickoni-supervisor",
     });
 
-    // CI macOS runners can take materially longer than local Linux to observe
-    // the crash transition and reap the exited child. Give the supervisor a
-    // real window to see the non-zero exit before stopProcess() requests a
-    // clean halt, otherwise the test can falsely observe .stopped.
-    const max_polls: u32 = 2000;
-    var poll: u32 = 0;
-    while (poll < max_polls) : (poll += 1) {
+    // This lane validates crash attribution, not stale-heartbeat detection.
+    // On slow macOS CI hosts, a fixed poll-count loop can stretch far past its
+    // nominal duration, so use a monotonic deadline and keep stale detection
+    // well out of the way of the self-exit observation window.
+    const crash_deadline_ns = util.process.monotonicNanos() + 30 * std.time.ns_per_s;
+    while (util.process.monotonicNanos() < crash_deadline_ns) {
         sup.refreshProcessHealth();
         if (sup.monitor()[tkrepl_idx].state == rt.tile.TileState.crashed) break;
         util.process.sleepNanos(5 * std.time.ns_per_ms);
