@@ -1913,8 +1913,14 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
 fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
+
+    const topo_run_platform_file = switch (step.root_module.resolved_target.?.result.os.tag) {
+        .macos => "src/tickoni/c_abi/shim/topo_run_platform_macos.c",
+        else => "src/tickoni/c_abi/shim/topo_run_platform_linux.c",
+    };
+
     step.root_module.addCSourceFiles(.{
-        .files = &.{ "src/tickoni/c_abi/shim/topo_run.c", "src/tickoni/c_abi/shim/topob.c" },
+        .files = &.{ "src/tickoni/c_abi/shim/topo_run.c", topo_run_platform_file, "src/tickoni/c_abi/shim/topob.c" },
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
     });
     step.root_module.addLibraryPath(b.path(fd_lib_dir));
