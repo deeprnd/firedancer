@@ -72,7 +72,7 @@ jobs:
         run: just build-fd-macos-intel
 
       - name: Run test suite
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib test --summary all
+        run: just test-unit-tk
 
   # ── macOS: Clang (ARM64, macOS 15) ─────────────────────────────────────────
   short-tests-macos-15-arm:
@@ -97,7 +97,7 @@ jobs:
         run: just build-fd-macos-arm
 
       - name: Run test suite
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib test --summary all
+        run: just test-unit-tk
 
   # ── macOS: Clang (x86_64, macOS 26) ────────────────────────────────────────
   short-tests-macos-26-intel:
@@ -122,7 +122,7 @@ jobs:
         run: just build-fd-macos-intel
 
       - name: Run test suite
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib test --summary all
+        run: just test-unit-tk
 
   # ── macOS: Clang (ARM64, macOS 26) ─────────────────────────────────────────
   short-tests-macos-26-arm:
@@ -147,7 +147,7 @@ jobs:
         run: just build-fd-macos-arm
 
       - name: Run test suite
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib test --summary all
+        run: just test-unit-tk
 
   # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
   integration-tests-macos-15-intel:
