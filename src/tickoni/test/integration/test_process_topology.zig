@@ -126,16 +126,18 @@ test "process_topology_integration: SIGKILL on one tile is reported by identity 
         .run_dir = run_dir,
         .event_count = 100_000,
         .heartbeat_interval_ns = 10 * std.time.ns_per_ms,
-        .heartbeat_stale_after_ns = 5 * std.time.ns_per_s,
+        .heartbeat_stale_after_ns = 60 * std.time.ns_per_s,
         .tile_exe_path = "zig-out/bin/tickoni-supervisor",
     });
 
     const tkrepl_pid = sup.monitor()[tkrepl_idx].pid orelse return error.MissingPid;
     try std.posix.kill(tkrepl_pid, std.posix.SIG.KILL);
 
-    const max_polls: u32 = 400;
-    var poll: u32 = 0;
-    while (poll < max_polls) : (poll += 1) {
+    // This lane validates signal-based crash attribution, not stale-heartbeat
+    // detection. On slower macOS CI hosts, use a monotonic deadline and keep
+    // stale detection far away from the crash observation window.
+    const crash_deadline_ns = util.process.monotonicNanos() + 30 * std.time.ns_per_s;
+    while (util.process.monotonicNanos() < crash_deadline_ns) {
         sup.refreshProcessHealth();
         if (sup.monitor()[tkrepl_idx].state == rt.tile.TileState.crashed) break;
         util.process.sleepNanos(5 * std.time.ns_per_ms);
