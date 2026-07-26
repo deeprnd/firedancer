@@ -216,7 +216,17 @@ test "process_cpu_placement_integration: shared-core reporting changes placement
     const floating_metrics = floating_sup.snapshotProcessMetrics();
     try std.testing.expectEqual(event_count, floating_metrics.audited);
     const floating_report_opt = floating_sup.processPlacementReport();
+    var floating_seen_pids: [8]std.process.Child.Id = undefined;
+    for (floating_sup.monitor(), 0..) |h, i| {
+        const pid = h.pid orelse return error.MissingPid;
+        for (floating_seen_pids[0..i]) |other| try std.testing.expect(other != pid);
+        floating_seen_pids[i] = pid;
+    }
     floating_sup.stopProcess(std.testing.io);
+    for (floating_sup.monitor()) |h| {
+        try std.testing.expectEqual(rt.tile.TileState.stopped, h.state);
+        try std.testing.expectEqual(rt.tile.CrashReason.none, h.crashed_because);
+    }
 
     // --- Run shared-core (two tiles on CPU 0, explicit shared) ---
     var tmp_shared = std.testing.tmpDir(.{});
@@ -247,7 +257,17 @@ test "process_cpu_placement_integration: shared-core reporting changes placement
     const shared_metrics = shared_sup.snapshotProcessMetrics();
     try std.testing.expectEqual(event_count, shared_metrics.audited);
     const shared_report_opt = shared_sup.processPlacementReport();
+    var shared_seen_pids: [8]std.process.Child.Id = undefined;
+    for (shared_sup.monitor(), 0..) |h, i| {
+        const pid = h.pid orelse return error.MissingPid;
+        for (shared_seen_pids[0..i]) |other| try std.testing.expect(other != pid);
+        shared_seen_pids[i] = pid;
+    }
     shared_sup.stopProcess(std.testing.io);
+    for (shared_sup.monitor()) |h| {
+        try std.testing.expectEqual(rt.tile.TileState.stopped, h.state);
+        try std.testing.expectEqual(rt.tile.CrashReason.none, h.crashed_because);
+    }
 
     // --- Verify placement reports match declarations ---
     try std.testing.expect(floating_report_opt != null);
