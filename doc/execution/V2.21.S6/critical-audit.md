@@ -148,13 +148,9 @@ The short-test workflow now runs `just test-cli-tk` on the full visible short-te
 
 ### 6. The branch is not fully coherent as a review unit
 
-The branch also contains unrelated work:
+**Status:** DONE
 
-- `contrib/engine/engine_check_changes.py`
-- `doc/knowledge/engine-harness-snapshot.json`
-- `justfile` memlock fallback tweak for `test-unit-fd`
-
-Those changes are not part of the S6 demo/conformance story itself. That makes the branch noisier and less coherent for review.
+The unrelated engine drift snapshot / engine-check hint changes and the `test-unit-fd` normal-page memlock tweak were removed from this S6 branch. The remaining branch scope is now centered on the deterministic demo, comparator, tests, CI wiring, and S6 execution docs.
 
 ## Test quality assessment
 
