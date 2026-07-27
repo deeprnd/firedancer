@@ -42,7 +42,7 @@ pub fn detectTier() Tier {
 /// Return the detected OS name string for display.
 pub fn detectOsString() []const u8 {
     return switch (builtin.target.os.tag) {
-        .macos => "macOS",
+        .macos => "MacOS",
         .windows => "Windows",
         .linux => "Linux",
         else => "Unknown",
@@ -107,7 +107,7 @@ test "tierName strings are lowercase with underscores" {
 
 test "detectOsString is a recognized OS name" {
     const os = detectOsString();
-    const known = [_][]const u8{ "Linux", "macOS", "Windows", "Unknown" };
+    const known = [_][]const u8{ "Linux", "MacOS", "Windows", "Unknown" };
     var found = false;
     for (known) |k| {
         if (std.mem.eql(u8, os, k)) {

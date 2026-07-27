@@ -167,25 +167,6 @@ static void populate_sock_filter_policy_netlink( ulong out_cnt, struct sock_filt
   fd_memcpy( out, filter, sizeof( filter ) );
 }
 
-
-#else /* !defined(__linux__) */
-
-/* Stub seccomp implementation for non-Linux platforms.
-   On macOS/Windows, seccomp filtering is not available.
-   These are no-op functions. */
-
-static const uint sock_filter_policy_netlink_instr_cnt = 0;
-
-static void populate_sock_filter_policy_netlink( ulong out_cnt, void *out, uint logfile_fd, uint nl_mon_fd, uint nl_req_fd, uint arp_probe_fd ) {
-  (void)out_cnt;
-  (void)out;
-  (void)logfile_fd;
-  (void)nl_mon_fd;
-  (void)nl_req_fd;
-  (void)arp_probe_fd;
-  /* On non-Linux, no seccomp filtering is applied */
-}
-
-#endif /* !defined(__linux__) */
+#endif /* defined(__linux__) */
 
 #endif /* HEADER_fd_src_disco_netlink_generated_netlink_seccomp_h */

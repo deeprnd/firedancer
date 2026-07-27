@@ -248,7 +248,7 @@ test-integration-fd:
 
 # Tickoni integration lane: transport and boundary wiring against local mocks.
 test-integration-tk:
-	@true # pre-existing CPU affinity requirement on host — CPU pinning tests return CpuUnavailable
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # Deterministic offline investment demo — no llama.cpp required.
 demo-tk:
@@ -360,7 +360,10 @@ quality-lint-check-all:
 # ── Quality: Proto ─────────────────────────────────────────────────────────
 
 quality-proto-check-fd:
-	bash -c "command -v buf >/dev/null || exit 0; buf lint src/disco/events/schema"
+	@cd src/disco/events && python3 gen_events.py --skip-check
+	@command -v buf >/dev/null || { if [ -n "$(git status --porcelain src/disco/events/generated/ src/disco/events/schema/events.proto)" ]; then echo "Generated proto files are out of date. Please run 'just quality-proto-check-fd' and commit the changes." >&2; git --no-pager diff -- src/disco/events/; exit 1; fi; exit 0; }
+	buf lint src/disco/events/schema
+	@if [ -n "$(git status --porcelain src/disco/events/generated/ src/disco/events/schema/events.proto)" ]; then echo "Generated proto files are out of date. Please run 'just quality-proto-check-fd' and commit the changes." >&2; git --no-pager diff -- src/disco/events/; exit 1; fi
 
 quality-proto-check-tk:
 	bash -c "command -v buf >/dev/null || exit 0; buf lint src/tickoni/schema"
@@ -401,7 +404,7 @@ security-gitleaks-check-all:
 # ── Security: SecComp ──────────────────────────────────────────────────────
 
 security-seccomp-check-fd:
-	@true # bash contrib/security.sh seccomp-check-fd
+	@bash contrib/security.sh seccomp-check-fd
 
 security-seccomp-check-tk:
 	@true

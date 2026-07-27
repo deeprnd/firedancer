@@ -76,3 +76,40 @@ test "process_pipeline_integration: process-mode payment pipeline matches expect
         try std.testing.expectEqual(rt.tile.CrashReason.none, h.crashed_because);
     }
 }
+
+test "process_pipeline_integration: stopProcess prefers clean exit over transient stale classification" {
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    var path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const len = try tmp.dir.realPath(std.testing.io, &path_buf);
+    const run_dir = path_buf[0..len];
+
+    const topo = topologies.paymentPipelineProcess();
+    var sup = try Supervisor.init(std.testing.allocator, topo);
+    defer sup.deinit();
+
+    const event_count: u64 = 8;
+    try sup.startPaymentPipelineProcess(std.testing.io, .{
+        .run_dir = run_dir,
+        .event_count = event_count,
+        .heartbeat_interval_ns = 20 * std.time.ns_per_ms,
+        .heartbeat_stale_after_ns = 1 * std.time.ns_per_ms,
+        .tile_exe_path = "zig-out/bin/tickoni-supervisor",
+    });
+
+    const max_polls: u32 = 400;
+    var poll: u32 = 0;
+    while (poll < max_polls) : (poll += 1) {
+        if (sup.snapshotProcessMetrics().audited >= event_count) break;
+        util.process.sleepNanos(5 * std.time.ns_per_ms);
+    }
+
+    util.process.sleepNanos(5 * std.time.ns_per_ms);
+    sup.stopProcess(std.testing.io);
+
+    for (sup.monitor()) |h| {
+        try std.testing.expectEqual(rt.tile.TileState.stopped, h.state);
+        try std.testing.expectEqual(rt.tile.CrashReason.none, h.crashed_because);
+    }
+}

@@ -31,6 +31,9 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/tickoni/util/util.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "c_abi", .module = c_abi_mod },
+        },
     });
     const runtime_mod = b.addModule("runtime", .{
         .root_source_file = b.path("src/tickoni/runtime/mod.zig"),
@@ -172,6 +175,9 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/tickoni/logger.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "util", .module = util_mod },
+        },
     });
 
     // ---------------------------------------------------------------------------
@@ -331,6 +337,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "audit_tile", .module = audit_tile_mod },
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
+            .{ .name = "util", .module = util_mod },
         },
     });
 
@@ -883,10 +890,11 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(topology_spec_test).step);
 
-    // topo_run.zig (v2.14.S8.T3): fd_topo_run_tile adapter. No test {}
-    // blocks yet (Topo/TopoTile are opaque and nothing builds a real one
-    // until v2.14.S8.T4) — this target's only job is to prove the shim
-    // compiles and links against the real Firedancer archives.
+    // topo_run.zig (v2.14.S8.T3/T4): fd_topo_run_tile adapter plus the
+    // simple process-mode launcher dispatch contract. Tests assert Linux
+    // stays on upstream fd_topo_run_tile while non-Linux falls back to the
+    // Tickoni shim, so this target links both topo_run.c and tile_run.c
+    // plus a tiny C file providing no-op callback stubs for TK_TILE_RUN.
     const topo_run_test = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tickoni/c_abi/topo_run.zig"),
@@ -894,8 +902,13 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+    topo_run_test.root_module.addCSourceFiles(.{
+        .files = &.{"src/tickoni/c_abi/shim/tile_run_test_stubs.c"},
+        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+    });
     linkTickoniFiredancer(b, topo_run_test, fd_lib_dir);
     linkTickoniTopoRun(b, topo_run_test, fd_lib_dir);
+    linkTickoniTileRun(b, topo_run_test, fd_lib_dir);
     test_step.dependOn(&b.addRunArtifact(topo_run_test).step);
 
     // topob.zig (v2.14.S8.T12): fd_topob topology builder. Same
@@ -1324,6 +1337,28 @@ pub fn build(b: *std.Build) void {
     run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_cpu_placement_test.step);
 
+    if (target.result.os.tag == .linux) {
+        const process_cpu_placement_linux_test = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/tickoni/test/integration/test_process_cpu_placement_linux.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "runtime", .module = runtime_mod },
+                    .{ .name = "util", .module = util_mod },
+                    .{ .name = "supervisor", .module = supervisor_named_mod },
+                    .{ .name = "topologies", .module = topologies_named_mod },
+                },
+            }),
+        });
+        linkTickoniCodec(b, process_cpu_placement_linux_test, fd_lib_dir);
+        linkTickoniFiredancer(b, process_cpu_placement_linux_test, fd_lib_dir);
+        linkTickoniTopoRun(b, process_cpu_placement_linux_test, fd_lib_dir);
+        const run_process_cpu_placement_linux_test = addPlainTestRun(b, process_cpu_placement_linux_test);
+        run_process_cpu_placement_linux_test.step.dependOn(&process_mode_exe_install.step);
+        integration_step.dependOn(&run_process_cpu_placement_linux_test.step);
+    }
+
     // v2.14.S1 M6: process isolation (T13: one OS process per tile,
     // parented by the supervisor), crash isolation (T12: SIGKILL one
     // tile, siblings unaffected), and the remaining process-mode
@@ -1348,6 +1383,29 @@ pub fn build(b: *std.Build) void {
     const run_process_topology_test = addPlainTestRun(b, process_topology_test);
     run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
     integration_step.dependOn(&run_process_topology_test.step);
+
+    if (target.result.os.tag == .linux) {
+        const process_topology_linux_test = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/tickoni/test/integration/test_process_topology_linux.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "runtime", .module = runtime_mod },
+                    .{ .name = "c_abi", .module = c_abi_mod },
+                    .{ .name = "util", .module = util_mod },
+                    .{ .name = "supervisor", .module = supervisor_named_mod },
+                    .{ .name = "topologies", .module = topologies_named_mod },
+                },
+            }),
+        });
+        linkTickoniCodec(b, process_topology_linux_test, fd_lib_dir);
+        linkTickoniFiredancer(b, process_topology_linux_test, fd_lib_dir);
+        linkTickoniTopoRun(b, process_topology_linux_test, fd_lib_dir);
+        const run_process_topology_linux_test = addPlainTestRun(b, process_topology_linux_test);
+        run_process_topology_linux_test.step.dependOn(&process_mode_exe_install.step);
+        integration_step.dependOn(&run_process_topology_linux_test.step);
+    }
 
     // v2.14.S1 M6: demo/replay parity — floating vs. explicit shared-core
     // CPU placement must reach identical final pipeline metrics through the
@@ -1885,6 +1943,7 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
             "src/tickoni/c_abi/shim/util.c",
             "src/tickoni/c_abi/shim/wksp.c",
             "src/tickoni/c_abi/shim/sandbox.c",
+            "src/tickoni/c_abi/shim/os.c",
         },
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
     });
@@ -1905,8 +1964,14 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
 fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
+
+    const topo_run_platform_file = switch (step.root_module.resolved_target.?.result.os.tag) {
+        .macos => "src/tickoni/c_abi/shim/topo_run_platform_macos.c",
+        else => "src/tickoni/c_abi/shim/topo_run_platform_linux.c",
+    };
+
     step.root_module.addCSourceFiles(.{
-        .files = &.{ "src/tickoni/c_abi/shim/topo_run.c", "src/tickoni/c_abi/shim/topob.c" },
+        .files = &.{ "src/tickoni/c_abi/shim/topo_run.c", topo_run_platform_file, "src/tickoni/c_abi/shim/topob.c" },
         .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
     });
     step.root_module.addLibraryPath(b.path(fd_lib_dir));

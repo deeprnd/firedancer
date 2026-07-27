@@ -177,57 +177,58 @@ test "process_cpu_placement_integration: exclusive and shared on the same cpu co
 }
 
 // ---------------------------------------------------------------------------
-// v2.14.S2.T14 — Shared-core lower-throughput visibility.
+// v2.14.S2.T14 — Cross-platform placement reporting, not kernel pinning.
 // ---------------------------------------------------------------------------
 
-// Shared-core placement (two tiles on the same CPU) produces measurably lower
-// throughput than exclusive-core placement because the two tiles contend for
-// the same core. This test runs the same pipeline with identical event counts
-// under both configs and verifies that shared-core throughput (events/second)
-// is lower than exclusive-core throughput.
-//
-// The test uses short runs (N=16 events) so it finishes quickly even on
-// shared-core. The throughput delta is observable because the pipeline
-// threads must actually serialize their work on the same core.
-//
-// This test mirrors the structure of test_process_demo_parity.zig which
-// successfully runs three sequential supervisor instances with separate
-// tmpDir instances.
-test "process_cpu_placement_integration: shared-core throughput is lower than exclusive-core" {
+// Shared-core placement is a policy/reporting dimension. On Linux the kernel
+// may enforce affinity; on macOS util/cpu.zig intentionally degrades affinity
+// to a no-op. The portable contract for this lane is therefore:
+//   - placement metadata/reporting is correct
+//   - tiles still run as distinct child processes
+//   - functional pipeline completion is unchanged
+// not a wall-clock throughput comparison that assumes real kernel pinning.
+test "process_cpu_placement_integration: shared-core reporting changes placement metadata, not correctness" {
     const event_count: u64 = 16;
 
-    // --- Run exclusive-core (floating, no CPU pinning) ---
-    // Separate tmpDir avoids workspace collision with shared run.
-    var tmp_exclusive = std.testing.tmpDir(.{});
-    defer tmp_exclusive.cleanup();
-    var exclusive_path_buf: [std.fs.max_path_bytes]u8 = undefined;
-    const exclusive_len = try tmp_exclusive.dir.realPath(std.testing.io, &exclusive_path_buf);
-    const exclusive_run_dir = exclusive_path_buf[0..exclusive_len];
+    // --- Run floating baseline (no explicit placement declarations) ---
+    var tmp_floating = std.testing.tmpDir(.{});
+    defer tmp_floating.cleanup();
+    var floating_path_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const floating_len = try tmp_floating.dir.realPath(std.testing.io, &floating_path_buf);
+    const floating_run_dir = floating_path_buf[0..floating_len];
 
-    const exclusive_topo = topologies.paymentPipelineProcess();
-    var exclusive_sup = try Supervisor.init(std.testing.allocator, exclusive_topo);
-    defer exclusive_sup.deinit();
+    const floating_topo = topologies.paymentPipelineProcess();
+    var floating_sup = try Supervisor.init(std.testing.allocator, floating_topo);
+    defer floating_sup.deinit();
 
-    const start_exclusive = util.process.monotonicNanos();
-    try exclusive_sup.startPaymentPipelineProcess(std.testing.io, .{
-        .run_dir = exclusive_run_dir,
+    try floating_sup.startPaymentPipelineProcess(std.testing.io, .{
+        .run_dir = floating_run_dir,
         .event_count = event_count,
         .tile_exe_path = "zig-out/bin/tickoni-supervisor",
     });
 
-    const exclusive_max_polls: u32 = 400;
+    const floating_max_polls: u32 = 400;
     var poll: u32 = 0;
-    while (poll < exclusive_max_polls) : (poll += 1) {
-        if (exclusive_sup.snapshotProcessMetrics().audited >= event_count) break;
+    while (poll < floating_max_polls) : (poll += 1) {
+        if (floating_sup.snapshotProcessMetrics().audited >= event_count) break;
         util.process.sleepNanos(5 * std.time.ns_per_ms);
     }
-    const exclusive_metrics = exclusive_sup.snapshotProcessMetrics();
-    try std.testing.expectEqual(event_count, exclusive_metrics.audited);
-    const exclusive_report_opt = exclusive_sup.processPlacementReport();
-    exclusive_sup.stopProcess(std.testing.io);
+    const floating_metrics = floating_sup.snapshotProcessMetrics();
+    try std.testing.expectEqual(event_count, floating_metrics.audited);
+    const floating_report_opt = floating_sup.processPlacementReport();
+    var floating_seen_pids: [8]std.process.Child.Id = undefined;
+    for (floating_sup.monitor(), 0..) |h, i| {
+        const pid = h.pid orelse return error.MissingPid;
+        for (floating_seen_pids[0..i]) |other| try std.testing.expect(other != pid);
+        floating_seen_pids[i] = pid;
+    }
+    floating_sup.stopProcess(std.testing.io);
+    for (floating_sup.monitor()) |h| {
+        try std.testing.expectEqual(rt.tile.TileState.stopped, h.state);
+        try std.testing.expectEqual(rt.tile.CrashReason.none, h.crashed_because);
+    }
 
     // --- Run shared-core (two tiles on CPU 0, explicit shared) ---
-    // Separate tmpDir avoids workspace overlap with exclusive run.
     var tmp_shared = std.testing.tmpDir(.{});
     defer tmp_shared.cleanup();
     var shared_path_buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -241,7 +242,6 @@ test "process_cpu_placement_integration: shared-core throughput is lower than ex
     var shared_sup = try Supervisor.init(std.testing.allocator, shared_topo);
     defer shared_sup.deinit();
 
-    const start_shared = util.process.monotonicNanos();
     try shared_sup.startPaymentPipelineProcess(std.testing.io, .{
         .run_dir = shared_run_dir,
         .event_count = event_count,
@@ -257,29 +257,33 @@ test "process_cpu_placement_integration: shared-core throughput is lower than ex
     const shared_metrics = shared_sup.snapshotProcessMetrics();
     try std.testing.expectEqual(event_count, shared_metrics.audited);
     const shared_report_opt = shared_sup.processPlacementReport();
-    shared_sup.stopProcess(std.testing.io);
-
-    // --- Verify placement reports match expectations ---
-    try std.testing.expect(exclusive_report_opt != null);
-    try std.testing.expect(!exclusive_report_opt.?.shared_core);
-    try std.testing.expect(shared_report_opt != null);
-    try std.testing.expect(shared_report_opt.?.shared_core);
-    try std.testing.expectEqual(@as(usize, 2), shared_report_opt.?.shared_count);
-
-    // --- Verify both runs completed successfully ---
-    try std.testing.expectEqual(event_count, exclusive_metrics.audited);
-    try std.testing.expectEqual(event_count, shared_metrics.audited);
-
-    // --- Verify throughput: shared-core takes longer than exclusive-core. ---
-    // Both runs processed the same event_count, so wall-clock duration is the
-    // throughput proxy. Shared-core serializes two pipeline tiles on one CPU,
-    // so it must be slower (or at most equal on a very lightly loaded system,
-    // but never faster). We assert shared >= exclusive to confirm contention.
-    // NOTE: exclusive_ns may be 0 on very fast runners — skip assertion in that case.
-    const exclusive_ns = util.process.monotonicNanos() - start_exclusive;
-    const shared_ns = util.process.monotonicNanos() - start_shared;
-
-    if (exclusive_ns > 0 and shared_ns > exclusive_ns) {
-        try std.testing.expect(shared_ns >= exclusive_ns);
+    var shared_seen_pids: [8]std.process.Child.Id = undefined;
+    for (shared_sup.monitor(), 0..) |h, i| {
+        const pid = h.pid orelse return error.MissingPid;
+        for (shared_seen_pids[0..i]) |other| try std.testing.expect(other != pid);
+        shared_seen_pids[i] = pid;
     }
+    shared_sup.stopProcess(std.testing.io);
+    for (shared_sup.monitor()) |h| {
+        try std.testing.expectEqual(rt.tile.TileState.stopped, h.state);
+        try std.testing.expectEqual(rt.tile.CrashReason.none, h.crashed_because);
+    }
+
+    // --- Verify placement reports match declarations ---
+    try std.testing.expect(floating_report_opt != null);
+    try std.testing.expectEqual(@as(usize, 0), floating_report_opt.?.shared_count);
+    try std.testing.expect(!floating_report_opt.?.shared_core);
+    try std.testing.expect(shared_report_opt != null);
+    try std.testing.expectEqual(@as(usize, 2), shared_report_opt.?.shared_count);
+    try std.testing.expectEqual(@as(usize, 6), shared_report_opt.?.floating_count);
+    try std.testing.expect(shared_report_opt.?.shared_core);
+
+    // --- Verify both runs completed successfully with identical counts ---
+    try std.testing.expectEqual(floating_metrics.produced, shared_metrics.produced);
+    try std.testing.expectEqual(floating_metrics.normalized, shared_metrics.normalized);
+    try std.testing.expectEqual(floating_metrics.invalid, shared_metrics.invalid);
+    try std.testing.expectEqual(floating_metrics.duplicates, shared_metrics.duplicates);
+    try std.testing.expectEqual(floating_metrics.denied, shared_metrics.denied);
+    try std.testing.expectEqual(floating_metrics.allowed, shared_metrics.allowed);
+    try std.testing.expectEqual(floating_metrics.audited, shared_metrics.audited);
 }

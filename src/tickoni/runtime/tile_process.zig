@@ -11,9 +11,10 @@
 /// Lifecycle: read the launch spec and the shared topology spec -> rebuild
 /// an identical topology (topo_build.build — see topo_build.zig's module
 /// doc, "topology handoff" finding: every process rebuilds rather than
-/// reattaching a serialized fd_topo_t) -> find this tile in it -> call
-/// fd_topo_run_tile via c_abi.topo_run.runTileSimple. That harness call
-/// drives three Tickoni-owned callbacks below (privileged_init joins cnc
+/// reattaching a serialized fd_topo_t) -> find this tile in it -> call the
+/// simple launcher entrypoint in c_abi.topo_run. On Linux that entrypoint
+/// dispatches straight to upstream fd_topo_run_tile; on non-Linux it falls
+/// back to Tickoni's shim. That harness call drives three Tickoni-owned
 /// and signals RUN, run calls `work` then heartbeats until HALT, checking
 /// crash_after_heartbeats each iteration exactly like before this
 /// migration). fd_topo_run_tile_t's callbacks have a fixed C signature
@@ -154,7 +155,11 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8, work
         std.debug.print("tile_process: bootWithSyntheticArgv failed for tile {d}: {t}\n", .{ spec.tile_idx, err });
         return 1;
     };
-    defer c_abi.boot.halt();
+    var built_opt: ?topo_build.BuiltTopo = null;
+    defer {
+        c_abi.boot.haltForTileProcess();
+        if (built_opt) |*built| built.deinit(allocator);
+    }
 
     var topology_spec_path_buf: [launch_spec.shmem_path_cap + 32]u8 = undefined;
     const topology_spec_path = std.fmt.bufPrint(&topology_spec_path_buf, "{s}/topology.spec", .{spec.shmemPath()}) catch {
@@ -169,11 +174,11 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8, work
     var channels_buf: [topology_spec.max_channels]link_mod.Channel = undefined;
     const topo_desc = topo_spec.toTopology(&tiles_buf, &channels_buf);
 
-    var built = topo_build.build(allocator, topo_desc, spec.workspace_name.slice()) catch |err| {
+    const built = topo_build.build(allocator, topo_desc, spec.workspace_name.slice()) catch |err| {
         std.debug.print("tile_process: failed to rebuild topology for tile {d}: {t}\n", .{ spec.tile_idx, err });
         return 1;
     };
-    defer built.deinit(allocator);
+    built_opt = built;
 
     var tile_id_buf: [7]u8 = undefined;
     const id_slice = spec.tile_id.slice();

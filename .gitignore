@@ -64,6 +64,12 @@ memory
 # Logs
 *.log
 
+# Local build/test artifacts
+*.o
+/os_api
+/test_process_topology
+/zig-test
+
 # VitePress docs
 /book/.vitepress/cache
 /book/.vitepress/dist

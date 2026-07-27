@@ -22,7 +22,9 @@ gfni_const_tbl:
 
 fd_reedsol_private_encode_32_32:
 .globl fd_reedsol_private_encode_32_32
+#if defined(__linux__)
 .cfi_startproc
+#endif
 endbr64
 
 # This file implements the FFT-like O(n log n) algorithm for computing Reed
@@ -83,20 +85,40 @@ endbr64
 
 # Push registers we clobber
 pushq   %r15
+#if defined(__linux__)
 .cfi_def_cfa_offset 16
+#endif
+#if defined(__linux__)
 .cfi_offset 15, -16
+#endif
 pushq   %r14
+#if defined(__linux__)
 .cfi_def_cfa_offset 24
+#endif
+#if defined(__linux__)
 .cfi_offset 14, -24
+#endif
 pushq   %r13
+#if defined(__linux__)
 .cfi_def_cfa_offset 32
+#endif
+#if defined(__linux__)
 .cfi_offset 13, -32
+#endif
 pushq   %r12
+#if defined(__linux__)
 .cfi_def_cfa_offset 40
+#endif
+#if defined(__linux__)
 .cfi_offset 12, -40
+#endif
 pushq   %rbx
+#if defined(__linux__)
 .cfi_def_cfa_offset 48
+#endif
+#if defined(__linux__)
 .cfi_offset 3, -48
+#endif
 
 # Load some values from data_shred into scalar registers to save loads later on
 mov        (%rsi),%r8
@@ -408,20 +430,32 @@ outer_loop:
 
 done:
 popq    %rbx
+#if defined(__linux__)
 .cfi_def_cfa_offset 40
+#endif
 popq    %r12
+#if defined(__linux__)
 .cfi_def_cfa_offset 32
+#endif
 popq    %r13
+#if defined(__linux__)
 .cfi_def_cfa_offset 24
+#endif
 popq    %r14
+#if defined(__linux__)
 .cfi_def_cfa_offset 16
+#endif
 popq    %r15
+#if defined(__linux__)
 .cfi_def_cfa_offset 8
+#endif
 ret
 #if defined(__linux__)
 .align 16
 #endif
+#if defined(__linux__)
 .cfi_endproc
+#endif
 
 /* Advertise IBT, SHSTK compliance — .note.gnu.property is ELF-only */
 #if defined(__linux__)
