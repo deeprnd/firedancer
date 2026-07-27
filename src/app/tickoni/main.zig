@@ -11,6 +11,7 @@ const tile_main = @import("tile_main.zig");
 const topologies = @import("topologies");
 const doctor_output = @import("doctor_output");
 const demo_preflight = @import("demo_preflight");
+const demo_cli = @import("../../tickoni/demo/cli.zig");
 const version = @import("version");
 
 const usage =
@@ -22,7 +23,8 @@ const usage =
     \\                  Tango shared memory (v2.14.S1); requires <run-dir>
     \\  status          Print topology tile names
     \\  doctor          Run environment checks
-    \\  demo <manifest> Run a demo scenario (preflight-gated)
+    \\  demo investment --manifest <path> [--json|--plain]
+    \\                  Run the deterministic investment demo (preflight-gated)
     \\  --version       Print version information
     \\
 ;
@@ -106,11 +108,14 @@ pub fn main(init: std.process.Init) !void {
         try cmdDoctor(init, format);
     } else if (std.mem.eql(u8, cmd, "demo")) {
         log.debug("main", "main", "demo command received") catch {};
-        const manifest_path = it.next() orelse {
-            try File.writeStreamingAll(File.stderr(), init.io, "demo requires <manifest-path>\n");
+        const demo_cmd = demo_cli.parseDemoArgs(args[1..arg_count]) catch |err| {
+            var buf: [256]u8 = undefined;
+            const msg = try std.fmt.bufPrint(&buf, "demo usage error: {}\n", .{err});
+            try File.writeStreamingAll(File.stderr(), init.io, msg);
+            try File.writeStreamingAll(File.stderr(), init.io, usage);
             std.process.exit(1);
         };
-        try cmdDemo(init, manifest_path);
+        try cmdDemo(init, demo_cmd);
     } else {
         var log_buf: [128]u8 = undefined;
         const msg = try std.fmt.bufPrint(&log_buf, "unknown command: {s}\n", .{cmd});
@@ -289,12 +294,12 @@ fn cmdStatus(io: std.Io, topo: rt.topology.Topology) !void {
 ///
 /// If preflight fails, prints diagnostic error and exits 1.
 /// No proposal/audit artifacts are created.
-fn cmdDemo(init: std.process.Init, manifest_path: []const u8) !void {
+fn cmdDemo(init: std.process.Init, demo_cmd: demo_cli.Command) !void {
     // Load manifest
     const cwd = std.Io.Dir.cwd();
-    const m = demo_preflight.loadManifest(init.gpa, init.io, cwd, manifest_path) catch |err| {
+    const m = demo_preflight.loadManifest(init.gpa, init.io, cwd, demo_cmd.manifest_path) catch |err| {
         var buf: [256]u8 = undefined;
-        const msg = try std.fmt.bufPrint(&buf, "error: could not load manifest '{s}': {}\n", .{ manifest_path, err });
+        const msg = try std.fmt.bufPrint(&buf, "error: could not load manifest '{s}': {}\n", .{ demo_cmd.manifest_path, err });
         try File.writeStreamingAll(File.stderr(), init.io, msg);
         std.process.exit(1);
     };
@@ -316,19 +321,32 @@ fn cmdDemo(init: std.process.Init, manifest_path: []const u8) !void {
         m,
         cwd,
         version_info.semver,
-        "linux_full", // installed runtime tier
-        "retail", // installed isolation tier
-        "/tmp/fixtures",
+        version_info.runtime_tier,
+        version_info.isolation_tier,
+        "src/tickoni/demo/fixtures",
     ) catch |err| {
         var buf: [256]u8 = undefined;
         const msg = try std.fmt.bufPrint(&buf, "error: preflight failed: {}\n", .{err});
         try File.writeStreamingAll(File.stderr(), init.io, msg);
         std.process.exit(1);
     };
+    defer demo_preflight.deinit(preflight_result, init.gpa);
 
-    // Preflight passed — proceed with demo
-    try File.writeStreamingAll(File.stdout(), init.io, "preflight: passed\n");
-    demo_preflight.deinit(preflight_result, init.gpa);
-    // Demo execution would go here
-    try File.writeStreamingAll(File.stdout(), init.io, "demo: completed\n");
+    // Preflight passed — proceed with stub demo output until S6 runner lands.
+    switch (demo_cmd.format) {
+        .plain => {
+            try File.writeStreamingAll(File.stdout(), init.io, "preflight: passed\n");
+            try File.writeStreamingAll(File.stdout(), init.io, "demo contract: investment\n");
+            try File.writeStreamingAll(File.stdout(), init.io, "demo status: stub\n");
+        },
+        .json => {
+            var buf: [512]u8 = undefined;
+            const msg = try std.fmt.bufPrint(
+                &buf,
+                "{\"scenario\":\"{s}\",\"manifest_path\":\"{s}\",\"runtime_tier\":\"{s}\",\"isolation_tier\":\"{s}\",\"preflight\":\"passed\",\"status\":\"stub\"}\n",
+                .{ demo_cmd.scenario, demo_cmd.manifest_path, version_info.runtime_tier, version_info.isolation_tier },
+            );
+            try File.writeStreamingAll(File.stdout(), init.io, msg);
+        },
+    }
 }
