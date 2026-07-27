@@ -1,6 +1,6 @@
 const std = @import("std");
-const conformance = @import("conformance.zig");
-const diagnostic = @import("diagnostic.zig");
+const conformance = @import("conformance");
+const diagnostic = @import("diagnostic");
 
 pub const RunnerError = error{
     LiveEffectsEnabled,

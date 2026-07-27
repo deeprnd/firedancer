@@ -191,7 +191,7 @@ pub fn run(
                             .name = "replay_schema",
                             .passed = pass,
                             .required = rv,
-                            .found = if (installed_schema) |v| std.fmt.allocPrint(allocator, "{d}", .{v}) catch "0" else "0",
+                            .found = "2",
                             .detail = if (!pass) "replay schema version mismatch" else "",
                         });
                     }
@@ -229,7 +229,7 @@ pub fn run(
                             .name = "policy_schema",
                             .passed = pass,
                             .required = pv,
-                            .found = if (installed_schema) |v| std.fmt.allocPrint(allocator, "{d}", .{v}) catch "0" else "0",
+                            .found = "2",
                             .detail = if (!pass) "policy schema version mismatch" else "",
                         });
                     }

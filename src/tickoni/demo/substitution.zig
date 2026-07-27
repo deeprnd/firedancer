@@ -1,6 +1,6 @@
 const std = @import("std");
-const diagnostic = @import("diagnostic.zig");
-const runner = @import("runner.zig");
+const diagnostic = @import("diagnostic");
+const runner = @import("runner");
 
 pub const Scenario = enum {
     allowed,

@@ -507,6 +507,8 @@ zig-out/bin/tickoni demo investment --json --manifest src/tickoni/demo/fixtures/
 
 #### 4. Add the demo runner module
 
+**Status:** DONE
+
 **Create:** `src/tickoni/demo/runner.zig`
 
 **Responsibilities:**
@@ -692,7 +694,9 @@ just test-integration-tk
 
 #### 11. Add a conformance comparator
 
-**Create:** `src/tickoni/demo/compare.zig`
+**Status:** DONE
+
+**Create:** `src/tickoni/demo/comparator.zig`
 
 **Responsibilities:**
 - compare Linux baseline vs macOS retail conformance outputs
@@ -714,6 +718,8 @@ zig build test --summary all
   fail with precise diagnostics
 
 #### 12. Remove hardcoded tier/isolation values from `cmdDemo()`
+
+**Status:** DONE
 
 **Edit:**
 - `src/app/tickoni/main.zig`
@@ -741,6 +747,8 @@ zig-out/bin/tickoni demo investment --json --manifest src/tickoni/demo/fixtures/
 
 #### 13. Reconcile `justfile` with the final CLI contract
 
+**Status:** DONE
+
 **Edit:** `justfile`
 
 **Required edits:**
@@ -760,6 +768,8 @@ just test-cli-tk
 
 #### 14. Reconcile `contrib/test/run_cli_demo_tests.sh`
 
+**Status:** DONE
+
 **Edit:** `contrib/test/run_cli_demo_tests.sh`
 
 **Required edits:**
@@ -776,6 +786,8 @@ bash contrib/test/run_cli_demo_tests.sh
 - CLI test script passes against the real demo implementation
 
 #### 15. Add focused S6 test files
+
+**Status:** DONE
 
 **Create or extend tests under:**
 - `src/tickoni/demo/*.zig` unit tests
@@ -824,6 +836,8 @@ rg -n "demo-tk|test-cli-tk|test-integration-tk|macos|conformance" .github/workfl
 
 #### 17. Add an S6 artifact/evidence doc set under `doc/execution/V2.21.S6/`
 
+**Status:** DONE
+
 **Create or update:**
 - `doc/execution/V2.21.S6/findings-and-plan.md`
 - `doc/execution/V2.21.S6/manifest-contract.md`
@@ -857,15 +871,15 @@ After the implementation is complete, the minimum focused command set for S6
 should be:
 
 ```bash
-zig build --summary all
+zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 just test-unit-tk
 just test-integration-tk
 just test-cli-tk
 just quality-check-all
 just security-check-all
 just demo-tk
-zig-out/bin/tickoni doctor --json
-zig-out/bin/tickoni demo investment --json --manifest src/tickoni/demo/fixtures/demo.manifest.json
+zig-out/bin/tickoni-supervisor doctor --json
+zig-out/bin/tickoni-supervisor demo investment --json --manifest src/tickoni/demo/fixtures/demo.manifest.json
 ```
 
 If CI wiring is added in the same change, also verify the workflow references:

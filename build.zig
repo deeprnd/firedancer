@@ -171,6 +171,42 @@ pub fn build(b: *std.Build) void {
             .{ .name = "demo_semver", .module = demo_semver_mod },
         },
     });
+    const demo_cli_mod = b.addModule("demo_cli", .{
+        .root_source_file = b.path("src/tickoni/demo/cli.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const demo_diagnostic_mod = b.addModule("demo_diagnostic", .{
+        .root_source_file = b.path("src/tickoni/demo/diagnostic.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const demo_conformance_mod = b.addModule("demo_conformance", .{
+        .root_source_file = b.path("src/tickoni/demo/conformance.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "diagnostic", .module = demo_diagnostic_mod },
+        },
+    });
+    const demo_runner_mod = b.addModule("demo_runner", .{
+        .root_source_file = b.path("src/tickoni/demo/runner.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "conformance", .module = demo_conformance_mod },
+            .{ .name = "diagnostic", .module = demo_diagnostic_mod },
+        },
+    });
+    const demo_substitution_mod = b.addModule("demo_substitution", .{
+        .root_source_file = b.path("src/tickoni/demo/substitution.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "diagnostic", .module = demo_diagnostic_mod },
+            .{ .name = "runner", .module = demo_runner_mod },
+        },
+    });
     const logger_mod = b.addModule("logger", .{
         .root_source_file = b.path("src/tickoni/logger.zig"),
         .target = target,
@@ -356,6 +392,10 @@ pub fn build(b: *std.Build) void {
             .{ .name = "doctor_checks", .module = doctor_checks_mod },
             .{ .name = "doctor_output", .module = doctor_output_mod },
             .{ .name = "demo_preflight", .module = demo_preflight_mod },
+            .{ .name = "demo_cli", .module = demo_cli_mod },
+            .{ .name = "demo_conformance", .module = demo_conformance_mod },
+            .{ .name = "demo_runner", .module = demo_runner_mod },
+            .{ .name = "demo_substitution", .module = demo_substitution_mod },
             .{ .name = "logger", .module = logger_mod },
         },
     });

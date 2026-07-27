@@ -49,6 +49,9 @@ jobs:
       - name: Run test suite
         run: just test-unit-tk
 
+      - name: Run deterministic demo CLI conformance suite
+        run: just test-cli-tk
+
   # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
   short-tests-macos-15-intel:
     name: Harness Unit Tests / macOS 15 (Intel)
@@ -98,6 +101,9 @@ jobs:
 
       - name: Run test suite
         run: just test-unit-tk
+
+      - name: Run deterministic demo CLI conformance suite
+        run: just test-cli-tk
 
   # ── macOS: Clang (x86_64, macOS 26) ────────────────────────────────────────
   short-tests-macos-26-intel:

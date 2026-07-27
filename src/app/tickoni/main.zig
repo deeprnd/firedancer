@@ -11,7 +11,10 @@ const tile_main = @import("tile_main.zig");
 const topologies = @import("topologies");
 const doctor_output = @import("doctor_output");
 const demo_preflight = @import("demo_preflight");
-const demo_cli = @import("../../tickoni/demo/cli.zig");
+const demo_cli = @import("demo_cli");
+const demo_conformance = @import("demo_conformance");
+const demo_runner = @import("demo_runner");
+const demo_substitution = @import("demo_substitution");
 const version = @import("version");
 
 const usage =
@@ -332,21 +335,46 @@ fn cmdDemo(init: std.process.Init, demo_cmd: demo_cli.Command) !void {
     };
     defer demo_preflight.deinit(preflight_result, init.gpa);
 
-    // Preflight passed — proceed with stub demo output until S6 runner lands.
+    const scenarios = [_]demo_substitution.Scenario{
+        .allowed,
+        .oversized_blocked,
+        .restricted_instrument,
+        .tampered_replay,
+    };
+    var artifacts: [scenarios.len]demo_conformance.Artifact = undefined;
+    for (scenarios, 0..) |scenario, idx| {
+        artifacts[idx] = try demo_runner.runWithBackend(init.gpa, cwd, init.io, .{
+            .manifest_id = "demo.investment.v1",
+            .manifest_version = m.demo_manifest_version orelse "1",
+            .tickoni_version = version_info.semver,
+            .runtime_tier = version_info.runtime_tier,
+            .isolation_tier = version_info.isolation_tier,
+        }, demo_substitution.backendForScenario(scenario));
+    }
+
     switch (demo_cmd.format) {
         .plain => {
-            try File.writeStreamingAll(File.stdout(), init.io, "preflight: passed\n");
-            try File.writeStreamingAll(File.stdout(), init.io, "demo contract: investment\n");
-            try File.writeStreamingAll(File.stdout(), init.io, "demo status: stub\n");
+            for (artifacts) |artifact| {
+                try File.writeStreamingAll(File.stdout(), init.io, "---\n");
+                var stdout_buffer: [4096]u8 = undefined;
+                var stdout_writer = std.Io.File.stdout().writer(init.io, &stdout_buffer);
+                try demo_conformance.writePlain(&stdout_writer.interface, artifact);
+                try stdout_writer.flush();
+            }
         },
         .json => {
-            var buf: [512]u8 = undefined;
-            const msg = try std.fmt.bufPrint(
-                &buf,
-                "{\"scenario\":\"{s}\",\"manifest_path\":\"{s}\",\"runtime_tier\":\"{s}\",\"isolation_tier\":\"{s}\",\"preflight\":\"passed\",\"status\":\"stub\"}\n",
-                .{ demo_cmd.scenario, demo_cmd.manifest_path, version_info.runtime_tier, version_info.isolation_tier },
+            var parts: [artifacts.len][]u8 = undefined;
+            defer for (parts) |part| init.gpa.free(part);
+            for (artifacts, 0..) |artifact, idx| {
+                parts[idx] = try demo_conformance.allocJson(init.gpa, artifact);
+            }
+            const payload = try std.fmt.allocPrint(
+                init.gpa,
+                "{{\"suite\":[{s},{s},{s},{s}],\"preflight\":\"passed\"}}\n",
+                .{ parts[0], parts[1], parts[2], parts[3] },
             );
-            try File.writeStreamingAll(File.stdout(), init.io, msg);
+            defer init.gpa.free(payload);
+            try File.writeStreamingAll(File.stdout(), init.io, payload);
         },
     }
 }
