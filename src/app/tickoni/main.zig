@@ -13,6 +13,7 @@ const doctor_output = @import("doctor_output");
 const demo_preflight = @import("demo_preflight");
 const demo_cli = @import("demo_cli");
 const demo_conformance = @import("demo_conformance");
+const demo_comparator = @import("demo_comparator");
 const demo_runner = @import("demo_runner");
 const demo_substitution = @import("demo_substitution");
 const version = @import("version");
@@ -31,6 +32,16 @@ const usage =
     \\  --version       Print version information
     \\
 ;
+
+const ComparisonSummary = struct {
+    scenario: []const u8,
+    matches: bool,
+    mismatch_count: usize,
+};
+
+fn boolText(value: bool) []const u8 {
+    return if (value) "true" else "false";
+}
 
 pub fn main(init: std.process.Init) !void {
     const log = logger.get();
@@ -349,18 +360,54 @@ fn cmdDemo(init: std.process.Init, demo_cmd: demo_cli.Command) !void {
         .tampered_replay,
     };
     var artifacts: [scenarios.len]demo_conformance.Artifact = undefined;
+    var baseline_artifacts: [scenarios.len]demo_conformance.Artifact = undefined;
+    var comparisons: [scenarios.len]ComparisonSummary = undefined;
+    const baseline_runtime_tier = "linux_full";
+    const baseline_isolation_tier = m.requiredIsolationTierFor(baseline_runtime_tier) orelse "full";
+    var comparison_all_match = true;
     for (scenarios, 0..) |scenario, idx| {
+        const backend = demo_substitution.backendForScenario(scenario);
         artifacts[idx] = try demo_runner.runWithBackend(init.gpa, cwd, init.io, .{
             .manifest_id = "demo.investment.v1",
             .manifest_version = m.demo_manifest_version orelse "1",
             .tickoni_version = version_info.semver,
             .runtime_tier = version_info.runtime_tier,
             .isolation_tier = version_info.isolation_tier,
-        }, demo_substitution.backendForScenario(scenario));
+        }, backend);
+        baseline_artifacts[idx] = try demo_runner.runWithBackend(init.gpa, cwd, init.io, .{
+            .manifest_id = "demo.investment.v1",
+            .manifest_version = m.demo_manifest_version orelse "1",
+            .tickoni_version = version_info.semver,
+            .runtime_tier = baseline_runtime_tier,
+            .isolation_tier = baseline_isolation_tier,
+        }, backend);
+        const report = demo_comparator.compare(baseline_artifacts[idx], artifacts[idx]);
+        comparisons[idx] = .{
+            .scenario = artifacts[idx].scenario,
+            .matches = report.matches,
+            .mismatch_count = report.mismatch_count,
+        };
+        comparison_all_match = comparison_all_match and report.matches;
     }
 
     switch (demo_cmd.format) {
         .plain => {
+            var header_buffer: [1024]u8 = undefined;
+            const header = try std.fmt.bufPrint(
+                &header_buffer,
+                "comparison_baseline_runtime_tier: {s}\ncomparison_target_runtime_tier: {s}\ncomparison_target_isolation_tier: {s}\ncomparison_all_match: {s}\n",
+                .{ baseline_runtime_tier, version_info.runtime_tier, version_info.isolation_tier, boolText(comparison_all_match) },
+            );
+            try File.writeStreamingAll(File.stdout(), init.io, header);
+            for (comparisons) |comparison| {
+                var comparison_buffer: [256]u8 = undefined;
+                const line = try std.fmt.bufPrint(
+                    &comparison_buffer,
+                    "comparison_scenario: {s} match={s} mismatch_count={d}\n",
+                    .{ comparison.scenario, boolText(comparison.matches), comparison.mismatch_count },
+                );
+                try File.writeStreamingAll(File.stdout(), init.io, line);
+            }
             for (artifacts) |artifact| {
                 try File.writeStreamingAll(File.stdout(), init.io, "---\n");
                 var stdout_buffer: [4096]u8 = undefined;
@@ -377,8 +424,8 @@ fn cmdDemo(init: std.process.Init, demo_cmd: demo_cli.Command) !void {
             }
             const payload = try std.fmt.allocPrint(
                 init.gpa,
-                "{{\"suite\":[{s},{s},{s},{s}],\"preflight\":\"passed\"}}\n",
-                .{ parts[0], parts[1], parts[2], parts[3] },
+                "{{\"suite\":[{s},{s},{s},{s}],\"preflight\":\"passed\",\"comparison\":{{\"baseline_runtime_tier\":\"{s}\",\"target_runtime_tier\":\"{s}\",\"target_isolation_tier\":\"{s}\",\"all_match\":{s},\"scenarios\":[{{\"scenario\":\"{s}\",\"matches\":{s},\"mismatch_count\":{d}}},{{\"scenario\":\"{s}\",\"matches\":{s},\"mismatch_count\":{d}}},{{\"scenario\":\"{s}\",\"matches\":{s},\"mismatch_count\":{d}}},{{\"scenario\":\"{s}\",\"matches\":{s},\"mismatch_count\":{d}}}]}}}}\n",
+                .{ parts[0], parts[1], parts[2], parts[3], baseline_runtime_tier, version_info.runtime_tier, version_info.isolation_tier, boolText(comparison_all_match), comparisons[0].scenario, boolText(comparisons[0].matches), comparisons[0].mismatch_count, comparisons[1].scenario, boolText(comparisons[1].matches), comparisons[1].mismatch_count, comparisons[2].scenario, boolText(comparisons[2].matches), comparisons[2].mismatch_count, comparisons[3].scenario, boolText(comparisons[3].matches), comparisons[3].mismatch_count },
             );
             defer init.gpa.free(payload);
             try File.writeStreamingAll(File.stdout(), init.io, payload);

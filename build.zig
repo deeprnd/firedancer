@@ -190,6 +190,14 @@ pub fn build(b: *std.Build) void {
             .{ .name = "diagnostic", .module = demo_diagnostic_mod },
         },
     });
+    const demo_comparator_mod = b.addModule("demo_comparator", .{
+        .root_source_file = b.path("src/tickoni/demo/comparator.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "conformance", .module = demo_conformance_mod },
+        },
+    });
     const demo_runner_mod = b.addModule("demo_runner", .{
         .root_source_file = b.path("src/tickoni/demo/runner.zig"),
         .target = target,
@@ -395,6 +403,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "demo_preflight", .module = demo_preflight_mod },
             .{ .name = "demo_cli", .module = demo_cli_mod },
             .{ .name = "demo_conformance", .module = demo_conformance_mod },
+            .{ .name = "demo_comparator", .module = demo_comparator_mod },
             .{ .name = "demo_runner", .module = demo_runner_mod },
             .{ .name = "demo_substitution", .module = demo_substitution_mod },
             .{ .name = "logger", .module = logger_mod },

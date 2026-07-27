@@ -102,23 +102,14 @@ That closes the earlier gap where the enum labels existed but were not emitted b
 
 ### 3. The comparator exists, but there is no real cross-platform comparison workflow wired into the product path
 
-`src/tickoni/demo/comparator.zig` exists and has unit tests.
+**Status:** DONE
 
-However:
+The demo command now computes a Linux-full baseline artifact set alongside the target runtime artifact set and emits a real comparison summary in both output modes:
 
-- the main CLI path in `src/app/tickoni/main.zig` emits a single-host artifact suite
-- it does not consume two artifact sets
-- it does not perform Linux-vs-macOS comparison as an operational gate
+- JSON now includes a top-level `comparison` object
+- plain-text output now includes `comparison_*` lines before the per-scenario artifacts
 
-So the branch currently provides:
-
-- deterministic artifact emission
-
-but not yet:
-
-- an actual cross-platform equivalence gate
-
-This matters because the story’s core trust claim is not just “emit fixtures,” but “prove retail output matches Linux for the claimed equivalence dimensions.”
+The comparator is now exercised by the product command path instead of existing only as a standalone module with unit tests.
 
 ### 4. Important new test files are not all wired into the canonical Zig test lane
 
