@@ -250,17 +250,13 @@ test-integration-fd:
 test-integration-tk:
 	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
-# Deterministic offline investment demo — no llama.cpp required.
-demo-tk:
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build
-	zig-out/bin/tickoni demo investment --fixture --thesis "I want to invest USD 2,000 in AI infrastructure through US-listed ETFs and large-cap equities."
+# Deterministic offline investment conformance suite — fixture-backed, no llama.cpp required.
+test-demo-tk:
+	bash contrib/test/run_cli_demo_tests.sh
 
 # Tickoni system lane: opt-in real-LLM investment demo proof.
 test-system-tk:
 	bash contrib/test/run_system_model_tests.sh
-
-test-cli-tk:
-	bash contrib/test/run_cli_demo_tests.sh
 
 test-system-fd:
 	@true

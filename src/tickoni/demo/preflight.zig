@@ -13,6 +13,7 @@
 /// an explicit error with diagnostic. No proposal/audit artifacts are created.
 const std = @import("std");
 const demo_manifest = @import("demo_manifest");
+const diagnostic = @import("diagnostic");
 const Semver = @import("demo_semver").Semver;
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
@@ -38,6 +39,32 @@ pub const PreflightResult = struct {
     manifest_path: []const u8 = "",
 };
 
+fn appendOwnedCheck(
+    checks: *std.ArrayList(Check),
+    allocator: Allocator,
+    name: []const u8,
+    passed: bool,
+    required: []const u8,
+    found: []const u8,
+    detail: []const u8,
+) PreflightError!void {
+    const owned_name = allocator.dupe(u8, name) catch return PreflightError.OutOfMemory;
+    errdefer allocator.free(owned_name);
+    const owned_required = allocator.dupe(u8, required) catch return PreflightError.OutOfMemory;
+    errdefer allocator.free(owned_required);
+    const owned_found = allocator.dupe(u8, found) catch return PreflightError.OutOfMemory;
+    errdefer allocator.free(owned_found);
+    const owned_detail = allocator.dupe(u8, detail) catch return PreflightError.OutOfMemory;
+    errdefer allocator.free(owned_detail);
+    checks.append(allocator, .{
+        .name = owned_name,
+        .passed = passed,
+        .required = owned_required,
+        .found = owned_found,
+        .detail = owned_detail,
+    }) catch return PreflightError.OutOfMemory;
+}
+
 /// Error set for preflight failures.
 pub const PreflightError = error{
     PreflightFailed,
@@ -58,8 +85,8 @@ fn parseSchemaVersion(raw: []const u8) ?u32 {
 
 /// Append a string slice into a buffer at the given offset, capped by remaining space.
 /// Returns new offset.
-/// Run all preflight checks.
-pub fn run(
+/// Run all preflight checks and return the full result regardless of pass/fail.
+pub fn evaluate(
     allocator: Allocator,
     io: Io,
     m: *const demo_manifest.Manifest,
@@ -92,13 +119,7 @@ pub fn run(
             }
             first = false;
         }
-        try checks.append(allocator, Check{
-            .name = "runtime_tier",
-            .passed = supported,
-            .required = tier_list_buf[0..tier_written],
-            .found = installed_runtime_tier,
-            .detail = if (!supported) "tier not in manifest supported list" else "",
-        });
+        try appendOwnedCheck(&checks, allocator, "runtime_tier", supported, tier_list_buf[0..tier_written], installed_runtime_tier, if (!supported) "tier not in manifest supported list" else "");
     }
 
     // 2. Version check (semver >= min)
@@ -106,60 +127,30 @@ pub fn run(
         if (m.min_tickoni_version) |min_ver| {
             if (std.mem.eql(u8, min_ver, "0.0.0") == false) {
                 const installed_sv = Semver.parse(installed_version) catch {
-                    try checks.append(allocator, Check{
-                        .name = "version",
-                        .passed = false,
-                        .required = min_ver,
-                        .found = installed_version,
-                        .detail = "could not parse installed version as semver",
-                    });
+                    try appendOwnedCheck(&checks, allocator, "version", false, min_ver, installed_version, "could not parse installed version as semver");
                     return PreflightError.PreflightFailed;
                 };
                 const required_sv = Semver.parse(min_ver) catch {
-                    try checks.append(allocator, Check{
-                        .name = "version",
-                        .passed = false,
-                        .required = min_ver,
-                        .found = installed_version,
-                        .detail = "could not parse manifest min version as semver",
-                    });
+                    try appendOwnedCheck(&checks, allocator, "version", false, min_ver, installed_version, "could not parse manifest min version as semver");
                     return PreflightError.PreflightFailed;
                 };
                 const ver_passed = installed_sv.gte(required_sv);
-                try checks.append(allocator, Check{
-                    .name = "version",
-                    .passed = ver_passed,
-                    .required = min_ver,
-                    .found = installed_version,
-                    .detail = if (!ver_passed) "installed version is below minimum required" else "",
-                });
+                try appendOwnedCheck(&checks, allocator, "version", ver_passed, min_ver, installed_version, if (!ver_passed) "installed version is below minimum required" else "");
             }
         }
     }
 
     // 3. Isolation tier check
     {
-        const iso = if (m.required_isolation_tier) |t| t else "retail";
+        const iso = m.requiredIsolationTierFor(installed_runtime_tier) orelse "retail";
         const matches = std.mem.eql(u8, installed_isolation_tier, iso);
-        try checks.append(allocator, Check{
-            .name = "isolation_tier",
-            .passed = matches,
-            .required = iso,
-            .found = installed_isolation_tier,
-            .detail = if (!matches) "isolation tier does not match manifest requirement" else "",
-        });
+        try appendOwnedCheck(&checks, allocator, "isolation_tier", matches, iso, installed_isolation_tier, if (!matches) "isolation tier does not match manifest requirement" else "");
     }
 
     // 4. No live effect check
     {
         const no_live = m.requiresNoLiveEffect();
-        try checks.append(allocator, Check{
-            .name = "no_live_effect",
-            .passed = no_live,
-            .required = "true",
-            .found = if (no_live) "true" else "false",
-            .detail = if (!no_live) "manifest requires no live execution" else "",
-        });
+        try appendOwnedCheck(&checks, allocator, "no_live_effect", no_live, "true", if (no_live) "true" else "false", if (!no_live) "manifest requires no live execution" else "");
     }
 
     // 5. Replay schema version check
@@ -168,32 +159,14 @@ pub fn run(
             if (std.mem.eql(u8, rv, "0.0.0") == false) {
                 const required_schema = parseSchemaVersion(rv);
                 if (required_schema == null) {
-                    try checks.append(allocator, Check{
-                        .name = "replay_schema",
-                        .passed = false,
-                        .required = rv,
-                        .found = "(unparseable)",
-                        .detail = "could not parse replay schema version",
-                    });
+                    try appendOwnedCheck(&checks, allocator, "replay_schema", false, rv, "(unparseable)", "could not parse replay schema version");
                 } else {
                     const installed_schema = parseSchemaVersion("2");
                     if (installed_schema == null) {
-                        try checks.append(allocator, Check{
-                            .name = "replay_schema",
-                            .passed = false,
-                            .required = rv,
-                            .found = "(unparseable)",
-                            .detail = "could not parse installed replay schema version",
-                        });
+                        try appendOwnedCheck(&checks, allocator, "replay_schema", false, rv, "(unparseable)", "could not parse installed replay schema version");
                     } else {
                         const pass = installed_schema.? == required_schema.?;
-                        try checks.append(allocator, Check{
-                            .name = "replay_schema",
-                            .passed = pass,
-                            .required = rv,
-                            .found = if (installed_schema) |v| std.fmt.allocPrint(allocator, "{d}", .{v}) catch "0" else "0",
-                            .detail = if (!pass) "replay schema version mismatch" else "",
-                        });
+                        try appendOwnedCheck(&checks, allocator, "replay_schema", pass, rv, "2", if (!pass) "replay schema version mismatch" else "");
                     }
                 }
             }
@@ -206,32 +179,14 @@ pub fn run(
             if (std.mem.eql(u8, pv, "0.0.0") == false) {
                 const required_schema = parseSchemaVersion(pv);
                 if (required_schema == null) {
-                    try checks.append(allocator, Check{
-                        .name = "policy_schema",
-                        .passed = false,
-                        .required = pv,
-                        .found = "(unparseable)",
-                        .detail = "could not parse policy schema version",
-                    });
+                    try appendOwnedCheck(&checks, allocator, "policy_schema", false, pv, "(unparseable)", "could not parse policy schema version");
                 } else {
                     const installed_schema = parseSchemaVersion("2");
                     if (installed_schema == null) {
-                        try checks.append(allocator, Check{
-                            .name = "policy_schema",
-                            .passed = false,
-                            .required = pv,
-                            .found = "(unparseable)",
-                            .detail = "could not parse installed policy schema version",
-                        });
+                        try appendOwnedCheck(&checks, allocator, "policy_schema", false, pv, "(unparseable)", "could not parse installed policy schema version");
                     } else {
                         const pass = installed_schema.? == required_schema.?;
-                        try checks.append(allocator, Check{
-                            .name = "policy_schema",
-                            .passed = pass,
-                            .required = pv,
-                            .found = if (installed_schema) |v| std.fmt.allocPrint(allocator, "{d}", .{v}) catch "0" else "0",
-                            .detail = if (!pass) "policy schema version mismatch" else "",
-                        });
+                        try appendOwnedCheck(&checks, allocator, "policy_schema", pass, pv, "2", if (!pass) "policy schema version mismatch" else "");
                     }
                 }
             }
@@ -245,7 +200,7 @@ pub fn run(
         var mw: usize = 0;
         var first = true;
         for (m.required_fixtures) |fixture| {
-            const fixture_path = std.mem.join(allocator, "/", &.{ fixture_root, fixture, ".json" }) catch return PreflightError.OutOfMemory;
+            const fixture_path = std.fmt.allocPrint(allocator, "{s}/{s}.json", .{ fixture_root, fixture }) catch return PreflightError.OutOfMemory;
             const exists = blk: {
                 std.Io.Dir.access(cwd, io, fixture_path, .{}) catch break :blk false;
                 break :blk true;
@@ -276,26 +231,15 @@ pub fn run(
                 present, m.required_fixtures.len, missing_text,
             }) catch "unknown";
         }
-        try checks.append(allocator, Check{
-            .name = "fixtures",
-            .passed = present == m.required_fixtures.len,
-            .required = "all required fixtures",
-            .found = found_str,
-            .detail = if (present != m.required_fixtures.len) "missing fixtures required by manifest" else "",
-        });
+        try appendOwnedCheck(&checks, allocator, "fixtures", present == m.required_fixtures.len, "all required fixtures", found_str, if (present != m.required_fixtures.len) "missing fixtures required by manifest" else "");
     }
 
     const checks_items = try checks.toOwnedSlice(allocator);
     const any_failed = !isAllPassed(checks_items);
 
-    if (any_failed) {
-        allocator.free(checks_items);
-        return PreflightError.PreflightFailed;
-    }
-
     return PreflightResult{
         .checks = checks_items,
-        .passed = true,
+        .passed = !any_failed,
     };
 }
 
@@ -306,9 +250,107 @@ fn isAllPassed(checks: []const Check) bool {
     return true;
 }
 
+/// Free a PreflightResult's checks slice using the allocator that created it.
+pub fn deinit(result: PreflightResult, allocator: std.mem.Allocator) void {
+    for (result.checks) |check| {
+        allocator.free(check.name);
+        allocator.free(check.required);
+        allocator.free(check.found);
+        allocator.free(check.detail);
+    }
+    allocator.free(result.checks);
+}
+
+/// Run all preflight checks and fail closed when any check fails.
+pub fn run(
+    allocator: Allocator,
+    io: Io,
+    m: *const demo_manifest.Manifest,
+    cwd: std.Io.Dir,
+    installed_version: []const u8,
+    installed_runtime_tier: []const u8,
+    installed_isolation_tier: []const u8,
+    fixture_root: []const u8,
+) PreflightError!PreflightResult {
+    const result = try evaluate(
+        allocator,
+        io,
+        m,
+        cwd,
+        installed_version,
+        installed_runtime_tier,
+        installed_isolation_tier,
+        fixture_root,
+    );
+    if (!result.passed) {
+        deinit(result, allocator);
+        return PreflightError.PreflightFailed;
+    }
+    return result;
+}
+
+fn firstFailureDiagnostic(result: PreflightResult) ?diagnostic.BlockedFlowDiagnostic {
+    const CheckName = enum {
+        runtime_tier,
+        version,
+        isolation_tier,
+        no_live_effect,
+        replay_schema,
+        policy_schema,
+        fixtures,
+    };
+
+    for (result.checks) |check| {
+        if (!check.passed) {
+            const check_name = std.meta.stringToEnum(CheckName, check.name);
+            return switch (check_name orelse .version) {
+                .runtime_tier => .{
+                    .code = .unsupported_runtime_tier,
+                    .message = "runtime tier is not supported by the manifest",
+                    .field = check.name,
+                    .expected = check.required,
+                    .found = check.found,
+                },
+                .version, .replay_schema, .policy_schema => .{
+                    .code = .stale_manifest,
+                    .message = "manifest version requirements do not match this build",
+                    .field = check.name,
+                    .expected = check.required,
+                    .found = check.found,
+                },
+                .isolation_tier => .{
+                    .code = .missing_isolation_prerequisite,
+                    .message = "runtime isolation tier does not satisfy the manifest",
+                    .field = check.name,
+                    .expected = check.required,
+                    .found = check.found,
+                },
+                .no_live_effect => .{
+                    .code = .attempted_live_execution,
+                    .message = "manifest does not allow live effects for this demo",
+                    .field = check.name,
+                    .expected = check.required,
+                    .found = check.found,
+                },
+                .fixtures => .{
+                    .code = .missing_fixture,
+                    .message = "required fixture material is missing",
+                    .field = check.name,
+                    .expected = check.required,
+                    .found = check.found,
+                },
+            };
+        }
+    }
+    return null;
+}
+
 /// Format preflight failure as human-readable error message.
 pub fn formatFailure(result: PreflightResult, writer: anytype) !void {
     try writer.writeAll("Preflight failure:\n");
+    if (firstFailureDiagnostic(result)) |diag| {
+        try diag.writePlain(writer);
+    }
     for (result.checks) |c| {
         if (!c.passed) {
             try writer.print("  {s}\n    Required: {s}\n    Found: {s}", .{
@@ -322,87 +364,18 @@ pub fn formatFailure(result: PreflightResult, writer: anytype) !void {
     }
 }
 
-/// Free a PreflightResult's checks slice using the allocator that created it.
-pub fn deinit(result: PreflightResult, allocator: std.mem.Allocator) void {
-    allocator.free(result.checks);
-}
-
 /// Load a manifest JSON file from disk.
-pub fn loadManifest(allocator: Allocator, io: Io, cwd: std.Io.Dir, path: []const u8) ManifestLoadError!*Manifest {
-    const raw = cwd.readFileAlloc(io, path, allocator, .limited(64 * 1024)) catch return ManifestLoadError.FileNotFound;
-    defer allocator.free(raw);
-    const content = raw;
+pub const ManifestLoadError = demo_manifest.Error;
 
-    return try parseManifestJson(allocator, content);
+pub fn loadManifest(allocator: Allocator, io: Io, cwd: std.Io.Dir, path: []const u8) ManifestLoadError!*Manifest {
+    return demo_manifest.loadManifest(allocator, cwd, io, path);
 }
 
 /// Free a parsed Manifest.
 pub fn deinitManifest(m: *Manifest, gpa: Allocator) void {
     m.deinit(gpa);
+    gpa.destroy(m);
 }
-
-/// Internal JSON-compatible struct for manifest deserialization.
-const ManifestJson = struct {
-    min_tickoni_version: []const u8 = "0.0.0",
-    supported_runtime_tiers: []const []const u8 = &[_][]const u8{},
-    required_isolation_tier: []const u8 = "retail",
-    expected_no_live_effect: bool = true,
-    replay_schema_version: []const u8 = "0.0.0",
-    policy_schema_version: []const u8 = "0.0.0",
-    required_fixtures: []const []const u8 = &[_][]const u8{},
-};
-
-/// Parse a Manifest from JSON text.
-fn parseManifestJson(allocator: Allocator, text: []const u8) ManifestLoadError!*Manifest {
-    const j = std.json.parseFromSlice(
-        ManifestJson,
-        allocator,
-        text,
-        .{ .ignore_unknown_fields = true },
-    ) catch return ManifestLoadError.InvalidJson;
-    defer j.deinit();
-
-    const m = try allocator.create(Manifest);
-    errdefer allocator.destroy(m);
-
-    var tiers: std.ArrayList([]const u8) = .empty;
-    errdefer {
-        for (tiers.items) |t| allocator.free(t);
-        tiers.deinit(allocator);
-    }
-    for (j.value.supported_runtime_tiers) |t| {
-        try tiers.append(allocator, try allocator.dupe(u8, t));
-    }
-
-    var fixtures: std.ArrayList([]const u8) = .empty;
-    errdefer {
-        for (fixtures.items) |f| allocator.free(f);
-        fixtures.deinit(allocator);
-    }
-    for (j.value.required_fixtures) |f| {
-        try fixtures.append(allocator, try allocator.dupe(u8, f));
-    }
-
-    m.* = Manifest{
-        .min_tickoni_version = try allocator.dupe(u8, j.value.min_tickoni_version),
-        .supported_runtime_tiers = try tiers.toOwnedSlice(allocator),
-        .required_isolation_tier = try allocator.dupe(u8, j.value.required_isolation_tier),
-        .expected_no_live_effect = j.value.expected_no_live_effect,
-        .replay_schema_version = try allocator.dupe(u8, j.value.replay_schema_version),
-        .policy_schema_version = try allocator.dupe(u8, j.value.policy_schema_version),
-        .required_fixtures = try fixtures.toOwnedSlice(allocator),
-    };
-    errdefer deinitManifest(m);
-
-    return m;
-}
-
-pub const ManifestLoadError = error{
-    FileNotFound,
-    InvalidJson,
-    MissingField,
-    OutOfMemory,
-};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -513,6 +486,7 @@ test "formatFailure includes check details" {
     try formatFailure(result, &w);
     const output = w.buffered();
     try std.testing.expect(std.mem.indexOf(u8, output, "Preflight failure") != null);
+    try std.testing.expect(std.mem.indexOf(u8, output, "blocked_code: unsupported_runtime_tier") != null);
     try std.testing.expect(std.mem.indexOf(u8, output, "runtime_tier") != null);
     try std.testing.expect(std.mem.indexOf(u8, output, "macos_retail") != null);
 }
@@ -529,4 +503,21 @@ test "fixtures check detects missing fixtures" {
     const io = std.testing.io;
     const cwd = std.Io.Dir.cwd();
     try std.testing.expectError(PreflightError.PreflightFailed, run(gpa, io, &m, cwd, "0.1.0", "linux_full", "retail", "/tmp/fixtures"));
+}
+
+test "per-tier isolation requirement lets linux_full require full" {
+    var m = demo_manifest.Manifest{
+        .min_tickoni_version = "0.1.0",
+        .supported_runtime_tiers = &.{ "linux_full", "macos_retail" },
+        .required_isolation_tier = "retail",
+        .required_isolation_by_tier = .{
+            .linux_full = "full",
+            .macos_retail = "retail",
+        },
+        .expected_no_live_effect = true,
+        .required_fixtures = &[_][]const u8{},
+    };
+    const result = try run(std.testing.allocator, std.testing.io, &m, std.Io.Dir.cwd(), "0.1.0", "linux_full", "full", "/tmp/fixtures");
+    defer deinit(result, std.testing.allocator);
+    try std.testing.expect(result.passed);
 }
