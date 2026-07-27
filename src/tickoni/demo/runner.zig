@@ -38,15 +38,21 @@ pub fn runWithBackend(
 ) RunnerError!conformance.Artifact {
     if (!backend.external_effects_disabled) return RunnerError.LiveEffectsEnabled;
 
-    const audit_bytes = cwd.readFileAlloc(io, backend.audit_jsonl_path, allocator, .limited(512 * 1024)) catch {
-        return RunnerError.ArtifactReadFailed;
+    const audit_hash = if (backend.audit_jsonl_path.len == 0) conformance.sha256Hex("") else blk: {
+        const audit_bytes = cwd.readFileAlloc(io, backend.audit_jsonl_path, allocator, .limited(512 * 1024)) catch {
+            return RunnerError.ArtifactReadFailed;
+        };
+        defer allocator.free(audit_bytes);
+        break :blk conformance.sha256Hex(audit_bytes);
     };
-    defer allocator.free(audit_bytes);
 
-    const replay_bytes = cwd.readFileAlloc(io, backend.replay_capsule_path, allocator, .limited(512 * 1024)) catch {
-        return RunnerError.ArtifactReadFailed;
+    const replay_hash = if (backend.replay_capsule_path.len == 0) conformance.sha256Hex("") else blk: {
+        const replay_bytes = cwd.readFileAlloc(io, backend.replay_capsule_path, allocator, .limited(512 * 1024)) catch {
+            return RunnerError.ArtifactReadFailed;
+        };
+        defer allocator.free(replay_bytes);
+        break :blk conformance.sha256Hex(replay_bytes);
     };
-    defer allocator.free(replay_bytes);
 
     return .{
         .manifest_id = request.manifest_id,
@@ -60,9 +66,9 @@ pub fn runWithBackend(
         .policy_outcome = backend.policy_outcome,
         .proposal_hash = conformance.sha256Hex(backend.proposal_material),
         .audit_jsonl_path = backend.audit_jsonl_path,
-        .audit_jsonl_sha256 = conformance.sha256Hex(audit_bytes),
+        .audit_jsonl_sha256 = audit_hash,
         .replay_capsule_path = backend.replay_capsule_path,
-        .replay_capsule_sha256 = conformance.sha256Hex(replay_bytes),
+        .replay_capsule_sha256 = replay_hash,
         .replay_result = backend.replay_result,
         .blocked_diagnostic = backend.blocked_diagnostic,
         .external_effects_disabled = true,
