@@ -603,6 +603,8 @@ zig build test --summary all
 
 #### 7. Wire the allowed paper-trade scenario into the runner
 
+**Status:** DONE
+
 **Reuse existing files:**
 - `src/tickoni/test/integration/test_investment_replay.zig`
 - `src/tickoni/test/demo/investment/support.zig`
@@ -626,6 +628,8 @@ zig-out/bin/tickoni demo investment --json --manifest src/tickoni/demo/fixtures/
 
 #### 8. Wire the blocked oversized scenario into the runner
 
+**Status:** DONE
+
 **Reuse existing file:**
 - `src/tickoni/test/integration/test_investment_blocked_limits.zig`
 
@@ -645,6 +649,8 @@ zig-out/bin/tickoni demo investment --json --manifest src/tickoni/demo/fixtures/
 
 #### 9. Wire the restricted-instrument scenario into the runner
 
+**Status:** DONE
+
 **Reuse existing file:**
 - `src/tickoni/test/integration/test_investment_restricted_instrument.zig`
 
@@ -662,6 +668,8 @@ just test-cli-tk
 - restricted ticker path denies before live model/adapter effects
 
 #### 10. Wire tampered replay detection into the runner/comparator path
+
+**Status:** DONE
 
 **Reuse existing files:**
 - `src/tickoni/test/integration/test_investment_replay.zig`

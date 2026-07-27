@@ -8,6 +8,8 @@ pub const Code = enum {
     tampered_replay_artifact,
     tampered_proposal_artifact,
     missing_isolation_prerequisite,
+    policy_denied,
+    restricted_instrument,
 
     pub fn label(self: Code) []const u8 {
         return switch (self) {
@@ -18,6 +20,8 @@ pub const Code = enum {
             .tampered_replay_artifact => "tampered_replay_artifact",
             .tampered_proposal_artifact => "tampered_proposal_artifact",
             .missing_isolation_prerequisite => "missing_isolation_prerequisite",
+            .policy_denied => "policy_denied",
+            .restricted_instrument => "restricted_instrument",
         };
     }
 };
@@ -46,6 +50,8 @@ test "all blocked diagnostic codes have stable labels" {
         .{ .code = .tampered_replay_artifact, .label = "tampered_replay_artifact" },
         .{ .code = .tampered_proposal_artifact, .label = "tampered_proposal_artifact" },
         .{ .code = .missing_isolation_prerequisite, .label = "missing_isolation_prerequisite" },
+        .{ .code = .policy_denied, .label = "policy_denied" },
+        .{ .code = .restricted_instrument, .label = "restricted_instrument" },
     };
     for (cases) |case| {
         try std.testing.expectEqualStrings(case.label, case.code.label());
