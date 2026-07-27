@@ -744,6 +744,65 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(demo_preflight_test).step);
 
+    const demo_diagnostic_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/demo/diagnostic.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(demo_diagnostic_test).step);
+
+    const demo_conformance_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/demo/conformance.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "diagnostic", .module = demo_diagnostic_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(demo_conformance_test).step);
+
+    const demo_comparator_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/demo/comparator.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "conformance", .module = demo_conformance_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(demo_comparator_test).step);
+
+    const demo_runner_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/demo/runner.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "conformance", .module = demo_conformance_mod },
+                .{ .name = "diagnostic", .module = demo_diagnostic_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(demo_runner_test).step);
+
+    const demo_substitution_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/tickoni/demo/substitution.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "diagnostic", .module = demo_diagnostic_mod },
+                .{ .name = "runner", .module = demo_runner_mod },
+            },
+        }),
+    });
+    test_step.dependOn(&b.addRunArtifact(demo_substitution_test).step);
+
     // src/tickoni/codec/thesis.zig: dedicated wrapper tests over the canonical
     // consumer-money schema hash APIs.
     const thesis_codec_test = b.addTest(.{
