@@ -113,7 +113,7 @@ pub fn formatJson(results: []const Result, platform_tier: []const u8, w: anytype
         try w.print("    {{\"name\": \"{s}\", \"status\": \"{s}\", \"message\": \"{s}\"}}", .{
             r.name,
             status_str,
-            r.message,
+            r.message(),
         });
         if (i < results.len - 1) try w.writeAll(",");
         try w.writeAll("\n");
@@ -158,8 +158,8 @@ test "formatText produces header" {
     var buf: [1024]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
     const results: []const Result = &.{
-        .{ .name = "os", .status = .pass, .message = "macOS 14.0" },
-        .{ .name = "zig", .status = .warn, .message = "scaffold" },
+        Result.initOwnedMessage("os", .pass, "macOS 14.0"),
+        Result.initOwnedMessage("zig", .warn, "scaffold"),
     };
     try formatText(results, "macos_retail", &w);
     const output = w.buffered();
@@ -170,9 +170,9 @@ test "formatText includes counts" {
     var buf: [1024]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
     const results: []const Result = &.{
-        .{ .name = "a", .status = .pass, .message = "" },
-        .{ .name = "b", .status = .warn, .message = "" },
-        .{ .name = "c", .status = .pass, .message = "" },
+        Result.initOwnedMessage("a", .pass, ""),
+        Result.initOwnedMessage("b", .warn, ""),
+        Result.initOwnedMessage("c", .pass, ""),
     };
     try formatText(results, "linux_full", &w);
     const output = w.buffered();
@@ -185,7 +185,7 @@ test "formatJson produces valid JSON structure" {
     var buf: [1024]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
     const results: []const Result = &.{
-        .{ .name = "os", .status = .pass, .message = "macOS" },
+        Result.initOwnedMessage("os", .pass, "macOS"),
     };
     try formatJson(results, "macos_retail", &w);
     const output = w.buffered();
@@ -199,9 +199,9 @@ test "formatText with failures shows FAIL result" {
     var buf: [1024]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
     const results: []const Result = &.{
-        .{ .name = "os", .status = .pass, .message = "Linux" },
-        .{ .name = "zig", .status = .fail, .message = "not found" },
-        .{ .name = "git", .status = .pass, .message = "git 2.45" },
+        Result.initOwnedMessage("os", .pass, "Linux"),
+        Result.initOwnedMessage("zig", .fail, "not found"),
+        Result.initOwnedMessage("git", .pass, "git 2.45"),
     };
     try formatText(results, "linux_full", &w);
     const output = w.buffered();
@@ -230,7 +230,7 @@ test "formatJson contains result field" {
     var buf: [1024]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
     const results: []const Result = &.{
-        .{ .name = "os", .status = .pass, .message = "macOS" },
+        Result.initOwnedMessage("os", .pass, "macOS"),
     };
     try formatJson(results, "macos_retail", &w);
     const output = w.buffered();
