@@ -127,20 +127,24 @@ Verified by rerunning `just test-unit-tk`, which now executes these roots inside
 
 ### 5. CI coverage is only partially wired
 
-`.github/workflows/tests-short.yml` now runs `just test-cli-tk` on:
+**Status:** DONE
 
-- Linux short tests
-- macOS 15 ARM short tests
+The short-test workflow now runs `just test-cli-tk` on the full visible short-test matrix covered by this workflow:
 
-But not across the full visible short-test macOS matrix in that workflow.
+- Linux
+- macOS 15 Intel
+- macOS 15 ARM
+- macOS 26 Intel
+- macOS 26 ARM
 
-Observed partiality:
+`contrib/test/run_cli_demo_tests.sh` was also extended to verify:
 
-- macOS 15 Intel short test job: no `just test-cli-tk`
-- macOS 26 Intel short test job: no `just test-cli-tk`
-- macOS 26 ARM short test job: no `just test-cli-tk`
-
-So the story’s “focused CI matrix” is only partially implemented.
+- comparison output is emitted in both JSON and plain-text modes
+- unsupported runtime tier emits an explicit diagnostic
+- missing fixture emits an explicit diagnostic
+- stale manifest emits an explicit diagnostic
+- missing isolation prerequisite emits an explicit diagnostic
+- `expected_no_live_effect = false` emits `blocked_code: attempted_live_execution`
 
 ### 6. The branch is not fully coherent as a review unit
 
