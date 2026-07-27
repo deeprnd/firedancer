@@ -162,6 +162,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const demo_diagnostic_mod = b.addModule("demo_diagnostic", .{
+        .root_source_file = b.path("src/tickoni/demo/diagnostic.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const demo_preflight_mod = b.addModule("demo_preflight", .{
         .root_source_file = b.path("src/tickoni/demo/preflight.zig"),
         .target = target,
@@ -169,15 +174,11 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "demo_manifest", .module = demo_manifest_mod },
             .{ .name = "demo_semver", .module = demo_semver_mod },
+            .{ .name = "diagnostic", .module = demo_diagnostic_mod },
         },
     });
     const demo_cli_mod = b.addModule("demo_cli", .{
         .root_source_file = b.path("src/tickoni/demo/cli.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    const demo_diagnostic_mod = b.addModule("demo_diagnostic", .{
-        .root_source_file = b.path("src/tickoni/demo/diagnostic.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -727,6 +728,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "demo_manifest", .module = demo_manifest_mod },
                 .{ .name = "demo_semver", .module = demo_semver_mod },
+                .{ .name = "diagnostic", .module = demo_diagnostic_mod },
                 .{ .name = "tier", .module = tier_mod },
             },
         }),

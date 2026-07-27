@@ -1,0 +1,256 @@
+# V2.21.S6 Critical Audit
+
+## Verdict
+
+**Not shippable.**
+
+The branch moves the demo in the right architectural direction, but it still misses key parts of the story contract it claims to implement.
+
+## What is aligned
+
+### 1. Architecture direction is mostly coherent
+
+The new work is concentrated under `src/tickoni/demo/`:
+
+- `cli.zig`
+- `manifest.zig`
+- `preflight.zig`
+- `conformance.zig`
+- `diagnostic.zig`
+- `comparator.zig`
+- `runner.zig`
+- `substitution.zig`
+
+That keeps the deterministic demo/conformance logic out of unrelated runtime code.
+
+### 2. The demo is fixture-backed and offline
+
+The branch removed the old llama/system-demo shape from the CLI verification path and replaced it with a deterministic fixture-backed suite.
+
+Evidence:
+
+- `contrib/test/run_cli_demo_tests.sh`
+- `justfile` `demo-tk`
+- `src/app/tickoni/main.zig`
+- `src/tickoni/demo/substitution.zig`
+
+This is aligned with the project architecture and the no-live-effect requirement.
+
+### 3. No new runtime OS switches were found in the demo path
+
+The changed Zig demo/runtime files were checked for runtime OS branching patterns such as:
+
+- `@import("builtin")`
+- `builtin.os`
+- `std.posix`
+- `os.tag`
+- `switch (...os...)`
+
+No new runtime OS-switching was found in the demo code. The only observed platform switches were in `build.zig`, i.e. build/platform wiring, not product runtime/demo logic.
+
+### 4. There are real tests, not just stubs
+
+The branch includes real checks for:
+
+- CLI usage failure
+- JSON suite shape
+- 4 deterministic scenarios
+- plain-text suite output markers
+- manifest validation
+- preflight validation
+- comparator behavior
+- artifact hashing/serialization
+- substitution fixture presence
+
+Also verified live in this session:
+
+- `just test-unit-tk` passed
+- `just test-integration-all` passed
+- `just test-cov-all` passed
+- `just test-system-all` passed
+- `just test-e2e-all` passed
+- `just tests-all` still fails only in `test-unit-fd` due the host memlock blocker, not due the S6 demo code itself
+
+## Critical findings
+
+### 1. Preflight failures do not emit the explicit blocked-flow diagnostics the story requires
+
+**Status:** DONE
+
+Resolved in code by routing `cmdDemo()` through `demo_preflight.evaluate(...)` and formatting failures with `demo_preflight.formatFailure(...)` before exit.
+
+Verified live during this session with temporary manifests for:
+
+- unsupported runtime tier → `blocked_code: unsupported_runtime_tier`
+- missing fixture → `blocked_code: missing_fixture`
+- stale manifest → `blocked_code: stale_manifest`
+- missing isolation prerequisite → `blocked_code: missing_isolation_prerequisite`
+
+### 2. Several diagnostic codes exist only as definitions/tests, not as surfaced runtime behavior
+
+**Status:** DONE
+
+The preflight/runtime path now surfaces real blocked-flow codes through stderr output, including:
+
+- `unsupported_runtime_tier`
+- `missing_fixture`
+- `stale_manifest`
+- `missing_isolation_prerequisite`
+- `attempted_live_execution` (mapped by the preflight formatter for `no_live_effect` failures)
+
+That closes the earlier gap where the enum labels existed but were not emitted by the real CLI path.
+
+### 3. The comparator exists, but there is no real cross-platform comparison workflow wired into the product path
+
+`src/tickoni/demo/comparator.zig` exists and has unit tests.
+
+However:
+
+- the main CLI path in `src/app/tickoni/main.zig` emits a single-host artifact suite
+- it does not consume two artifact sets
+- it does not perform Linux-vs-macOS comparison as an operational gate
+
+So the branch currently provides:
+
+- deterministic artifact emission
+
+but not yet:
+
+- an actual cross-platform equivalence gate
+
+This matters because the story’s core trust claim is not just “emit fixtures,” but “prove retail output matches Linux for the claimed equivalence dimensions.”
+
+### 4. Important new test files are not all wired into the canonical Zig test lane
+
+`build.zig` defines modules for:
+
+- `demo_diagnostic`
+- `demo_conformance`
+- `demo_runner`
+- `demo_substitution`
+
+But the explicit `b.addTest(...)` wiring visible in the canonical test step clearly includes:
+
+- `src/tickoni/demo/manifest.zig`
+- `src/tickoni/demo/preflight.zig`
+
+and does **not** clearly add dedicated canonical test binaries for:
+
+- `src/tickoni/demo/diagnostic.zig`
+- `src/tickoni/demo/conformance.zig`
+- `src/tickoni/demo/comparator.zig`
+- `src/tickoni/demo/runner.zig`
+- `src/tickoni/demo/substitution.zig`
+
+Those files contain tests, but they are not all obviously part of the normal `zig build test` lane from the aggregate wiring inspected here.
+
+That weakens the claim that the branch is fully covered by the standard unit lane.
+
+### 5. CI coverage is only partially wired
+
+`.github/workflows/tests-short.yml` now runs `just test-cli-tk` on:
+
+- Linux short tests
+- macOS 15 ARM short tests
+
+But not across the full visible short-test macOS matrix in that workflow.
+
+Observed partiality:
+
+- macOS 15 Intel short test job: no `just test-cli-tk`
+- macOS 26 Intel short test job: no `just test-cli-tk`
+- macOS 26 ARM short test job: no `just test-cli-tk`
+
+So the story’s “focused CI matrix” is only partially implemented.
+
+### 6. The branch is not fully coherent as a review unit
+
+The branch also contains unrelated work:
+
+- `contrib/engine/engine_check_changes.py`
+- `doc/knowledge/engine-harness-snapshot.json`
+- `justfile` memlock fallback tweak for `test-unit-fd`
+
+Those changes are not part of the S6 demo/conformance story itself. That makes the branch noisier and less coherent for review.
+
+## Test quality assessment
+
+## Substantial enough to be meaningful
+
+`contrib/test/run_cli_demo_tests.sh` is materially better than a smoke test. It validates:
+
+- bare `demo` invocation fails
+- JSON output parses
+- suite contains 4 scenarios
+- blocked/tampered paths appear in output
+- plain-text output contains expected markers
+
+## Still not substantial enough for story closure
+
+It does **not** yet verify the most important negative-path contract end to end:
+
+- unsupported runtime tier emits explicit diagnostic
+- missing fixture emits explicit diagnostic
+- stale manifest emits explicit diagnostic
+- missing isolation prerequisite emits explicit diagnostic
+- attempted live execution emits explicit diagnostic
+- tampered proposal artifact emits explicit diagnostic
+
+So the tests are useful, but not yet sufficient for the claimed story scope.
+
+## Code smell assessment
+
+### No major structural smell in module placement
+
+The new files are grouped sensibly and the demo path remains isolated.
+
+### Main remaining smell: dead contract surface
+
+The biggest smell is not formatting or naming; it is the gap between:
+
+- diagnostic types / documented contract
+- and actual surfaced runtime behavior
+
+That is a trust problem, because the branch appears more complete from its types/docs than it is in real execution.
+
+## OS-switch assessment
+
+### Pass, with one caveat
+
+- No new runtime OS branching was found in the changed demo path.
+- Platform branching observed during audit was in `build.zig`, which is acceptable build-layer/platform wiring.
+
+So on the specific requirement **“no os switches besides in shims”**, this branch does not show a new red flag in the demo code reviewed here.
+
+## Overall judgment
+
+### Passes
+
+- directionally aligned with architecture
+- fixture-backed / offline / no-live-effect shape
+- demo logic reasonably isolated
+- no obvious new runtime OS-switch leakage in reviewed demo path
+- contains non-trivial tests
+
+### Fails
+
+- explicit blocked-flow diagnostics not actually delivered for preflight failures
+- comparator not wired into a real cross-platform equivalence workflow
+- important new tests not all clearly wired into canonical Zig test lane
+- CI matrix coverage partial
+- branch polluted with unrelated engine/memlock work
+
+## Final conclusion
+
+**Critical audit result: reject in current form.**
+
+The branch is close in direction, but it is not yet coherent and complete enough to call shippable.
+
+## Recommended fix order
+
+1. Wire `preflight.formatFailure(...)` into `cmdDemo()` and surface explicit per-failure diagnostics.
+2. Ensure blocked-flow diagnostic codes map to real runtime failure paths, not just type definitions.
+3. Add canonical `build.zig` test wiring for all new demo modules with embedded tests.
+4. Extend CLI verification to cover the missing negative-path contracts explicitly.
+5. Wire `just test-cli-tk` across the intended macOS matrix consistently.
+6. Split unrelated engine/memlock work out of the S6 review branch or PR.
