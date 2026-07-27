@@ -1,0 +1,10 @@
+Preflight failure:
+blocked_code: stale_manifest
+message: manifest version requirements do not match this build
+field: version
+expected: 999.0.0
+found: 0.1.0-dev
+  version
+    Required: 999.0.0
+    Found: 0.1.0-dev
+    installed version is below minimum required
