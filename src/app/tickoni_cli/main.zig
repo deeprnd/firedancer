@@ -1,19 +1,13 @@
 const clap = @import("clap");
 const demo = @import("investment_demo");
+const doctor_output = @import("doctor_output");
 const std = @import("std");
-const tier = @import("tier");
-
-/// Return compiler version string (clang, gcc, etc.) via __VERSION__.
-pub extern "c" fn tickoni_compiler_version() [*:0]const u8;
-pub fn compilerVersion() []const u8 {
-    return std.mem.sliceTo(tickoni_compiler_version(), 0);
-}
-
-pub const version_str = "0.1.1";
+const version = @import("version");
 
 const MainCommand = enum {
     demo,
     version,
+    doctor,
 };
 
 const DemoCommand = enum {
@@ -29,7 +23,8 @@ const demo_parsers = .{
 };
 
 const main_params = clap.parseParamsComptime(
-    \\-h, --help  Display this help and exit.
+    \\-h, --help     Display this help and exit.
+    \\    --version  Display Tickoni version information and exit.
     \\<command>
     \\
 );
@@ -37,6 +32,13 @@ const main_params = clap.parseParamsComptime(
 const demo_params = clap.parseParamsComptime(
     \\-h, --help  Display this help and exit.
     \\<command>
+    \\
+);
+
+const doctor_params = clap.parseParamsComptime(
+    \\-h, --help   Display this help and exit.
+    \\    --json   Emit machine-readable JSON.
+    \\    --plain  Emit human-readable text output.
     \\
 );
 
@@ -70,6 +72,11 @@ pub fn main(init: std.process.Init) !void {
     };
     defer res.deinit();
 
+    if (res.args.version != 0) {
+        try printVersion(init.io, gpa);
+        return;
+    }
+
     if (res.args.help != 0 or res.positionals[0] == null) {
         try clap.helpToFile(init.io, std.Io.File.stderr(), clap.Help, &main_params, .{});
         return;
@@ -77,21 +84,42 @@ pub fn main(init: std.process.Init) !void {
 
     switch (res.positionals[0].?) {
         .demo => try demoMain(gpa, init.io, &iter),
-        .version => {
-            var fmt_buf: [512]u8 = undefined;
-            const line = std.fmt.bufPrint(&fmt_buf, "{s} {s} ({s} {s} {s})\n", .{
-                version_str,
-                tier.tierName(tier.detectTier()),
-                tier.detectOsString(),
-                tier.detectArchString(),
-                compilerVersion(),
-            }) catch unreachable;
-            var write_buf: [256]u8 = undefined;
-            var sw = std.Io.File.stdout().writer(init.io, &write_buf);
-            try sw.interface.writeAll(line);
-            try sw.flush();
-        },
+        .version => try printVersion(init.io, gpa),
+        .doctor => try doctorMain(gpa, init.io, &iter),
     }
+}
+
+fn printVersion(io: std.Io, gpa: std.mem.Allocator) !void {
+    var info = try version.VersionInfo.init(gpa);
+    defer info.deinit(gpa);
+
+    var buf: [1024]u8 = undefined;
+    var writer = std.Io.Writer.fixed(&buf);
+    try version.formatVersionInfo(info, &writer);
+    try std.Io.File.writeStreamingAll(std.Io.File.stdout(), io, writer.buffered());
+}
+
+fn doctorMain(gpa: std.mem.Allocator, io: std.Io, iter: *std.process.Args.Iterator) !void {
+    var diag = clap.Diagnostic{};
+    var res = clap.parseEx(clap.Help, &doctor_params, clap.parsers.default, iter, .{
+        .diagnostic = &diag,
+        .allocator = gpa,
+    }) catch |err| {
+        try diag.reportToFile(io, std.Io.File.stderr(), err);
+        return err;
+    };
+    defer res.deinit();
+
+    if (res.args.help != 0) {
+        try clap.helpToFile(io, std.Io.File.stderr(), clap.Help, &doctor_params, .{});
+        return;
+    }
+
+    const format: doctor_output.Format = if (res.args.json != 0) .json else .text;
+    var buf: [8192]u8 = undefined;
+    var writer = std.Io.Writer.fixed(&buf);
+    try doctor_output.runAndFormat(io, gpa, format, &writer);
+    try std.Io.File.writeStreamingAll(std.Io.File.stdout(), io, writer.buffered());
 }
 
 fn demoMain(gpa: std.mem.Allocator, io: std.Io, iter: *std.process.Args.Iterator) !void {
