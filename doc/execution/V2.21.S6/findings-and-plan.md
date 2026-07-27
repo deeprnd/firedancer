@@ -471,6 +471,8 @@ zig-out/bin/tickoni demo investment --help || true
 
 #### 3. Fix manifest semantics for Linux full vs macOS retail comparison
 
+**Status:** DONE
+
 **Edit:**
 - `src/tickoni/demo/manifest.zig`
 - `src/tickoni/demo/preflight.zig`
@@ -536,6 +538,8 @@ zig-out/bin/tickoni demo investment --json --manifest src/tickoni/demo/fixtures/
 
 #### 5. Define the conformance artifact schema in code
 
+**Status:** DONE
+
 **Create:** `src/tickoni/demo/conformance.zig`
 
 **Required fields:**
@@ -568,6 +572,8 @@ zig-out/bin/tickoni demo investment --json --manifest src/tickoni/demo/fixtures/
 - all required fields are present
 
 #### 6. Add explicit blocked-flow diagnostic schema
+
+**Status:** DONE
 
 **Create:** `src/tickoni/demo/diagnostic.zig`
 
