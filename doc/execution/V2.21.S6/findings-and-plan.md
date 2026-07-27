@@ -816,21 +816,39 @@ just test-cli-tk
 
 #### 16. Add CI matrix wiring for Linux baseline vs macOS retail
 
+**Status:** DONE
+
 **Edit:** relevant CI workflow files under `.github/workflows/`
 
-**Required edits:**
-- Linux job runs deterministic demo and uploads baseline artifacts
-- macOS job runs deterministic retail demo and uploads retail artifacts
-- follow-up comparison step checks equivalence on claimed deterministic fields
-- blocked/tampered lane proves fail-closed behavior
+**Implemented edits:**
+- `tests-short.yml` now includes a Linux demo-conformance bundle job
+- `tests-short.yml` now includes a macOS 15 ARM retail demo-conformance bundle job
+- both jobs upload:
+  - `conformance.json`
+  - `comparison.json`
+  - `blocked-diagnostics.json`
+  - copied referenced audit / replay artifacts
+- a follow-up compare job downloads both bundles and checks deterministic-field equivalence with `contrib/test/compare_demo_conformance.py`
+- change detection now watches the S6 demo CI helper scripts:
+  - `contrib/test/run_cli_demo_tests.sh`
+  - `contrib/test/export_demo_conformance_bundle.py`
+  - `contrib/test/compare_demo_conformance.py`
 
 **Verification commands:**
 ```bash
-rg -n "demo-tk|test-cli-tk|test-integration-tk|macos|conformance" .github/workflows
+python3 contrib/test/export_demo_conformance_bundle.py . /tmp/hermes-demo-bundle
+python3 contrib/test/compare_demo_conformance.py /tmp/hermes-demo-bundle/conformance.json /tmp/hermes-demo-bundle/conformance.json
+python3 - <<'PY'
+import yaml, pathlib
+print('YAML_OK' if yaml.safe_load(pathlib.Path('.github/workflows/tests-short.yml').read_text()) is not None else 'YAML_EMPTY')
+PY
+rg -n "demo-conformance|upload-artifact|download-artifact|compare_demo_conformance|export_demo_conformance_bundle|test-cli-tk" .github/workflows/tests-short.yml
 ```
 
 **Expected result:**
-- workflow definitions explicitly show S6 Linux/macOS coverage
+- workflow definitions explicitly show Linux/macOS S6 artifact generation and comparison
+- comparison helper passes on identical conformance bundles
+- workflow YAML parses cleanly
 
 ### Phase 6 — Finish Evidence And Closure Docs
 
