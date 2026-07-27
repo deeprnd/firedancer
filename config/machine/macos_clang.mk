@@ -19,26 +19,17 @@ include config/extra/with-threads.mk
 # Platform detection (MUST come before any platform-specific settings)
 UNAME?=$(shell uname)
 
-# Use system GAS assembler on macOS — clang's integrated assembler rejects
-# .cfi_escape / .cfi_restore directives that are valid GAS but fail on
-# macOS clang 16 with "invalid CFI advance_loc expression".
 ifeq ($(UNAME), Darwin)
-ASFLAGS+=-no-integrated-as
-endif
 
-ifeq ($(UNAME), Darwin)
+# Use LLVM integrated AS on macOS.
+# LLVM integrated AS supports all .cfi_* and Mach-O section directives
+# used in Firedancer's .S files (guarded by #if defined(__linux__) for ELF-only parts).
+# macOS clang's integrated assembler handles .cfi_escape / .cfi_restore correctly.
+
 FD_HAS_MACOS:=1
 CPPFLAGS+=-DFD_HAS_MACOS=1
-else
-# Not macOS — skip
-BUILDDIR?=native/$(notdir $(CC))
-include config/machine/native.mk
-$(eval $(filter-out %,$(BUILDDIR)))
-endif
 
 # ARM vs Intel detection
-ifeq ($(UNAME), Darwin)
-# Check architecture at build time
 IS_ARM?=$(shell uname -m | grep -qE 'aarch64|arm64' && echo 1 || echo 0)
 
 ifeq ($(IS_ARM),1)
@@ -51,7 +42,8 @@ FD_HAS_THREADS:=1
 CPPFLAGS+=-mcpu=apple-m1
 CPPFLAGS+=-DFD_HAS_ARM64=1 -DFD_HAS_INT128=1 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1 -DFD_HAS_THREADS=1
 else
-# Intel x86_64
+# Intel x86_64 — macOS runners are 2018-era Intel (Coffee Lake/Skylake)
+# with AVX2 but no AVX-512. Use skylake to match GitHub Actions runners.
 FD_HAS_INT128:=1
 FD_HAS_DOUBLE:=1
 FD_HAS_ALLOCA:=1
@@ -60,9 +52,15 @@ FD_HAS_X86:=1
 FD_HAS_SSE:=1
 FD_HAS_AVX:=1
 FD_HAS_AVX2:=1
-FD_HAS_AVX512:=1
+FD_HAS_AESNI:=1
 FD_IS_X86_64:=1
-CPPFLAGS+=-march=icelake-server
-CPPFLAGS+=-DFD_HAS_X86=1 -DFD_HAS_SSE=1 -DFD_HAS_AVX=1 -DFD_HAS_AVX2=1 -DFD_HAS_AVX512=1 -DFD_IS_X86_64=1 -DFD_HAS_INT128=1 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1 -DFD_HAS_THREADS=1
+CPPFLAGS+=-march=skylake
+CPPFLAGS+=-DFD_HAS_X86=1 -DFD_HAS_SSE=1 -DFD_HAS_AVX=1 -DFD_HAS_AVX2=1 -DFD_HAS_AESNI=1 -DFD_IS_X86_64=1 -DFD_HAS_INT128=1 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1 -DFD_HAS_THREADS=1
 endif
+
+else
+# Not macOS — skip
+BUILDDIR?=native/$(notdir $(CC))
+include config/machine/native.mk
+$(eval $(filter-out %,$(BUILDDIR)))
 endif

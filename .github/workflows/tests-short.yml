@@ -49,6 +49,206 @@ jobs:
       - name: Run test suite
         run: just test-unit-tk
 
+  # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
+  short-tests-macos-15-intel:
+    name: Harness Unit Tests / macOS 15 (Intel)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-intel
+
+      - name: Run test suite
+        run: just test-unit-tk
+
+  # ── macOS: Clang (ARM64, macOS 15) ─────────────────────────────────────────
+  short-tests-macos-15-arm:
+    name: Harness Unit Tests / macOS 15 (ARM)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-arm
+
+      - name: Run test suite
+        run: just test-unit-tk
+
+  # ── macOS: Clang (x86_64, macOS 26) ────────────────────────────────────────
+  short-tests-macos-26-intel:
+    name: Harness Unit Tests / macOS 26 (Intel)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-26-intel
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-intel
+
+      - name: Run test suite
+        run: just test-unit-tk
+
+  # ── macOS: Clang (ARM64, macOS 26) ─────────────────────────────────────────
+  short-tests-macos-26-arm:
+    name: Harness Unit Tests / macOS 26 (ARM)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-arm
+
+      - name: Run test suite
+        run: just test-unit-tk
+
+  # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
+  integration-tests-macos-15-intel:
+    name: Integration Tests / macOS 15 (Intel)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-intel
+
+      - name: Run integration tests
+        run: just test-integration-tk
+
+  # ── macOS: Clang (ARM64, macOS 15) ─────────────────────────────────────────
+  integration-tests-macos-15-arm:
+    name: Integration Tests / macOS 15 (ARM)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-arm
+
+      - name: Run integration tests
+        run: just test-integration-tk
+
+  # ── macOS: Clang (x86_64, macOS 26) ────────────────────────────────────────
+  integration-tests-macos-26-intel:
+    name: Integration Tests / macOS 26 (Intel)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-26-intel
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-intel
+
+      - name: Run integration tests
+        run: just test-integration-tk
+
+  # ── macOS: Clang (ARM64, macOS 26) ─────────────────────────────────────────
+  integration-tests-macos-26-arm:
+    name: Integration Tests / macOS 26 (ARM)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-arm
+
+      - name: Run integration tests
+        run: just test-integration-tk
+
   integration-tests-tk:
     name: Harness Integration Tests
     needs: detect-changes

@@ -111,24 +111,25 @@ fd_build_fd() {
   # Use gmake on macOS (GitHub Actions runners ship BSD make 3.81,
   # but Firedancer's GNUmakefile requires GNU make >= 3.82 for
   # the 'undefine' directive).
-  # Check all possible Homebrew prefixes since macOS runners vary.
+  # Check PATH first (via command -v) — this respects PATH modifications from setup actions.
+  # Use brew --prefix on macOS to find gmake regardless of Intel/ARM install location.
   local MAKE
   MAKE=""
   # Check PATH first (via command -v) — this respects PATH modifications from setup actions
   if command -v gmake >/dev/null 2>&1; then
     MAKE="$(command -v gmake)"
-  # Hardcoded Homebrew fallbacks for when PATH isn't set
-  elif [ -x /opt/homebrew/bin/gmake ]; then
-    MAKE="/opt/homebrew/bin/gmake"
-  elif [ -x /usr/local/homebrew/bin/gmake ]; then
-    MAKE="/usr/local/homebrew/bin/gmake"
+  # macOS fallback: use brew --prefix to find gmake (works on both Intel/ARM)
+  elif [ "${RUNNER_OS}" = "macOS" ] && command -v brew >/dev/null 2>&1; then
+    local HOMEBREW_BIN
+    HOMEBREW_BIN="$(brew --prefix)/bin"
+    if [ -x "${HOMEBREW_BIN}/gmake" ]; then
+      MAKE="${HOMEBREW_BIN}/gmake"
+    elif [ -x "${HOMEBREW_BIN}/make" ]; then
+      MAKE="${HOMEBREW_BIN}/make"
+    fi
+  # Fallback: try standard locations (older setups without brew --prefix on PATH)
   elif [ -x /usr/local/bin/gmake ]; then
     MAKE="/usr/local/bin/gmake"
-  # GNU make may be installed as 'make' on newer Homebrew (gmake formula removed)
-  elif [ -x /opt/homebrew/bin/make ]; then
-    MAKE="/opt/homebrew/bin/make"
-  elif [ -x /usr/local/homebrew/bin/make ]; then
-    MAKE="/usr/local/homebrew/bin/make"
   elif command -v make >/dev/null 2>&1; then
     MAKE="$(command -v make)"
   fi

@@ -13,6 +13,7 @@
 ///   defer log.exit("module", "func") catch {};
 ///   log.debug("module", "message") catch {};
 const std = @import("std");
+const util = @import("util");
 
 /// Log severity levels — matches OpenTelemetry/SLF4J.
 pub const Level = enum(u8) {
@@ -34,14 +35,8 @@ pub const Logger = struct {
     pub fn write(self: *Logger, level: Level, module: []const u8, func: []const u8, message: []const u8) !void {
         if (@intFromEnum(level) > @intFromEnum(self.level)) return;
 
-        // Monotonic nanosecond timestamp via clock_gettime (Linux)
-        const ts: i64 = blk: {
-            var ts_spec: std.os.linux.timespec = undefined;
-            if (std.os.linux.clock_gettime(std.os.linux.clockid_t.MONOTONIC, &ts_spec) == 0) {
-                break :blk @as(i64, ts_spec.sec) * 1_000_000_000 + ts_spec.nsec;
-            }
-            break :blk 0;
-        };
+        // Monotonic nanosecond timestamp via os.c shim (cross-platform)
+        const ts: i64 = util.os_api.monotonicNanos();
 
         // Format: {ts} {LEVEL} [{module}] {func}: {message}
         var buf: [512]u8 = undefined;
@@ -55,9 +50,8 @@ pub const Logger = struct {
         else
             try std.fmt.bufPrint(&buf, "{d} {s} [{s}] {s}\n", .{ ts, level_str, module, func });
 
-        // Write to stderr (fd 2) using Linux syscall
-        const len = std.os.linux.write(2, line.ptr, line.len);
-        _ = len; // ignore partial writes — best-effort logging
+        // Write to stderr (fd 2) via os.c shim (cross-platform)
+        _ = util.os_api.write(2, line);
     }
 
     /// Log at panic level (always enabled).

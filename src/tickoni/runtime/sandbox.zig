@@ -15,9 +15,32 @@
 /// path when namespaces are unavailable, never escalating privileges) is
 /// scoped to a future V1.21 support-tier story. See
 /// doc/strategy/roadmap/stories/v2.14.md's v2.14.S8.T5 entry.
+const builtin = @import("builtin");
 const std = @import("std");
 const util = @import("util");
 const sandbox_defaults = util.sandbox_defaults;
+
+/// Process-mode sandbox policy tier. v2.14 keeps the retail/consumer path on
+/// explicit `none` across every platform: no sudo, no capabilities, and no
+/// namespace dependency. A future Linux-only support tier can add a real
+/// namespace sandbox mode without changing macOS semantics.
+pub const SandboxMode = enum {
+    none,
+    linux_namespaces,
+};
+
+pub fn defaultProcessModeForOs(os_tag: std.Target.Os.Tag) SandboxMode {
+    _ = os_tag;
+    return .none;
+}
+
+pub fn defaultProcessMode() SandboxMode {
+    return defaultProcessModeForOs(builtin.os.tag);
+}
+
+pub fn processModeUsesSandbox(mode: SandboxMode) bool {
+    return mode != .none;
+}
 
 /// Configuration for entering a tile sandbox via c_abi.sandbox.enter.
 /// Defaults are the most restrictive safe values.
@@ -34,6 +57,21 @@ pub const SandboxConfig = struct {
     rlimit_data: u64 = sandbox_defaults.rlimit_data,
     rlimit_nproc: u64 = 0,
 };
+
+test "default process mode is explicit none on this build" {
+    try std.testing.expectEqual(SandboxMode.none, defaultProcessMode());
+    try std.testing.expect(!processModeUsesSandbox(defaultProcessMode()));
+}
+
+test "macOS process mode remains none" {
+    try std.testing.expectEqual(SandboxMode.none, defaultProcessModeForOs(.macos));
+    try std.testing.expect(!processModeUsesSandbox(defaultProcessModeForOs(.macos)));
+}
+
+test "linux process mode stays none until a future support-tier story wires namespaces" {
+    try std.testing.expectEqual(SandboxMode.none, defaultProcessModeForOs(.linux));
+    try std.testing.expect(!processModeUsesSandbox(defaultProcessModeForOs(.linux)));
+}
 
 test "SandboxConfig defaults are least-privilege" {
     const cfg = SandboxConfig{};
