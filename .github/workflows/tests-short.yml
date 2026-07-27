@@ -50,7 +50,7 @@ jobs:
         run: just test-unit-tk
 
       - name: Run deterministic demo CLI conformance suite
-        run: just test-cli-tk
+        run: just test-demo-tk
 
   # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
   short-tests-macos-15-intel:
@@ -78,7 +78,7 @@ jobs:
         run: just test-unit-tk
 
       - name: Run deterministic demo CLI conformance suite
-        run: just test-cli-tk
+        run: just test-demo-tk
 
   # ── macOS: Clang (ARM64, macOS 15) ─────────────────────────────────────────
   short-tests-macos-15-arm:
@@ -106,7 +106,7 @@ jobs:
         run: just test-unit-tk
 
       - name: Run deterministic demo CLI conformance suite
-        run: just test-cli-tk
+        run: just test-demo-tk
 
   # ── macOS: Clang (x86_64, macOS 26) ────────────────────────────────────────
   short-tests-macos-26-intel:
@@ -134,7 +134,7 @@ jobs:
         run: just test-unit-tk
 
       - name: Run deterministic demo CLI conformance suite
-        run: just test-cli-tk
+        run: just test-demo-tk
 
   # ── macOS: Clang (ARM64, macOS 26) ─────────────────────────────────────────
   short-tests-macos-26-arm:
@@ -162,7 +162,7 @@ jobs:
         run: just test-unit-tk
 
       - name: Run deterministic demo CLI conformance suite
-        run: just test-cli-tk
+        run: just test-demo-tk
 
   # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
   integration-tests-macos-15-intel:
