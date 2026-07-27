@@ -167,6 +167,7 @@ The runtime must preserve strict control over high-volume events such as:
 | [`doc/knowledge/architecture.md`](../knowledge/architecture.md) | System layers, runtime model, event path, attached systems, audit/replay architecture | Product backlog sequencing |
 | [`doc/knowledge/tile-topology.md`](../knowledge/tile-topology.md) | Tile IDs, tile ownership, topology, reuse boundary, validator-tile replacement decisions | Product backlog, roadmap sequencing, WBS tasks |
 | [`doc/knowledge/platform-tiers.md`](../knowledge/platform-tiers.md) | Official runtime support tiers, workflow-to-tier mapping, degraded-guarantee definitions, visibility rules | Tier implementation (S3), CaseOps integration (S7), or testing per tier |
+| [`doc/execution/retail-runtime-support.md`](../execution/retail-runtime-support.md) | Canonical retail runtime trust surface: supported binaries, install/update/uninstall paths, storage locations, manual verification, privacy defaults, unsupported features | Tier definitions themselves, low-level topology ownership, or release-signing claims that do not exist |
 | [`doc/execution/tile-delivery-status.md`](../execution/tile-delivery-status.md) | Current topology implementation facts, link table, readiness prerequisites, synchronization debt, completion gate | Architecture or tile ownership |
 
 ## Product Operating Model
