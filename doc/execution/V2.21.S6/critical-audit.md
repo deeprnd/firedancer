@@ -113,19 +113,9 @@ The comparator is now exercised by the product command path instead of existing 
 
 ### 4. Important new test files are not all wired into the canonical Zig test lane
 
-`build.zig` defines modules for:
+**Status:** DONE
 
-- `demo_diagnostic`
-- `demo_conformance`
-- `demo_runner`
-- `demo_substitution`
-
-But the explicit `b.addTest(...)` wiring visible in the canonical test step clearly includes:
-
-- `src/tickoni/demo/manifest.zig`
-- `src/tickoni/demo/preflight.zig`
-
-and does **not** clearly add dedicated canonical test binaries for:
+`build.zig` now wires dedicated canonical test binaries for the new demo modules:
 
 - `src/tickoni/demo/diagnostic.zig`
 - `src/tickoni/demo/conformance.zig`
@@ -133,9 +123,7 @@ and does **not** clearly add dedicated canonical test binaries for:
 - `src/tickoni/demo/runner.zig`
 - `src/tickoni/demo/substitution.zig`
 
-Those files contain tests, but they are not all obviously part of the normal `zig build test` lane from the aggregate wiring inspected here.
-
-That weakens the claim that the branch is fully covered by the standard unit lane.
+Verified by rerunning `just test-unit-tk`, which now executes these roots inside the normal `zig build ... test --summary all` lane.
 
 ### 5. CI coverage is only partially wired
 
