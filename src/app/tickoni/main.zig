@@ -318,7 +318,7 @@ fn cmdDemo(init: std.process.Init, demo_cmd: demo_cli.Command) !void {
     defer version_info.deinit(init.gpa);
 
     // Run preflight — fail-closed
-    const preflight_result = demo_preflight.run(
+    const preflight_result = demo_preflight.evaluate(
         init.gpa,
         init.io,
         m,
@@ -334,6 +334,13 @@ fn cmdDemo(init: std.process.Init, demo_cmd: demo_cli.Command) !void {
         std.process.exit(1);
     };
     defer demo_preflight.deinit(preflight_result, init.gpa);
+    if (!preflight_result.passed) {
+        var stderr_buffer: [4096]u8 = undefined;
+        var stderr_writer = std.Io.File.stderr().writer(init.io, &stderr_buffer);
+        try demo_preflight.formatFailure(preflight_result, &stderr_writer.interface);
+        try stderr_writer.flush();
+        std.process.exit(1);
+    }
 
     const scenarios = [_]demo_substitution.Scenario{
         .allowed,
