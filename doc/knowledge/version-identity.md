@@ -18,6 +18,14 @@ No runtime dependency on git. Release builds carry the tag; local dev builds car
 
 ### Version output format (T5)
 
+Command:
+
+```bash
+tickoni --version
+```
+
+Expected output shape:
+
 ```
 Tickoni 0.1.1
 Build ID: tk-20260721-a3f2c9d
@@ -87,6 +95,13 @@ Preflight failure: runtime tier mismatch
 ```
 
 ## 4. `tickoni doctor` Design
+
+Command:
+
+```bash
+tickoni doctor --plain
+tickoni doctor --json
+```
 
 ### Check categories
 
@@ -195,7 +210,7 @@ CLI (tickoni/main.zig) ──► all modules
 ## 9. Testing Strategy
 
 - Unit tests: every function in every new module (hardcoded returns for scaffold).
-- CLI tests: `tickoni --version` output format, `tickoni doctor` output format.
+- CLI tests: `tickoni --version` output format, `tickoni doctor --plain`, and `tickoni doctor --json` output format.
 - Integration tests: valid manifest parse + preflight pass, invalid manifest parse fail,
   preflight mismatch fail-closed (no artifacts).
 - Audit/replay tests: metadata fields present in JSONL output, replay includes metadata.
@@ -207,6 +222,6 @@ CLI (tickoni/main.zig) ──► all modules
 | Version source of truth | Build-time env vars (BUILD_VERSION, BUILD_GIT_SHA, BUILD_ID) injected by `build.zig` |
 | Manifest format | JSON (Zig `std.json` built-in, no external deps) |
 | Isolation tier derivation | Mapped from runtime tier: linux_full→full, macos_retail→retail, windows_retail→retail, unsupported→degraded |
-| Doctor check scope | Platform-relevant only — no Firedancer tile internals, no internal telemetry |
+| Doctor check scope | Platform-relevant only — no Firedancer tile internals, no internal telemetry; command lives on `tickoni` |
 | Version semver format | Strict semver 2.0.0 validation (MAJOR.MINOR.PATCH-prerelease+metadata) |
 | Manifest file path | `~/.tickoni/demos/<name>/manifest.json` or CLI-specified `--manifest <path>` |
