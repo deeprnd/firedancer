@@ -30,7 +30,7 @@ The branch removed the old llama/system-demo shape from the CLI verification pat
 Evidence:
 
 - `contrib/test/run_cli_demo_tests.sh`
-- `justfile` `demo-tk`
+- `justfile` `test-demo-tk`
 - `src/app/tickoni/main.zig`
 - `src/tickoni/demo/substitution.zig`
 
@@ -129,7 +129,7 @@ Verified by rerunning `just test-unit-tk`, which now executes these roots inside
 
 **Status:** DONE
 
-The short-test workflow now runs `just test-cli-tk` on the full visible short-test matrix covered by this workflow:
+The short-test workflow now runs `just test-demo-tk` on the full visible short-test matrix covered by this workflow:
 
 - Linux
 - macOS 15 Intel
@@ -231,5 +231,5 @@ The branch is close in direction, but it is not yet coherent and complete enough
 2. Ensure blocked-flow diagnostic codes map to real runtime failure paths, not just type definitions.
 3. Add canonical `build.zig` test wiring for all new demo modules with embedded tests.
 4. Extend CLI verification to cover the missing negative-path contracts explicitly.
-5. Wire `just test-cli-tk` across the intended macOS matrix consistently.
+5. Wire `just test-demo-tk` across the intended macOS matrix consistently.
 6. Split unrelated engine/memlock work out of the S6 review branch or PR.

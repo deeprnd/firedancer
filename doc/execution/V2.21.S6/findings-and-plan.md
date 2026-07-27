@@ -315,8 +315,7 @@ Need explicit checks/tests that prove:
 S6 needs one final supported public surface for:
 
 - `tickoni demo ...`
-- `just demo-tk`
-- `just test-cli-tk`
+- `just test-demo-tk`
 - any S6-specific fixture or comparison recipes
 
 Files that must be reconciled together:
@@ -663,7 +662,7 @@ zig-out/bin/tickoni demo investment --json --manifest src/tickoni/demo/fixtures/
 **Verification commands:**
 ```bash
 just test-integration-tk
-just test-cli-tk
+just test-demo-tk
 ```
 
 **Expected result:**
@@ -752,15 +751,13 @@ zig-out/bin/tickoni demo investment --json --manifest src/tickoni/demo/fixtures/
 **Edit:** `justfile`
 
 **Required edits:**
-- update `demo-tk` to call the final CLI contract
-- update `test-cli-tk` or add a narrower S6-specific recipe if needed
+- unify the deterministic public demo surface under `test-demo-tk`
 - add a dedicated comparison recipe if S6 needs one, e.g.
   `test-conformance-tk`
 
 **Verification commands:**
 ```bash
-just demo-tk
-just test-cli-tk
+just test-demo-tk
 ```
 
 **Expected result:**
@@ -808,7 +805,7 @@ bash contrib/test/run_cli_demo_tests.sh
 ```bash
 just test-unit-tk
 just test-integration-tk
-just test-cli-tk
+just test-demo-tk
 ```
 
 **Expected result:**
@@ -842,7 +839,7 @@ python3 - <<'PY'
 import yaml, pathlib
 print('YAML_OK' if yaml.safe_load(pathlib.Path('.github/workflows/tests-short.yml').read_text()) is not None else 'YAML_EMPTY')
 PY
-rg -n "demo-conformance|upload-artifact|download-artifact|compare_demo_conformance|export_demo_conformance_bundle|test-cli-tk" .github/workflows/tests-short.yml
+rg -n "demo-conformance|upload-artifact|download-artifact|compare_demo_conformance|export_demo_conformance_bundle|test-demo-tk" .github/workflows/tests-short.yml
 ```
 
 **Expected result:**
@@ -892,10 +889,10 @@ should be:
 zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 just test-unit-tk
 just test-integration-tk
-just test-cli-tk
+just test-demo-tk
 just quality-check-all
 just security-check-all
-just demo-tk
+just test-demo-tk
 zig-out/bin/tickoni-supervisor doctor --json
 zig-out/bin/tickoni-supervisor demo investment --json --manifest src/tickoni/demo/fixtures/demo.manifest.json
 ```
@@ -903,7 +900,7 @@ zig-out/bin/tickoni-supervisor demo investment --json --manifest src/tickoni/dem
 If CI wiring is added in the same change, also verify the workflow references:
 
 ```bash
-rg -n "macos|demo-tk|test-cli-tk|test-integration-tk|conformance" .github/workflows
+rg -n "macos|test-demo-tk|test-integration-tk|conformance" .github/workflows
 ```
 
 ## Definition Of Done For This File's Plan
