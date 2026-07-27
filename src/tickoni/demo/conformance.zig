@@ -1,5 +1,5 @@
 const std = @import("std");
-const diagnostic = @import("diagnostic.zig");
+const diagnostic = @import("diagnostic");
 
 pub const ReplayResult = struct {
     replay_match: bool,

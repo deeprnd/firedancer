@@ -1,5 +1,5 @@
 const std = @import("std");
-const conformance = @import("conformance.zig");
+const conformance = @import("conformance");
 
 pub const Mismatch = struct {
     field: []const u8,
