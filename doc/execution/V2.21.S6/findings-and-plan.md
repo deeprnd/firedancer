@@ -431,6 +431,8 @@ rg -n "macOS retail path" doc/strategy/roadmap/stories/v2.21-s6.md
 
 #### 2. Freeze the supported S6 CLI contract
 
+**Status:** DONE
+
 **Edit:** `src/app/tickoni/main.zig`
 
 **Decide and implement one public surface. Recommended:**

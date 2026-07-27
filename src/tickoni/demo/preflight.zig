@@ -139,7 +139,7 @@ pub fn run(
 
     // 3. Isolation tier check
     {
-        const iso = if (m.required_isolation_tier) |t| t else "retail";
+        const iso = m.requiredIsolationTierFor(installed_runtime_tier) orelse "retail";
         const matches = std.mem.eql(u8, installed_isolation_tier, iso);
         try checks.append(allocator, Check{
             .name = "isolation_tier",
@@ -245,7 +245,7 @@ pub fn run(
         var mw: usize = 0;
         var first = true;
         for (m.required_fixtures) |fixture| {
-            const fixture_path = std.mem.join(allocator, "/", &.{ fixture_root, fixture, ".json" }) catch return PreflightError.OutOfMemory;
+            const fixture_path = std.fmt.allocPrint(allocator, "{s}/{s}.json", .{ fixture_root, fixture }) catch return PreflightError.OutOfMemory;
             const exists = blk: {
                 std.Io.Dir.access(cwd, io, fixture_path, .{}) catch break :blk false;
                 break :blk true;
@@ -328,81 +328,17 @@ pub fn deinit(result: PreflightResult, allocator: std.mem.Allocator) void {
 }
 
 /// Load a manifest JSON file from disk.
-pub fn loadManifest(allocator: Allocator, io: Io, cwd: std.Io.Dir, path: []const u8) ManifestLoadError!*Manifest {
-    const raw = cwd.readFileAlloc(io, path, allocator, .limited(64 * 1024)) catch return ManifestLoadError.FileNotFound;
-    defer allocator.free(raw);
-    const content = raw;
+pub const ManifestLoadError = demo_manifest.Error;
 
-    return try parseManifestJson(allocator, content);
+pub fn loadManifest(allocator: Allocator, io: Io, cwd: std.Io.Dir, path: []const u8) ManifestLoadError!*Manifest {
+    return demo_manifest.loadManifest(allocator, cwd, io, path);
 }
 
 /// Free a parsed Manifest.
 pub fn deinitManifest(m: *Manifest, gpa: Allocator) void {
     m.deinit(gpa);
+    gpa.destroy(m);
 }
-
-/// Internal JSON-compatible struct for manifest deserialization.
-const ManifestJson = struct {
-    min_tickoni_version: []const u8 = "0.0.0",
-    supported_runtime_tiers: []const []const u8 = &[_][]const u8{},
-    required_isolation_tier: []const u8 = "retail",
-    expected_no_live_effect: bool = true,
-    replay_schema_version: []const u8 = "0.0.0",
-    policy_schema_version: []const u8 = "0.0.0",
-    required_fixtures: []const []const u8 = &[_][]const u8{},
-};
-
-/// Parse a Manifest from JSON text.
-fn parseManifestJson(allocator: Allocator, text: []const u8) ManifestLoadError!*Manifest {
-    const j = std.json.parseFromSlice(
-        ManifestJson,
-        allocator,
-        text,
-        .{ .ignore_unknown_fields = true },
-    ) catch return ManifestLoadError.InvalidJson;
-    defer j.deinit();
-
-    const m = try allocator.create(Manifest);
-    errdefer allocator.destroy(m);
-
-    var tiers: std.ArrayList([]const u8) = .empty;
-    errdefer {
-        for (tiers.items) |t| allocator.free(t);
-        tiers.deinit(allocator);
-    }
-    for (j.value.supported_runtime_tiers) |t| {
-        try tiers.append(allocator, try allocator.dupe(u8, t));
-    }
-
-    var fixtures: std.ArrayList([]const u8) = .empty;
-    errdefer {
-        for (fixtures.items) |f| allocator.free(f);
-        fixtures.deinit(allocator);
-    }
-    for (j.value.required_fixtures) |f| {
-        try fixtures.append(allocator, try allocator.dupe(u8, f));
-    }
-
-    m.* = Manifest{
-        .min_tickoni_version = try allocator.dupe(u8, j.value.min_tickoni_version),
-        .supported_runtime_tiers = try tiers.toOwnedSlice(allocator),
-        .required_isolation_tier = try allocator.dupe(u8, j.value.required_isolation_tier),
-        .expected_no_live_effect = j.value.expected_no_live_effect,
-        .replay_schema_version = try allocator.dupe(u8, j.value.replay_schema_version),
-        .policy_schema_version = try allocator.dupe(u8, j.value.policy_schema_version),
-        .required_fixtures = try fixtures.toOwnedSlice(allocator),
-    };
-    errdefer deinitManifest(m);
-
-    return m;
-}
-
-pub const ManifestLoadError = error{
-    FileNotFound,
-    InvalidJson,
-    MissingField,
-    OutOfMemory,
-};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -529,4 +465,21 @@ test "fixtures check detects missing fixtures" {
     const io = std.testing.io;
     const cwd = std.Io.Dir.cwd();
     try std.testing.expectError(PreflightError.PreflightFailed, run(gpa, io, &m, cwd, "0.1.0", "linux_full", "retail", "/tmp/fixtures"));
+}
+
+test "per-tier isolation requirement lets linux_full require full" {
+    var m = demo_manifest.Manifest{
+        .min_tickoni_version = "0.1.0",
+        .supported_runtime_tiers = &.{ "linux_full", "macos_retail" },
+        .required_isolation_tier = "retail",
+        .required_isolation_by_tier = .{
+            .linux_full = "full",
+            .macos_retail = "retail",
+        },
+        .expected_no_live_effect = true,
+        .required_fixtures = &[_][]const u8{},
+    };
+    const result = try run(std.testing.allocator, std.testing.io, &m, std.Io.Dir.cwd(), "0.1.0", "linux_full", "full", "/tmp/fixtures");
+    defer deinit(result, std.testing.allocator);
+    try std.testing.expect(result.passed);
 }

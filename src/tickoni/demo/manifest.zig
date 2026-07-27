@@ -33,6 +33,46 @@ pub const validTierLabels = [_][]const u8{ "linux_full", "macos_retail", "window
 /// Valid isolation tier labels.
 pub const validIsolationTiers = [_][]const u8{ "full", "retail", "degraded" };
 
+/// Optional per-tier isolation requirements. Use this when one manifest supports
+/// several runtime tiers that intentionally differ in isolation guarantees.
+pub const RequiredIsolationByTier = struct {
+    linux_full: ?[]const u8 = null,
+    macos_retail: ?[]const u8 = null,
+    windows_retail: ?[]const u8 = null,
+    unsupported: ?[]const u8 = null,
+
+    pub fn deinit(self: *RequiredIsolationByTier, gpa: std.mem.Allocator) void {
+        if (self.linux_full) |s| gpa.free(s);
+        if (self.macos_retail) |s| gpa.free(s);
+        if (self.windows_retail) |s| gpa.free(s);
+        if (self.unsupported) |s| gpa.free(s);
+        self.* = .{};
+    }
+
+    pub fn validate(self: *const RequiredIsolationByTier) Error!void {
+        inline for (.{ self.linux_full, self.macos_retail, self.windows_retail, self.unsupported }) |maybe_iso| {
+            if (maybe_iso) |iso| {
+                if (!isValidIsolationTier(iso)) return Error.InvalidTier;
+            }
+        }
+    }
+
+    pub fn hasAny(self: *const RequiredIsolationByTier) bool {
+        return self.linux_full != null or
+            self.macos_retail != null or
+            self.windows_retail != null or
+            self.unsupported != null;
+    }
+
+    pub fn forTier(self: *const RequiredIsolationByTier, tier: []const u8) ?[]const u8 {
+        if (std.mem.eql(u8, tier, "linux_full")) return self.linux_full;
+        if (std.mem.eql(u8, tier, "macos_retail")) return self.macos_retail;
+        if (std.mem.eql(u8, tier, "windows_retail")) return self.windows_retail;
+        if (std.mem.eql(u8, tier, "unsupported")) return self.unsupported;
+        return null;
+    }
+};
+
 /// Check if a string is a valid tier label.
 fn isValidTierLabel(s: []const u8) bool {
     for (validTierLabels) |t| {
@@ -88,6 +128,7 @@ pub const Manifest = struct {
     min_tickoni_version: ?[]const u8 = null,
     supported_runtime_tiers: []const []const u8 = &[_][]const u8{},
     required_isolation_tier: ?[]const u8 = null,
+    required_isolation_by_tier: RequiredIsolationByTier = .{},
     required_fixtures: []const []const u8 = &[_][]const u8{},
     replay_schema_version: ?[]const u8 = null,
     policy_schema_version: ?[]const u8 = null,
@@ -104,6 +145,7 @@ pub const Manifest = struct {
         self.supported_runtime_tiers = &[_][]const u8{};
         if (self.required_isolation_tier) |s| gpa.free(s);
         self.required_isolation_tier = null;
+        self.required_isolation_by_tier.deinit(gpa);
         for (self.required_fixtures) |f| gpa.free(f);
         gpa.free(self.required_fixtures);
         self.required_fixtures = &[_][]const u8{};
@@ -133,6 +175,7 @@ pub const Manifest = struct {
         if (self.required_isolation_tier) |tier| {
             if (!isValidIsolationTier(tier)) return Error.InvalidTier;
         }
+        try self.required_isolation_by_tier.validate();
 
         // Validate semver fields (skip null/0.0.0 defaults)
         if (self.replay_schema_version) |v| {
@@ -166,6 +209,21 @@ pub const Manifest = struct {
     pub fn requiresNoLiveEffect(self: *const Manifest) bool {
         return self.expected_no_live_effect;
     }
+
+    /// Return the required isolation tier for a specific runtime tier. Uses the
+    /// per-tier override first and falls back to the legacy one-size-fits-all
+    /// field when no per-tier entry exists.
+    pub fn requiredIsolationTierFor(self: *const Manifest, runtime_tier: []const u8) ?[]const u8 {
+        return self.required_isolation_by_tier.forTier(runtime_tier) orelse self.required_isolation_tier;
+    }
+};
+
+/// JSON-compatible struct for per-tier isolation requirements.
+const RequiredIsolationByTierJson = struct {
+    linux_full: ?[]const u8 = null,
+    macos_retail: ?[]const u8 = null,
+    windows_retail: ?[]const u8 = null,
+    unsupported: ?[]const u8 = null,
 };
 
 /// JSON-compatible struct for manifest deserialization.
@@ -173,6 +231,7 @@ const ManifestJson = struct {
     min_tickoni_version: ?[]const u8 = null,
     supported_runtime_tiers: []const []const u8 = &[_][]const u8{},
     required_isolation_tier: ?[]const u8 = null,
+    required_isolation_by_tier: RequiredIsolationByTierJson = .{},
     expected_no_live_effect: bool = true,
     replay_schema_version: ?[]const u8 = null,
     policy_schema_version: ?[]const u8 = null,
@@ -186,7 +245,10 @@ pub fn loadManifest(gpa: std.mem.Allocator, cwd: std.Io.Dir, io: std.Io, path: [
     // Read file contents
     const raw = cwd.readFileAlloc(io, path, gpa, .limited(64 * 1024)) catch return Error.FileError;
     defer gpa.free(raw);
+    return parseManifestJson(gpa, raw);
+}
 
+fn parseManifestJson(gpa: std.mem.Allocator, raw: []const u8) Error!*Manifest {
     // Parse JSON
     const json_value = std.json.parseFromSlice(
         ManifestJson,
@@ -204,8 +266,13 @@ pub fn loadManifest(gpa: std.mem.Allocator, cwd: std.Io.Dir, io: std.Io, path: [
     // Required field: supported_runtime_tiers
     if (j.supported_runtime_tiers.len == 0) return Error.MissingField;
 
-    // Required field: required_isolation_tier
-    const iso_tier = j.required_isolation_tier orelse return Error.MissingField;
+    // Required field: required_isolation_tier or required_isolation_by_tier
+    const has_per_tier_isolation =
+        j.required_isolation_by_tier.linux_full != null or
+        j.required_isolation_by_tier.macos_retail != null or
+        j.required_isolation_by_tier.windows_retail != null or
+        j.required_isolation_by_tier.unsupported != null;
+    if (j.required_isolation_tier == null and !has_per_tier_isolation) return Error.MissingField;
 
     // Allocate tier list
     var tier_list: std.ArrayList([]const u8) = .empty;
@@ -250,8 +317,21 @@ pub fn loadManifest(gpa: std.mem.Allocator, cwd: std.Io.Dir, io: std.Io, path: [
     const min_ver_dup = try gpa.dupe(u8, min_ver);
     errdefer gpa.free(min_ver_dup);
 
-    const iso_tier_dup = try gpa.dupe(u8, iso_tier);
-    errdefer gpa.free(iso_tier_dup);
+    const iso_tier_dup = if (j.required_isolation_tier) |iso_tier|
+        try gpa.dupe(u8, iso_tier)
+    else
+        null;
+    errdefer if (iso_tier_dup) |s| gpa.free(s);
+
+    var iso_by_tier = RequiredIsolationByTier{};
+    iso_by_tier.linux_full = if (j.required_isolation_by_tier.linux_full) |v| try gpa.dupe(u8, v) else null;
+    errdefer if (iso_by_tier.linux_full) |s| gpa.free(s);
+    iso_by_tier.macos_retail = if (j.required_isolation_by_tier.macos_retail) |v| try gpa.dupe(u8, v) else null;
+    errdefer if (iso_by_tier.macos_retail) |s| gpa.free(s);
+    iso_by_tier.windows_retail = if (j.required_isolation_by_tier.windows_retail) |v| try gpa.dupe(u8, v) else null;
+    errdefer if (iso_by_tier.windows_retail) |s| gpa.free(s);
+    iso_by_tier.unsupported = if (j.required_isolation_by_tier.unsupported) |v| try gpa.dupe(u8, v) else null;
+    errdefer if (iso_by_tier.unsupported) |s| gpa.free(s);
 
     const m = try gpa.create(Manifest);
     errdefer gpa.destroy(m);
@@ -260,6 +340,7 @@ pub fn loadManifest(gpa: std.mem.Allocator, cwd: std.Io.Dir, io: std.Io, path: [
         .min_tickoni_version = min_ver_dup,
         .supported_runtime_tiers = try tier_list.toOwnedSlice(gpa),
         .required_isolation_tier = iso_tier_dup,
+        .required_isolation_by_tier = iso_by_tier,
         .required_fixtures = try fixture_list.toOwnedSlice(gpa),
         .replay_schema_version = replay_ver,
         .policy_schema_version = policy_ver,
@@ -425,4 +506,45 @@ test "parseSemver accepts single-number schema versions" {
     try parseSemver("1");
     try parseSemver("2");
     try parseSemver("100");
+}
+
+test "Manifest.requiredIsolationTierFor returns per-tier requirement when configured" {
+    var m = Manifest{
+        .required_isolation_tier = "retail",
+        .required_isolation_by_tier = .{
+            .linux_full = "full",
+            .macos_retail = "retail",
+        },
+    };
+    try std.testing.expectEqualStrings("full", m.requiredIsolationTierFor("linux_full").?);
+    try std.testing.expectEqualStrings("retail", m.requiredIsolationTierFor("macos_retail").?);
+    try std.testing.expectEqualStrings("retail", m.requiredIsolationTierFor("windows_retail").?);
+}
+
+test "loadManifest parses required_isolation_by_tier JSON" {
+    const gpa = std.testing.allocator;
+    const json =
+        \\{
+        \\  "demo_manifest_version": "1.0.0",
+        \\  "min_tickoni_version": "0.1.0",
+        \\  "supported_runtime_tiers": ["linux_full", "macos_retail"],
+        \\  "required_isolation_by_tier": {
+        \\    "linux_full": "full",
+        \\    "macos_retail": "retail"
+        \\  },
+        \\  "required_fixtures": ["investment_sample"],
+        \\  "replay_schema_version": "2",
+        \\  "policy_schema_version": "2",
+        \\  "expected_no_live_effect": true
+        \\}
+    ;
+
+    const m = try parseManifestJson(gpa, json);
+    defer {
+        m.deinit(gpa);
+        gpa.destroy(m);
+    }
+
+    try std.testing.expectEqualStrings("full", m.requiredIsolationTierFor("linux_full").?);
+    try std.testing.expectEqualStrings("retail", m.requiredIsolationTierFor("macos_retail").?);
 }
