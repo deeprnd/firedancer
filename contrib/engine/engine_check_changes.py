@@ -166,7 +166,7 @@ def main() -> int:
             "FAIL: watched Firedancer harness files have changed since the last "
             "snapshot.\n"
             "Review the changes and port them into Tickoni, then run:\n"
-            "  python3 contrib/engine/engine_check_changes.py --update\n",
+            "  python3 contrib/engine/engine_check_check_changes.py --update\n",
             file=sys.stderr,
         )
         for d in diffs:
