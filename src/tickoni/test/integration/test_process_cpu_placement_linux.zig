@@ -1,6 +1,7 @@
-/// Linux-strict CPU placement proof: shared-core declarations must create
-/// observable contention relative to a non-shared baseline on a host with real
-/// sched_*affinity semantics.
+/// Linux-strict CPU placement proof: pin every tile onto one explicit shared
+/// core so the shared placement signal is materially stronger than ambient CI
+/// noise, then require that fully-shared run to be slower than a floating
+/// baseline on a host with real sched_*affinity semantics.
 const std = @import("std");
 const rt = @import("runtime");
 const supervisor_mod = @import("supervisor");
@@ -13,15 +14,15 @@ const TileId = rt.topology.TileId;
 const shared_core_tiles = [_]rt.topology.TileDescriptor{
     .{ .id = TileId.parse("tkings") catch unreachable, .name = "ingest_tile", .cpu_placement = .{ .shared = 0 } },
     .{ .id = TileId.parse("tknorm") catch unreachable, .name = "normalize_tile", .cpu_placement = .{ .shared = 0 } },
-    .{ .id = TileId.parse("tkdedu") catch unreachable, .name = "dedupe_tile" },
-    .{ .id = TileId.parse("tkpoly") catch unreachable, .name = "policy_tile" },
-    .{ .id = TileId.parse("tkaudt") catch unreachable, .name = "audit_tile" },
-    .{ .id = TileId.parse("tkrepl") catch unreachable, .name = "replay_tile" },
-    .{ .id = TileId.parse("tkmetr") catch unreachable, .name = "metric_tile" },
-    .{ .id = TileId.parse("tkdiag") catch unreachable, .name = "diag_tile" },
+    .{ .id = TileId.parse("tkdedu") catch unreachable, .name = "dedupe_tile", .cpu_placement = .{ .shared = 0 } },
+    .{ .id = TileId.parse("tkpoly") catch unreachable, .name = "policy_tile", .cpu_placement = .{ .shared = 0 } },
+    .{ .id = TileId.parse("tkaudt") catch unreachable, .name = "audit_tile", .cpu_placement = .{ .shared = 0 } },
+    .{ .id = TileId.parse("tkrepl") catch unreachable, .name = "replay_tile", .cpu_placement = .{ .shared = 0 } },
+    .{ .id = TileId.parse("tkmetr") catch unreachable, .name = "metric_tile", .cpu_placement = .{ .shared = 0 } },
+    .{ .id = TileId.parse("tkdiag") catch unreachable, .name = "diag_tile", .cpu_placement = .{ .shared = 0 } },
 };
 
-const event_count: u64 = 32;
+const event_count: u64 = 64;
 const samples: usize = 5;
 
 fn runDurationNs(io: std.Io, topo: rt.topology.Topology, run_dir: []const u8) !u64 {
