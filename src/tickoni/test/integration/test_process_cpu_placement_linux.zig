@@ -22,7 +22,7 @@ const shared_core_tiles = [_]rt.topology.TileDescriptor{
 };
 
 const event_count: u64 = 32;
-const samples: usize = 3;
+const samples: usize = 5;
 
 fn runDurationNs(io: std.Io, topo: rt.topology.Topology, run_dir: []const u8) !u64 {
     var sup = try Supervisor.init(std.testing.allocator, topo);
@@ -56,37 +56,39 @@ fn runDurationNs(io: std.Io, topo: rt.topology.Topology, run_dir: []const u8) !u
     return elapsed_ns;
 }
 
-fn median3(values: [samples]u64) u64 {
+fn median(values: [samples]u64) u64 {
     var copy = values;
     std.sort.pdq(u64, &copy, {}, std.sort.asc(u64));
-    return copy[1];
+    return copy[samples / 2];
 }
 
 test "process_cpu_placement_linux: shared-core contention is slower than a floating baseline" {
-    var floating_runs: [samples]u64 = undefined;
-    inline for (0..samples) |i| {
-        var tmp = std.testing.tmpDir(.{});
-        defer tmp.cleanup();
-        var path_buf: [std.fs.max_path_bytes]u8 = undefined;
-        const len = try tmp.dir.realPath(std.testing.io, &path_buf);
-        floating_runs[i] = try runDurationNs(std.testing.io, topologies.paymentPipelineProcess(), path_buf[0..len]);
-    }
-
+    // Interleave floating and shared samples so transient host noise hits both
+    // placement modes in the same phase, then take a median over five runs to
+    // keep one slow ambient outlier from flipping the proof.
     const shared_topo = rt.topology.Topology{
         .tiles = &shared_core_tiles,
         .channels = topologies.paymentPipelineProcess().channels,
     };
+
+    var floating_runs: [samples]u64 = undefined;
     var shared_runs: [samples]u64 = undefined;
     inline for (0..samples) |i| {
-        var tmp = std.testing.tmpDir(.{});
-        defer tmp.cleanup();
-        var path_buf: [std.fs.max_path_bytes]u8 = undefined;
-        const len = try tmp.dir.realPath(std.testing.io, &path_buf);
-        shared_runs[i] = try runDurationNs(std.testing.io, shared_topo, path_buf[0..len]);
+        var floating_tmp = std.testing.tmpDir(.{});
+        defer floating_tmp.cleanup();
+        var floating_path_buf: [std.fs.max_path_bytes]u8 = undefined;
+        const floating_len = try floating_tmp.dir.realPath(std.testing.io, &floating_path_buf);
+        floating_runs[i] = try runDurationNs(std.testing.io, topologies.paymentPipelineProcess(), floating_path_buf[0..floating_len]);
+
+        var shared_tmp = std.testing.tmpDir(.{});
+        defer shared_tmp.cleanup();
+        var shared_path_buf: [std.fs.max_path_bytes]u8 = undefined;
+        const shared_len = try shared_tmp.dir.realPath(std.testing.io, &shared_path_buf);
+        shared_runs[i] = try runDurationNs(std.testing.io, shared_topo, shared_path_buf[0..shared_len]);
     }
 
-    const floating_median = median3(floating_runs);
-    const shared_median = median3(shared_runs);
+    const floating_median = median(floating_runs);
+    const shared_median = median(shared_runs);
 
     try std.testing.expect(shared_median >= floating_median);
 }
