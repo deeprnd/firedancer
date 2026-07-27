@@ -1,0 +1,43 @@
+# V2.21.S7 Quality Gate
+
+## Closure contract frozen for V2.21
+
+### Decision A — user-facing command contract
+- **Decision:** `tickoni` is the documented product binary for retail users.
+- **Required surfaces:** `tickoni --version`, `tickoni doctor`, and the documented demo command path.
+- **Non-goal:** `tickoni-supervisor` may remain as an internal/test binary, but it is not the retail-facing trust surface.
+
+### Decision B — CaseOps scope for V2.21
+- **Decision:** V2.21 ships CLI, audit, replay, metrics, and diagnostics tier visibility now.
+- **Deferred:** CaseOps tier/degraded-guarantee display remains deferred until a dedicated tkapi/UI story lands.
+- **Documentation rule:** S7 docs must say this explicitly instead of implying a shipped CaseOps surface.
+
+### Decision C — manual verification format
+- **Decision:** V2.21 documents a checksum-based manual verification path.
+- **Required evidence:** release artifact filename examples, SHA256 command examples, and the expected local artifact locations.
+- **Non-goal:** signed release assets or attestations are not claimed unless they actually exist.
+
+## Acceptance mapping
+
+| S7 acceptance requirement | Owning artifact / command | Notes |
+| --- | --- | --- |
+| Support matrix, tiers, install paths, storage, manual verification, update/uninstall, unsupported features | `doc/execution/retail-runtime-support.md` | Canonical closure doc for retail runtime trust surface |
+| Tier/degraded-guarantee visibility in CLI/diagnostics and honest CaseOps scope | `tickoni --version`, `tickoni doctor`, `doc/knowledge/platform-tiers.md`, `doc/execution/observability.md` | CaseOps deferred explicitly for V2.21 |
+| Paper/sandbox default and live execution disabled | `doc/execution/retail-runtime-support.md`, `doc/execution/V2.21.S7/security-audit.md` | Must be visible in user-facing docs |
+| Privacy defaults / no installer telemetry by default | `doc/execution/telemetry.md`, `doc/execution/retail-runtime-support.md`, `doc/execution/V2.21.S7/telemetry-audit.md` | Opt-in diagnostics only by future explicit decision |
+| Evidence artifacts linked | `doc/execution/V2.21.S7/evidence-index.md` | Must link version, doctor, demo, blocked-flow, conformance, audit, replay |
+
+## Deferred from V2.21
+
+- CaseOps dashboard/UI display of runtime tier and degraded guarantees
+- Release-signing/attestation claims beyond checksum-based verification
+- Windows-specific closure work owned by V2.22
+- Any claim of Linux full-runtime parity on macOS retail runtime
+
+## Review checklist
+
+- [x] Command contract chosen
+- [x] CaseOps scope chosen
+- [x] Manual verification format chosen
+- [x] Every S7 acceptance criterion mapped to an artifact or command
+- [x] Deferred work stated explicitly to prevent silent scope creep into V2.22 or future UI work
