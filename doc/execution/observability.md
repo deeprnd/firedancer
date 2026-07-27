@@ -17,6 +17,12 @@ Every tile, every future agent, every tool call, and every policy decision
 should expose runtime state. Observability is not log text added after the
 fact; it is part of the tile ownership model.
 
+For V2.21 retail runtime support, this observability surface remains local-first
+and evidence-oriented: CLI host reports, deterministic demo output, local audit
+artifacts, replay artifacts, and linked conformance evidence. CaseOps UI
+surfacing and hosted observability stacks are explicitly deferred work, not
+implied current behavior.
+
 ## Current Runtime Commands
 
 Build the Tickoni supervisor:
