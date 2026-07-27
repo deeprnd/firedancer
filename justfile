@@ -216,9 +216,12 @@ test-unit-fd:
 	# Both the lib build (via fd_build_fd) and the unit-test link (via make run-unit-test)
 	# need the CET override.
 	bash contrib/fd-build-lib.sh {{fd_tickoni_build}} gcc-12 test "" ""
+	# Normal-page fallback must fit on consumer hardware without gigantic-page setup.
+	# Keep the per-job reservation at 256 MiB so the scheduler can run on a 32 GiB
+	# host even when normal-page free memory is fragmented by other processes.
 	{{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} \
 		LDFLAGS_EXE="-Wl,-z,shstk" \
-		run-unit-test TEST_OPTS="--page-sz normal"
+		run-unit-test TEST_OPTS="--page-sz normal --job-mem 268435456"
 
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.
