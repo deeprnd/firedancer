@@ -39,6 +39,10 @@ payload = json.loads(sys.argv[1])
 assert payload['preflight'] == 'passed', payload
 suite = payload['suite']
 assert len(suite) == 4, suite
+comparison = payload['comparison']
+assert comparison['baseline_runtime_tier'] == 'linux_full', comparison
+assert comparison['all_match'] is True, comparison
+assert len(comparison['scenarios']) == 4, comparison
 scenarios = {item['scenario']: item for item in suite}
 assert set(scenarios) == {'allowed', 'oversized_blocked', 'restricted_instrument', 'tampered_replay'}, scenarios
 assert scenarios['allowed']['policy_outcome'] == 'allow', scenarios['allowed']
@@ -60,9 +64,36 @@ plain_output="$($binary demo investment --plain --manifest "$manifest")" || exit
 python3 - <<'PY' "$plain_output"
 import sys
 text = sys.argv[1]
+assert 'comparison_all_match: true' in text, text
+assert 'comparison_scenario: allowed match=true mismatch_count=0' in text, text
 assert text.count('manifest_id: demo.investment.v1') == 4, text
 assert 'scenario: tampered_replay' in text, text
 assert 'blocked_code: tampered_replay_artifact' in text, text
+PY
+
+printf 'verifying fail-closed preflight diagnostics\n'
+python3 - <<'PY' "$binary" "$manifest"
+import json, os, pathlib, subprocess, sys, tempfile
+binary = sys.argv[1]
+manifest_path = pathlib.Path(sys.argv[2])
+base = json.loads(manifest_path.read_text())
+case_map = {
+    'unsupported_runtime_tier': ('blocked_code: unsupported_runtime_tier', dict(base, supported_runtime_tiers=['macos_retail'])),
+    'missing_fixture': ('blocked_code: missing_fixture', dict(base, required_fixtures=['does_not_exist'])),
+    'stale_manifest': ('blocked_code: stale_manifest', dict(base, min_tickoni_version='999.0.0')),
+    'missing_isolation_prerequisite': ('blocked_code: missing_isolation_prerequisite', dict(base, required_isolation_by_tier={'linux_full': 'retail', 'macos_retail': 'retail'})),
+    'attempted_live_execution': ('blocked_code: attempted_live_execution', dict(base, expected_no_live_effect=False)),
+}
+for name, (needle, payload) in case_map.items():
+    fd, temp_path = tempfile.mkstemp(prefix='hermes-cli-demo-', suffix='.json')
+    os.close(fd)
+    path = pathlib.Path(temp_path)
+    path.write_text(json.dumps(payload))
+    proc = subprocess.run([binary, 'demo', 'investment', '--manifest', str(path)], text=True, capture_output=True)
+    assert proc.returncode == 1, (name, proc.returncode, proc.stdout, proc.stderr)
+    assert 'Preflight failure:' in proc.stderr, (name, proc.stderr)
+    assert needle in proc.stderr, (name, proc.stderr)
+    path.unlink()
 PY
 
 printf 'PASS: tickoni-supervisor demo contract and suite outputs verified\n'
