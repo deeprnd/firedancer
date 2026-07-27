@@ -1,147 +1,99 @@
 #!/usr/bin/env bash
-# Ensure llama.cpp and model exist, start the local server, run the CLI investment
-# demo proofs, then stop the server.
-set -euo pipefail
+# Focused S6 CLI verification: build the supervisor demo binary, validate usage
+# failures, then assert the fixture-backed conformance suite JSON contract.
+set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=contrib/test/llama_cpp_env.sh
-source "${SCRIPT_DIR}/llama_cpp_env.sh"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$repo_root"
 
-llama_dir="$(tk_resolve_llama_cpp_dir)"
+build_cmd=(zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all)
+manifest="src/tickoni/demo/fixtures/demo.manifest.json"
+binary="zig-out/bin/tickoni-supervisor"
 
-backend=cpu
-if command -v nvidia-smi >/dev/null 2>&1; then
-  gpu_count="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l || echo 0)"
-  if (( gpu_count > 0 )); then
-    if ldd "${llama_dir}/llama-server" 2>/dev/null | grep -qi 'cuda\|cublas'; then
-      backend=gpu
-    else
-      echo "note: GPU detected but llama.cpp binary has no CUDA support; using cpu"
-    fi
-  fi
-fi
-echo "compute backend: ${backend}"
+export ZIG_GLOBAL_CACHE_DIR=.zig-global-cache
 
-if [[ "$backend" == "gpu" ]]; then
-  bash "${SCRIPT_DIR}/ensure_llama_cpp.sh" --gpu
-else
-  bash "${SCRIPT_DIR}/ensure_llama_cpp.sh"
-fi
-
-bash "${SCRIPT_DIR}/ensure_hf_model.sh"
-
-server_pid=
-log_file="/tmp/llama_server_cli_$$.log"
-cleanup() {
-  [[ -n "$server_pid" ]] && kill "$server_pid" 2>/dev/null || true
-  [[ -n "$server_pid" ]] && wait "$server_pid" 2>/dev/null || true
-}
-trap cleanup EXIT
-
-echo "starting llama-server (${backend}) — log: ${log_file}"
-bash "${SCRIPT_DIR}/run_llm_server.sh" "$backend" >"$log_file" 2>&1 &
-server_pid=$!
-
-endpoint="${TK_LLM_ENDPOINT:-http://127.0.0.1:8080/v1}"
-health_url="${endpoint%/v1}/health"
-echo "waiting for llama-server at ${health_url}"
-ready=0
-for i in $(seq 1 60); do
-  if curl -sf "$health_url" >/dev/null 2>&1; then
-    ready=1
-    break
-  fi
-  if ! kill -0 "$server_pid" 2>/dev/null; then
-    echo "llama-server exited prematurely; log: ${log_file}" >&2
-    head -3 "$log_file" >&2
-    echo "..." >&2
-    tail -20 "$log_file" >&2
-    exit 1
-  fi
-  sleep 2
-done
-if (( !ready )); then
-  echo "llama-server did not become ready within 120s; log: ${log_file}" >&2
-  head -3 "$log_file" >&2
-  echo "..." >&2
-  tail -20 "$log_file" >&2
+printf 'building tickoni-supervisor with fixture-backed demo modules\n'
+if ! "${build_cmd[@]}"; then
+  echo "build failed" >&2
   exit 1
 fi
-echo "llama-server ready"
 
-echo "building tickoni CLI"
-ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build --summary all
-
-run_and_assert() {
-  local thesis="$1"
-  local expected_scenario="$2"
-  local expected_policy="$3"
-  local expected_ticket_id="$4"
-  local expected_blocked_reason="$5"
-  local expected_failed_scope_dim="$6"
-
-  local output
-  output="$(zig-out/bin/tickoni demo investment --json --thesis "$thesis")"
-  JSON_OUTPUT="$output" \
-  EXPECTED_SCENARIO="$expected_scenario" \
-  EXPECTED_POLICY="$expected_policy" \
-  EXPECTED_TICKET_ID="$expected_ticket_id" \
-  EXPECTED_BLOCKED_REASON="$expected_blocked_reason" \
-  EXPECTED_FAILED_SCOPE_DIM="$expected_failed_scope_dim" \
-  python3 - <<'PY'
-import json
-import os
-
-payload = json.loads(os.environ["JSON_OUTPUT"])
-assert payload["scenario"] == os.environ["EXPECTED_SCENARIO"], payload
-assert payload["policy_outcome"] == os.environ["EXPECTED_POLICY"], payload
-expected_ticket_id = os.environ["EXPECTED_TICKET_ID"]
-if expected_ticket_id:
-    assert payload["ticket_id"] == expected_ticket_id, payload
-else:
-    assert payload["ticket_id"] is None, payload
-expected_blocked_reason = os.environ["EXPECTED_BLOCKED_REASON"]
-if expected_blocked_reason:
-    assert payload["blocked_reason"] == expected_blocked_reason, payload
-else:
-    assert payload["blocked_reason"] is None, payload
-expected_failed_scope_dim = os.environ["EXPECTED_FAILED_SCOPE_DIM"]
-if expected_failed_scope_dim:
-    assert payload["failed_scope_dim"] == expected_failed_scope_dim, payload
-else:
-    assert payload["failed_scope_dim"] is None, payload
-assert payload["matched_ticker"], payload
-assert payload["model_id"], payload
-assert payload["excerpt"], payload
-assert payload["replay_match"] is True, payload
-assert payload["external_effects_disabled"] is True, payload
-assert payload["divergence_count"] == 0, payload
+printf 'verifying bare demo usage fails closed\n'
+usage_output="$($binary demo 2>&1)"
+usage_status=$?
+if [[ $usage_status -eq 0 ]]; then
+  echo "expected bare demo invocation to fail" >&2
+  exit 1
+fi
+python3 - <<'PY' "$usage_output"
+import sys
+text = sys.argv[1]
+assert 'demo usage error' in text or 'Usage:' in text, text
 PY
+
+printf 'running JSON conformance suite\n'
+json_output="$($binary demo investment --json --manifest "$manifest")" || exit 1
+python3 - <<'PY' "$json_output"
+import json, sys
+payload = json.loads(sys.argv[1])
+assert payload['preflight'] == 'passed', payload
+suite = payload['suite']
+assert len(suite) == 4, suite
+comparison = payload['comparison']
+assert comparison['baseline_runtime_tier'] == 'linux_full', comparison
+assert comparison['all_match'] is True, comparison
+assert len(comparison['scenarios']) == 4, comparison
+scenarios = {item['scenario']: item for item in suite}
+assert set(scenarios) == {'allowed', 'oversized_blocked', 'restricted_instrument', 'tampered_replay'}, scenarios
+assert scenarios['allowed']['policy_outcome'] == 'allow', scenarios['allowed']
+assert scenarios['allowed']['external_effects_disabled'] is True, scenarios['allowed']
+assert scenarios['oversized_blocked']['policy_outcome'] == 'deny', scenarios['oversized_blocked']
+assert scenarios['oversized_blocked']['blocked_diagnostic']['code'] == 'policy_denied', scenarios['oversized_blocked']
+assert scenarios['restricted_instrument']['blocked_diagnostic']['code'] == 'restricted_instrument', scenarios['restricted_instrument']
+assert scenarios['tampered_replay']['blocked_diagnostic']['code'] == 'tampered_replay_artifact', scenarios['tampered_replay']
+assert scenarios['tampered_replay']['replay_result']['replay_match'] is False, scenarios['tampered_replay']
+for item in suite:
+    assert item['runtime_tier'], item
+    assert item['isolation_tier'], item
+    assert item['normalized_event_hash'], item
+    assert item['proposal_hash'] is not None, item
+PY
+
+printf 'running plain-text conformance suite\n'
+plain_output="$($binary demo investment --plain --manifest "$manifest")" || exit 1
+python3 - <<'PY' "$plain_output"
+import sys
+text = sys.argv[1]
+assert 'comparison_all_match: true' in text, text
+assert 'comparison_scenario: allowed match=true mismatch_count=0' in text, text
+assert text.count('manifest_id: demo.investment.v1') == 4, text
+assert 'scenario: tampered_replay' in text, text
+assert 'blocked_code: tampered_replay_artifact' in text, text
+PY
+
+printf 'verifying fail-closed preflight diagnostics\n'
+python3 - <<'PY' "$binary" "$manifest"
+import json, os, pathlib, subprocess, sys, tempfile
+binary = sys.argv[1]
+manifest_path = pathlib.Path(sys.argv[2])
+base = json.loads(manifest_path.read_text())
+case_map = {
+    'unsupported_runtime_tier': ('blocked_code: unsupported_runtime_tier', dict(base, supported_runtime_tiers=['macos_retail'])),
+    'missing_fixture': ('blocked_code: missing_fixture', dict(base, required_fixtures=['does_not_exist'])),
+    'stale_manifest': ('blocked_code: stale_manifest', dict(base, min_tickoni_version='999.0.0')),
+    'missing_isolation_prerequisite': ('blocked_code: missing_isolation_prerequisite', dict(base, required_isolation_by_tier={'linux_full': 'retail', 'macos_retail': 'retail'})),
+    'attempted_live_execution': ('blocked_code: attempted_live_execution', dict(base, expected_no_live_effect=False)),
 }
+for name, (needle, payload) in case_map.items():
+    fd, temp_path = tempfile.mkstemp(prefix='hermes-cli-demo-', suffix='.json')
+    os.close(fd)
+    path = pathlib.Path(temp_path)
+    path.write_text(json.dumps(payload))
+    proc = subprocess.run([binary, 'demo', 'investment', '--manifest', str(path)], text=True, capture_output=True)
+    assert proc.returncode == 1, (name, proc.returncode, proc.stdout, proc.stderr)
+    assert 'Preflight failure:' in proc.stderr, (name, proc.stderr)
+    assert needle in proc.stderr, (name, proc.stderr)
+    path.unlink()
+PY
 
-echo "running CLI allowed scenario"
-run_and_assert \
-  "I want to invest USD 2,000 in AI infrastructure through US-listed ETFs and large-cap equities." \
-  "allowed" \
-  "allow" \
-  "ticket_ai_infra_2000_market" \
-  "" \
-  ""
-
-echo "running CLI oversized blocked scenario"
-run_and_assert \
-  "I want to invest USD 25,000 in AI infrastructure through US-listed ETFs and large-cap equities." \
-  "oversized_blocked" \
-  "deny" \
-  "ticket_ai_infra_25000_blocked" \
-  "per_order_notional_exceeded" \
-  "per_order_notional"
-
-echo "running CLI restricted ticker scenario"
-run_and_assert \
-  "Buy SOXL in an AI infrastructure basket with USD 2,000." \
-  "restricted_instrument" \
-  "deny" \
-  "" \
-  "restricted_instrument" \
-  "restricted_instrument"
+printf 'PASS: tickoni-supervisor demo contract and suite outputs verified\n'

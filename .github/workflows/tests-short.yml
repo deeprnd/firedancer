@@ -27,7 +27,7 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
-          paths: '^(src/(app/tickoni|tickoni)/|build\.zig(\.zon)?$|justfile$|contrib/quality\.sh$|contrib/security\.sh$|contrib/test/coverage(-tk)?\.json$|contrib/test/coverage\.sh$|contrib/readme/coverage_report\.py$|\.github/actions/|\.github/workflows/tests-short\.yml$)'
+          paths: '^(src/(app/tickoni|tickoni)/|build\.zig(\.zon)?$|justfile$|contrib/quality\.sh$|contrib/security\.sh$|contrib/test/(run_cli_demo_tests\.sh|export_demo_conformance_bundle\.py|compare_demo_conformance\.py|coverage(-tk)?\.json|coverage\.sh)$|contrib/readme/coverage_report\.py$|\.github/actions/|\.github/workflows/tests-short\.yml$)'
 
   short-tests:
     name: Harness Unit Tests
@@ -48,6 +48,9 @@ jobs:
 
       - name: Run test suite
         run: just test-unit-tk
+
+      - name: Run deterministic demo CLI conformance suite
+        run: just test-demo-tk
 
   # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
   short-tests-macos-15-intel:
@@ -74,6 +77,9 @@ jobs:
       - name: Run test suite
         run: just test-unit-tk
 
+      - name: Run deterministic demo CLI conformance suite
+        run: just test-demo-tk
+
   # ── macOS: Clang (ARM64, macOS 15) ─────────────────────────────────────────
   short-tests-macos-15-arm:
     name: Harness Unit Tests / macOS 15 (ARM)
@@ -98,6 +104,9 @@ jobs:
 
       - name: Run test suite
         run: just test-unit-tk
+
+      - name: Run deterministic demo CLI conformance suite
+        run: just test-demo-tk
 
   # ── macOS: Clang (x86_64, macOS 26) ────────────────────────────────────────
   short-tests-macos-26-intel:
@@ -124,6 +133,9 @@ jobs:
       - name: Run test suite
         run: just test-unit-tk
 
+      - name: Run deterministic demo CLI conformance suite
+        run: just test-demo-tk
+
   # ── macOS: Clang (ARM64, macOS 26) ─────────────────────────────────────────
   short-tests-macos-26-arm:
     name: Harness Unit Tests / macOS 26 (ARM)
@@ -148,6 +160,9 @@ jobs:
 
       - name: Run test suite
         run: just test-unit-tk
+
+      - name: Run deterministic demo CLI conformance suite
+        run: just test-demo-tk
 
   # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
   integration-tests-macos-15-intel:
@@ -268,6 +283,95 @@ jobs:
 
       - name: Run test suite
         run: just test-integration-tk
+
+  demo-conformance-linux:
+    name: Demo Conformance Baseline / Linux
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - uses: ./.github/actions/build-fd-tk-libs
+
+      - name: Build supervisor
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+
+      - name: Export Linux conformance bundle
+        run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/linux
+
+      - name: Upload Linux conformance bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-conformance-linux
+          path: build/demo-conformance/linux
+
+  demo-conformance-macos-retail:
+    name: Demo Conformance Retail / macOS 15 (ARM)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-arm
+
+      - name: Build supervisor
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+
+      - name: Export macOS retail conformance bundle
+        run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/macos-retail
+
+      - name: Upload macOS retail conformance bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-conformance-macos-retail
+          path: build/demo-conformance/macos-retail
+
+  demo-conformance-compare:
+    name: Demo Conformance Compare / Linux vs macOS retail
+    needs:
+      - demo-conformance-linux
+      - demo-conformance-macos-retail
+    if: needs.demo-conformance-linux.result == 'success' && needs.demo-conformance-macos-retail.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Linux conformance bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-conformance-linux
+          path: build/demo-conformance/linux
+
+      - name: Download macOS retail conformance bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-conformance-macos-retail
+          path: build/demo-conformance/macos-retail
+
+      - name: Compare deterministic conformance fields
+        run: python3 contrib/test/compare_demo_conformance.py build/demo-conformance/linux/conformance.json build/demo-conformance/macos-retail/conformance.json
 
   cov-tk:
     name: Harness Tests Coverage
