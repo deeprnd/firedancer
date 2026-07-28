@@ -116,7 +116,7 @@ build-fd:
 	    if [[ "$arch" =~ ^(arm64|aarch64)$ ]]; then
 	      exec just build-fd-macos-arm
 	    else
-	      exec just build-fd-macos-intel
+	      exec just build-fd-macos-x86_64
 	    fi
 	    ;;
 	  MINGW*|MSYS*|CYGWIN*)
@@ -140,12 +140,12 @@ build-fd-clang:
 build-fd-arm:
 	bash contrib/fd-build-lib.sh fd-arm gcc-14
 
-# macOS Intel build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
+# macOS x86_64 build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
 # EXTRAS="" prevents blst/zstd/lz4 from being built: their vendor sources
-# have path mismatches and platform-specific assembly that fails on macOS Intel.
-build-fd-macos-intel:
-	# macOS Intel: set PATH to Homebrew prefix before invoking build script
-	# GitHub Actions macOS 15 Intel runners use /usr/local/homebrew
+# have path mismatches and platform-specific assembly that fails on macOS x86_64.
+build-fd-macos-x86_64:
+	# macOS x86_64: set PATH to Homebrew prefix before invoking build script
+	# GitHub Actions macOS 15 x86_64 runners use /usr/local/homebrew
 	# Each recipe line runs in a separate shell, so set PATH on each line
 	export PATH="/usr/local/homebrew/bin:/usr/local/bin:$PATH"
 	export JUST_GMAKE="/usr/local/homebrew/bin/gmake"

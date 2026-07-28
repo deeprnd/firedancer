@@ -53,8 +53,8 @@ jobs:
         run: just test-demo-tk
 
   # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
-  short-tests-macos-15-intel:
-    name: Harness Unit Tests / macOS 15 (Intel)
+  short-tests-macos-15-x86_64:
+    name: Harness Unit Tests / macOS 15 (x86_64)
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: macos-15-intel
@@ -72,7 +72,7 @@ jobs:
         run: brew install make
 
       - name: Build FD libs
-        run: just build-fd-macos-intel
+        run: just build-fd-macos-x86_64
 
       - name: Run test suite
         run: just test-unit-tk
@@ -109,8 +109,8 @@ jobs:
         run: just test-demo-tk
 
   # ── macOS: Clang (x86_64, macOS 26) ────────────────────────────────────────
-  short-tests-macos-26-intel:
-    name: Harness Unit Tests / macOS 26 (Intel)
+  short-tests-macos-26-x86_64:
+    name: Harness Unit Tests / macOS 26 (x86_64)
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: macos-26-intel
@@ -128,7 +128,7 @@ jobs:
         run: brew install make
 
       - name: Build FD libs
-        run: just build-fd-macos-intel
+        run: just build-fd-macos-x86_64
 
       - name: Run test suite
         run: just test-unit-tk
@@ -165,8 +165,8 @@ jobs:
         run: just test-demo-tk
 
   # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
-  integration-tests-macos-15-intel:
-    name: Integration Tests / macOS 15 (Intel)
+  integration-tests-macos-15-x86_64:
+    name: Integration Tests / macOS 15 (x86_64)
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: macos-15-intel
@@ -184,7 +184,7 @@ jobs:
         run: brew install make
 
       - name: Build FD libs
-        run: just build-fd-macos-intel
+        run: just build-fd-macos-x86_64
 
       - name: Run integration tests
         run: just test-integration-tk
@@ -215,8 +215,8 @@ jobs:
         run: just test-integration-tk
 
   # ── macOS: Clang (x86_64, macOS 26) ────────────────────────────────────────
-  integration-tests-macos-26-intel:
-    name: Integration Tests / macOS 26 (Intel)
+  integration-tests-macos-26-x86_64:
+    name: Integration Tests / macOS 26 (x86_64)
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: macos-26-intel
@@ -234,7 +234,7 @@ jobs:
         run: brew install make
 
       - name: Build FD libs
-        run: just build-fd-macos-intel
+        run: just build-fd-macos-x86_64
 
       - name: Run integration tests
         run: just test-integration-tk

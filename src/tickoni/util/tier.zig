@@ -7,7 +7,7 @@
 ///
 /// Tier inventory (matching doc/knowledge/platform-tiers.md):
 ///   - linux_full     Linux  x86_64 / ARM64 — shared-mem topology, seccomp
-///   - macos_retail   macOS  ARM64 / Intel  — socket networking, no sandbox
+///   - macos_retail   macOS  ARM64 / x86_64  — socket networking, no sandbox
 ///   - windows_retail Windows x86_64 / ARM64 — socket networking, no sandbox
 ///   - unsupported    anything else
 const std = @import("std");
