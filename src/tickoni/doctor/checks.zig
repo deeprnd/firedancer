@@ -13,7 +13,25 @@ pub const Status = enum { pass, warn, fail };
 pub const Result = struct {
     name: []const u8,
     status: Status,
-    message: []const u8,
+    message_len: usize,
+    message_storage: [128]u8,
+
+    pub fn initOwnedMessage(name: []const u8, status: Status, text: []const u8) Result {
+        var result = Result{
+            .name = name,
+            .status = status,
+            .message_len = 0,
+            .message_storage = [_]u8{0} ** 128,
+        };
+        const len = @min(text.len, result.message_storage.len);
+        @memcpy(result.message_storage[0..len], text[0..len]);
+        result.message_len = len;
+        return result;
+    }
+
+    pub fn message(self: *const Result) []const u8 {
+        return self.message_storage[0..self.message_len];
+    }
 
     pub fn toString(self: Result, w: anytype) !void {
         const icon = switch (self.status) {
@@ -21,7 +39,7 @@ pub const Result = struct {
             .warn => "[WARN]",
             .fail => "[FAIL]",
         };
-        try w.print("  {s} {s}: {s}\n", .{ icon, self.name, self.message });
+        try w.print("  {s} {s}: {s}\n", .{ icon, self.name, self.message() });
     }
 };
 
@@ -61,10 +79,11 @@ pub const OsChecks = struct {
             else => @tagName(builtin.target.os.tag),
         };
 
-        const version = detectOsVersion(io, gpa) orelse "unknown version";
+        var version_buf: [128]u8 = undefined;
+        const version = detectOsVersion(io, gpa, &version_buf) orelse "unknown version";
         var msg_buf: [128]u8 = undefined;
         const msg = std.fmt.bufPrint(&msg_buf, "{s} {s}", .{ os_name, version }) catch os_name;
-        return Result{ .name = "os", .status = .pass, .message = msg };
+        return Result.initOwnedMessage("os", .pass, msg);
     }
 
     /// Check architecture and CPU features.
@@ -75,30 +94,27 @@ pub const OsChecks = struct {
             .arm => "ARM32",
             else => @tagName(builtin.target.cpu.arch),
         };
-        return Result{ .name = "architecture", .status = .pass, .message = arch_name };
+        return Result.initOwnedMessage("architecture", .pass, arch_name);
     }
 
     /// Check if running in container, WSL2, VM, or native environment.
     pub fn checkEnvironment(io: Io, gpa: Allocator) Result {
         const env = detectEnvironment(io, gpa);
-        return Result{
-            .name = "environment",
-            .status = switch (env) {
-                .native => .pass,
-                .container => .warn,
-                .wsl => .warn,
-                .vm => .warn,
-            },
-            .message = switch (env) {
-                .native => "native",
-                .container => "container (docker/lxc detected)",
-                .wsl => "WSL2 (Windows Subsystem for Linux)",
-                .vm => "virtual machine",
-            },
+        const message = switch (env) {
+            .native => "native",
+            .container => "container (docker/lxc detected)",
+            .wsl => "WSL2 (Windows Subsystem for Linux)",
+            .vm => "virtual machine",
         };
+        return Result.initOwnedMessage("environment", switch (env) {
+            .native => .pass,
+            .container => .warn,
+            .wsl => .warn,
+            .vm => .warn,
+        }, message);
     }
 
-    fn detectOsVersion(io: Io, gpa: Allocator) ?[]const u8 {
+    fn detectOsVersion(io: Io, gpa: Allocator, out_buf: []u8) ?[]const u8 {
         switch (builtin.target.os.tag) {
             .linux => {
                 const cwd = std.Io.Dir.cwd();
@@ -107,12 +123,12 @@ pub const OsChecks = struct {
                     defer file.close(io);
                     const data = readFileContents(file, io, gpa, 4096) catch return "Linux";
                     defer gpa.free(data);
-                    if (std.mem.indexOf(u8, data, "PRETTY_NAME")) |start| {
-                        const rest = data[start + 12 ..];
-                        const q = std.mem.indexOfScalar(u8, rest, '"') orelse
-                            std.mem.indexOfScalar(u8, rest, '\'') orelse rest.len;
-                        const trimmed = std.mem.trim(u8, rest[0..q], " \"'");
-                        return gpa.dupe(u8, trimmed) catch return "Linux";
+                    if (std.mem.indexOf(u8, data, "PRETTY_NAME=")) |start| {
+                        const line = data[start + "PRETTY_NAME=".len ..];
+                        const end = std.mem.indexOfScalar(u8, line, '\n') orelse line.len;
+                        const trimmed = std.mem.trim(u8, line[0..end], " \"'\r");
+                        const copied = std.fmt.bufPrint(out_buf, "{s}", .{trimmed}) catch return "Linux";
+                        return copied;
                     }
                 }
                 if (fileExists(cwd, io, "/proc/version")) {
@@ -123,7 +139,8 @@ pub const OsChecks = struct {
                     if (std.mem.indexOf(u8, data, "Linux version ")) |s| {
                         const after = data[s + 14 ..];
                         const end = std.mem.indexOfScalar(u8, after, ' ') orelse after.len;
-                        return gpa.dupe(u8, after[0..end]) catch return "Linux";
+                        const copied = std.fmt.bufPrint(out_buf, "{s}", .{after[0..end]}) catch return "Linux";
+                        return copied;
                     }
                 }
                 return "Linux";
@@ -141,7 +158,8 @@ pub const OsChecks = struct {
                     var buf: [256]u8 = undefined;
                     const len = std.Io.File.readPositionalAll(stdout, io, &buf, 0) catch return "macOS";
                     const trimmed = std.mem.trim(u8, buf[0..len], " \n\r");
-                    return gpa.dupe(u8, trimmed) catch return "macOS";
+                    const copied = std.fmt.bufPrint(out_buf, "{s}", .{trimmed}) catch return "macOS";
+                    return copied;
                 }
                 return "macOS";
             },
@@ -219,33 +237,17 @@ pub const ToolChecks = struct {
             .stdout = .pipe,
             .stderr = .pipe,
         };
-        var child = std.process.spawn(io, opts) catch return .{
-            .name = name,
-            .status = .fail,
-            .message = "not found",
-        };
-        const result = child.wait(io) catch return .{
-            .name = name,
-            .status = .fail,
-            .message = "not found",
-        };
-        if (!isExitedZero(result)) return .{
-            .name = name,
-            .status = .fail,
-            .message = "not found",
-        };
+        var child = std.process.spawn(io, opts) catch return Result.initOwnedMessage(name, .fail, "not found");
+        const result = child.wait(io) catch return Result.initOwnedMessage(name, .fail, "not found");
+        if (!isExitedZero(result)) return Result.initOwnedMessage(name, .fail, "not found");
         if (child.stdout) |stdout| {
             var buf: [1024]u8 = undefined;
-            const len = std.Io.File.readPositionalAll(stdout, io, &buf, 0) catch return .{
-                .name = name,
-                .status = .fail,
-                .message = "no output",
-            };
+            const len = std.Io.File.readPositionalAll(stdout, io, &buf, 0) catch return Result.initOwnedMessage(name, .fail, "no output");
             const version = std.mem.trim(u8, buf[0..len], " \n\r");
             const clipped = if (version.len > 80) version[0..80] else version;
-            return .{ .name = name, .status = .pass, .message = clipped };
+            return Result.initOwnedMessage(name, .pass, clipped);
         }
-        return .{ .name = name, .status = .fail, .message = "no output" };
+        return Result.initOwnedMessage(name, .fail, "no output");
     }
 };
 
@@ -256,26 +258,14 @@ pub const ModeChecks = struct {
         const cwd = std.Io.Dir.cwd();
         const fixtures_path = "/home/vicgenin/work/git/tickoni/src/tickoni/demo/fixtures/demo.manifest.json";
         std.Io.Dir.access(cwd, io, fixtures_path, .{}) catch {
-            return Result{
-                .name = "fixtures",
-                .status = .warn,
-                .message = "no fixtures found (demo fixtures expected)",
-            };
+            return Result.initOwnedMessage("fixtures", .warn, "no fixtures found (demo fixtures expected)");
         };
-        return Result{
-            .name = "fixtures",
-            .status = .pass,
-            .message = "demo fixtures present",
-        };
+        return Result.initOwnedMessage("fixtures", .pass, "demo fixtures present");
     }
 
     /// Check model/mock mode status.
     pub fn checkModelMode() Result {
-        return Result{
-            .name = "model_mode",
-            .status = .warn,
-            .message = "no model provider configured (offline only)",
-        };
+        return Result.initOwnedMessage("model_mode", .warn, "no model provider configured (offline only)");
     }
 
     /// Check if local storage paths are writable.
@@ -285,26 +275,14 @@ pub const ModeChecks = struct {
         var data_dir_buf: [512]u8 = undefined;
         const data_dir = std.fmt.bufPrint(&data_dir_buf, "{s}/.tickoni", .{home}) catch "unknown";
         std.Io.Dir.access(cwd, io, data_dir, .{}) catch {
-            return Result{
-                .name = "storage",
-                .status = .warn,
-                .message = "storage unavailable",
-            };
+            return Result.initOwnedMessage("storage", .warn, "storage unavailable");
         };
-        return Result{
-            .name = "storage",
-            .status = .pass,
-            .message = "storage writable",
-        };
+        return Result.initOwnedMessage("storage", .pass, "storage writable");
     }
 
     /// Check if live execution is disabled (must be true on retail tiers).
     pub fn checkLiveExecutionDisabled() Result {
-        return Result{
-            .name = "live_execution",
-            .status = .pass,
-            .message = "disabled",
-        };
+        return Result.initOwnedMessage("live_execution", .pass, "disabled");
     }
 
     /// Check if built from unsupported direct source (non-tagged commit).
@@ -314,40 +292,16 @@ pub const ModeChecks = struct {
             .stdout = .pipe,
             .stderr = .pipe,
         };
-        var child = std.process.spawn(io, opts) catch return .{
-            .name = "source_build",
-            .status = .warn,
-            .message = "git not available",
-        };
-        const result = child.wait(io) catch return .{
-            .name = "source_build",
-            .status = .warn,
-            .message = "git error",
-        };
-        if (!isExitedZero(result)) return .{
-            .name = "source_build",
-            .status = .warn,
-            .message = "unreleased commit (not on a release tag)",
-        };
+        var child = std.process.spawn(io, opts) catch return Result.initOwnedMessage("source_build", .warn, "git not available");
+        const result = child.wait(io) catch return Result.initOwnedMessage("source_build", .warn, "git error");
+        if (!isExitedZero(result)) return Result.initOwnedMessage("source_build", .warn, "unreleased commit (not on a release tag)");
         if (child.stdout) |stdout| {
             var buf: [256]u8 = undefined;
-            const len = std.Io.File.readPositionalAll(stdout, io, &buf, 0) catch return .{
-                .name = "source_build",
-                .status = .warn,
-                .message = "git error",
-            };
+            const len = std.Io.File.readPositionalAll(stdout, io, &buf, 0) catch return Result.initOwnedMessage("source_build", .warn, "git error");
             const tag = std.mem.trim(u8, buf[0..len], " \n\r");
-            return .{
-                .name = "source_build",
-                .status = .pass,
-                .message = tag,
-            };
+            return Result.initOwnedMessage("source_build", .pass, tag);
         }
-        return .{
-            .name = "source_build",
-            .status = .warn,
-            .message = "unreleased commit (not on a release tag)",
-        };
+        return Result.initOwnedMessage("source_build", .warn, "unreleased commit (not on a release tag)");
     }
 };
 
@@ -421,11 +375,7 @@ pub fn runAll(results: []Result, io: Io, gpa: Allocator) usize {
 test "Result.toString produces correct format" {
     var buf: [256]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
-    const result = Result{
-        .name = "test_check",
-        .status = .pass,
-        .message = "test message",
-    };
+    const result = Result.initOwnedMessage("test_check", .pass, "test message");
     try result.toString(&w);
     const output = w.buffered();
     try std.testing.expect(std.mem.startsWith(u8, output, "  [PASS]"));
@@ -436,11 +386,7 @@ test "Result.toString produces correct format" {
 test "Result.warn status" {
     var buf: [256]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
-    const result = Result{
-        .name = "warn_check",
-        .status = .warn,
-        .message = "warning",
-    };
+    const result = Result.initOwnedMessage("warn_check", .warn, "warning");
     try result.toString(&w);
     const output = w.buffered();
     try std.testing.expect(std.mem.indexOf(u8, output, "warn_check") != null);
@@ -450,11 +396,7 @@ test "Result.warn status" {
 test "Result.fail status" {
     var buf: [256]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
-    const result = Result{
-        .name = "fail_check",
-        .status = .fail,
-        .message = "failure",
-    };
+    const result = Result.initOwnedMessage("fail_check", .fail, "failure");
     try result.toString(&w);
     const output = w.buffered();
     try std.testing.expect(std.mem.startsWith(u8, output, "  [FAIL]"));
@@ -463,66 +405,66 @@ test "Result.fail status" {
 test "checkLiveExecutionDisabled returns pass" {
     const r = ModeChecks.checkLiveExecutionDisabled();
     try std.testing.expectEqual(Status.pass, r.status);
-    try std.testing.expectEqualStrings("disabled", r.message);
+    try std.testing.expectEqualStrings("disabled", r.message());
 }
 
 test "checkOS returns pass with OS name" {
     const r = OsChecks.checkOS(std.testing.io, std.testing.allocator);
     try std.testing.expectEqual(Status.pass, r.status);
-    try std.testing.expect(r.message.len > 0);
+    try std.testing.expect(r.message().len > 0);
 }
 
 test "checkArchitecture returns pass with arch" {
     const r = OsChecks.checkArchitecture();
     try std.testing.expectEqual(Status.pass, r.status);
-    try std.testing.expect(r.message.len > 0);
+    try std.testing.expect(r.message().len > 0);
 }
 
 test "checkEnvironment returns result" {
     const r = OsChecks.checkEnvironment(std.testing.io, std.testing.allocator);
-    try std.testing.expect(r.message.len > 0);
+    try std.testing.expect(r.message().len > 0);
 }
 
 test "checkZig returns result" {
     const r = ToolChecks.checkZig(std.testing.io);
     try std.testing.expect(r.name.len > 0);
-    try std.testing.expect(r.message.len > 0);
+    try std.testing.expect(r.message().len > 0);
 }
 
 test "checkGit returns result" {
     const r = ToolChecks.checkGit(std.testing.io);
     try std.testing.expect(r.name.len > 0);
-    try std.testing.expect(r.message.len > 0);
+    try std.testing.expect(r.message().len > 0);
 }
 
 test "checkMake returns result" {
     const r = ToolChecks.checkMake(std.testing.io);
     try std.testing.expect(r.name.len > 0);
-    try std.testing.expect(r.message.len > 0);
+    try std.testing.expect(r.message().len > 0);
 }
 
 test "checkFixtures returns result" {
     const r = ModeChecks.checkFixtures(std.testing.io);
     try std.testing.expect(r.name.len > 0);
-    try std.testing.expect(r.message.len > 0);
+    try std.testing.expect(r.message().len > 0);
 }
 
 test "checkModelMode returns result" {
     const r = ModeChecks.checkModelMode();
     try std.testing.expect(r.name.len > 0);
-    try std.testing.expect(r.message.len > 0);
+    try std.testing.expect(r.message().len > 0);
 }
 
 test "checkStorage returns result" {
     const r = ModeChecks.checkStorage(std.testing.io, null);
     try std.testing.expect(r.name.len > 0);
-    try std.testing.expect(r.message.len > 0);
+    try std.testing.expect(r.message().len > 0);
 }
 
 test "checkSourceBuild returns result" {
     const r = ModeChecks.checkSourceBuild(std.testing.io);
     try std.testing.expect(r.name.len > 0);
-    try std.testing.expect(r.message.len > 0);
+    try std.testing.expect(r.message().len > 0);
 }
 
 test "runAll fills results array" {

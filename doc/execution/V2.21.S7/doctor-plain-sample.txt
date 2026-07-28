@@ -1,0 +1,18 @@
+tickoni doctor — host report
+Platform tier: linux_full
+OS: Linux | arch: x86_64
+---
+  [PASS] os: Linux Ubuntu 24.04.4 LTS
+  [PASS] architecture: x86_64
+  [PASS] environment: native
+  [FAIL] zig: not found
+  [FAIL] git: no output
+  [FAIL] make: no output
+  [PASS] fixtures: demo fixtures present
+  [WARN] model_mode: no model provider configured (offline only)
+  [WARN] storage: storage unavailable
+  [PASS] live_execution: disabled
+  [WARN] source_build: unreleased commit (not on a release tag)
+---
+Checks: 5 pass, 3 warn, 3 fail
+RESULT: FAIL

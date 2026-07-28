@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Focused S6 CLI verification: build the supervisor demo binary, validate usage
-# failures, then assert the fixture-backed conformance suite JSON contract.
+# Focused S6/S7 CLI verification: build both user-facing and supervisor binaries,
+# validate version/doctor contracts on `tickoni`, then assert the fixture-backed
+# conformance suite JSON contract on `tickoni-supervisor`.
 set -uo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -8,15 +9,51 @@ cd "$repo_root"
 
 build_cmd=(zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all)
 manifest="src/tickoni/demo/fixtures/demo.manifest.json"
+cli_binary="zig-out/bin/tickoni"
 binary="zig-out/bin/tickoni-supervisor"
 
 export ZIG_GLOBAL_CACHE_DIR=.zig-global-cache
 
-printf 'building tickoni-supervisor with fixture-backed demo modules\n'
+printf 'building tickoni and tickoni-supervisor with fixture-backed demo modules\n'
 if ! "${build_cmd[@]}"; then
   echo "build failed" >&2
   exit 1
 fi
+
+printf 'verifying tickoni --version contract\n'
+version_output="$($cli_binary --version)" || exit 1
+python3 - <<'PY' "$version_output"
+import sys
+text = sys.argv[1]
+assert text.startswith('Tickoni '), text
+for needle in [
+    'Build ID:',
+    'Git:',
+    'OS:',
+    'Runtime Tier:',
+    'Isolation Tier:',
+    'Policy Schema:',
+    'Replay Schema:',
+    'Demo Manifest:',
+    'Compiler:',
+]:
+    assert needle in text, (needle, text)
+PY
+
+printf 'verifying tickoni doctor plain/json contracts\n'
+plain_output="$($cli_binary doctor --plain 2>&1 || true)"
+json_output="$($cli_binary doctor --json 2>&1 || true)"
+python3 - <<'PY' "$plain_output" "$json_output"
+import json, sys
+plain = sys.argv[1]
+js = sys.argv[2]
+assert 'tickoni doctor — host report' in plain, plain
+assert 'Platform tier:' in plain, plain
+payload = json.loads(js)
+assert 'platform_tier' in payload, payload
+assert 'result' in payload, payload
+assert 'checks' in payload and isinstance(payload['checks'], list), payload
+PY
 
 printf 'verifying bare demo usage fails closed\n'
 usage_output="$($binary demo 2>&1)"
@@ -96,4 +133,4 @@ for name, (needle, payload) in case_map.items():
     path.unlink()
 PY
 
-printf 'PASS: tickoni-supervisor demo contract and suite outputs verified\n'
+printf 'PASS: tickoni CLI contract and tickoni-supervisor demo contract verified\n'

@@ -1,0 +1,22 @@
+manifest_id: demo.investment.v1
+manifest_version: 1.0.0
+tickoni_version: 0.1.0-dev
+runtime_tier: linux_full
+isolation_tier: full
+fixture_set_id: investment_sample
+scenario: tampered_replay
+normalized_event_hash: aafb79ccc732ea9506d7c9213287736be0d4f7d59a7fa1f0316d7e244e0265fb
+policy_outcome: allow
+proposal_hash: 81bc0274f88bb6763261f044b17303954fce1e38d4284e82fdd83e3130e6d3dc
+audit_jsonl_path: src/tickoni/test/fixtures/investment/scenarios/fixture_audit_allowed_2000.jsonl
+audit_jsonl_sha256: e73ddcd62170c940c6a1224ad44b2c2200875992ac5a7d42eb221cc611ddf64c
+replay_capsule_path: src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule_tampered_paper_fill.json
+replay_capsule_sha256: 91306d317a74f369f571ec85609df5485776898e89d7a1f82824e7149f21d0b3
+replay_match: false
+divergence_count: 1
+external_effects_disabled: true
+blocked_code: tampered_replay_artifact
+message: replay capsule fixture was tampered and must fail closed
+field: replay_capsule_path
+expected: src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule.json
+found: src/tickoni/test/fixtures/investment/scenarios/fixture_replay_capsule_tampered_paper_fill.json

@@ -77,7 +77,9 @@ The tier and its degraded dimensions must be visible in all five surfaces.
 
 ### CLI (`tickoni doctor`)
 
-Prints tier name, OS, architecture, degraded dimensions, and affected tiles:
+The supported product command is `tickoni doctor` on the retail-facing `tickoni`
+binary. It prints tier name, OS, architecture, degraded dimensions, and
+affected tiles:
 
 ```
 Tier: macos_retail
@@ -88,12 +90,16 @@ Tiles excluded: 5
 
 ### CLI (`tickoni --version`)
 
-Prints tier name only (short form of doctor output).
+The supported product command is `tickoni --version` on the retail-facing
+`tickoni` binary. It prints the version/provenance fields plus the runtime and
+isolation tiers as the short trust surface for retail users.
 
 ### CaseOps
 
-Tier is part of the host metadata shown on the dashboard. Any degraded dimension
-is flagged next to the affected workflow.
+CaseOps tier/degraded-guarantee display is deferred for V2.21. In this epic,
+platform trust is exposed through CLI, audit, replay, metrics, diagnostics, and
+linked evidence artifacts. A future tkapi/UI story must add the dashboard host
+metadata surface before docs can claim CaseOps display is shipped.
 
 ### Audit
 
@@ -113,7 +119,7 @@ docs or stories reference them.
 | --- | --- |
 | What tiers exist and what do they guarantee? | This document (V2.21.S1 / V2.22.S1) |
 | How do we detect the tier at runtime? | S3 (doctor/preflight) |
-| How is tier shown in CaseOps? | S7 (trust/security/docs) |
+| How is tier shown in CaseOps? | Deferred beyond V2.21; S7 documents the deferral explicitly |
 | How do we test per tier? | Separate testing story |
 
 ## Quality Gate
