@@ -79,7 +79,11 @@ runs:
 
     - name: Install system level dependencies
       shell: bash
-      run: FD_AUTO_INSTALL_PACKAGES=1 '${{ inputs.deps-script-path }}' check
+      run: |
+        CC='${{ inputs.compiler }}' \
+        CXX='${{ inputs.compiler == 'gcc' && 'g++' || 'clang++' }}' \
+        FD_AUTO_INSTALL_PACKAGES=1 \
+        '${{ inputs.deps-script-path }}' check
 
     - name: Ensure zstd CLI is available
       shell: bash
