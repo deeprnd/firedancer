@@ -43,6 +43,47 @@ FD_TK_LIBS_EXTRA=( libfd_blst.a libfd_zstd.a libfd_lz4.a )
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+fd_host_os() {
+  case "$(uname -s)" in
+    Darwin) echo "macOS" ;;
+    Linux) echo "Linux" ;;
+    MINGW*|MSYS*|CYGWIN*) echo "Windows" ;;
+    *) echo "unknown" ;;
+  esac
+}
+
+fd_resolve_make() {
+  if [ -n "${JUST_GMAKE:-}" ] && [ -x "${JUST_GMAKE}" ]; then
+    printf '%s\n' "${JUST_GMAKE}"
+    return 0
+  fi
+
+  if command -v gmake >/dev/null 2>&1; then
+    command -v gmake
+    return 0
+  fi
+
+  if [ "$(fd_host_os)" = "macOS" ] && command -v brew >/dev/null 2>&1; then
+    local homebrew_bin
+    homebrew_bin="$(brew --prefix)/bin"
+    if [ -x "${homebrew_bin}/gmake" ]; then
+      printf '%s\n' "${homebrew_bin}/gmake"
+      return 0
+    fi
+    if [ -x "${homebrew_bin}/make" ]; then
+      printf '%s\n' "${homebrew_bin}/make"
+      return 0
+    fi
+  fi
+
+  if command -v make >/dev/null 2>&1; then
+    command -v make
+    return 0
+  fi
+
+  return 1
+}
+
 # Compute the LOCAL_MKS string from a given source-dir list.
 # Usage: local mks; mks=$(fd_compute_mks "${FD_TK_LIB_SRCS[@]}")
 fd_compute_mks() {
@@ -108,30 +149,10 @@ fd_build_fd() {
   local mks
   mks=$(fd_compute_mks ${SRCS})
 
-  # Use gmake on macOS (GitHub Actions runners ship BSD make 3.81,
-  # but Firedancer's GNUmakefile requires GNU make >= 3.82 for
-  # the 'undefine' directive).
-  # Check PATH first (via command -v) — this respects PATH modifications from setup actions.
-  # Use brew --prefix on macOS to find gmake regardless of Intel/ARM install location.
   local MAKE
-  MAKE=""
-  # Check PATH first (via command -v) — this respects PATH modifications from setup actions
-  if command -v gmake >/dev/null 2>&1; then
-    MAKE="$(command -v gmake)"
-  # macOS fallback: use brew --prefix to find gmake (works on both Intel/ARM)
-  elif [ "${RUNNER_OS}" = "macOS" ] && command -v brew >/dev/null 2>&1; then
-    local HOMEBREW_BIN
-    HOMEBREW_BIN="$(brew --prefix)/bin"
-    if [ -x "${HOMEBREW_BIN}/gmake" ]; then
-      MAKE="${HOMEBREW_BIN}/gmake"
-    elif [ -x "${HOMEBREW_BIN}/make" ]; then
-      MAKE="${HOMEBREW_BIN}/make"
-    fi
-  # Fallback: try standard locations (older setups without brew --prefix on PATH)
-  elif [ -x /usr/local/bin/gmake ]; then
-    MAKE="/usr/local/bin/gmake"
-  elif command -v make >/dev/null 2>&1; then
-    MAKE="$(command -v make)"
+  if ! MAKE="$(fd_resolve_make)"; then
+    echo "failed to locate GNU make for Tickoni FD build" >&2
+    exit 1
   fi
 
   local -a cmd=( "$MAKE" -j"$(fd_nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" )

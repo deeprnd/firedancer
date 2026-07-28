@@ -34,10 +34,13 @@ endif
 # Platform-specific config.
 # On macOS, use the dedicated macOS build profile which auto-detects
 # architecture (Apple Silicon vs Intel) and sets correct flags.
+# On Windows/MSYS, use the dedicated Windows clang profile.
 # On Linux, use native detection (native_config.sh).
 UNAME?=$(shell uname)
 ifeq ($(UNAME), Darwin)
   include config/machine/macos_clang.mk
+else ifneq (,$(filter MINGW% MSYS% CYGWIN% Windows_NT,$(UNAME)))
+  include config/machine/windows_clang.mk
 else
 include config/machine/native.mk
 endif

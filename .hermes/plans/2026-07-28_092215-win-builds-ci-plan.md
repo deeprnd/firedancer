@@ -244,7 +244,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 
 ---
 
-### Phase 2: add Windows-aware repo build entrypoints before workflows
+### Phase 2: add Windows-aware repo build entrypoints before workflows — DONE
 
 **Objective:** Create stable `just`/script entrypoints for Windows so workflows can call them the same way macOS/Linux workflows do.
 
@@ -428,7 +428,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 - `.github/actions/deps/action.yml`
 - optional helper scripts under `.github/actions/**/scripts/`
 
-### Task 3: Add repo-facing Windows build recipes
+### Task 3: Add repo-facing Windows build recipes — DONE
 **Files:**
 - `justfile`
 - `contrib/fd-build-windows.sh`
