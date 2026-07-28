@@ -45,11 +45,16 @@ if ($InstallGnuMake) {
 
 Install-ChocoPackage -Name 'strawberryperl'
 
-$strawberryPaths = @(
+$bootstrapPaths = @(
+    'C:\ProgramData\chocolatey\bin',
+    'C:\Program Files\Git\cmd',
+    'C:\Program Files\Git\usr\bin',
+    'C:\Program Files\CMake\bin',
+    'C:\Program Files\LLVM\bin',
     'C:\Strawberry\perl\bin',
     'C:\Strawberry\c\bin'
 )
-foreach ($pathEntry in $strawberryPaths) {
+foreach ($pathEntry in $bootstrapPaths) {
     if (Test-Path $pathEntry) {
         Add-ToGitHubPath -Value $pathEntry
     }

@@ -355,7 +355,7 @@ check_windows_pkgs () {
     return 0
   fi
 
-  local CHOCO_PKGS=( git make strawberryperl pkgconfiglite cmake )
+  local CHOCO_PKGS=( make strawberryperl pkgconfiglite cmake )
   if [[ "${_CC}" == clang* ]]; then
     CHOCO_PKGS+=( llvm )
   else
