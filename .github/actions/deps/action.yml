@@ -69,6 +69,7 @@ runs:
         fi
 
     - id: deps-sh-cache
+      if: runner.os != 'Windows'
       uses: corca-ai/local-cache@v2
       with:
         base: "${{ runner.tool_cache }}/cache"
@@ -101,7 +102,7 @@ runs:
       shell: bash
       run: |
         zstd -d -c deps-bundle.tar.zst | tar -xf -
-      if: steps.deps-sh-cache.outputs.cache-hit == 'true'
+      if: runner.os != 'Windows' && steps.deps-sh-cache.outputs.cache-hit == 'true'
 
     - name: Install dependencies from scratch
       shell: bash
@@ -125,4 +126,4 @@ runs:
         FD_AUTO_INSTALL_PACKAGES=1 \
         '${{ inputs.deps-script-path }}' ${{ inputs.extras }} fetch install
         '${{ inputs.deps-bundle-path }}'
-      if: steps.deps-sh-cache.outputs.cache-hit != 'true'
+      if: runner.os == 'Windows' || steps.deps-sh-cache.outputs.cache-hit != 'true'
