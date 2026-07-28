@@ -386,7 +386,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 
 ---
 
-### Phase 6: pre-CI verification sweep before opening the PR
+### Phase 6: pre-CI verification sweep before opening the PR — DONE
 
 **Objective:** Catch the obvious repo-level mismatches locally before relying on GitHub Actions.
 
@@ -453,7 +453,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 - `.github/workflows/build-tk.yml`
 - `doc/execution/ci.md`
 
-### Task 7: Run ad-hoc verification and then CI
+### Task 7: Run ad-hoc verification and then CI — DONE
 **Files:**
 - temp verifier under `/tmp`
 
