@@ -511,7 +511,8 @@ install_openssl () {
 
   if [[ "$ID" = windows ]]; then
     local openssl_target
-    if [[ "$FD_WINDOWS_ARCH" =~ ^(arm64|aarch64)$ || "$(uname -m)" =~ ^(arm64|aarch64)$ ]]; then
+    local windows_arch="${FD_WINDOWS_ARCH:-$(uname -m)}"
+    if [[ "$windows_arch" =~ ^(arm64|aarch64)$ ]]; then
       openssl_target="mingwarm64"
     else
       openssl_target="mingw64"
