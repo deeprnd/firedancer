@@ -74,9 +74,9 @@ endif
 # sub-profiles (e.g. macos_clang -> native -> base).
 #
 # Detection order:
-#   1. MACHINE name → known cross-compile targets (macos_clang, freebsd_*)
+#   1. MACHINE name → known cross-compile targets (macos_clang, windows_clang, freebsd_*)
 #   2. UNAME → native builds (native, tickoni_fd, linux_clang_zen2)
-#   3. Default → hosted mode (Windows/unknown)
+#   3. Default → hosted mode on unknown platforms
 ifeq ($(FD_PLATFORM_DETECTED),)
 FD_PLATFORM_DETECTED:=1
 
@@ -87,6 +87,10 @@ ifneq (,$(filter $(MACHINE),macos_clang macos_clang_m1))
   CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_MACOS=1
   FD_HAS_HOSTED:=1
   FD_HAS_MACOS:=1
+else ifneq (,$(filter $(MACHINE),windows_clang))
+  CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_WINDOWS=1
+  FD_HAS_HOSTED:=1
+  FD_HAS_WINDOWS:=1
 else ifneq (,$(filter $(MACHINE),freebsd_clang_noarch128))
   CPPFLAGS+=-DFD_HAS_HOSTED=1
   FD_HAS_HOSTED:=1
@@ -100,11 +104,15 @@ else
     CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_MACOS=1
     FD_HAS_HOSTED:=1
     FD_HAS_MACOS:=1
+  else ifneq (,$(filter MINGW% MSYS% CYGWIN% Windows_NT,$(UNAME)))
+    CPPFLAGS+=-DFD_HAS_HOSTED=1 -DFD_HAS_WINDOWS=1
+    FD_HAS_HOSTED:=1
+    FD_HAS_WINDOWS:=1
   else ifeq ($(UNAME),FreeBSD)
     CPPFLAGS+=-DFD_HAS_HOSTED=1
     FD_HAS_HOSTED:=1
   else
-    # Step 3: Windows or unknown — hosted mode, no OS-specific features
+    # Step 3: Unknown hosted target — no OS-specific features
     CPPFLAGS+=-DFD_HAS_HOSTED=1
     FD_HAS_HOSTED:=1
   endif

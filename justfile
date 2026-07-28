@@ -5,8 +5,8 @@ export PATH := `echo $PATH:/opt/zig`
 # Firedancer's GNUmakefile uses `undefine`, which needs GNU Make >= 3.82.
 make := `command -v gmake || command -v make`
 
-# Firedancer/Tickoni build natively only on Linux. On macOS, build/test/run
-# recipes transparently re-run inside this Linux container (see the `dock` recipe).
+# Firedancer/Tickoni build natively on Linux and Windows. On macOS, build/test/run
+# recipes can still re-run inside the Linux container via the `dock` recipe.
 dev_image := "tickoni-dev:24.04"
 
 # Shared Firedancer lib definitions — used by contrib/fd-build-lib.sh and
@@ -101,10 +101,32 @@ build-fd-tk-libs: build-fd
 # ── Public build recipes ─────────────────────────────────────────────────────
 
 # Auto-detect host platform/arch and route to the correct platform-specific recipe.
-# CI recipes below (build-fd-gcc, build-fd-clang, build-fd-arm, build-fd-macos-*)
-# are called directly with explicit values for reproducibility.
+# CI recipes below (build-fd-gcc, build-fd-clang, build-fd-arm, build-fd-macos-*,
+# build-fd-windows-*) are called directly with explicit values for reproducibility.
 build-fd:
-	exec bash contrib/fd-build-linux.sh
+	#!/usr/bin/env bash
+	set -euo pipefail
+	os="$(uname -s)"
+	arch="$(uname -m)"
+	case "$os" in
+	  Linux)
+	    exec bash contrib/fd-build-linux.sh
+	    ;;
+	  Darwin)
+	    if [[ "$arch" =~ ^(arm64|aarch64)$ ]]; then
+	      exec just build-fd-macos-arm
+	    else
+	      exec just build-fd-macos-intel
+	    fi
+	    ;;
+	  MINGW*|MSYS*|CYGWIN*)
+	    exec bash contrib/fd-build-windows.sh "$arch"
+	    ;;
+	  *)
+	    echo "unsupported host OS for build-fd: $os" >&2
+	    exit 1
+	    ;;
+	esac
 
 # Linux GCC (CI: maps to fd-gcc for test/quality/security compatibility)
 build-fd-gcc:
@@ -133,6 +155,16 @@ build-fd-macos-intel:
 # macOS ARM build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
 build-fd-macos-arm:
 	bash contrib/fd-build-lib.sh fd-tickoni-fd clang libs "lz4 blst zstd"
+
+# Windows x86_64 build — native Windows runner path backed by the Windows
+# machine profile and GNU make under bash.
+build-fd-windows-x86:
+	bash contrib/fd-build-windows.sh x86_64
+
+# Windows ARM64 build — native Windows runner path backed by the Windows
+# machine profile and GNU make under bash.
+build-fd-windows-arm:
+	bash contrib/fd-build-windows.sh arm64
 
 build-fd-dev:
 	make -j"$(nproc)" all
