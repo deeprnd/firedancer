@@ -164,7 +164,7 @@ jobs:
         uses: ./.github/actions/setup-public-gh-runner
         with:
           zig: 'true'
-          fd-deps: 'true'
+          fd-deps: 'false'
           compiler: clang
           compiler-version: system
 
@@ -188,7 +188,7 @@ jobs:
         uses: ./.github/actions/setup-public-gh-runner
         with:
           zig: 'true'
-          fd-deps: 'true'
+          fd-deps: 'false'
           compiler: clang
           compiler-version: system
 
