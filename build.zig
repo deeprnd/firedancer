@@ -2044,9 +2044,19 @@ fn addPlainTestRun(b: *std.Build, test_compile: *std.Build.Step.Compile) *std.Bu
 /// Links the Firedancer substrate used by Tickoni runtime wrappers. Tickoni
 /// code crosses Firedancer only through src/tickoni/c_abi/shim/**, so this
 /// compiles the required Tickoni-owned shim files alongside upstream libs.
+fn shimCFlagsFor(target_os: std.Target.Os.Tag) []const []const u8 {
+    return switch (target_os) {
+        .linux => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_LINUX=1" },
+        .macos => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_MACOS=1" },
+        .windows => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1" },
+        else => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1" },
+    };
+}
+
 fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
+    const target_os = step.root_module.resolved_target.?.result.os.tag;
     step.root_module.addCSourceFiles(.{
         .files = &.{
             "src/tickoni/c_abi/shim/tango.c",
@@ -2055,7 +2065,7 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
             "src/tickoni/c_abi/shim/sandbox.c",
             "src/tickoni/c_abi/shim/os.c",
         },
-        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+        .flags = shimCFlagsFor(target_os),
     });
     step.root_module.addLibraryPath(b.path(fd_lib_dir));
     step.root_module.linkSystemLibrary("fd_tango", .{});
@@ -2074,15 +2084,16 @@ fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_di
 fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
+    const target_os = step.root_module.resolved_target.?.result.os.tag;
 
-    const topo_run_platform_file = switch (step.root_module.resolved_target.?.result.os.tag) {
+    const topo_run_platform_file = switch (target_os) {
         .macos => "src/tickoni/c_abi/shim/topo_run_platform_macos.c",
         else => "src/tickoni/c_abi/shim/topo_run_platform_linux.c",
     };
 
     step.root_module.addCSourceFiles(.{
         .files = &.{ "src/tickoni/c_abi/shim/topo_run.c", topo_run_platform_file, "src/tickoni/c_abi/shim/topob.c" },
-        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+        .flags = shimCFlagsFor(target_os),
     });
     step.root_module.addLibraryPath(b.path(fd_lib_dir));
     step.root_module.linkSystemLibrary("fd_disco", .{});
@@ -2103,9 +2114,10 @@ fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: 
 fn linkTickoniTileRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
+    const target_os = step.root_module.resolved_target.?.result.os.tag;
     step.root_module.addCSourceFiles(.{
         .files = &.{"src/tickoni/c_abi/shim/tile_run.c"},
-        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+        .flags = shimCFlagsFor(target_os),
     });
     step.root_module.addLibraryPath(b.path(fd_lib_dir));
     step.root_module.linkSystemLibrary("fd_disco", .{});

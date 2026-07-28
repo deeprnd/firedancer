@@ -312,7 +312,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 
 ---
 
-### Phase 4: abstract supervisor process control away from POSIX-only APIs
+### Phase 4: abstract supervisor/process control away from POSIX-only APIs — DONE
 
 **Objective:** Fix the most obvious Zig-side Windows blockers before CI shows compile failures in `tickoni`.
 
@@ -442,7 +442,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 - `src/tickoni/c_abi/boot.zig`
 - `src/tickoni/util/os_api.zig`
 
-### Task 5: Fix supervisor/process portability
+### Task 5: Fix supervisor/process portability — DONE
 **Files:**
 - `src/app/tickoni/supervisor.zig`
 - optional `src/tickoni/util/process_api.zig`

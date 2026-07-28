@@ -10,7 +10,7 @@
 /* Sandbox functions are Linux-only (seccomp, user namespaces). */
 #if FD_HAS_LINUX
 
-#include "fd_sandbox.h"
+#include "../../../util/sandbox/fd_sandbox.h"
 
 int tk_sandbox_requires_cap_sys_admin( uint desired_uid, uint desired_gid ) { return fd_sandbox_requires_cap_sys_admin( desired_uid, desired_gid ); }
 
