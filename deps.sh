@@ -513,17 +513,23 @@ install_openssl () {
     local openssl_target
     local windows_arch="${FD_WINDOWS_ARCH:-$(uname -m)}"
     local openssl_perl="perl"
-    local openssl_perl5lib=""
-    if [[ -x /usr/bin/perl ]]; then
-      openssl_perl="/usr/bin/perl"
-      openssl_perl5lib="/c/Strawberry/perl/site/lib:/c/Strawberry/perl/vendor/lib:/c/Strawberry/perl/lib"
+
+    # Do not mix Git-for-Windows /usr/bin/perl with Strawberry's Perl libs.
+    # OpenSSL Configure needs a self-consistent Perl install.
+    if [[ -x /c/Strawberry/perl/bin/perl.exe ]]; then
+      openssl_perl="/c/Strawberry/perl/bin/perl.exe"
+    elif [[ -x /c/Strawberry/perl/bin/perl ]]; then
+      openssl_perl="/c/Strawberry/perl/bin/perl"
+    elif command -v perl >/dev/null 2>&1; then
+      openssl_perl="$(command -v perl)"
     fi
+
     if [[ "$windows_arch" =~ ^(arm64|aarch64)$ ]]; then
       openssl_target="mingwarm64"
     else
       openssl_target="mingw64"
     fi
-    PERL5LIB="$openssl_perl5lib" CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" "$openssl_perl" ./Configure "$openssl_target" "${CONFIG_OPTS[@]}"
+    CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" "$openssl_perl" ./Configure "$openssl_target" "${CONFIG_OPTS[@]}"
   else
     CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" ./config "${CONFIG_OPTS[@]}"
   fi
