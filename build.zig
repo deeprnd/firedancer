@@ -2088,6 +2088,7 @@ fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: 
 
     const topo_run_platform_file = switch (target_os) {
         .macos => "src/tickoni/c_abi/shim/topo_run_platform_macos.c",
+        .windows => "src/tickoni/c_abi/shim/topo_run_platform_windows.c",
         else => "src/tickoni/c_abi/shim/topo_run_platform_linux.c",
     };
 

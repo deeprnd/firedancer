@@ -27,7 +27,7 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
-          paths: '^((src/disco/|src/tango/|src/waltz/|src/util/|contrib/deps-bundle\.sh$|contrib/fd-build-lib\.sh$|contrib/fd-tk-libs\.sh$|build\.zig$|GNUmakefile$|\.github/actions/build-fd-tk-libs/|\.github/workflows/build-fd\.yml$)|deps\.sh$)'
+          paths: '^((src/disco/|src/tango/|src/waltz/|src/util/|config/|contrib/deps-bundle\.sh$|contrib/fd-build-lib\.sh$|contrib/fd-build-windows\.(sh|ps1)$|contrib/fd-tk-libs\.sh$|justfile$|build\.zig$|GNUmakefile$|\.github/actions/build-fd-tk-libs/|\.github/workflows/build-fd\.yml$)|deps\.sh$)'
 
   # ── Linux: GCC (x86_64) ────────────────────────────────────────────────────
   build-linux-gcc:
@@ -161,3 +161,43 @@ jobs:
 
       - name: Build
         run: just build-fd-macos-arm
+
+  # ── Windows: Clang (x86_64) ────────────────────────────────────────────────
+  build-windows-x86:
+    name: Engine Build / Windows x86_64
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup deps
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          fd-deps: 'true'
+          compiler: clang
+          compiler-version: system
+
+      - name: Build
+        run: just build-fd-windows-x86
+
+  # ── Windows: Clang (ARM64) ─────────────────────────────────────────────────
+  build-windows-arm:
+    name: Engine Build / Windows ARM64
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: windows-11-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup deps
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          fd-deps: 'true'
+          compiler: clang
+          compiler-version: system
+
+      - name: Build
+        run: just build-fd-windows-arm

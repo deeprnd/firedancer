@@ -10,7 +10,7 @@
 #include "../../../util/fd_util.h"
 #include "../../../util/rng/fd_rng.h"
 
-#include <unistd.h>
+extern int tk_sandbox_getpid( void );
 
 ulong tk_mcache_align( void ) { return fd_mcache_align(); }
 ulong tk_mcache_footprint( ulong depth, ulong app_sz ) { return fd_mcache_footprint( depth, app_sz ); }
@@ -113,7 +113,7 @@ static FD_TL fd_rng_t * tk_tempo_rng = NULL;
 
 static fd_rng_t *
 tk_tempo_rng_tls( void ) {
-  if( FD_UNLIKELY( !tk_tempo_rng ) ) tk_tempo_rng = fd_rng_join( fd_rng_new( tk_tempo_rng_mem, (uint)getpid(), 0UL ) );
+  if( FD_UNLIKELY( !tk_tempo_rng ) ) tk_tempo_rng = fd_rng_join( fd_rng_new( tk_tempo_rng_mem, (uint)tk_sandbox_getpid(), 0UL ) );
   return tk_tempo_rng;
 }
 

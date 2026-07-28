@@ -354,7 +354,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 
 ---
 
-### Phase 5: wire Windows build jobs into CI only after entrypoints and shims exist
+### Phase 5: wire Windows build jobs into CI only after entrypoints and shims exist — DONE
 
 **Objective:** Add the actual GitHub Actions jobs after the build and portability substrate is ready.
 
@@ -447,7 +447,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 - `src/app/tickoni/supervisor.zig`
 - optional `src/tickoni/util/process_api.zig`
 
-### Task 6: Add Windows workflow jobs
+### Task 6: Add Windows workflow jobs — DONE
 **Files:**
 - `.github/workflows/build-fd.yml`
 - `.github/workflows/build-tk.yml`
