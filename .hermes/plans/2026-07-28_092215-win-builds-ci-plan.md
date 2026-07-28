@@ -209,7 +209,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 
 ---
 
-### Phase 1: make shared CI bootstrap actions OS-selectable
+### Phase 1: make shared CI bootstrap actions OS-selectable — DONE
 
 **Objective:** Ensure the shared GitHub Actions bootstrap layers can run on Windows without Linux/macOS-only assumptions.
 
@@ -422,7 +422,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 - `doc/execution/V2.22/windows-build-ci.md`
 - `doc/execution/ci.md`
 
-### Task 2: Add Windows support branches to shared actions
+### Task 2: Add Windows support branches to shared actions — DONE
 **Files:**
 - `.github/actions/setup-public-gh-runner/action.yml`
 - `.github/actions/deps/action.yml`

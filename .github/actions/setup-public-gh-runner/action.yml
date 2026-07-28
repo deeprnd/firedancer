@@ -48,6 +48,12 @@ runs:
         brew install make
         echo "$(brew --prefix)/opt/make/libexec/gnubin" >> "$GITHUB_PATH"
 
+    - name: Install Windows bootstrap tools
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        .github/actions/setup-public-gh-runner/scripts/setup-windows.ps1 -AptPackages '${{ inputs.apt-packages }}' -InstallGnuMake -InstallGitleaks:('${{ inputs.gitleaks }}' -eq 'true') -GitleaksVersion '8.30.1' -InstallKcov:('${{ inputs.kcov }}' -eq 'true')
+
     - name: Setup Zig
       if: inputs.zig == 'true'
       uses: mlugg/setup-zig@v2
@@ -68,14 +74,14 @@ runs:
         python -m pip install ${{ inputs.python-tools }}
 
     - name: Install apt packages
-      if: inputs.apt-packages != ''
+      if: inputs.apt-packages != '' && runner.os != 'Windows'
       shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install -y ${{ inputs.apt-packages }}
 
     - name: Install kcov
-      if: inputs.kcov == 'true'
+      if: inputs.kcov == 'true' && runner.os != 'Windows'
       shell: bash
       run: |
         sudo apt-get update
@@ -95,13 +101,23 @@ runs:
         sudo make -C "$RUNNER_TEMP/kcov-build" install
 
     - name: Install Gitleaks
-      if: inputs.gitleaks == 'true'
+      if: inputs.gitleaks == 'true' && runner.os != 'Windows'
       shell: bash
       env:
         GITLEAKS_VERSION: 8.30.1
       run: |
         mkdir -p "$RUNNER_TEMP/gitleaks"
-        curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o "$RUNNER_TEMP/gitleaks/gitleaks.tar.gz"
+        case "${{ runner.os }}-${{ runner.arch }}" in
+          Linux-X64)   asset="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" ;;
+          Linux-ARM64) asset="gitleaks_${GITLEAKS_VERSION}_linux_arm64.tar.gz" ;;
+          macOS-X64)   asset="gitleaks_${GITLEAKS_VERSION}_darwin_x64.tar.gz" ;;
+          macOS-ARM64) asset="gitleaks_${GITLEAKS_VERSION}_darwin_arm64.tar.gz" ;;
+          *)
+            echo "unsupported runner for gitleaks asset selection: ${{ runner.os }}-${{ runner.arch }}" >&2
+            exit 1
+            ;;
+        esac
+        curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${asset}" -o "$RUNNER_TEMP/gitleaks/gitleaks.tar.gz"
         tar -xzf "$RUNNER_TEMP/gitleaks/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks"
         chmod +x "$RUNNER_TEMP/gitleaks/gitleaks"
         echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"

@@ -19,6 +19,10 @@ case "$OS" in
       source /etc/os-release
     fi
     ;;
+  MINGW*|MSYS*|CYGWIN*)
+    MAKE=( make -j )
+    ID=windows
+    ;;
   *)
     echo "[!] Unsupported OS $OS"
     ;;
@@ -300,6 +304,61 @@ check_arch_pkgs () {
   fi
 }
 
+check_windows_pkgs () {
+  local REQUIRED_CMDS=(
+    curl
+    git
+    make
+    perl
+    cmake
+    tar
+  )
+
+  if command -v pkg-config >/dev/null 2>&1; then
+    :
+  elif command -v pkgconf >/dev/null 2>&1; then
+    :
+  else
+    REQUIRED_CMDS+=( pkg-config )
+  fi
+
+  if [[ "${_CC}" == clang* ]]; then
+    REQUIRED_CMDS+=( clang clang++ )
+  else
+    REQUIRED_CMDS+=( gcc g++ )
+  fi
+
+  if [[ $DEVMODE == 1 ]]; then
+    REQUIRED_CMDS+=( protoc )
+  fi
+
+  echo "[~] Checking for required Windows build tools"
+
+  local MISSING_CMDS=( )
+  for cmd in "${REQUIRED_CMDS[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      MISSING_CMDS+=( "$cmd" )
+    fi
+  done
+
+  if [[ ${#MISSING_CMDS[@]} -eq 0 ]]; then
+    echo "[~] OK: Windows build tools required for build are installed"
+    return 0
+  fi
+
+  local CHOCO_PKGS=( git make strawberryperl pkgconfiglite cmake )
+  if [[ "${_CC}" == clang* ]]; then
+    CHOCO_PKGS+=( llvm )
+  else
+    CHOCO_PKGS+=( mingw )
+  fi
+  if [[ $DEVMODE == 1 ]]; then
+    CHOCO_PKGS+=( protoc )
+  fi
+
+  PACKAGE_INSTALL_CMD=( choco install -y --no-progress ${CHOCO_PKGS[*]} )
+}
+
 check () {
   # Initialize to avoid 'unbound variable' with set -u when all packages are present.
   PACKAGE_INSTALL_CMD=( )
@@ -307,6 +366,8 @@ check () {
   # macOS has no /etc/os-release — must be handled separately.
   if [[ "$OS" = "Darwin" ]]; then
     check_macos_pkgs
+  elif [[ "$ID" = "windows" ]]; then
+    check_windows_pkgs
   else
     DISTRO="${ID_LIKE:-${ID:-}}"
     for word in $DISTRO ; do
