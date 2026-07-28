@@ -155,7 +155,7 @@ jobs:
     name: Harness Build / Windows x86_64
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
-    runs-on: windows-2025
+    runs-on: windows-2025-vs2026
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -179,7 +179,7 @@ jobs:
     name: Harness Build / Windows ARM64
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
-    runs-on: windows-11-arm
+    runs-on: windows-11-vs2026-arm
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
