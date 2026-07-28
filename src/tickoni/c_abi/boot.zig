@@ -21,7 +21,7 @@ pub fn halt() void {
 }
 
 /// Platform-neutral tile-process teardown hook. Linux keeps the explicit
-/// fd_boot/fd_halt pairing; non-Linux process-mode child tiles exit
+/// fd_boot/fd_halt pairing; macOS and Windows retail child tiles exit
 /// immediately after their one tile returns, so skip tk_halt() there and let
 /// process teardown reclaim process-local state.
 pub fn haltForTileProcess() void {

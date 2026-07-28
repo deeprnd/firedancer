@@ -1,8 +1,11 @@
 /// Cross-platform OS abstraction — re-exports c_abi.os shim.
-/// All platform-specific code is in os.c behind #if FD_HAS_LINUX guards.
-/// Zig callers just call these — no platform forks in .zig files.
+/// All platform-specific code is hidden behind src/tickoni/c_abi/shim/os.c.
+const builtin = @import("builtin");
 const std = @import("std");
 pub const c = @import("c_abi").os;
+
+pub const ProcessId = if (builtin.os.tag == .windows) u32 else std.posix.pid_t;
+pub const FileDescriptor = if (builtin.os.tag == .windows) i32 else std.posix.fd_t;
 
 pub fn monotonicNanos() i64 {
     return c.monotonicNanos();
@@ -16,9 +19,9 @@ pub fn selfExePath(buf: []u8) ![]const u8 {
 pub fn parentPid(pid: c_int) c_int {
     return c.parentPid(pid) catch -1;
 }
-pub fn kill(pid: std.posix.pid_t) void {
+pub fn kill(pid: ProcessId) void {
     c.killProcess(@intCast(pid));
 }
-pub fn write(fd: std.posix.fd_t, buf: []const u8) usize {
+pub fn write(fd: FileDescriptor, buf: []const u8) usize {
     return c.write(@intCast(fd), buf);
 }
