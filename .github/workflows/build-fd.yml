@@ -111,8 +111,8 @@ jobs:
         run: just build-fd-arm
 
   # ── macOS: Clang (x86_64) ──────────────────────────────────────────────────
-  build-macos-intel:
-    name: Engine Build / macOS Intel
+  build-macos-x86_64:
+    name: Engine Build / macOS x86_64
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: macos-15-intel
@@ -140,7 +140,7 @@ jobs:
           compiler-version: system
 
       - name: Build
-        run: just build-fd-macos-intel
+        run: just build-fd-macos-x86_64
 
   # ── macOS: Clang (ARM64) ───────────────────────────────────────────────────
   build-macos-arm:

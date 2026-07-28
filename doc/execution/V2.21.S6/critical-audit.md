@@ -132,9 +132,9 @@ Verified by rerunning `just test-unit-tk`, which now executes these roots inside
 The short-test workflow now runs `just test-demo-tk` on the full visible short-test matrix covered by this workflow:
 
 - Linux
-- macOS 15 Intel
+- macOS 15 x86_64
 - macOS 15 ARM
-- macOS 26 Intel
+- macOS 26 x86_64
 - macOS 26 ARM
 
 `contrib/test/run_cli_demo_tests.sh` was also extended to verify:

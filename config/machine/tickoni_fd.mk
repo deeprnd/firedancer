@@ -33,7 +33,7 @@ endif
 
 # Platform-specific config.
 # On macOS, use the dedicated macOS build profile which auto-detects
-# architecture (Apple Silicon vs Intel) and sets correct flags.
+# architecture (Apple Silicon vs x86_64) and sets correct flags.
 # On Windows/MSYS, use the dedicated Windows clang profile.
 # On Linux, use native detection (native_config.sh).
 UNAME?=$(shell uname)

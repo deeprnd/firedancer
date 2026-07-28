@@ -15,7 +15,7 @@ those are scoped to separate stories (S3, S7, etc.).
 | Tier | OS | Arch | What it is |
 | --- | --- | --- | --- |
 | `linux_full` | Linux | x86_64, ARM64 | Shared-memory topology, seccomp/Landlock sandbox, AF_PACKET networking, full tile set |
-| `macos_retail` | macOS | ARM64, Intel | No seccomp/sandbox, no shared-memory topology, socket networking, reduced tile set |
+| `macos_retail` | macOS | ARM64, x86_64 | No seccomp/sandbox, no shared-memory topology, socket networking, reduced tile set |
 | `windows_retail` | Windows | x86_64, ARM64 | No seccomp/sandbox, no shared-memory topology, socket networking, reduced tile set |
 | `container_assisted` | Any hosted OS | varies | Runs inside another OS/host; tier is that of the host, with additional notes about hosting context |
 | `unsupported` | any | any | Not a supported OS or architecture; nothing runs |
