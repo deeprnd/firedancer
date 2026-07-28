@@ -514,9 +514,12 @@ install_openssl () {
     local windows_arch="${FD_WINDOWS_ARCH:-$(uname -m)}"
     local openssl_perl="perl"
 
-    # Do not mix Git-for-Windows /usr/bin/perl with Strawberry's Perl libs.
-    # OpenSSL Configure needs a self-consistent Perl install.
-    if [[ -x /c/Strawberry/perl/bin/perl.exe ]]; then
+    # In the MSYS/Git-Bash build path, OpenSSL Configure expects a Perl that
+    # speaks Unix-style paths. Prefer the shell-matched /usr/bin/perl when it
+    # exists; only fall back to Strawberry if no MSYS/Git Perl is available.
+    if [[ -x /usr/bin/perl ]]; then
+      openssl_perl="/usr/bin/perl"
+    elif [[ -x /c/Strawberry/perl/bin/perl.exe ]]; then
       openssl_perl="/c/Strawberry/perl/bin/perl.exe"
     elif [[ -x /c/Strawberry/perl/bin/perl ]]; then
       openssl_perl="/c/Strawberry/perl/bin/perl"
