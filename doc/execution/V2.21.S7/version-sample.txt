@@ -1,0 +1,10 @@
+Tickoni 0.1.0-dev
+Build ID: dev-unknown
+Git: unknown
+OS: Linux x86_64
+Runtime Tier: linux_full
+Isolation Tier: full
+Policy Schema: 2
+Replay Schema: 2
+Demo Manifest: 0
+Compiler: gcc (GCC)

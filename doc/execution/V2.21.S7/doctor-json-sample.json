@@ -1,0 +1,18 @@
+{
+  "platform_tier": "linux_full",
+  "result": "FAIL",
+  "counts": {"pass": 5, "warn": 3, "fail": 3},
+  "checks": [
+    {"name": "os", "status": "pass", "message": "Linux Ubuntu 24.04.4 LTS"},
+    {"name": "architecture", "status": "pass", "message": "x86_64"},
+    {"name": "environment", "status": "pass", "message": "native"},
+    {"name": "zig", "status": "fail", "message": "not found"},
+    {"name": "git", "status": "fail", "message": "no output"},
+    {"name": "make", "status": "fail", "message": "no output"},
+    {"name": "fixtures", "status": "pass", "message": "demo fixtures present"},
+    {"name": "model_mode", "status": "warn", "message": "no model provider configured (offline only)"},
+    {"name": "storage", "status": "warn", "message": "storage unavailable"},
+    {"name": "live_execution", "status": "pass", "message": "disabled"},
+    {"name": "source_build", "status": "warn", "message": "unreleased commit (not on a release tag)"}
+  ]
+}

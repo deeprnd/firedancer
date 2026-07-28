@@ -14,6 +14,20 @@ tile.
 There are no Tickoni-specific Prometheus endpoints in the current Phase 0
 supervisor.
 
+## Retail Runtime Privacy Defaults
+
+V2.21 retail runtime support is local-first:
+
+- installer telemetry is disabled by default
+- `tickoni --version`, `tickoni doctor`, and the deterministic demo flows do not
+  require outbound telemetry
+- evidence generation is local/offline by default
+- a later story may add opt-in diagnostics or managed export, but V2.21 does
+  not claim that remote telemetry is part of the retail support path
+
+The retail trust surface is therefore inspectable without network-side
+collection, background exporters, or hosted analytics dependencies.
+
 Current manual telemetry output is available through:
 
 ```bash
