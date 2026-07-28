@@ -43,6 +43,18 @@ if ($InstallGnuMake) {
     Install-ChocoPackage -Name 'make'
 }
 
+Install-ChocoPackage -Name 'strawberryperl'
+
+$strawberryPaths = @(
+    'C:\Strawberry\perl\bin',
+    'C:\Strawberry\c\bin'
+)
+foreach ($pathEntry in $strawberryPaths) {
+    if (Test-Path $pathEntry) {
+        Add-ToGitHubPath -Value $pathEntry
+    }
+}
+
 if ($InstallGitleaks) {
     $asset = Get-GitleaksAssetName -Version $GitleaksVersion
     $root = Join-Path $env:RUNNER_TEMP 'gitleaks'

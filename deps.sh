@@ -309,10 +309,16 @@ check_windows_pkgs () {
     curl
     git
     make
-    perl
     cmake
     tar
   )
+
+  local PERL_OK=0
+  if command -v perl >/dev/null 2>&1; then
+    if perl -MLocale::Maketext::Simple -e1 >/dev/null 2>&1; then
+      PERL_OK=1
+    fi
+  fi
 
   if command -v pkg-config >/dev/null 2>&1; then
     :
@@ -340,6 +346,9 @@ check_windows_pkgs () {
       MISSING_CMDS+=( "$cmd" )
     fi
   done
+  if [[ $PERL_OK -ne 1 ]]; then
+    MISSING_CMDS+=( perl-with-Locale-Maketext-Simple )
+  fi
 
   if [[ ${#MISSING_CMDS[@]} -eq 0 ]]; then
     echo "[~] OK: Windows build tools required for build are installed"
