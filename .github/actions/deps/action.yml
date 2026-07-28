@@ -38,6 +38,15 @@ runs:
           echo "HAS_APT_GET=0" >> $GITHUB_ENV
         fi
 
+    - name: Has choco?
+      shell: bash
+      run: |
+        if command -v choco > /dev/null 2>&1; then
+          echo "HAS_CHOCO=1" >> $GITHUB_ENV
+        else
+          echo "HAS_CHOCO=0" >> $GITHUB_ENV
+        fi
+
     - name: Set extras key value
       shell: bash
       id: extras_trimmed
@@ -79,6 +88,8 @@ runs:
         elif [ "${{ runner.os }}" = "macOS" ]; then
           brew install zstd
           echo "$(brew --prefix)/bin" >> $GITHUB_PATH
+        elif [ "${{ runner.os }}" = "Windows" ]; then
+          powershell -NoProfile -ExecutionPolicy Bypass -File .github/actions/deps/scripts/install-zstd-windows.ps1
         elif [ "${{ env.HAS_APT_GET }}" = "1" ]; then
           sudo apt-get install -y zstd
         else
@@ -89,13 +100,13 @@ runs:
     - name: Install dependencies from cache
       shell: bash
       run: |
-        tar -Izstd -xvf deps-bundle.tar.zst
+        zstd -d -c deps-bundle.tar.zst | tar -xf -
       if: steps.deps-sh-cache.outputs.cache-hit == 'true'
 
     - name: Install dependencies from scratch
       shell: bash
       run: |
-        if [[ "${{ inputs.compiler-version }}" != "system" ]]; then
+        if [[ "${{ runner.os }}" = "Linux" && "${{ inputs.compiler-version }}" != "system" ]]; then
           activate_path="/opt/${{ inputs.compiler }}/${{ inputs.compiler }}-${{ inputs.compiler-version }}/activate"
           if [[ -f "$activate_path" ]]; then
             source "$activate_path"
