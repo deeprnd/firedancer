@@ -18,8 +18,8 @@ The first-pass Windows build lanes must run natively on these GitHub-hosted runn
 
 | Runner label | Architecture | Mode |
 | --- | --- | --- |
-| `windows-2025` | x86_64 | native Windows |
-| `windows-11-arm` | ARM64 | native Windows |
+| `windows-2025-vs2026` | x86_64 | native Windows |
+| `windows-11-vs2026-arm` | ARM64 | native Windows |
 
 WSL2, containers, and VMs are not the official first-pass support path and must not be presented as the repo's Windows CI strategy.
 
@@ -31,10 +31,10 @@ The first PR series must land these four jobs:
 
 | Workflow | Job | Runner | Entrypoint |
 | --- | --- | --- | --- |
-| `build-fd.yml` | `Engine Build / Windows 2025` | `windows-2025` | `just build-fd-windows-x86` |
-| `build-fd.yml` | `Engine Build / Windows 11 ARM` | `windows-11-arm` | `just build-fd-windows-arm` |
-| `build-tk.yml` | `Harness Build / Windows 2025` | `windows-2025` | `just build-tk` after shared FD libs are built |
-| `build-tk.yml` | `Harness Build / Windows 11 ARM` | `windows-11-arm` | `just build-tk` after shared FD libs are built |
+| `build-fd.yml` | `Engine Build / Windows 2025` | `windows-2025-vs2026` | `just build-fd-windows-x86` |
+| `build-fd.yml` | `Engine Build / Windows 11 ARM` | `windows-11-vs2026-arm` | `just build-fd-windows-arm` |
+| `build-tk.yml` | `Harness Build / Windows 2025` | `windows-2025-vs2026` | `just build-tk` after shared FD libs are built |
+| `build-tk.yml` | `Harness Build / Windows 11 ARM` | `windows-11-vs2026-arm` | `just build-tk` after shared FD libs are built |
 
 Each workflow job must call existing repo entrypoints or shared composite actions. No job may inline a bespoke one-off Windows build sequence.
 
