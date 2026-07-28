@@ -35,9 +35,9 @@ Optional workflows (`benchmark.yml`, `book.yml`) are callable via `workflow_call
 || Workflow                  | Runner(s)                           | Jobs                                                         | Timeout |
 | ------------------------- | ----------------------------------- | ------------------------------------------------------------ | ------- |
 | `build-fd.yml`            | `ubuntu-24.04`, `ubuntu-24.04-arm`  | Engine Build (GCC, Clang, ARM)                               | 20–30 m |
-| `build-fd.yml` *(planned Windows lanes)* | `windows-2025`, `windows-11-arm` | Engine Build / Windows 2025, Engine Build / Windows 11 ARM | 20–30 m |
+| `build-fd.yml`            | `windows-2025`, `windows-11-arm`    | Engine Build / Windows x86_64, Engine Build / Windows ARM64  | 20–45 m |
 | `build-tk.yml`            | `ubuntu-24.04`                      | Harness Build                                                | 20–30 m |
-| `build-tk.yml` *(planned Windows lanes)* | `windows-2025`, `windows-11-arm` | Harness Build / Windows 2025, Harness Build / Windows 11 ARM | 20–30 m |
+| `build-tk.yml`            | `windows-2025`, `windows-11-arm`    | Harness Build / Windows x86_64, Harness Build / Windows ARM64 | 20–45 m |
 | `quality.yml`             | `ubuntu-24.04`                      | Format Check, Lint Check, Proto Check                        | 20–30 m |
 | `security.yml`            | `ubuntu-24.04`                      | Gitleaks, Sanitizers, SecComp                                | 20–45 m |
 | `tests-short.yml`         | `ubuntu-24.04`                      | Harness Unit Tests, Harness Integration Tests, Harness Coverage | 20 m    |
@@ -128,9 +128,9 @@ The ARM job uses the `ubuntu-24.04-arm` GitHub-hosted runner to catch architectu
 
 **File:** `.github/workflows/build-tk.yml`
 
-Compiles the Tickoni Zig harness (`just build-tk`). Runs on `ubuntu-24.04`.
+Compiles the Tickoni Zig harness (`just build-tk`). Runs on `ubuntu-24.04`, `windows-2025`, and `windows-11-arm`.
 
-The frozen V2.22 contract also plans two native Windows harness build lanes on `windows-2025` and `windows-11-arm`. Those jobs remain documentation-only until the shared actions, build entrypoints, and Windows portability fixes land.
+The frozen V2.22 contract in `doc/execution/V2.22/windows-build-ci.md` defines the first-pass native Windows harness lanes and their shared entrypoints.
 
 ---
 

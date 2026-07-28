@@ -78,6 +78,6 @@ Unsupported Windows runtime behavior must stay explicit in docs and code gates.
 
 ---
 
-## Planned lane note for CI docs
+## CI doc note
 
-Until the workflow jobs are wired in, `doc/execution/ci.md` should describe these as **planned Windows lanes** under the frozen contract above.
+`doc/execution/ci.md` should list these as active native Windows build lanes and point back to this frozen V2.22 contract for scope and non-goals.
