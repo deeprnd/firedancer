@@ -277,7 +277,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 
 ---
 
-### Phase 3: implement Windows C ABI shim support before trying to link Zig harness
+### Phase 3: implement Windows C ABI shim support before trying to link Zig harness — DONE
 
 **Objective:** Remove the obvious Windows compile blockers in C shims and OS helpers first.
 
@@ -435,7 +435,7 @@ But those jobs must still call shared repo entrypoints, not inline ad-hoc comman
 - `contrib/fd-build-lib.sh`
 - `contrib/fd-tk-libs.sh`
 
-### Task 4: Fix C shims for Windows
+### Task 4: Fix C shims for Windows — DONE
 **Files:**
 - `src/tickoni/c_abi/shim/os.c`
 - `src/tickoni/c_abi/shim/sandbox.c`
