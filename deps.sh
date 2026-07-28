@@ -512,12 +512,18 @@ install_openssl () {
   if [[ "$ID" = windows ]]; then
     local openssl_target
     local windows_arch="${FD_WINDOWS_ARCH:-$(uname -m)}"
+    local openssl_perl="perl"
+    local openssl_perl5lib=""
+    if [[ -x /usr/bin/perl ]]; then
+      openssl_perl="/usr/bin/perl"
+      openssl_perl5lib="/c/Strawberry/perl/site/lib:/c/Strawberry/perl/vendor/lib:/c/Strawberry/perl/lib"
+    fi
     if [[ "$windows_arch" =~ ^(arm64|aarch64)$ ]]; then
       openssl_target="mingwarm64"
     else
       openssl_target="mingw64"
     fi
-    CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" perl ./Configure "$openssl_target" "${CONFIG_OPTS[@]}"
+    PERL5LIB="$openssl_perl5lib" CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" "$openssl_perl" ./Configure "$openssl_target" "${CONFIG_OPTS[@]}"
   else
     CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" ./config "${CONFIG_OPTS[@]}"
   fi
