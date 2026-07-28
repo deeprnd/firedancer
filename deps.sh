@@ -509,7 +509,17 @@ install_openssl () {
     CONFIG_OPTS+=( enable-msan no-asm )
   fi
 
-  CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" ./config "${CONFIG_OPTS[@]}"
+  if [[ "$ID" = windows ]]; then
+    local openssl_target
+    if [[ "$FD_WINDOWS_ARCH" =~ ^(arm64|aarch64)$ || "$(uname -m)" =~ ^(arm64|aarch64)$ ]]; then
+      openssl_target="mingwarm64"
+    else
+      openssl_target="mingw64"
+    fi
+    CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" perl ./Configure "$openssl_target" "${CONFIG_OPTS[@]}"
+  else
+    CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" ./config "${CONFIG_OPTS[@]}"
+  fi
   echo "[+] Configured OpenSSL"
 
   echo "[+] Building OpenSSL"
