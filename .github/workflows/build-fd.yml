@@ -175,7 +175,7 @@ jobs:
       - name: Setup deps
         uses: ./.github/actions/setup-public-gh-runner
         with:
-          fd-deps: 'true'
+          fd-deps: 'false'
           compiler: clang
           compiler-version: system
 
@@ -195,7 +195,7 @@ jobs:
       - name: Setup deps
         uses: ./.github/actions/setup-public-gh-runner
         with:
-          fd-deps: 'true'
+          fd-deps: 'false'
           compiler: clang
           compiler-version: system
 
