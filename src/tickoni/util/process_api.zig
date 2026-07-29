@@ -19,7 +19,9 @@ pub const PollResult = union(enum) {
 };
 
 pub fn forceTerminate(pid: std.process.Child.Id) void {
-    os_api.kill(@intCast(pid));
+    if (builtin.os.tag != .windows) {
+        os_api.kill(@intCast(pid));
+    }
 }
 
 pub fn outcomeFromTerm(term: std.process.Child.Term, force_terminated: bool) ProcessOutcome {

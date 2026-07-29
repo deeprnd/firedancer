@@ -395,14 +395,16 @@ pub const Supervisor = struct {
             h.state = .running;
             state.children[i] = child;
 
-            switch (tile.cpu_placement) {
-                .exclusive, .shared => |cpu| {
-                    var cpu_set: util.cpu.CpuSet = undefined;
-                    util.cpu.zero(&cpu_set);
-                    util.cpu.set(&cpu_set, cpu);
-                    try util.cpu.setAffinity(@intCast(child.id.?), &cpu_set);
-                },
-                .floating => {},
+            if (@import("builtin").os.tag == .linux) {
+                switch (tile.cpu_placement) {
+                    .exclusive, .shared => |cpu| {
+                        var cpu_set: util.cpu.CpuSet = undefined;
+                        util.cpu.zero(&cpu_set);
+                        util.cpu.set(&cpu_set, cpu);
+                        try util.cpu.setAffinity(@intCast(child.id.?), &cpu_set);
+                    },
+                    .floating => {},
+                }
             }
         }
     }

@@ -2048,7 +2048,7 @@ fn shimCFlagsFor(target_os: std.Target.Os.Tag) []const []const u8 {
     return switch (target_os) {
         .linux => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_LINUX=1" },
         .macos => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_MACOS=1" },
-        .windows => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1" },
+        .windows => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1", "-D_CRT_SECURE_NO_WARNINGS", "-DFD_IO_STYLE=1", "-Wno-format", "-Wno-format-extra-args" },
         else => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1" },
     };
 }
@@ -2132,11 +2132,12 @@ fn linkTickoniTileRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: 
 fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
+    const target_os = step.root_module.resolved_target.?.result.os.tag;
     step.root_module.addCSourceFiles(.{
         .files = &.{
             "src/tickoni/c_abi/shim/ballet.c",
         },
-        .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+        .flags = shimCFlagsFor(target_os),
     });
     step.root_module.addLibraryPath(b.path(fd_lib_dir));
     step.root_module.linkSystemLibrary("fd_util", .{});
