@@ -1734,10 +1734,7 @@ pub fn build(b: *std.Build) void {
     cli_exe.root_module.addCSourceFiles(.{
         .files = &.{"src/tickoni/util/compiler_version.c"},
     });
-    cli_exe.root_module.addLibraryPath(b.path(fd_lib_dir));
-    cli_exe.root_module.linkSystemLibrary("fd_util", .{});
-    cli_exe.root_module.linkSystemLibrary("fd_ballet", .{});
-    cli_exe.root_module.linkSystemLibrary("stdc++", .{});
+    linkTickoniCodec(b, cli_exe, fd_lib_dir);
     b.installArtifact(cli_exe);
 
     const run_cli = b.addRunArtifact(cli_exe);
