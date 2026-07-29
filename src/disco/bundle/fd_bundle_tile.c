@@ -19,8 +19,8 @@
 #else
 #include <unistd.h> /* close */
 #include <sys/uio.h> /* writev */
-#endif
 #include <sys/mman.h> /* PROT_READ (seccomp) */
+#endif
 #include <netinet/in.h> /* AF_INET */
 #include <netinet/tcp.h> /* TCP_FASTOPEN_CONNECT (seccomp) */
 #include "../../waltz/resolv/fd_netdb.h"
