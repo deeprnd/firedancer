@@ -238,7 +238,7 @@ SORT_(cnt_valid)( SORT_IDX_T cnt ) {
   /* Written funny for supporting different signed idx types without
      generating compiler warnings. */
   SORT_IDX_T max = (SORT_IDX_T)fd_ulong_min( (-alignof(SORT_KEY_T))/sizeof(SORT_KEY_T), /* ==floor( (2^64-align-1)/sz ) */
-                                             (ulong)(SORT_IDX_T)((1UL<<57)-1UL) );      /* ==SORT_IDX_MAX as ulong */
+                                             (ulong)(SORT_IDX_T)((1ULL<<57)-1ULL) );     /* ==SORT_IDX_MAX as ulong */
   return (!cnt) | ((((SORT_IDX_T)0)<cnt) & (cnt<max)) | (cnt==max);
 }
 

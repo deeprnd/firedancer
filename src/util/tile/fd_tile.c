@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #include <errno.h>
+#if FD_HAS_LINUX
 #include <sched.h>
+#endif
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -12,7 +14,7 @@
 int
 fd_cpuset_getaffinity( ulong         pid,
                        fd_cpuset_t * mask ) {
-# if defined(__linux__)
+# if FD_HAS_LINUX
   return sched_getaffinity( (int)pid, fd_cpuset_word_cnt<<3, (cpu_set_t *)fd_type_pun( mask ) );
 # else
   (void)pid; (void)mask;
@@ -24,7 +26,7 @@ fd_cpuset_getaffinity( ulong         pid,
 int
 fd_cpuset_setaffinity( ulong               pid,
                        fd_cpuset_t const * mask ) {
-# if defined(__linux__)
+# if FD_HAS_LINUX
   return sched_setaffinity( (int)pid, fd_cpuset_word_cnt<<3, (cpu_set_t const *)fd_type_pun_const( mask ) );
 # else
   (void)pid; (void)mask;
@@ -35,7 +37,7 @@ fd_cpuset_setaffinity( ulong               pid,
 
 ulong
 fd_tile_private_sibling_idx( ulong cpu_idx ) {
-# if defined(__linux__)
+# if FD_HAS_LINUX
   char path[ PATH_MAX ];
   FD_TEST( fd_cstr_printf_check( path, PATH_MAX, NULL, "/sys/devices/system/cpu/cpu%lu/topology/thread_siblings_list", cpu_idx ) );
 

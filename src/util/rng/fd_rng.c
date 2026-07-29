@@ -21,7 +21,7 @@ fd_rng_float_robust( fd_rng_t * rng ) {
 float
 fd_rng_float_exp( fd_rng_t * rng ) {
   ulong u = 1UL + (fd_rng_ulong( rng ) >> 1);    /* In (0,2^63] uniform */
-  float f = ((float)u) * (1.f/(float)(1UL<<63)); /* In uniform (0,1] with reasonably low quant, exact */
+  float f = ((float)u) * (1.f/(float)(1ULL<<63)); /* In uniform (0,1] with reasonably low quant, exact */
   return -logf( f );                             /* Convert to exp */
 }
 
@@ -301,7 +301,7 @@ fd_rng_double_robust( fd_rng_t * rng ) {
 double
 fd_rng_double_exp( fd_rng_t * rng ) {
   ulong  u = 1UL + (fd_rng_ulong( rng ) >> 1);
-  double d = ((double)u) * (1./(double)(1UL<<63));
+  double d = ((double)u) * (1./(double)(1ULL<<63));
   return -log( d );
 }
 
