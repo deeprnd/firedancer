@@ -331,7 +331,9 @@ fd_ulong_pow2_up( ulong x ) {
   x |= (x>> 4);
   x |= (x>> 8);
   x |= (x>>16);
+#if FD_HAS_WINDOWS || ULONG_MAX>0xffffffffUL
   x |= (x>>32);
+#endif
   x++;
   return x;
 }
@@ -344,7 +346,9 @@ fd_ulong_pow2_dn( ulong x ) {
   x |= (x>> 4);
   x |= (x>> 8);
   x |= (x>>16);
+#if FD_HAS_WINDOWS || ULONG_MAX>0xffffffffUL
   x |= (x>>32);
+#endif
   x++;
   return x;
 }
@@ -418,7 +422,7 @@ FD_FN_CONST static inline T    fd_##T##_zz_dec      ( UT x            ) { return
 FD_SRC_UTIL_BITS_FD_BITS_IMPL(schar, uchar,    8)
 FD_SRC_UTIL_BITS_FD_BITS_IMPL(short, ushort,  16)
 FD_SRC_UTIL_BITS_FD_BITS_IMPL(int,   uint,    32)
-FD_SRC_UTIL_BITS_FD_BITS_IMPL(long,  ulong,   64)
+FD_SRC_UTIL_BITS_FD_BITS_IMPL(long,  ulong,   (8UL*sizeof(long)))
 #ifdef __SIZEOF_INT128__
 FD_SRC_UTIL_BITS_FD_BITS_IMPL(int128,uint128,128)
 #endif
@@ -458,9 +462,9 @@ fd_uint_hash( uint x ) {
 FD_FN_CONST static inline ulong
 fd_ulong_hash( ulong x ) {
   x ^= x >> 33;
-  x *= 0xff51afd7ed558ccdUL;
+  x *= 0xff51afd7ed558ccdULL;
   x ^= x >> 33;
-  x *= 0xc4ceb9fe1a85ec53UL;
+  x *= 0xc4ceb9fe1a85ec53ULL;
   x ^= x >> 33;
   return x;
 }
@@ -488,9 +492,9 @@ fd_uint_hash_inverse( uint x ) {
 FD_FN_CONST static inline ulong
 fd_ulong_hash_inverse( ulong x ) {
   x ^= x >> 33;
-  x *= 0x9cb4b2f8129337dbUL;
+  x *= 0x9cb4b2f8129337dbULL;
   x ^= x >> 33;
-  x *= 0x4f74430c22a54005UL;
+  x *= 0x4f74430c22a54005ULL;
   x ^= x >> 33;
   return x;
 }
@@ -714,11 +718,11 @@ FD_FN_PURE static inline uint   fd_uint_load_3_fast  ( void const * p ) { uint  
 
 #define                         fd_ulong_load_1_fast                    fd_ulong_load_1
 #define                         fd_ulong_load_2_fast                    fd_ulong_load_2
-FD_FN_PURE static inline ulong  fd_ulong_load_3_fast ( void const * p ) { uint   t; memcpy( &t, p, 4UL ); return ((ulong)t) & 0x0000000000ffffffUL; }
+FD_FN_PURE static inline ulong  fd_ulong_load_3_fast ( void const * p ) { uint   t; memcpy( &t, p, 4UL ); return ((ulong)t) & 0x0000000000ffffffULL; }
 #define                         fd_ulong_load_4_fast                    fd_ulong_load_4
-FD_FN_PURE static inline ulong  fd_ulong_load_5_fast ( void const * p ) { ulong  t; memcpy( &t, p, 8UL ); return         t  & 0x000000ffffffffffUL; }
-FD_FN_PURE static inline ulong  fd_ulong_load_6_fast ( void const * p ) { ulong  t; memcpy( &t, p, 8UL ); return         t  & 0x0000ffffffffffffUL; }
-FD_FN_PURE static inline ulong  fd_ulong_load_7_fast ( void const * p ) { ulong  t; memcpy( &t, p, 8UL ); return         t  & 0x00ffffffffffffffUL; }
+FD_FN_PURE static inline ulong  fd_ulong_load_5_fast ( void const * p ) { ulong  t; memcpy( &t, p, 8UL ); return         t  & 0x000000ffffffffffULL; }
+FD_FN_PURE static inline ulong  fd_ulong_load_6_fast ( void const * p ) { ulong  t; memcpy( &t, p, 8UL ); return         t  & 0x0000ffffffffffffULL; }
+FD_FN_PURE static inline ulong  fd_ulong_load_7_fast ( void const * p ) { ulong  t; memcpy( &t, p, 8UL ); return         t  & 0x00ffffffffffffffULL; }
 #define                         fd_ulong_load_8_fast                    fd_ulong_load_8
 
 #elif FD_UNALIGNED_ACCESS_STYLE==1 /* direct access */
@@ -767,11 +771,11 @@ FD_FN_PURE static inline uint   fd_uint_load_3_fast  ( void const * p ) { FD_COM
 
 #define                         fd_ulong_load_1_fast                    fd_ulong_load_1
 #define                         fd_ulong_load_2_fast                    fd_ulong_load_2
-FD_FN_PURE static inline ulong  fd_ulong_load_3_fast ( void const * p ) { FD_COMPILER_FORGET( p ); return ((ulong)*(uint   const *)p) & 0x0000000000ffffffUL; } /* Tail read 1B */
+FD_FN_PURE static inline ulong  fd_ulong_load_3_fast ( void const * p ) { FD_COMPILER_FORGET( p ); return ((ulong)*(uint   const *)p) & 0x0000000000ffffffULL; } /* Tail read 1B */
 #define                         fd_ulong_load_4_fast                    fd_ulong_load_4
-FD_FN_PURE static inline ulong  fd_ulong_load_5_fast ( void const * p ) { FD_COMPILER_FORGET( p ); return (       *(ulong  const *)p) & 0x000000ffffffffffUL; } /* Tail read 3B */
-FD_FN_PURE static inline ulong  fd_ulong_load_6_fast ( void const * p ) { FD_COMPILER_FORGET( p ); return (       *(ulong  const *)p) & 0x0000ffffffffffffUL; } /* Tail read 2B */
-FD_FN_PURE static inline ulong  fd_ulong_load_7_fast ( void const * p ) { FD_COMPILER_FORGET( p ); return (       *(ulong  const *)p) & 0x00ffffffffffffffUL; } /* Tail read 1B */
+FD_FN_PURE static inline ulong  fd_ulong_load_5_fast ( void const * p ) { FD_COMPILER_FORGET( p ); return (       *(ulong  const *)p) & 0x000000ffffffffffULL; } /* Tail read 3B */
+FD_FN_PURE static inline ulong  fd_ulong_load_6_fast ( void const * p ) { FD_COMPILER_FORGET( p ); return (       *(ulong  const *)p) & 0x0000ffffffffffffULL; } /* Tail read 2B */
+FD_FN_PURE static inline ulong  fd_ulong_load_7_fast ( void const * p ) { FD_COMPILER_FORGET( p ); return (       *(ulong  const *)p) & 0x00ffffffffffffffULL; } /* Tail read 1B */
 #define                         fd_ulong_load_8_fast                    fd_ulong_load_8
 
 #else
@@ -791,8 +795,8 @@ fd_ulong_svw_enc_sz( ulong x ) {
   if( FD_LIKELY( x<(1UL<<10) ) ) return 2UL;
   if( FD_LIKELY( x<(1UL<<18) ) ) return 3UL;
   if( FD_LIKELY( x<(1UL<<24) ) ) return 4UL;
-  if( FD_LIKELY( x<(1UL<<32) ) ) return 5UL;
-  if( FD_LIKELY( x<(1UL<<56) ) ) return 8UL;
+  if( FD_LIKELY( x<(1ULL<<32) ) ) return 5UL;
+  if( FD_LIKELY( x<(1ULL<<56) ) ) return 8UL;
   return                                9UL;
 }
 
@@ -808,8 +812,8 @@ fd_ulong_svw_enc( uchar * b,
   else if( FD_LIKELY( x<(1UL<<10) ) ) { FD_STORE( ushort, b, (ushort)(            0x8001UL | (x<<3)) );                                   b+=2; } /* 100  | x(10) |  001 */
   else if( FD_LIKELY( x<(1UL<<18) ) ) { FD_STORE( ushort, b, (ushort)(               0x5UL | (x<<3)) ); b[2] = (uchar)(0xa0UL | (x>>13)); b+=3; } /* 101  | x(18) |  101 */
   else if( FD_LIKELY( x<(1UL<<24) ) ) { FD_STORE( uint,   b, (uint  )(        0xc0000003UL | (x<<4)) );                                   b+=4; } /* 1100 | x(24) | 0011 */
-  else if( FD_LIKELY( x<(1UL<<32) ) ) { FD_STORE( uint,   b, (uint  )(               0xbUL | (x<<4)) ); b[4] = (uchar)(0xd0UL | (x>>28)); b+=5; } /* 1101 | x(32) | 1011 */
-  else if( FD_LIKELY( x<(1UL<<56) ) ) { FD_STORE( ulong,  b,          0xe000000000000007UL | (x<<4)  );                                   b+=8; } /* 1110 | x(56) | 0111 */
+  else if( FD_LIKELY( x<(1ULL<<32) ) ) { FD_STORE( uint,   b, (uint  )(               0xbUL | (x<<4)) ); b[4] = (uchar)(0xd0UL | (x>>28)); b+=5; } /* 1101 | x(32) | 1011 */
+  else if( FD_LIKELY( x<(1ULL<<56) ) ) { FD_STORE( ulong,  b,          0xe000000000000007ULL | (x<<4)  );                                  b+=8; } /* 1110 | x(56) | 0111 */
   else                                { FD_STORE( ulong,  b,                         0xfUL | (x<<4)  ); b[8] = (uchar)(0xf0UL | (x>>60)); b+=9; } /* 1111 | x(64) | 1111 */
   return b;
 }
@@ -830,7 +834,7 @@ fd_ulong_svw_enc_fixed( uchar * b,
   else if( FD_LIKELY( csz==3UL ) ) { FD_STORE( ushort, b, (ushort)(               0x5UL | (x<<3)) ); b[2] = (uchar)(0xa0UL | (x>>13)); } /* 101  | x(18) |  101 */
   else if( FD_LIKELY( csz==4UL ) ) { FD_STORE( uint,   b, (uint  )(        0xc0000003UL | (x<<4)) );                                   } /* 1100 | x(24) | 0011 */
   else if( FD_LIKELY( csz==5UL ) ) { FD_STORE( uint,   b, (uint  )(               0xbUL | (x<<4)) ); b[4] = (uchar)(0xd0UL | (x>>28)); } /* 1101 | x(32) | 1011 */
-  else if( FD_LIKELY( csz==8UL ) ) { FD_STORE( ulong,  b,          0xe000000000000007UL | (x<<4)  );                                   } /* 1110 | x(56) | 0111 */
+  else if( FD_LIKELY( csz==8UL ) ) { FD_STORE( ulong,  b,          0xe000000000000007ULL | (x<<4)  );                                  } /* 1110 | x(56) | 0111 */
   else             /* csz==9UL */  { FD_STORE( ulong,  b,                         0xfUL | (x<<4)  ); b[8] = (uchar)(0xf0UL | (x>>60)); } /* 1111 | x(64) | 1111 */
   return b+csz;
 }
@@ -855,7 +859,7 @@ fd_ulong_svw_dec_sz( uchar const * b ) {
      1111 1110 1101 1100 1011 1010 1001 1000 0111 0110 0101 0100 0011 0010 0001 0000
        9    1    3    1    5    1    2    1    8    1    3    1    4    1    2    1 */
 
-  return (0x9131512181314121UL >> ((((ulong)b[0]) & 15UL) << 2)) & 15UL;
+  return (0x9131512181314121ULL >> ((((ulong)b[0]) & 15UL) << 2)) & 15UL;
 }
 
 /* fd_ulong_svw_dec_tail_sz returns the number of bytes representing an
@@ -878,7 +882,7 @@ fd_ulong_svw_dec_tail_sz( uchar const * b ) {
      1111 1110 1101 1100 1011 1010 1001 1000 0111 0110 0101 0100 0011 0010 0001 0000
        9    8    5    4    3    3    2    2    1    1    1    1    1    1    1    1 */
 
-  return (0x9854332211111111UL >> ((((ulong)b[-1]) >> 4) << 2)) & 15UL;
+  return (0x9854332211111111ULL >> ((((ulong)b[-1]) >> 4) << 2)) & 15UL;
 }
 
 /* fd_ulong_svw_dec_fixed decodes a ulong encoded as a symmetric
@@ -894,7 +898,7 @@ fd_ulong_svw_dec_fixed( uchar const * b,
   if( FD_LIKELY( csz==3UL ) ) return (fd_ulong_load_2( b ) >> 3) | ((((ulong)b[2]) & 0x1fUL) << 13);
   if( FD_LIKELY( csz==4UL ) ) return (fd_ulong_load_4( b ) >> 4) &          16777215UL;
   if( FD_LIKELY( csz==5UL ) ) return (fd_ulong_load_4( b ) >> 4) | ((((ulong)b[4]) & 0x0fUL) << 28);
-  if( FD_LIKELY( csz==8UL ) ) return (fd_ulong_load_8( b ) >> 4) & 72057594037927935UL;
+  if( FD_LIKELY( csz==8UL ) ) return (fd_ulong_load_8( b ) >> 4) & 72057594037927935ULL;
   return       /*csz==9UL*/          (fd_ulong_load_8( b ) >> 4) | ( ((ulong)b[8])           << 60);
 }
 

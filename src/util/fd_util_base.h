@@ -322,7 +322,11 @@ typedef signed char schar; /* See above note of sadness */
 typedef unsigned char  uchar;
 typedef unsigned short ushort;
 typedef unsigned int   uint;
+#if FD_HAS_WINDOWS
+typedef unsigned long long ulong;
+#else
 typedef unsigned long  ulong;
+#endif
 
 #ifdef __SIZEOF_INT128__
 
