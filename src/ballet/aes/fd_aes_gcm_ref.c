@@ -64,7 +64,7 @@ fd_gcm128_aad( fd_aes_gcm_ref_t * aes_gcm,
     return -2;
 
   alen += aad_sz;
-  if (alen > (1UL<<61) || (sizeof(aad_sz) == 8 && alen < aad_sz))
+  if (alen > (1ULL<<61) || (sizeof(aad_sz) == 8 && alen < aad_sz))
     return -1;
   aes_gcm->len.u[0] = alen;
 
@@ -112,7 +112,7 @@ fd_gcm128_encrypt( fd_aes_gcm_ref_t * ctx,
   void *key = &ctx->key;
 
   mlen += len;
-  if (mlen > ((1UL<<36) - 32) || (sizeof(len) == 8 && mlen < len))
+  if (mlen > ((1ULL<<36) - 32) || (sizeof(len) == 8 && mlen < len))
     return -1;
   ctx->len.u[1] = mlen;
 
@@ -165,7 +165,7 @@ fd_gcm128_decrypt( fd_aes_gcm_ref_t * ctx,
   void * key = &ctx->key;
 
   mlen += len;
-  if (mlen > ((1UL<<36) - 32) || (sizeof(len) == 8 && mlen < len))
+  if (mlen > ((1ULL<<36) - 32) || (sizeof(len) == 8 && mlen < len))
     return -1;
   ctx->len.u[1] = mlen;
 

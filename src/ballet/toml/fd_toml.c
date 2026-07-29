@@ -3,7 +3,13 @@
 #include "../../util/fd_util.h"
 #include <ctype.h>
 #include <math.h>
+#include <string.h>
+#if !FD_HAS_WINDOWS
 #include <strings.h>
+#else
+#define strcasecmp  _stricmp
+#define strncasecmp _strnicmp
+#endif
 
 /* Implementation note:
 
