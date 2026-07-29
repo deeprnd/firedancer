@@ -111,7 +111,7 @@ fd_cnc_delete( void * shcnc ) {
   return (void *)cnc;
 }
 
-#if FD_HAS_HOSTED && FD_HAS_ATOMIC
+#if FD_HAS_HOSTED && FD_HAS_ATOMIC && !FD_HAS_WINDOWS
 
 #include <errno.h>
 #include <signal.h>
