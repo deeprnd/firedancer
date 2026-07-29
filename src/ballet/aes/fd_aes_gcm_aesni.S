@@ -555,7 +555,6 @@
 
 	// Additional local variables.
 	// %xmm0-%xmm1 and %rax are used as temporaries.
-	.set	RNDKEYLAST_PTR,	%rsi
 	.set	H_CUR,		%xmm2
 	.set	H_POW1,		%xmm3	// H^1
 	.set	H_POW1_X64,	%xmm4	// H^1 * x^64
@@ -563,15 +562,15 @@
 
 	// Encrypt an all-zeroes block to get the raw hash subkey.
 	movl		OFFSETOF_AESKEYLEN(%rdi), %eax
-	lea		6*16(%rdi,%rax,4), RNDKEYLAST_PTR
+	lea		6*16(%rdi,%rax,4), %rsi
 	movdqa		(%rdi), H_POW1  // Zero-th round key XOR all-zeroes block
 	lea		16(%rdi), %rax
 1:
 	aesenc		(%rax), H_POW1
 	add		$FD_IMM_16d, %rax
-	cmp		%rax, RNDKEYLAST_PTR
+	cmp		%rax, %rsi
 	jne		1b
-	aesenclast	(RNDKEYLAST_PTR), H_POW1
+	aesenclast	(%rsi), H_POW1
 
 	// Preprocess the raw hash subkey as needed to operate on GHASH's
 	// bit-reflected values directly: reflect its bytes, then multiply it by
@@ -755,7 +754,6 @@
 
 	.set	AESKEYLEN,	%r10d	// AES key length in bytes
 	.set	AESKEYLEN64,	%r10
-	.set	RNDKEYLAST_PTR,	%r11	// Pointer to last AES round key
 
 	// Put the most frequently used values in %xmm0-%xmm7 to reduce code
 	// size.  (%xmm0-%xmm7 take fewer bytes to encode than %xmm8-%xmm15.)
@@ -782,7 +780,7 @@
 	movdqu		(LE_CTR_PTR), LE_CTR
 
 	movl		OFFSETOF_AESKEYLEN(%rdi), AESKEYLEN
-	lea		6*16(%rdi,AESKEYLEN64,4), RNDKEYLAST_PTR
+	lea		6*16(%rdi,AESKEYLEN64,4), %r11
 
 	// If there are at least 8*16 bytes of data, then continue into the main
 	// loop, which processes 8*16 bytes of data per iteration.
@@ -807,7 +805,7 @@ GNU_PALIGN(4)
 	movdqa		(%rsi), TMP0
 	_aesenc_8x	TMP0
 	add		$FD_IMM_16d, %rsi
-	cmp		%rsi, RNDKEYLAST_PTR
+	cmp		%rsi, %r11
 	jne		1b
 	movdqa		(%rsi), TMP0
 	_aesenclast_8x	TMP0
@@ -849,11 +847,11 @@ GNU_PALIGN(4)
 	movdqa		(%rsi), TMP0
 	add		$FD_IMM_16d, %rsi
 	_aesenc_8x	TMP0
-	cmp		%rsi, RNDKEYLAST_PTR
+	cmp		%rsi, %r11
 	jne		1b
 
 	// Do the GHASH reduction and the last round of AES.
-	movdqa		(RNDKEYLAST_PTR), TMP0
+	movdqa		(%r11), TMP0
 	_ghash_update_end_8x_step	0
 	_aesenclast_8x	TMP0
 	_ghash_update_end_8x_step	1
@@ -926,7 +924,7 @@ GNU_PALIGN(4)
 	_vpshufb	BSWAP_MASK, LE_CTR, TMP0
 	paddd		ONE, LE_CTR
 	pxor		(%rdi), TMP0
-	lea		-6*16(RNDKEYLAST_PTR), %rsi	// Reduce code size
+	lea		-6*16(%r11), %rsi	// Reduce code size
 	cmp		$FD_IMM_24d, AESKEYLEN
 	jl		128f	// AES-128?
 	je		192f	// AES-192?
@@ -940,7 +938,7 @@ GNU_PALIGN(4)
 .irp i, -3,-2,-1,0,1,2,3,4,5
 	aesenc		\i*16(%rsi), TMP0
 .endr
-	aesenclast	(RNDKEYLAST_PTR), TMP0
+	aesenclast	(%r11), TMP0
 
 	// Load the next key power H^i.
 	movdqa		OFFSETOF_H_POWERS(%rdi,%rax,2), H_POW
@@ -987,9 +985,9 @@ GNU_PALIGN(4)
 1:
 	aesenc		(%rsi), LE_CTR
 	add		$FD_IMM_16d, %rsi
-	cmp		%rsi, RNDKEYLAST_PTR
+	cmp		%rsi, %r11
 	jne		1b
-	aesenclast	(RNDKEYLAST_PTR), LE_CTR
+	aesenclast	(%r11), LE_CTR
 
 	// Load the lowest key power, H^1.
 	movdqa		OFFSETOF_H_POWERS(%rdi,%rax,2), H_POW
@@ -997,10 +995,10 @@ GNU_PALIGN(4)
 
 	// Load and zero-pad 1 <= DATALEN <= 15 bytes of data from SRC.  SRC is
 	// in %rcx, but _load_partial_block needs DATALEN in %rcx instead.
-	// RNDKEYLAST_PTR is no longer needed, so reuse it for SRC.
-	mov		SRC, RNDKEYLAST_PTR
+	// %r11 is no longer needed, so reuse it for SRC.
+	mov		SRC, %r11
 	mov		DATALEN, %ecx
-	_load_partial_block	RNDKEYLAST_PTR, TMP0, %rsi, %esi
+	_load_partial_block	%r11, TMP0, %rsi, %esi
 
 	// XOR the keystream block that was just generated in LE_CTR with the
 	// source data block and store the resulting en/decrypted data to DST.
