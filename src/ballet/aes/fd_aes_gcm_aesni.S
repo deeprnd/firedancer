@@ -735,9 +735,6 @@
 	// the LE counter pointer and is then reused as a temp register after the
 	// counter load.
 
-	.set	AESKEYLEN,	%r10d	// AES key length in bytes
-	.set	AESKEYLEN64,	%r10
-
 	// Put the most frequently used values in %xmm0-%xmm7 to reduce code
 	// size.  (%xmm0-%xmm7 take fewer bytes to encode than %xmm8-%xmm15.)
 	.set	TMP0,		%xmm0
@@ -762,8 +759,8 @@
 	movdqu		(%rdx), GHASH_ACC
 	movdqu		(%rsi), LE_CTR
 
-	movl		OFFSETOF_AESKEYLEN(%rdi), AESKEYLEN
-	lea		6*16(%rdi,AESKEYLEN64,4), %r11
+	movl		OFFSETOF_AESKEYLEN(%rdi), %r10d
+	lea		6*16(%rdi,%r10,4), %r11
 
 	// If there are at least 8*16 bytes of data, then continue into the main
 	// loop, which processes 8*16 bytes of data per iteration.
@@ -908,7 +905,7 @@ GNU_PALIGN(4)
 	paddd		ONE, LE_CTR
 	pxor		(%rdi), TMP0
 	lea		-6*16(%r11), %rsi	// Reduce code size
-	cmp		$FD_IMM_24d, AESKEYLEN
+	cmp		$FD_IMM_24d, %r10d
 	jl		128f	// AES-128?
 	je		192f	// AES-192?
 	// AES-256
@@ -1043,8 +1040,6 @@ GNU_PALIGN(4)
 
 	// Additional local variables.
 	// %rax and %xmm0-%xmm2 are used as temporary registers.
-	.set	AESKEYLEN,	%r11d
-	.set	AESKEYLEN64,	%r11
 	.set	BSWAP_MASK,	%xmm3
 	.set	GHASH_ACC,	%xmm4
 	.set	H_POW1,		%xmm5	// H^1
@@ -1052,7 +1047,7 @@ GNU_PALIGN(4)
 	.set	GFPOLY,		%xmm7
 
 	movdqa		.Lbswap_mask(%rip), BSWAP_MASK
-	movl		OFFSETOF_AESKEYLEN(%rdi), AESKEYLEN
+	movl		OFFSETOF_AESKEYLEN(%rdi), %r11d
 
 	// Set up a counter block with 1 in the low 32-bit word.  This is the
 	// counter that produces the ciphertext needed to encrypt the auth tag.
@@ -1072,13 +1067,13 @@ GNU_PALIGN(4)
 
 	// Make %rax point to the 6th from last AES round key.  (Using signed
 	// byte offsets -7*16 through 6*16 decreases code size.)
-	lea		(%rdi,AESKEYLEN64,4), %rax
+	lea		(%rdi,%r11,4), %rax
 
 	// AES-encrypt the counter block and also multiply GHASH_ACC by H^1.
 	// Interleave the AES and GHASH instructions to improve performance.
 	pshufb		BSWAP_MASK, %xmm0
 	pxor		(%rdi), %xmm0
-	cmp		$FD_IMM_24d, AESKEYLEN
+	cmp		$FD_IMM_24d, %r11d
 	jl		128f	// AES-128?
 	je		192f	// AES-192?
 	// AES-256
