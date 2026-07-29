@@ -20,12 +20,16 @@
 #include <inttypes.h> /* PRIu64 for portable uint64 format */
 #if FD_HAS_WINDOWS
 #include <io.h>
+struct pollfd { int fd; short events; short revents; };
+#define POLLOUT 0x0010
+#define POLLERR 0x0008
+#define POLLHUP 0x0010
 #define FD_BUNDLE_SOCKET_CLOSE closesocket
 #else
 #include <unistd.h> /* close */
+#include <poll.h> /* poll */
 #define FD_BUNDLE_SOCKET_CLOSE close
 #endif
-#include <poll.h> /* poll */
 #include <sys/socket.h> /* socket */
 #include <netinet/in.h>
 #if FD_HAS_LINUX
