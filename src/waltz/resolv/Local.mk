@@ -2,6 +2,9 @@ ifdef FD_HAS_HOSTED
 
 # High level API
 $(call add-hdrs,fd_netdb.h)
+ifdef FD_HAS_WINDOWS
+$(call add-objs,fd_netdb_windows_stub,fd_waltz)
+else
 $(call add-objs,fd_getaddrinfo,fd_waltz)
 
 # Config
@@ -34,5 +37,6 @@ $(call make-fuzz-test,fuzz_dns_parse,fuzz_dns_parse,fd_waltz fd_util)
 
 $(call make-unit-test,test_resolv,test_resolv,fd_waltz fd_util)
 $(call run-unit-test,test_resolv)
+endif
 
 endif
