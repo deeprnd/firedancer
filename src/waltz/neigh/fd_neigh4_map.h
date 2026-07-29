@@ -15,21 +15,35 @@ union __attribute__((aligned(16))) fd_neigh4_entry {
     uint  ip4_addr;
     uchar mac_addr[6]; /* MAC address */
     uchar state;
-    ulong probe_suppress_until : 40; /* Holds deadline>>24, so minimum delay
-                                        is ~16.7M ticks (2**24) */
-    #define FD_NEIGH4_PROBE_SUPPRESS_SHIFT ( sizeof(ulong)*8 - 40 )
-    #define FD_NEIGH4_PROBE_SUPPRESS_MASK ( (1UL<<40) - 1 )
-
-    #define FD_NEIGH4_PROBE_SUPPRESS_UNTIL_SET(entry, deadline) \
-      ulong udead = ((ulong)(deadline))>>FD_NEIGH4_PROBE_SUPPRESS_SHIFT; \
-      (entry)->probe_suppress_until = udead & FD_NEIGH4_PROBE_SUPPRESS_MASK;
-    #define FD_NEIGH4_PROBE_SUPPRESS_UNTIL_GET(entry) \
-      (long)(((entry)->probe_suppress_until)<<FD_NEIGH4_PROBE_SUPPRESS_SHIFT)
+    uchar probe_suppress_until[5]; /* Holds deadline>>24, so minimum delay is ~16.7M ticks (2**24) */
   };
 #if FD_HAS_X86
   __m128i xmm[1];
 #endif
 };
+
+#define FD_NEIGH4_PROBE_SUPPRESS_SHIFT ( 24UL )
+#define FD_NEIGH4_PROBE_SUPPRESS_MASK  ( (1ULL<<40) - 1ULL )
+#define FD_NEIGH4_PROBE_SUPPRESS_RAW_GET(entry) \
+  ( ((ulong)((entry)->probe_suppress_until[0]))        | \
+    ((ulong)((entry)->probe_suppress_until[1])<< 8)    | \
+    ((ulong)((entry)->probe_suppress_until[2])<<16)    | \
+    ((ulong)((entry)->probe_suppress_until[3])<<24)    | \
+    ((ulong)((entry)->probe_suppress_until[4])<<32) )
+#define FD_NEIGH4_PROBE_SUPPRESS_RAW_SET(entry, value) do { \
+    ulong _u = ((ulong)(value)) & FD_NEIGH4_PROBE_SUPPRESS_MASK; \
+    (entry)->probe_suppress_until[0] = (uchar)_u; \
+    (entry)->probe_suppress_until[1] = (uchar)(_u>> 8); \
+    (entry)->probe_suppress_until[2] = (uchar)(_u>>16); \
+    (entry)->probe_suppress_until[3] = (uchar)(_u>>24); \
+    (entry)->probe_suppress_until[4] = (uchar)(_u>>32); \
+  } while(0)
+#define FD_NEIGH4_PROBE_SUPPRESS_UNTIL_SET(entry, deadline) do { \
+    ulong _udead = ((ulong)(deadline))>>FD_NEIGH4_PROBE_SUPPRESS_SHIFT; \
+    FD_NEIGH4_PROBE_SUPPRESS_RAW_SET( (entry), _udead ); \
+  } while(0)
+#define FD_NEIGH4_PROBE_SUPPRESS_UNTIL_GET(entry) \
+  ( (long)( FD_NEIGH4_PROBE_SUPPRESS_RAW_GET( (entry) )<<FD_NEIGH4_PROBE_SUPPRESS_SHIFT ) )
 
 typedef union fd_neigh4_entry fd_neigh4_entry_t;
 
@@ -44,7 +58,7 @@ fd_neigh4_entry_atomic_st( fd_neigh4_entry_t       * dst,
   FD_VOLATILE( dst->xmm[0] ) = src->xmm[0];
 # else
   memcpy( dst->mac_addr, src->mac_addr, 6 );
-  dst->probe_suppress_until     = src->probe_suppress_until;
+  memcpy( dst->probe_suppress_until, src->probe_suppress_until, 5 );
   FD_VOLATILE( dst->ip4_addr )  = src->ip4_addr;
   FD_VOLATILE( dst->state )     = src->state;
 # endif
@@ -59,9 +73,9 @@ fd_neigh4_entry_atomic_ld( fd_neigh4_entry_t       * dst,
   dst->xmm[0] = FD_VOLATILE_CONST( src->xmm[0] );
 # else
   memcpy( dst->mac_addr, src->mac_addr, 6 );
-  dst->probe_suppress_until = src->probe_suppress_until;
-  dst->ip4_addr             = FD_VOLATILE_CONST( src->ip4_addr );
-  dst->state                = FD_VOLATILE_CONST( src->state );
+  memcpy( dst->probe_suppress_until, src->probe_suppress_until, 5 );
+  dst->ip4_addr                = FD_VOLATILE_CONST( src->ip4_addr );
+  dst->state                   = FD_VOLATILE_CONST( src->state );
 # endif
 }
 
