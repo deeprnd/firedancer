@@ -230,7 +230,7 @@ static inline __m128d vu_to_vd_core( vu_t u ) { /* FIXME: workaround vd_t isn't 
 
   __m128i c  = _mm_cmpgt_epi32( _mm_setzero_si128(), u );         // 0      if u<2^31, -1     o.w
   __m128d d  = _mm_cvtepi32_pd( u );                              // u      if u<2^31, u-2^32 o.w, exact
-  __m128d ds = _mm_add_pd( d, _mm_set1_pd( (double)(1UL<<32) ) ); // u+2^32 if u<2^31, u      o.w, exact
+  __m128d ds = _mm_add_pd( d, _mm_set1_pd( (double)(1ULL<<32) ) ); // u+2^32 if u<2^31, u      o.w, exact
   __m128i cl = _mm_cvtepi32_epi64( c );                           // 0L     if u<2^31, -1L    o.w
   return _mm_blendv_pd( d, ds, _mm_castsi128_pd( cl ) );          // u
 
