@@ -447,8 +447,8 @@
 // _ghash_update_continue_8x use Karatsuba multiplication instead of schoolbook
 // multiplication.  See the file comment for more details about this choice.
 //
-// Both macros expect the ciphertext blocks blk[0-7] to be available at DST if
-// encrypting, or SRC if decrypting.  They also expect the precomputed hash key
+// Both macros expect the ciphertext blocks blk[0-7] to be available at %r8 if
+// encrypting, or %rcx if decrypting.  They also expect the precomputed hash key
 // powers H^i and their XOR'd-together halves to be available in the struct
 // pointed to by %rdi.  Both macros clobber TMP[0-2].
 .macro	_ghash_update_begin_8x	enc
@@ -461,9 +461,9 @@
 
 	// Load the first ciphertext block and byte-reflect it.
 .if \enc
-	movdqu		(DST), TMP1
+	movdqu		(%r8), TMP1
 .else
-	movdqu		(SRC), TMP1
+	movdqu		(%rcx), TMP1
 .endif
 	pshufb		BSWAP_MASK, TMP1
 
@@ -496,9 +496,9 @@
 
 	// Load the next ciphertext block and byte-reflect it.
 .if \enc
-	movdqu		(DST,%rax,2), TMP1
+	movdqu		(%r8,%rax,2), TMP1
 .else
-	movdqu		(SRC,%rax,2), TMP1
+	movdqu		(%rcx,%rax,2), TMP1
 .endif
 	pshufb		BSWAP_MASK, TMP1
 
@@ -690,14 +690,14 @@
 .endr
 .endm
 
-// XOR eight blocks from SRC with the keystream blocks in AESDATA[0-7], and
-// store the result to DST.  Clobbers TMP0.
+// XOR eight blocks from %rcx with the keystream blocks in AESDATA[0-7], and
+// store the result to %r8.  Clobbers TMP0.
 .macro	_xor_data_8x
 .irp i, 0,1,2,3,4,5,6,7
-	_xor_mem_to_reg	\i*16(SRC), AESDATA\i, tmp=TMP0
+	_xor_mem_to_reg	\i*16(%rcx), AESDATA\i, tmp=TMP0
 .endr
 .irp i, 0,1,2,3,4,5,6,7
-	movdqu		AESDATA\i, \i*16(DST)
+	movdqu		AESDATA\i, \i*16(%r8)
 .endr
 .endm
 
@@ -726,8 +726,6 @@
 .macro	_aes_gcm_update	enc
 
 	// Function arguments
-	.set	SRC,		%rcx
-	.set	DST,		%r8
 	.set	DATALEN,	%r9d
 	.set	DATALEN64,	%r9	// Zero-extend DATALEN before using!
 	// Note: the code setting up for _load_partial_block assumes that SRC is
@@ -797,8 +795,8 @@ GNU_PALIGN(4)
 	movdqa		(%rsi), TMP0
 	_aesenclast_8x	TMP0
 	_xor_data_8x
-	// Don't increment DST until the ciphertext blocks have been hashed.
-	sub		$-8*16, SRC
+	// Don't increment %r8 until the ciphertext blocks have been hashed.
+	sub		$-8*16, %rcx
 	add		$-8*16, DATALEN
 	jl		.Lghash_last_ciphertext_8x\@
 .endif
@@ -845,12 +843,12 @@ GNU_PALIGN(4)
 
 	// XOR the data with the AES-CTR keystream blocks.
 .if \enc
-	sub		$-8*16, DST
+	sub		$-8*16, %r8
 .endif
 	_xor_data_8x
-	sub		$-8*16, SRC
+	sub		$-8*16, %rcx
 .if !\enc
-	sub		$-8*16, DST
+	sub		$-8*16, %r8
 .endif
 	add		$-8*16, DATALEN
 	jge		.Lcrypt_loop_8x\@
@@ -866,7 +864,7 @@ GNU_PALIGN(4)
 	jne		1b
 	_ghash_update_end_8x_step	0
 	_ghash_update_end_8x_step	1
-	sub		$-8*16, DST
+	sub		$-8*16, %r8
 .endif
 
 .Lcrypt_loop_8x_done\@:
@@ -932,14 +930,14 @@ GNU_PALIGN(4)
 	movq		OFFSETOF_H_POWERS_XORED(%rdi,%rax), H_POW_XORED
 
 	// XOR the keystream block that was just generated in TMP0 with the next
-	// source data block and store the resulting en/decrypted data to DST.
+	// source data block and store the resulting en/decrypted data to %r8.
 .if \enc
-	_xor_mem_to_reg	(SRC), TMP0, tmp=TMP1
-	movdqu		TMP0, (DST)
+	_xor_mem_to_reg	(%rcx), TMP0, tmp=TMP1
+	movdqu		TMP0, (%r8)
 .else
-	movdqu		(SRC), TMP1
+	movdqu		(%rcx), TMP1
 	pxor		TMP1, TMP0
-	movdqu		TMP0, (DST)
+	movdqu		TMP0, (%r8)
 .endif
 
 	// Update GHASH with the ciphertext block.
@@ -954,8 +952,8 @@ GNU_PALIGN(4)
 	pxor		GHASH_ACC, GHASH_ACC
 
 	add		$FD_IMM_8d, %eax
-	add		$FD_IMM_16d, SRC
-	add		$FD_IMM_16d, DST
+	add		$FD_IMM_16d, %rcx
+	add		$FD_IMM_16d, %r8
 	sub		$FD_IMM_16d, DATALEN
 	jge		.Lcrypt_loop_1x\@
 .Lcrypt_loop_1x_done\@:
@@ -980,18 +978,18 @@ GNU_PALIGN(4)
 	movdqa		OFFSETOF_H_POWERS(%rdi,%rax,2), H_POW
 	movq		OFFSETOF_H_POWERS_XORED(%rdi,%rax), H_POW_XORED
 
-	// Load and zero-pad 1 <= DATALEN <= 15 bytes of data from SRC.  SRC is
-	// in %rcx, but _load_partial_block needs DATALEN in %rcx instead.
-	// %r11 is no longer needed, so reuse it for SRC.
-	mov		SRC, %r11
+	// Load and zero-pad 1 <= DATALEN <= 15 bytes of data from %rcx.  %rcx is
+	// the source pointer, but _load_partial_block needs DATALEN in %ecx.
+	// %r11 is no longer needed, so reuse it for the source pointer.
+	mov		%rcx, %r11
 	mov		DATALEN, %ecx
 	_load_partial_block	%r11, TMP0, %rsi, %esi
 
 	// XOR the keystream block that was just generated in LE_CTR with the
-	// source data block and store the resulting en/decrypted data to DST.
+	// source data block and store the resulting en/decrypted data to %r8.
 	pxor		TMP0, LE_CTR
 	mov		DATALEN, %ecx
-	_store_partial_block	LE_CTR, DST
+	_store_partial_block	LE_CTR, %r8
 
 	// If encrypting, zero-pad the final ciphertext block for GHASH.  (If
 	// decrypting, this was already done by _load_partial_block.)
