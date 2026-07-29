@@ -1,5 +1,9 @@
 $(call add-hdrs,fd_shmem.h)
+ifdef FD_HAS_WINDOWS
+$(call add-objs,fd_shmem_windows_stub,fd_util)
+else
 $(call add-objs,fd_shmem_admin fd_shmem_user,fd_util)
+endif
 $(call add-scripts,fd_shmem_cfg)
 $(call make-bin,fd_shmem_ctl,fd_shmem_ctl,fd_util)
 $(call make-unit-test,test_shmem,test_shmem,fd_util)
