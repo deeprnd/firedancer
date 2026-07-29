@@ -1255,10 +1255,10 @@ FD_FN_PURE ulong
 fd_topo_normal_page_cnt( fd_topo_t const * topo );
 
 /* Prints a message describing the topology to an output stream.  If
-   stdout is true, will be written to stdout, otherwise will be written
+   write_stdout is true, will be written to stdout, otherwise will be written
    as a NOTICE log message to the log file. */
 void
-fd_topo_print_log( int         stdout,
+fd_topo_print_log( int         write_stdout,
                    fd_topo_t * topo );
 
 FD_PROTOTYPES_END
