@@ -29,6 +29,24 @@ _fd_tickcount( void const * _ ) {
 
 #if FD_HAS_HOSTED
 
+#if FD_HAS_WINDOWS
+#include <errno.h>
+
+void fd_yield( void ) { FD_SPIN_PAUSE(); }
+
+int
+fd_syscall_poll( struct pollfd * fds,
+                 uint            nfds,
+                 int             timeout ) {
+  (void)fds;
+  (void)nfds;
+  (void)timeout;
+  errno = ENOTSUP;
+  return -1;
+}
+
+#else
+
 #include <poll.h>
 #include <sched.h>
 #include <time.h>
@@ -39,7 +57,7 @@ int
 fd_syscall_poll( struct pollfd * fds,
                  uint            nfds,
                  int             timeout ) {
-#if defined(__linux__)
+#if FD_HAS_LINUX
   if( timeout<0 ) {
     return ppoll( fds, nfds, NULL, NULL );
   } else {
@@ -53,5 +71,7 @@ fd_syscall_poll( struct pollfd * fds,
   return poll( fds, nfds, timeout );
 #endif
 }
+
+#endif
 
 #endif
