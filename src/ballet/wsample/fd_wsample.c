@@ -502,7 +502,7 @@ fd_wsample_remove( fd_wsample_t * sampler,
 #elif 1
     /* The compiler loves inserting a difficult to predict branch for
        fd_ulong_if, but this forces it not to do that. */
-    for( ulong k=0UL; k<R-1UL; k++ ) tree[ parent ].left_sum[ k ] -= (ulong)(((long)(child_idx - k - 1UL))>>63) & to_remove.weight;
+    for( ulong k=0UL; k<R-1UL; k++ ) tree[ parent ].left_sum[ k ] -= (ulong)(((long long)(child_idx - k - 1UL))>>63) & to_remove.weight;
 #else
     /* This version does the least work, but has a hard-to-predict
        branch.  The branchless versions are normally substantially

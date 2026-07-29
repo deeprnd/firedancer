@@ -1787,7 +1787,7 @@ insert_bundle_impl( fd_pack_t           * pack,
                     fd_pack_ord_txn_t * * bundle,
                     ulong                 expires_at ) {
   ulong prev_reward = ((BUNDLE_L_PRIME * (BUNDLE_N - bundle_idx))) - 1UL;
-  ulong prev_cost = 1UL<<32;
+  ulong prev_cost = 1ULL<<32;
 
   /* Assign last to first */
   for( ulong i=0UL; i<txn_cnt; i++ ) {
