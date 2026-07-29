@@ -16,6 +16,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const fd_lib_dir = b.option([]const u8, "fd-lib-dir", "Firedancer lib dir (default: build/native/gcc/lib)") orelse "build/native/gcc/lib";
+    const build_tests = b.option(bool, "test", "Compile and run Tickoni test binaries") orelse false;
     const clap_dep = b.dependency("clap", .{});
     const clap_mod = clap_dep.module("clap");
 
@@ -425,9 +426,9 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_exe.step);
 
     // ---------------------------------------------------------------------------
-    // Test / integration / system / coverage steps — gated behind --test flag
+    // Test / integration / system / coverage steps — gated behind -Dtest=true
     // so `zig build` alone never compiles test binaries (important for macOS
-    // CI where we only need the exe).  Use `zig build --test` to compile + run
+    // CI where we only need the exe).  Use `zig build -Dtest=true ...` to compile + run
     // them.
     // ---------------------------------------------------------------------------
     const tkpoly_int_mod = b.createModule(.{
@@ -564,14 +565,15 @@ pub fn build(b: *std.Build) void {
             .{ .name = "trade_ticket", .module = trade_ticket_mod },
         },
     });
-    const investment_demo_test = b.addTest(.{ .root_module = investment_demo_mod });
+    if (build_tests) {
+        const investment_demo_test = b.addTest(.{ .root_module = investment_demo_mod });
 
-    // ---------------------------------------------------------------------------
-    // Test step — offline Tickoni unit tests only.
-    // Pure logic and fixture/mock-backed proofs belong here; no running servers.
-    // Run with: zig build --test test
-    // ---------------------------------------------------------------------------
-    const test_step = b.step("test", "Run offline Tickoni unit tests");
+        // ---------------------------------------------------------------------------
+        // Test step — offline Tickoni unit tests only.
+        // Pure logic and fixture/mock-backed proofs belong here; no running servers.
+        // Run with: zig build -Dtest=true test
+        // ---------------------------------------------------------------------------
+        const test_step = b.step("test", "Run offline Tickoni unit tests");
 
     // Files with no cross-module imports: standalone test binaries.
     for ([_][]const u8{
@@ -1706,9 +1708,10 @@ pub fn build(b: *std.Build) void {
     portfolio_cash_demo_test.root_module.linkSystemLibrary("stdc++", .{});
     system_step.dependOn(&b.addRunArtifact(portfolio_cash_demo_test).step);
 
-    // Compatibility alias for the old live-model smoke command.
-    const live_model_step = b.step("integration-test-live-model", "Alias for the live V1.1 system/demo lane");
-    live_model_step.dependOn(system_step);
+        // Compatibility alias for the old live-model smoke command.
+        const live_model_step = b.step("integration-test-live-model", "Alias for the live V1.1 system/demo lane");
+        live_model_step.dependOn(system_step);
+    }
 
     const cli_main_mod = b.createModule(.{
         .root_source_file = b.path("src/app/tickoni_cli/main.zig"),

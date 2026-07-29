@@ -78,5 +78,5 @@ echo "llama-server ready"
 echo "running live investment system/demo proof"
 
 # Run the live system test in foreground so stdin is available for the
-# zig build --listen=- test protocol. The EXIT trap kills the server.
-ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib system-test --summary all
+# zig build --listen=- -Dtest=true test protocol. The EXIT trap kills the server.
+ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir=build/fd-tickoni-fd/lib system-test --summary all
