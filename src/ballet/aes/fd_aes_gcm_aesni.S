@@ -624,9 +624,7 @@
 .macro	_aes_gcm_aad_update
 
 	// Function arguments
-	.set	AAD,		%rdx
-	.set	AADLEN,		%ecx
-	// Note: _load_partial_block relies on AADLEN being in %ecx.
+	// Note: _load_partial_block relies on %ecx containing AADLEN.
 
 	// Additional local variables.
 	// %rax, %r10, and %xmm0-%xmm1 are used as temporary registers.
@@ -643,24 +641,24 @@
 	movq		.Lgfpoly(%rip), GFPOLY
 
 	// Process the AAD one full block at a time.
-	sub		$FD_IMM_16d, AADLEN
+	sub		$FD_IMM_16d, %ecx
 	jl		.Laad_loop_1x_done\@
 .Laad_loop_1x\@:
-	movdqu		(AAD), %xmm0
+	movdqu		(%rdx), %xmm0
 	pshufb		BSWAP_MASK, %xmm0
 	pxor		%xmm0, GHASH_ACC
 	_ghash_mul	H_POW1, H_POW1_X64, GHASH_ACC, GFPOLY, %xmm0, %xmm1
-	add		$FD_IMM_16d, AAD
-	sub		$FD_IMM_16d, AADLEN
+	add		$FD_IMM_16d, %rdx
+	sub		$FD_IMM_16d, %ecx
 	jge		.Laad_loop_1x\@
 .Laad_loop_1x_done\@:
 	// Check whether there is a partial block at the end.
-	add		$FD_IMM_16d, AADLEN
+	add		$FD_IMM_16d, %ecx
 	jz		.Laad_done\@
 
 	// Process a partial block of length 1 <= AADLEN <= 15.
 	// _load_partial_block assumes that %ecx contains AADLEN.
-	_load_partial_block	AAD, %xmm0, %r10, %r10d
+	_load_partial_block	%rdx, %xmm0, %r10, %r10d
 	pshufb		BSWAP_MASK, %xmm0
 	pxor		%xmm0, GHASH_ACC
 	_ghash_mul	H_POW1, H_POW1_X64, GHASH_ACC, GFPOLY, %xmm0, %xmm1
