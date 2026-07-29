@@ -628,26 +628,21 @@
 
 	// Additional local variables.
 	// %rax, %r10, and %xmm0-%xmm1 are used as temporary registers.
-	.set	BSWAP_MASK,	%xmm2
-	.set	GHASH_ACC,	%xmm3
-	.set	H_POW1,		%xmm4	// H^1
-	.set	H_POW1_X64,	%xmm5	// H^1 * x^64
-	.set	GFPOLY,		%xmm6
 
-	movdqa		.Lbswap_mask(%rip), BSWAP_MASK
-	movdqu		(%rsi), GHASH_ACC
-	movdqa		OFFSETOF_H_POWERS+7*16(%rdi), H_POW1
-	movdqa		OFFSETOF_H_TIMES_X64(%rdi), H_POW1_X64
-	movq		.Lgfpoly(%rip), GFPOLY
+	movdqa		.Lbswap_mask(%rip), %xmm2
+	movdqu		(%rsi), %xmm3
+	movdqa		OFFSETOF_H_POWERS+7*16(%rdi), %xmm4
+	movdqa		OFFSETOF_H_TIMES_X64(%rdi), %xmm5
+	movq		.Lgfpoly(%rip), %xmm6
 
 	// Process the AAD one full block at a time.
 	sub		$FD_IMM_16d, %ecx
 	jl		.Laad_loop_1x_done\@
 .Laad_loop_1x\@:
 	movdqu		(%rdx), %xmm0
-	pshufb		BSWAP_MASK, %xmm0
-	pxor		%xmm0, GHASH_ACC
-	_ghash_mul	H_POW1, H_POW1_X64, GHASH_ACC, GFPOLY, %xmm0, %xmm1
+	pshufb		%xmm2, %xmm0
+	pxor		%xmm0, %xmm3
+	_ghash_mul	%xmm4, %xmm5, %xmm3, %xmm6, %xmm0, %xmm1
 	add		$FD_IMM_16d, %rdx
 	sub		$FD_IMM_16d, %ecx
 	jge		.Laad_loop_1x\@
@@ -659,12 +654,12 @@
 	// Process a partial block of length 1 <= AADLEN <= 15.
 	// _load_partial_block assumes that %ecx contains AADLEN.
 	_load_partial_block	%rdx, %xmm0, %r10, %r10d
-	pshufb		BSWAP_MASK, %xmm0
-	pxor		%xmm0, GHASH_ACC
-	_ghash_mul	H_POW1, H_POW1_X64, GHASH_ACC, GFPOLY, %xmm0, %xmm1
+	pshufb		%xmm2, %xmm0
+	pxor		%xmm0, %xmm3
+	_ghash_mul	%xmm4, %xmm5, %xmm3, %xmm6, %xmm0, %xmm1
 
 .Laad_done\@:
-	movdqu		GHASH_ACC, (%rsi)
+	movdqu		%xmm3, (%rsi)
 	RET
 .endm
 
