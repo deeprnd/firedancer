@@ -9,10 +9,12 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <time.h>
-#if FD_HAS_LINUX
-#include <fcntl.h>
+#if !FD_HAS_WINDOWS
 #include <sys/types.h> /* SEEK_SET */
 #include <unistd.h>
+#endif
+#if FD_HAS_LINUX
+#include <fcntl.h>
 #endif
 
 #if FD_HAS_LINUX
