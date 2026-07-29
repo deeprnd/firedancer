@@ -4,7 +4,9 @@
    favor of FD_IO_STYLE here. */
 
 #ifndef FD_IO_STYLE
-#if FD_HAS_HOSTED
+#if FD_HAS_WINDOWS
+#define FD_IO_STYLE 1
+#elif FD_HAS_HOSTED
 #define FD_IO_STYLE 0
 #else
 #error "Define FD_IO_STYLE for this platform"
@@ -700,7 +702,7 @@ fd_io_strsignal( int sig ) {
   return "unknown";
 }
 
-#elif FD_LOG_STYLE==1 /* generic embedded target */
+#elif FD_IO_STYLE==1 /* generic embedded target */
 
 FD_FN_UNUSED static inline void _unused( void ) {} /* required due to -Wpedantic */
 
