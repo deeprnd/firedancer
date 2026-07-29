@@ -414,13 +414,18 @@ pub fn build(b: *std.Build) void {
         .name = "tickoni-supervisor",
         .root_module = main_mod,
     });
-    if (target.result.os.tag == .windows) {
+    if (isWindowsX86_64Target(target)) {
         exe.root_module.linkLibrary(addTickoniSupervisorShimLibrary(b, target, optimize));
         addWindowsFdObjectFixups(exe, &.{
             "build/fd-tickoni-fd/obj/disco/topo/fd_topob.o",
             "build/fd-tickoni-fd/obj/disco/topo/fd_topo.o",
             "build/fd-tickoni-fd/obj/util/log/fd_log.o",
         });
+    } else if (target.result.os.tag == .windows) {
+        addTickoniCodecShim(b, exe);
+        addTickoniFiredancerShims(b, exe);
+        addTickoniTopoRunShims(b, exe);
+        addTickoniTileRunShim(b, exe);
     } else {
         addTickoniCodecShim(b, exe);
         addTickoniFiredancerShims(b, exe);
@@ -1744,7 +1749,7 @@ pub fn build(b: *std.Build) void {
     cli_exe.root_module.addCSourceFiles(.{
         .files = &.{"src/tickoni/util/compiler_version.c"},
     });
-    if (target.result.os.tag == .windows) {
+    if (isWindowsX86_64Target(target)) {
         cli_exe.root_module.linkLibrary(addTickoniCodecShimLibrary(b, target, optimize, "tickoni-codec-shims"));
         addWindowsFdObjectFixups(cli_exe, &.{
             "build/fd-tickoni-fd/obj/ballet/siphash13/fd_siphash13.o",
@@ -1753,6 +1758,9 @@ pub fn build(b: *std.Build) void {
             "build/fd-tickoni-fd/obj/util/log/fd_log.o",
         });
         linkTickoniSystemLibraries(cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
+        cli_exe.root_module.linkSystemLibrary("crypt32", .{});
+    } else if (target.result.os.tag == .windows) {
+        linkTickoniCodec(b, cli_exe, fd_lib_dir);
         cli_exe.root_module.linkSystemLibrary("crypt32", .{});
     } else {
         linkTickoniCodec(b, cli_exe, fd_lib_dir);
@@ -2221,6 +2229,10 @@ fn addTickoniCodecShimLibrary(
 fn addWindowsFdObjectFixups(step: *std.Build.Step.Compile, paths: []const []const u8) void {
     if (step.root_module.resolved_target.?.result.os.tag != .windows) return;
     for (paths) |path| step.root_module.addObjectFile(.{ .cwd_relative = path });
+}
+
+fn isWindowsX86_64Target(target: std.Build.ResolvedTarget) bool {
+    return target.result.os.tag == .windows and target.result.cpu.arch == .x86_64;
 }
 
 /// Links shim/ballet.c (Firedancer siphash/protobuf/JSON primitives). Audit
