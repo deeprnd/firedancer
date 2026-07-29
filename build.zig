@@ -414,18 +414,15 @@ pub fn build(b: *std.Build) void {
         .name = "tickoni-supervisor",
         .root_module = main_mod,
     });
-    if (isWindowsX86_64Target(target)) {
+    if (target.result.os.tag == .windows) {
         exe.root_module.linkLibrary(addTickoniSupervisorShimLibrary(b, target, optimize));
-        addWindowsFdObjectFixups(exe, &.{
-            "build/fd-tickoni-fd/obj/disco/topo/fd_topob.o",
-            "build/fd-tickoni-fd/obj/disco/topo/fd_topo.o",
-            "build/fd-tickoni-fd/obj/util/log/fd_log.o",
-        });
-    } else if (target.result.os.tag == .windows) {
-        addTickoniCodecShim(b, exe);
-        addTickoniFiredancerShims(b, exe);
-        addTickoniTopoRunShims(b, exe);
-        addTickoniTileRunShim(b, exe);
+        if (isWindowsX86_64Target(target)) {
+            addWindowsFdObjectFixups(exe, &.{
+                "build/fd-tickoni-fd/obj/disco/topo/fd_topob.o",
+                "build/fd-tickoni-fd/obj/disco/topo/fd_topo.o",
+                "build/fd-tickoni-fd/obj/util/log/fd_log.o",
+            });
+        }
     } else {
         addTickoniCodecShim(b, exe);
         addTickoniFiredancerShims(b, exe);
@@ -1749,18 +1746,17 @@ pub fn build(b: *std.Build) void {
     cli_exe.root_module.addCSourceFiles(.{
         .files = &.{"src/tickoni/util/compiler_version.c"},
     });
-    if (isWindowsX86_64Target(target)) {
+    if (target.result.os.tag == .windows) {
         cli_exe.root_module.linkLibrary(addTickoniCodecShimLibrary(b, target, optimize, "tickoni-codec-shims"));
-        addWindowsFdObjectFixups(cli_exe, &.{
-            "build/fd-tickoni-fd/obj/ballet/siphash13/fd_siphash13.o",
-            "build/fd-tickoni-fd/obj/ballet/pb/fd_pb_tokenize.o",
-            "build/fd-tickoni-fd/obj/third_party/cjson/cJSON.o",
-            "build/fd-tickoni-fd/obj/util/log/fd_log.o",
-        });
+        if (isWindowsX86_64Target(target)) {
+            addWindowsFdObjectFixups(cli_exe, &.{
+                "build/fd-tickoni-fd/obj/ballet/siphash13/fd_siphash13.o",
+                "build/fd-tickoni-fd/obj/ballet/pb/fd_pb_tokenize.o",
+                "build/fd-tickoni-fd/obj/third_party/cjson/cJSON.o",
+                "build/fd-tickoni-fd/obj/util/log/fd_log.o",
+            });
+        }
         linkTickoniSystemLibraries(cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
-        cli_exe.root_module.linkSystemLibrary("crypt32", .{});
-    } else if (target.result.os.tag == .windows) {
-        linkTickoniCodec(b, cli_exe, fd_lib_dir);
         cli_exe.root_module.linkSystemLibrary("crypt32", .{});
     } else {
         linkTickoniCodec(b, cli_exe, fd_lib_dir);
