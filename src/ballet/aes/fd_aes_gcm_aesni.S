@@ -726,7 +726,6 @@
 .macro	_aes_gcm_update	enc
 
 	// Function arguments
-	.set	LE_CTR_PTR,	%rsi	// Note: overlaps with usage as temp reg
 	.set	SRC,		%rcx
 	.set	DST,		%r8
 	.set	DATALEN,	%r9d
@@ -736,8 +735,9 @@
 
 	// Additional local variables
 
-	// %rax and %rsi are used as temporary registers.  Note: %rsi overlaps
-	// with LE_CTR_PTR, which is used only at the beginning.
+	// %rax and %rsi are used as temporary registers.  Note: %rsi starts as
+	// the LE counter pointer and is then reused as a temp register after the
+	// counter load.
 
 	.set	AESKEYLEN,	%r10d	// AES key length in bytes
 	.set	AESKEYLEN64,	%r10
@@ -764,7 +764,7 @@
 
 	movdqa		.Lbswap_mask(%rip), BSWAP_MASK
 	movdqu		(%rdx), GHASH_ACC
-	movdqu		(LE_CTR_PTR), LE_CTR
+	movdqu		(%rsi), LE_CTR
 
 	movl		OFFSETOF_AESKEYLEN(%rdi), AESKEYLEN
 	lea		6*16(%rdi,AESKEYLEN64,4), %r11
@@ -1039,7 +1039,6 @@ GNU_PALIGN(4)
 .macro	_aes_gcm_final	enc
 
 	// Function arguments
-	.set	LE_CTR_PTR,	%rsi
 	.set	TOTAL_AADLEN,	%rcx
 	.set	TOTAL_DATALEN,	%r8
 	.set	TAG,		%r9
@@ -1061,7 +1060,7 @@ GNU_PALIGN(4)
 
 	// Set up a counter block with 1 in the low 32-bit word.  This is the
 	// counter that produces the ciphertext needed to encrypt the auth tag.
-	movdqu		(LE_CTR_PTR), %xmm0
+	movdqu		(%rsi), %xmm0
 	mov		$FD_IMM_1d, %eax
 	pinsrd		$FD_IMM_0d, %eax, %xmm0
 
