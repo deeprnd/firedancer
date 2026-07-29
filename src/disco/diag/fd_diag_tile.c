@@ -6,12 +6,14 @@
 #include "../topo/fd_topo.h"
 #include "../../util/tile/fd_tile_private.h"
 
-#include <fcntl.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <sys/types.h> /* SEEK_SET */
 #include <time.h>
+#if FD_HAS_LINUX
+#include <fcntl.h>
+#include <sys/types.h> /* SEEK_SET */
 #include <unistd.h>
+#endif
 
 #if FD_HAS_LINUX
 #include "fd_proc_interrupts.h"
