@@ -624,7 +624,6 @@
 .macro	_aes_gcm_aad_update
 
 	// Function arguments
-	.set	GHASH_ACC_PTR,	%rsi
 	.set	AAD,		%rdx
 	.set	AADLEN,		%ecx
 	// Note: _load_partial_block relies on AADLEN being in %ecx.
@@ -638,7 +637,7 @@
 	.set	GFPOLY,		%xmm6
 
 	movdqa		.Lbswap_mask(%rip), BSWAP_MASK
-	movdqu		(GHASH_ACC_PTR), GHASH_ACC
+	movdqu		(%rsi), GHASH_ACC
 	movdqa		OFFSETOF_H_POWERS+7*16(%rdi), H_POW1
 	movdqa		OFFSETOF_H_TIMES_X64(%rdi), H_POW1_X64
 	movq		.Lgfpoly(%rip), GFPOLY
@@ -667,7 +666,7 @@
 	_ghash_mul	H_POW1, H_POW1_X64, GHASH_ACC, GFPOLY, %xmm0, %xmm1
 
 .Laad_done\@:
-	movdqu		GHASH_ACC, (GHASH_ACC_PTR)
+	movdqu		GHASH_ACC, (%rsi)
 	RET
 .endm
 
@@ -735,7 +734,6 @@
 
 	// Function arguments
 	.set	LE_CTR_PTR,	%rsi	// Note: overlaps with usage as temp reg
-	.set	GHASH_ACC_PTR,	%rdx
 	.set	SRC,		%rcx
 	.set	DST,		%r8
 	.set	DATALEN,	%r9d
@@ -772,7 +770,7 @@
 	.set	AESDATA7,	%xmm15
 
 	movdqa		.Lbswap_mask(%rip), BSWAP_MASK
-	movdqu		(GHASH_ACC_PTR), GHASH_ACC
+	movdqu		(%rdx), GHASH_ACC
 	movdqu		(LE_CTR_PTR), LE_CTR
 
 	movl		OFFSETOF_AESKEYLEN(%rdi), AESKEYLEN
@@ -1021,7 +1019,7 @@ GNU_PALIGN(4)
 
 .Ldone\@:
 	// Store the updated GHASH accumulator back to memory.
-	movdqu		GHASH_ACC, (GHASH_ACC_PTR)
+	movdqu		GHASH_ACC, (%rdx)
 
 	RET
 .endm
@@ -1049,7 +1047,6 @@ GNU_PALIGN(4)
 
 	// Function arguments
 	.set	LE_CTR_PTR,	%rsi
-	.set	GHASH_ACC_PTR,	%rdx
 	.set	TOTAL_AADLEN,	%rcx
 	.set	TOTAL_DATALEN,	%r8
 	.set	TAG,		%r9
@@ -1079,7 +1076,7 @@ GNU_PALIGN(4)
 	movq		TOTAL_DATALEN, GHASH_ACC
 	pinsrq		$FD_IMM_1d, TOTAL_AADLEN, GHASH_ACC
 	psllq		$FD_IMM_3d, GHASH_ACC	// Bytes to bits
-	_xor_mem_to_reg	(GHASH_ACC_PTR), GHASH_ACC, %xmm1
+	_xor_mem_to_reg	(%rdx), GHASH_ACC, %xmm1
 
 	movdqa		OFFSETOF_H_POWERS+7*16(%rdi), H_POW1
 	movdqa		OFFSETOF_H_TIMES_X64(%rdi), H_POW1_X64
@@ -1118,7 +1115,7 @@ GNU_PALIGN(4)
 
 .if \enc
 	// Return the computed auth tag.
-	movdqu		GHASH_ACC, (GHASH_ACC_PTR)
+	movdqu		GHASH_ACC, (%rdx)
 .else
 	.set		ZEROPAD_MASK_PTR, TOTAL_AADLEN // Reusing TOTAL_AADLEN!
 
