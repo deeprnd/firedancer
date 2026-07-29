@@ -63,7 +63,7 @@ fd_rnonce_ss_compute( fd_rnonce_ss_t const * ss,
                       long                   time_ns ) {
   fd_rnonce_ss_t temp[1] = { *ss };
   /* truncate time down to intervals of 2^32 ns, which is ~4 seconds. */
-  temp->private.time      = (uint)(time_ns>>32);
+  temp->private.time      = (uint)(((ulong)(long long)time_ns)>>32);
   temp->private.slot      = fd_ulong_if( normal_repair, slot,      slot/128UL );
   temp->private.shred_idx = fd_uint_if ( normal_repair, shred_idx, 0U         );
   /* seed is fractional part of sqrt(17) */
@@ -94,7 +94,7 @@ fd_rnonce_ss_verify( fd_rnonce_ss_t const * ss,
      in the slot, then it's unlikely the cluster has confirmed it. */
   if( FD_UNLIKELY( (!normal_repair) & (!slot_complete) ) ) return 0;
 
-  temp->private.time      = (uint)(time_ns>>32);
+  temp->private.time      = (uint)(((ulong)(long long)time_ns)>>32);
   temp->private.slot      = fd_ulong_if( normal_repair, slot,      slot/128UL );
   temp->private.shred_idx = fd_uint_if ( normal_repair, shred_idx, 0U         );
 #define ALLOWED_TIME_DELTA ((uint)((1000000000UL + (1UL<<24) - 1UL)/(1UL<<24)))  /* == 60 */
@@ -108,7 +108,7 @@ fd_rnonce_ss_verify( fd_rnonce_ss_t const * ss,
 
   CHECKN( temp );
 
-  int try_prev_time = ((time_ns-1000000000L)>>32) != (time_ns>>32);
+  int try_prev_time = ((((long long)time_ns)-1000000000LL)>>32) != (((long long)time_ns)>>32);
   if( try_prev_time ) {
     /* If that doesn't match, check the previous time bucket. */
     temp->private.time--;

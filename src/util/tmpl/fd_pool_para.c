@@ -485,9 +485,9 @@ static inline void
 POOL_(unlock)( POOL_(t) * join ) {
   POOL_(shmem_t) * pool = join->pool;
   FD_COMPILER_MFENCE();
-  pool->ver_top  += 1UL<<POOL_IDX_WIDTH;
+  pool->ver_top  += 1ULL<<POOL_IDX_WIDTH;
 # if POOL_LAZY
-  pool->ver_lazy += 1UL<<POOL_IDX_WIDTH;
+  pool->ver_lazy += 1ULL<<POOL_IDX_WIDTH;
 # endif
   FD_COMPILER_MFENCE();
 }
@@ -866,9 +866,9 @@ POOL_(lock)( POOL_(t) * join,
     /* use a test-and-test-and-set style for reduced contention */
 
     ver_top = *_v;
-    if( FD_LIKELY( !(ver_top & (1UL<<POOL_IDX_WIDTH)) ) ) { /* opt for low contention */
-      ver_top = POOL_(private_fetch_and_or)( _v, 1UL<<POOL_IDX_WIDTH );
-      if( FD_LIKELY( !(ver_top & (1UL<<POOL_IDX_WIDTH)) ) ) break; /* opt for low contention */
+    if( FD_LIKELY( !(ver_top & (1ULL<<POOL_IDX_WIDTH)) ) ) { /* opt for low contention */
+      ver_top = POOL_(private_fetch_and_or)( _v, 1ULL<<POOL_IDX_WIDTH );
+      if( FD_LIKELY( !(ver_top & (1ULL<<POOL_IDX_WIDTH)) ) ) break; /* opt for low contention */
     }
 
     if( FD_UNLIKELY( !blocking ) ) { /* opt for blocking */
