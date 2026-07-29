@@ -2,10 +2,9 @@
 #include <errno.h>
 #if FD_HAS_LINUX
 #include <sched.h>
-#endif
-
 #include <unistd.h>
 #include <fcntl.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
