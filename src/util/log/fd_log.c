@@ -1,5 +1,7 @@
 #ifndef FD_LOG_STYLE
-#if FD_HAS_HOSTED
+#if FD_HAS_WINDOWS
+#define FD_LOG_STYLE 1
+#elif FD_HAS_HOSTED
 #define FD_LOG_STYLE 0
 #else
 #error "Define FD_LOG_STYLE for this platform"
