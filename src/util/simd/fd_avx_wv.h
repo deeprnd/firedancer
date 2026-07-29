@@ -198,8 +198,8 @@ static inline wv_t wv_ror_vector( wv_t a, wl_t b ) {
 
 #define wv_eq(a,b) _mm256_cmpeq_epi64( (a), (b) )                                              /* [ a0==b0 a1==b1 ... a3==b3 ] */
 #define wv_gt(a,b)                                                                             /* [ a0> b0 a1> b1 ... a3> b3 ] */ \
-  _mm256_cmpgt_epi64( _mm256_sub_epi64( (a), _mm256_set1_epi64x( (long)(1UL<<63) ) ),                                             \
-                      _mm256_sub_epi64( (b), _mm256_set1_epi64x( (long)(1UL<<63) ) ) )
+  _mm256_cmpgt_epi64( _mm256_sub_epi64( (a), _mm256_set1_epi64x( (long)(1ULL<<63) ) ),                                            \
+                      _mm256_sub_epi64( (b), _mm256_set1_epi64x( (long)(1ULL<<63) ) ) )
 #define wv_lt(a,b) wv_gt( (b), (a) )                                                           /* [ a0< b0 a1< b1 ... a3< b3 ] */
 #define wv_ne(a,b) _mm256_xor_si256( _mm256_set1_epi64x(-1L), _mm256_cmpeq_epi64( (a), (b) ) ) /* [ a0!=b0 a1!=b1 ... a3!=b3 ] */
 #define wv_ge(a,b) _mm256_xor_si256( _mm256_set1_epi64x(-1L), wv_gt( (b), (a) ) )              /* [ a0>=b0 a1>=b1 ... a3>=b3 ] */

@@ -990,7 +990,7 @@ fd_fxp_log2_approx( ulong x,
      63b wide. */
 
   int   i = fd_ulong_find_msb( x );    /* In [0,63] */
-  ulong y = (x << (63-i)) - (1UL<<63); /* In [0,2^63) */
+  ulong y = (x << (63-i)) - (1ULL<<63); /* In [0,2^63) */
 
   /* Convert this to a fixed point approximation of x:
 
@@ -1006,7 +1006,7 @@ fd_fxp_log2_approx( ulong x,
      here as per note above).  Given the use of a round nearest style, d
      is in [0,2^30] (closed at both ends). */
 
-  ulong d = (y + (1UL<<32)) >> 33;
+  ulong d = (y + (1ULL<<32)) >> 33;
 
   /* Given this, we have:
 

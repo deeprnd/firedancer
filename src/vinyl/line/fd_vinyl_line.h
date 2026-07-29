@@ -46,7 +46,7 @@
    impractically large amounts of DRAM for the vinyl cache ... TiB to
    PiB). */
 
-#define FD_VINYL_LINE_MAX ((1UL<<32)-1UL)
+#define FD_VINYL_LINE_MAX ((1ULL<<32)-1ULL)
 
 /* FD_VINYL_LINE_REF_MAX gives the max acquires-for-read allowed on a
    vinyl cache line.  Like LINE_MAX, this could be made larger at the
@@ -55,14 +55,14 @@
    sufficient to support an impractical number of concurrent clients
    acquiring the same pair for concurrently read. */
 
-#define FD_VINYL_LINE_REF_MAX ((1L<<32)-2L)
+#define FD_VINYL_LINE_REF_MAX ((1LL<<32)-2LL)
 
 /* FD_VINYL_LINE_VER_MAX gives the maximum number of versions a line
    can have before its version number gets reused.  This is a large
    power of 2 minus 1 such that version number reuse is impractical over
    the duration of any speculative reads. */
 
-#define FD_VINYL_LINE_VER_MAX ((1UL<<32)-1UL)
+#define FD_VINYL_LINE_VER_MAX ((1ULL<<32)-1ULL)
 
 /* A fd_vinyl_line_t stores information the vinyl tile uses to track
    how a key-val pair has been cached in DRAM.  If the val field is
@@ -109,7 +109,7 @@ fd_vinyl_line_ctl( ulong ver,
 }
 
 FD_FN_CONST static inline ulong fd_vinyl_line_ctl_ver( ulong ctl ) { return ctl>>32; }
-FD_FN_CONST static inline long  fd_vinyl_line_ctl_ref( ulong ctl ) { return ((long)(ctl & ((1UL<<32)-1UL)))-1L; }
+FD_FN_CONST static inline long  fd_vinyl_line_ctl_ref( ulong ctl ) { return ((long)(ctl & ((1ULL<<32)-1ULL)))-1L; }
 
 /* fd_vinyl_line_evict_prio changes the eviction priority of line
    line_idx to evict_prio.  Cannot fail from the caller's perspective
