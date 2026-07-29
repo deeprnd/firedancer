@@ -14,7 +14,7 @@ UNAME?=$(shell uname)
 FD_WINDOWS_ARCH?=$(shell uname -m)
 
 FD_HAS_WINDOWS:=1
-CPPFLAGS+=-DFD_HAS_WINDOWS=1 -D_CRT_SECURE_NO_WARNINGS
+CPPFLAGS+=-DFD_HAS_WINDOWS=1 -D_CRT_SECURE_NO_WARNINGS -DFD_IO_STYLE=1
 
 # Firedancer assumes LP64-style ulong-heavy formatting and bit helpers.
 # On Windows/LLP64 we carry a Windows-specific 64-bit ulong typedef in
