@@ -15,6 +15,12 @@ FD_WINDOWS_ARCH?=$(shell uname -m)
 
 FD_HAS_WINDOWS:=1
 CPPFLAGS+=-DFD_HAS_WINDOWS=1
+
+# Firedancer assumes LP64-style ulong-heavy formatting and bit helpers.
+# On Windows/LLP64 we carry a Windows-specific 64-bit ulong typedef in
+# fd_util_base.h for build compatibility, so suppress the resulting %lu/
+# %lx family mismatches in this first-pass build-only lane.
+CPPFLAGS+=-Wno-format -Wno-format-extra-args
 AR:=llvm-ar
 RANLIB:=llvm-ranlib
 LD?=$(CC)
