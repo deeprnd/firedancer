@@ -119,7 +119,7 @@
 #endif
 
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
 .section .rodata
 #else
 	.section __TEXT,__const
