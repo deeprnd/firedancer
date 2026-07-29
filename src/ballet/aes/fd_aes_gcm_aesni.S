@@ -555,61 +555,57 @@
 
 	// Additional local variables.
 	// %xmm0-%xmm1 and %rax are used as temporaries.
-	.set	H_CUR,		%xmm2
-	.set	H_POW1,		%xmm3	// H^1
-	.set	H_POW1_X64,	%xmm4	// H^1 * x^64
-	.set	GFPOLY,		%xmm5
 
 	// Encrypt an all-zeroes block to get the raw hash subkey.
 	movl		OFFSETOF_AESKEYLEN(%rdi), %eax
 	lea		6*16(%rdi,%rax,4), %rsi
-	movdqa		(%rdi), H_POW1  // Zero-th round key XOR all-zeroes block
+	movdqa		(%rdi), %xmm3  // Zero-th round key XOR all-zeroes block
 	lea		16(%rdi), %rax
 1:
-	aesenc		(%rax), H_POW1
+	aesenc		(%rax), %xmm3
 	add		$FD_IMM_16d, %rax
 	cmp		%rax, %rsi
 	jne		1b
-	aesenclast	(%rsi), H_POW1
+	aesenclast	(%rsi), %xmm3
 
 	// Preprocess the raw hash subkey as needed to operate on GHASH's
 	// bit-reflected values directly: reflect its bytes, then multiply it by
 	// x^-1 (using the backwards interpretation of polynomial coefficients
 	// from the GCM spec) or equivalently x^1 (using the alternative,
 	// natural interpretation of polynomial coefficients).
-	pshufb		.Lbswap_mask(%rip), H_POW1
-	movdqa		H_POW1, %xmm0
+	pshufb		.Lbswap_mask(%rip), %xmm3
+	movdqa		%xmm3, %xmm0
 	pshufd		$FD_IMM_d3, %xmm0, %xmm0
 	psrad		$FD_IMM_31d, %xmm0
-	paddq		H_POW1, H_POW1
+	paddq		%xmm3, %xmm3
 	pand		.Lgfpoly_and_internal_carrybit(%rip), %xmm0
-	pxor		%xmm0, H_POW1
+	pxor		%xmm0, %xmm3
 
 	// Store H^1.
-	movdqa		H_POW1, OFFSETOF_H_POWERS+7*16(%rdi)
+	movdqa		%xmm3, OFFSETOF_H_POWERS+7*16(%rdi)
 
 	// Compute and store H^1 * x^64.
-	movq		.Lgfpoly(%rip), GFPOLY
-	pshufd		$FD_IMM_4e, H_POW1, %xmm0
-	_vpclmulqdq	$FD_IMM_00, H_POW1, GFPOLY, H_POW1_X64
-	pxor		%xmm0, H_POW1_X64
-	movdqa		H_POW1_X64, OFFSETOF_H_TIMES_X64(%rdi)
+	movq		.Lgfpoly(%rip), %xmm5
+	pshufd		$FD_IMM_4e, %xmm3, %xmm0
+	_vpclmulqdq	$FD_IMM_00, %xmm3, %xmm5, %xmm4
+	pxor		%xmm0, %xmm4
+	movdqa		%xmm4, OFFSETOF_H_TIMES_X64(%rdi)
 
 	// Compute and store the halves of H^1 XOR'd together.
-	pxor		H_POW1, %xmm0
+	pxor		%xmm3, %xmm0
 	movq		%xmm0, OFFSETOF_H_POWERS_XORED+7*8(%rdi)
 
 	// Compute and store the remaining key powers H^2 through H^8.
-	movdqa		H_POW1, H_CUR
+	movdqa		%xmm3, %xmm2
 	mov		$FD_IMM_6d*8, %eax
 .Lprecompute_next\@:
 	// Compute H^i = H^{i-1} * H^1.
-	_ghash_mul	H_POW1, H_POW1_X64, H_CUR, GFPOLY, %xmm0, %xmm1
+	_ghash_mul	%xmm3, %xmm4, %xmm2, %xmm5, %xmm0, %xmm1
 	// Store H^i.
-	movdqa		H_CUR, OFFSETOF_H_POWERS(%rdi,%rax,2)
+	movdqa		%xmm2, OFFSETOF_H_POWERS(%rdi,%rax,2)
 	// Compute and store the halves of H^i XOR'd together.
-	pshufd		$FD_IMM_4e, H_CUR, %xmm0
-	pxor		H_CUR, %xmm0
+	pshufd		$FD_IMM_4e, %xmm2, %xmm0
+	pxor		%xmm2, %xmm0
 	movq		%xmm0, OFFSETOF_H_POWERS_XORED(%rdi,%rax)
 	sub		$FD_IMM_8d, %eax
 	jge		.Lprecompute_next\@
