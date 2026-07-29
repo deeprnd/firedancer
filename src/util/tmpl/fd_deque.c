@@ -211,8 +211,8 @@ DEQUE_(new)( void * shmem ) {
      practice that might otherwise be required if max is not a
      power-of-two MAX).  Note also that overflow/underflow doesn't
      matter if max is a power of two as per the note above. */
-  hdr->start = 1UL << 63;
-  hdr->end   = 1UL << 63;
+  hdr->start = 1ULL << 63;
+  hdr->end   = 1ULL << 63;
   return hdr;
 }
 
@@ -471,8 +471,8 @@ static inline DEQUE_T *
 DEQUE_(remove_all)( DEQUE_T * deque ) {
   DEQUE_(private_t) * hdr = DEQUE_(private_hdr_from_deque)( deque );
   /* See note in new */
-  hdr->start = 1UL << 63;
-  hdr->end   = 1UL << 63;
+  hdr->start = 1ULL << 63;
+  hdr->end   = 1ULL << 63;
   return deque;
 }
 
