@@ -52,7 +52,7 @@ elif [ "$JOB" = "coverage-tk" ]; then
     # correctly across multiple CUs. Debug mode emits DWARFv5 with per-CU
     # rnglists_base; kcov v44 only honours the first CU's base, silently dropping
     # all subsequent user-code CUs from the coverage report.
-    zig build cov -Doptimize=ReleaseSafe -Dfd-lib-dir=build/fd-tickoni-fd/lib
+    zig build -Dtest=true cov -Doptimize=ReleaseSafe -Dfd-lib-dir=build/fd-tickoni-fd/lib
 
     mkdir -p "$COV_RAW"
 
