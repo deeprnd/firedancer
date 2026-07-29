@@ -414,10 +414,14 @@ pub fn build(b: *std.Build) void {
         .name = "tickoni-supervisor",
         .root_module = main_mod,
     });
-    addTickoniCodecShim(b, exe);
-    addTickoniFiredancerShims(b, exe);
-    addTickoniTopoRunShims(b, exe);
-    addTickoniTileRunShim(b, exe);
+    if( target.result.os.tag==.windows ) {
+        exe.root_module.linkLibrary( addTickoniSupervisorShimLibrary( b, target, optimize ) );
+    } else {
+        addTickoniCodecShim(b, exe);
+        addTickoniFiredancerShims(b, exe);
+        addTickoniTopoRunShims(b, exe);
+        addTickoniTileRunShim(b, exe);
+    }
     linkTickoniSystemLibraries(exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" });
     b.installArtifact(exe);
 
@@ -1735,7 +1739,13 @@ pub fn build(b: *std.Build) void {
     cli_exe.root_module.addCSourceFiles(.{
         .files = &.{"src/tickoni/util/compiler_version.c"},
     });
-    linkTickoniCodec(b, cli_exe, fd_lib_dir);
+    if( target.result.os.tag==.windows ) {
+        cli_exe.root_module.linkLibrary( addTickoniCodecShimLibrary( b, target, optimize, "tickoni-codec-shims" ) );
+        linkTickoniSystemLibraries( cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" } );
+        cli_exe.root_module.linkSystemLibrary( "crypt32", .{} );
+    } else {
+        linkTickoniCodec(b, cli_exe, fd_lib_dir);
+    }
     b.installArtifact(cli_exe);
 
     const run_cli = b.addRunArtifact(cli_exe);
@@ -2134,6 +2144,60 @@ fn addTickoniTileRunShim(b: *std.Build, step: *std.Build.Step.Compile) void {
         .files = &.{"src/tickoni/c_abi/shim/tile_run.c"},
         .flags = shimCFlagsFor(target_os),
     });
+}
+
+fn addTickoniShimLibrary(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    name: []const u8,
+    files: []const []const u8,
+) *std.Build.Step.Compile {
+    const mod = b.createModule(.{
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    mod.addIncludePath( b.path( "src" ) );
+    mod.addCSourceFiles(.{
+        .files = files,
+        .flags = shimCFlagsFor( target.result.os.tag ),
+    });
+    return b.addLibrary(.{
+        .name = name,
+        .linkage = .static,
+        .root_module = mod,
+    });
+}
+
+fn addTickoniSupervisorShimLibrary(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    return addTickoniShimLibrary( b, target, optimize, "tickoni-supervisor-shims", &.{
+        "src/tickoni/c_abi/shim/ballet.c",
+        "src/tickoni/c_abi/shim/tango.c",
+        "src/tickoni/c_abi/shim/util.c",
+        "src/tickoni/c_abi/shim/wksp.c",
+        "src/tickoni/c_abi/shim/sandbox.c",
+        "src/tickoni/c_abi/shim/os.c",
+        "src/tickoni/c_abi/shim/topo_run.c",
+        "src/tickoni/c_abi/shim/topo_run_platform_windows.c",
+        "src/tickoni/c_abi/shim/topob.c",
+        "src/tickoni/c_abi/shim/tile_run.c",
+    } );
+}
+
+fn addTickoniCodecShimLibrary(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    name: []const u8,
+) *std.Build.Step.Compile {
+    return addTickoniShimLibrary( b, target, optimize, name, &.{
+        "src/tickoni/c_abi/shim/ballet.c",
+    } );
 }
 
 /// Links shim/ballet.c (Firedancer siphash/protobuf/JSON primitives). Audit
