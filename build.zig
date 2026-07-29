@@ -416,13 +416,7 @@ pub fn build(b: *std.Build) void {
     });
     if (target.result.os.tag == .windows) {
         exe.root_module.linkLibrary(addTickoniSupervisorShimLibrary(b, target, optimize));
-        if (isWindowsX86_64Target(target)) {
-            addWindowsFdObjectFixups(exe, &.{
-                "build/fd-tickoni-fd/obj/disco/topo/fd_topob.o",
-                "build/fd-tickoni-fd/obj/disco/topo/fd_topo.o",
-                "build/fd-tickoni-fd/obj/util/log/fd_log.o",
-            });
-        }
+        addWindowsFdSupervisorFixups(exe);
     } else {
         addTickoniCodecShim(b, exe);
         addTickoniFiredancerShims(b, exe);
@@ -1748,14 +1742,7 @@ pub fn build(b: *std.Build) void {
     });
     if (target.result.os.tag == .windows) {
         cli_exe.root_module.linkLibrary(addTickoniCodecShimLibrary(b, target, optimize, "tickoni-codec-shims"));
-        if (isWindowsX86_64Target(target)) {
-            addWindowsFdObjectFixups(cli_exe, &.{
-                "build/fd-tickoni-fd/obj/ballet/siphash13/fd_siphash13.o",
-                "build/fd-tickoni-fd/obj/ballet/pb/fd_pb_tokenize.o",
-                "build/fd-tickoni-fd/obj/third_party/cjson/cJSON.o",
-                "build/fd-tickoni-fd/obj/util/log/fd_log.o",
-            });
-        }
+        addWindowsFdCodecFixups(cli_exe);
         linkTickoniSystemLibraries(cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
         cli_exe.root_module.linkSystemLibrary("crypt32", .{});
     } else {
@@ -2227,8 +2214,39 @@ fn addWindowsFdObjectFixups(step: *std.Build.Step.Compile, paths: []const []cons
     for (paths) |path| step.root_module.addObjectFile(.{ .cwd_relative = path });
 }
 
-fn isWindowsX86_64Target(target: std.Build.ResolvedTarget) bool {
-    return target.result.os.tag == .windows and target.result.cpu.arch == .x86_64;
+fn addWindowsFdSupervisorFixups(step: *std.Build.Step.Compile) void {
+    addWindowsFdObjectFixups(step, &.{
+        "build/fd-tickoni-fd/obj/tango/mcache/fd_mcache.o",
+        "build/fd-tickoni-fd/obj/tango/dcache/fd_dcache.o",
+        "build/fd-tickoni-fd/obj/tango/fseq/fd_fseq.o",
+        "build/fd-tickoni-fd/obj/tango/fctl/fd_fctl.o",
+        "build/fd-tickoni-fd/obj/tango/tempo/fd_tempo.o",
+        "build/fd-tickoni-fd/obj/tango/cnc/fd_cnc.o",
+        "build/fd-tickoni-fd/obj/util/wksp/fd_wksp_helper.o",
+        "build/fd-tickoni-fd/obj/util/wksp/fd_wksp_user.o",
+        "build/fd-tickoni-fd/obj/util/shmem/fd_shmem_admin.o",
+        "build/fd-tickoni-fd/obj/disco/topo/fd_topob.o",
+        "build/fd-tickoni-fd/obj/disco/topo/fd_topo.o",
+        "build/fd-tickoni-fd/obj/util/log/fd_log.o",
+        "build/fd-tickoni-fd/obj/util/pod/fd_pod.o",
+        "build/fd-tickoni-fd/obj/util/fd_util.o",
+        "build/fd-tickoni-fd/obj/ballet/siphash13/fd_siphash13.o",
+        "build/fd-tickoni-fd/obj/ballet/pb/fd_pb_tokenize.o",
+        "build/fd-tickoni-fd/obj/third_party/cjson/cJSON.o",
+        "build/fd-tickoni-fd/obj/disco/events/fd_event_report.o",
+        "build/fd-tickoni-fd/obj/disco/metrics/fd_metrics.o",
+        "build/fd-tickoni-fd/obj/util/cstr/fd_cstr.o",
+        "build/fd-tickoni-fd/obj/util/tile/fd_tile_threads.o",
+    });
+}
+
+fn addWindowsFdCodecFixups(step: *std.Build.Step.Compile) void {
+    addWindowsFdObjectFixups(step, &.{
+        "build/fd-tickoni-fd/obj/ballet/siphash13/fd_siphash13.o",
+        "build/fd-tickoni-fd/obj/ballet/pb/fd_pb_tokenize.o",
+        "build/fd-tickoni-fd/obj/third_party/cjson/cJSON.o",
+        "build/fd-tickoni-fd/obj/util/log/fd_log.o",
+    });
 }
 
 /// Links shim/ballet.c (Firedancer siphash/protobuf/JSON primitives). Audit
