@@ -136,8 +136,8 @@ fd_neigh4_netlink_ingest_message( fd_neigh4_hmap_t *      map,
 
     fd_neigh4_entry_t * ele = fd_neigh4_hmap_upsert( map, &ip4_dst );
     if( FD_LIKELY( ele ) ) {
-      ulong suppress_until = ele->probe_suppress_until; /* either 0 or some old value */
-      to_insert.probe_suppress_until = suppress_until&FD_NEIGH4_PROBE_SUPPRESS_MASK;
+      ulong suppress_until = FD_NEIGH4_PROBE_SUPPRESS_RAW_GET( ele ); /* either 0 or some old value */
+      FD_NEIGH4_PROBE_SUPPRESS_RAW_SET( &to_insert, suppress_until );
       fd_neigh4_entry_atomic_st( ele, &to_insert );
     }
   }
