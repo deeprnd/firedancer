@@ -726,10 +726,8 @@
 .macro	_aes_gcm_update	enc
 
 	// Function arguments
-	.set	DATALEN,	%r9d
-	.set	DATALEN64,	%r9	// Zero-extend DATALEN before using!
-	// Note: the code setting up for _load_partial_block assumes that SRC is
-	// in %rcx (and that DATALEN is *not* in %rcx).
+	// Note: the code setting up for _load_partial_block assumes that the
+	// source pointer is in %rcx and that the data length is *not* in %ecx.
 
 	// Additional local variables
 
@@ -779,7 +777,7 @@
 	//
 	// Code size optimization: Prefer adding or subtracting -8*16 over 8*16,
 	// as this makes the immediate fit in a signed byte, saving 3 bytes.
-	add		$-8*16, DATALEN
+	add		$-8*16, %r9d
 	jl		.Lcrypt_loop_8x_done\@
 .if \enc
 	// Encrypt the first 8 plaintext blocks.
@@ -797,7 +795,7 @@ GNU_PALIGN(4)
 	_xor_data_8x
 	// Don't increment %r8 until the ciphertext blocks have been hashed.
 	sub		$-8*16, %rcx
-	add		$-8*16, DATALEN
+	add		$-8*16, %r9d
 	jl		.Lghash_last_ciphertext_8x\@
 .endif
 
@@ -850,7 +848,7 @@ GNU_PALIGN(4)
 .if !\enc
 	sub		$-8*16, %r8
 .endif
-	add		$-8*16, DATALEN
+	add		$-8*16, %r9d
 	jge		.Lcrypt_loop_8x\@
 
 .if \enc
@@ -869,7 +867,7 @@ GNU_PALIGN(4)
 
 .Lcrypt_loop_8x_done\@:
 
-	sub		$-8*16, DATALEN
+	sub		$-8*16, %r9d
 	jz		.Ldone\@
 
 	// Handle the remainder of length 1 <= DATALEN < 8*16 bytes.  We keep
@@ -893,13 +891,13 @@ GNU_PALIGN(4)
 	// Set up a block counter %rax to contain 8*(8-n), where n is the number
 	// of blocks that remain, counting any partial block.  This will be used
 	// to access the key powers H^n through H^1.
-	mov		DATALEN, %eax
+	mov		%r9d, %eax
 	neg		%eax
 	and		$~15, %eax
 	sar		$FD_IMM_1d, %eax
 	add		$FD_IMM_64d, %eax
 
-	sub		$FD_IMM_16d, DATALEN
+	sub		$FD_IMM_16d, %r9d
 	jl		.Lcrypt_loop_1x_done\@
 
 	// Process the data one full block at a time.
@@ -954,11 +952,11 @@ GNU_PALIGN(4)
 	add		$FD_IMM_8d, %eax
 	add		$FD_IMM_16d, %rcx
 	add		$FD_IMM_16d, %r8
-	sub		$FD_IMM_16d, DATALEN
+	sub		$FD_IMM_16d, %r9d
 	jge		.Lcrypt_loop_1x\@
 .Lcrypt_loop_1x_done\@:
 	// Check whether there is a partial block at the end.
-	add		$FD_IMM_16d, DATALEN
+	add		$FD_IMM_16d, %r9d
 	jz		.Lghash_reduce\@
 
 	// Process a partial block of length 1 <= DATALEN <= 15.
@@ -979,23 +977,23 @@ GNU_PALIGN(4)
 	movq		OFFSETOF_H_POWERS_XORED(%rdi,%rax), H_POW_XORED
 
 	// Load and zero-pad 1 <= DATALEN <= 15 bytes of data from %rcx.  %rcx is
-	// the source pointer, but _load_partial_block needs DATALEN in %ecx.
+	// the source pointer, but _load_partial_block needs the length in %ecx.
 	// %r11 is no longer needed, so reuse it for the source pointer.
 	mov		%rcx, %r11
-	mov		DATALEN, %ecx
+	mov		%r9d, %ecx
 	_load_partial_block	%r11, TMP0, %rsi, %esi
 
 	// XOR the keystream block that was just generated in LE_CTR with the
 	// source data block and store the resulting en/decrypted data to %r8.
 	pxor		TMP0, LE_CTR
-	mov		DATALEN, %ecx
+	mov		%r9d, %ecx
 	_store_partial_block	LE_CTR, %r8
 
 	// If encrypting, zero-pad the final ciphertext block for GHASH.  (If
 	// decrypting, this was already done by _load_partial_block.)
 .if \enc
 	lea		.Lzeropad_mask+16(%rip), %rax
-	sub		DATALEN64, %rax
+	sub		%r9, %rax
 	_vpand		(%rax), LE_CTR, TMP0
 .endif
 
