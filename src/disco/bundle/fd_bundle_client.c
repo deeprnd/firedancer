@@ -18,7 +18,13 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <inttypes.h> /* PRIu64 for portable uint64 format */
+#if FD_HAS_WINDOWS
+#include <io.h>
+#define FD_BUNDLE_SOCKET_CLOSE closesocket
+#else
 #include <unistd.h> /* close */
+#define FD_BUNDLE_SOCKET_CLOSE close
+#endif
 #include <poll.h> /* poll */
 #include <sys/socket.h> /* socket */
 #include <netinet/in.h>
@@ -50,7 +56,7 @@ fd_bundle_now( void ) {
 void
 fd_bundle_client_reset( fd_bundle_tile_t * ctx ) {
   if( FD_UNLIKELY( ctx->tcp_sock >= 0 ) ) {
-    if( FD_UNLIKELY( 0!=close( ctx->tcp_sock ) ) ) {
+    if( FD_UNLIKELY( 0!=FD_BUNDLE_SOCKET_CLOSE( ctx->tcp_sock ) ) ) {
       FD_LOG_ERR(( "close(tcp_sock=%i) failed (%i-%s)", ctx->tcp_sock, errno, fd_io_strerror( errno ) ));
     }
     ctx->tcp_sock = -1;
