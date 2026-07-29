@@ -554,11 +554,15 @@ install_rocksdb () {
   NJOBS=$((NJOBS>0 ? NJOBS : 1))
   make clean-ext-libraries-all clean-rocks
 
+  # Avoid RocksDB's default -march=native CPU probing. On newer GitHub
+  # runners with clang 18 this can resolve to AVX10 feature sets that clang
+  # then rejects under -Werror=invalid-feature-combination.
   ROCKSDB_DISABLE_NUMA=1 \
   ROCKSDB_DISABLE_ZLIB=1 \
   ROCKSDB_DISABLE_BZIP=1 \
   ROCKSDB_DISABLE_GFLAGS=1 \
   ROCKSDB_USE_IO_URING=0 \
+  PORTABLE=1 \
   CFLAGS="-isystem $(pwd)/../../include -isystem $(pwd)/../../../src/third_party/lz4/lib -isystem $(pwd)/../../../src/third_party/zstd/lib -g0 -DSNAPPY -DZSTD -DLZ4 -Wno-unknown-warning-option -Wno-uninitialized -Wno-array-bounds -Wno-stringop-overread -fPIC $EXTRA_CXXFLAGS" \
   make -j $NJOBS \
     LITE=1 \
