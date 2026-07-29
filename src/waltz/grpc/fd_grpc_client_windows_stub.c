@@ -1,4 +1,5 @@
 #include "fd_grpc_client.h"
+#include "../h2/fd_h2_callback.h"
 
 #include <errno.h>
 #include <string.h>
