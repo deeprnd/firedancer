@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include "../../util/fd_windows_compat.h"
 #include "fd_sshttp_private.h"
 #include "fd_ssarchive.h"
 
