@@ -4,12 +4,7 @@
 #include <ctype.h>
 #include <math.h>
 #include <string.h>
-#if !FD_HAS_WINDOWS
-#include <strings.h>
-#else
-#define strcasecmp  _stricmp
-#define strncasecmp _strnicmp
-#endif
+#include "../../util/fd_windows_compat.h"
 
 /* Implementation note:
 
