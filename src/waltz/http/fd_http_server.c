@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include "../../util/fd_windows_compat.h"
 #include "fd_http_server_private.h"
 
 #include "../../third_party/picohttpparser/picohttpparser.h"
