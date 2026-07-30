@@ -1,6 +1,5 @@
 #include "fd_event_client.h"
-#include <errno.h>
-#include <string.h>
+#include "../../util/fd_platform_stub_object.h"
 
 #if FD_HAS_WINDOWS
 
@@ -20,7 +19,7 @@ fd_event_client_align( void ) {
 FD_FN_CONST ulong
 fd_event_client_footprint( ulong buf_max ) {
   (void)buf_max;
-  return sizeof( fd_event_client_private_t );
+  return fd_platform_stub_object_footprint( fd_event_client_align(), sizeof( fd_event_client_private_t ) );
 }
 
 void *
@@ -43,16 +42,17 @@ fd_event_client_new( void *                 shmem,
   (void)keyguard_client; (void)rng; (void)circq; (void)so_sndbuf; (void)endpoint;
   (void)identity_pubkey; (void)client_version; (void)commit_hash; (void)action;
   (void)instance_id; (void)boot_id; (void)machine_id; (void)buf_max; (void)use_tls; (void)ssl_ctx;
-  if( FD_UNLIKELY( !shmem ) ) return NULL;
-  fd_event_client_private_t * client = (fd_event_client_private_t *)shmem;
-  memset( client, 0, sizeof(*client) );
+  fd_event_client_private_t * client = fd_platform_stub_object_new( shmem,
+                                                                    fd_event_client_align(),
+                                                                    sizeof( fd_event_client_private_t ) );
+  if( FD_UNLIKELY( !client ) ) return NULL;
   client->state = FD_EVENT_CLIENT_STATE_DISCONNECTED;
   return client;
 }
 
 fd_event_client_t *
 fd_event_client_join( void * shec ) {
-  return (fd_event_client_t *)shec;
+  return fd_platform_stub_object_join( shec, fd_event_client_align() );
 }
 
 fd_event_client_metrics_t const *

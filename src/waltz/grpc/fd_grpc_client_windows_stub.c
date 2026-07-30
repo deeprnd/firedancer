@@ -1,5 +1,6 @@
 #include "fd_grpc_client.h"
 #include "../h2/fd_h2_callback.h"
+#include "../../util/fd_platform_stub_object.h"
 
 #include <errno.h>
 #include <string.h>
@@ -27,7 +28,7 @@ fd_grpc_client_align( void ) {
 ulong
 fd_grpc_client_footprint( ulong buf_max ) {
   (void)buf_max;
-  return sizeof( fd_grpc_client_t );
+  return fd_platform_stub_object_footprint( fd_grpc_client_align(), sizeof( fd_grpc_client_t ) );
 }
 
 fd_grpc_client_t *
@@ -39,10 +40,11 @@ fd_grpc_client_new( void *                             mem,
                     ulong                              rng_seed ) {
   (void)buf_max;
   (void)rng_seed;
-  if( FD_UNLIKELY( !mem ) ) return NULL;
-  if( FD_UNLIKELY( !fd_ulong_is_aligned( (ulong)mem, fd_grpc_client_align() ) ) ) return NULL;
+  fd_grpc_client_t * client = fd_platform_stub_object_new( mem,
+                                                           fd_grpc_client_align(),
+                                                           sizeof( fd_grpc_client_t ) );
+  if( FD_UNLIKELY( !client ) ) return NULL;
 
-  fd_grpc_client_t * client = (fd_grpc_client_t *)mem;
   *client = (fd_grpc_client_t){
     .callbacks = callbacks,
     .metrics   = metrics,
@@ -58,7 +60,7 @@ fd_grpc_client_new( void *                             mem,
 
 void *
 fd_grpc_client_delete( fd_grpc_client_t * client ) {
-  return client;
+  return fd_platform_stub_object_delete( client, fd_grpc_client_align() );
 }
 
 void
