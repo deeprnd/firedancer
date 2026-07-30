@@ -212,7 +212,7 @@ git commit -m "refactor: consume windows zig link manifests"
 ---
 
 ### Task 4: Final tracker update and closure sweep
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Record the finished state, verification, and any intentionally deferred follow-up.
 
@@ -248,6 +248,12 @@ Expected: both build entrypoints pass, no raw object paths remain in `build.zig`
 git add doc/execution/win-support/finding-3-build-zig-link-closure-plan.md
 git commit -m "docs: update windows link closure tracker"
 ```
+
+**Resolution:** Re-ran both repo build entrypoints, re-verified that `build.zig` no longer contains any raw `build/fd-tickoni-fd/obj/...` references, and confirmed both generated link manifests remain present under `build/fd-tickoni-fd/lib/`. Closure archives stay an optional future cleanup, but the finding itself is closed now that Zig consumes the generated manifest contract instead of owning the object-path closure directly.
+
+**Verification used:** `just build-fd`; `just build-tk`; `grep -n "build/fd-tickoni-fd/obj/" build.zig || true`; Python size/existence check for `fd_windows_zig_supervisor_link.txt` and `fd_windows_zig_codec_link.txt`
+
+**Commit subject:** `docs: update windows link closure tracker`
 
 ---
 
