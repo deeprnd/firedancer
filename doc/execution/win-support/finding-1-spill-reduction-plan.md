@@ -226,7 +226,7 @@ git commit -m "refactor: centralize windows tile stub boilerplate"
 ---
 
 ### Task 3: Split `src/util/fd_util.c` behavioral Windows divergence into platform files
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Remove substantive Windows behavior branching from the shared utility implementation.
 
@@ -279,6 +279,12 @@ Expected: no substantive behavioral Windows branch remains in `fd_util.c`.
 git add src/util/fd_util.c src/util/Local.mk src/util/fd_util_hosted_*.c
 git commit -m "refactor: split hosted util behavior by platform"
 ```
+
+**Resolution:** Kept `src/util/fd_util.c` down to boot/halt/shared tickcount logic and moved hosted `fd_yield`/`fd_syscall_poll` into build-selected `src/util/fd_util_hosted_posix.c` and `src/util/fd_util_hosted_windows.c`.
+
+**Verification used:** `just build-fd`; `grep -n "FD_HAS_WINDOWS" src/util/fd_util.c || true`; `find src/util -maxdepth 1 -name 'fd_util_hosted_*.c' | sort`
+
+**Commit subject:** `refactor: split hosted util behavior by platform`
 
 ---
 
