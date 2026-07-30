@@ -6,12 +6,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#if !FD_HAS_WINDOWS
-#include <strings.h>
-#else
-#define strcasecmp  _stricmp
-#define strncasecmp _strnicmp
-#endif
+#include "../fd_windows_compat.h"
 #include <ctype.h>
 
 char const * fd_cstr_to_cstr  ( char const * cstr ) { return cstr;                             }

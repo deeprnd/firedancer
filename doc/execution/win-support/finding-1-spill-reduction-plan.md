@@ -426,7 +426,7 @@ Suggested messages:
 ---
 
 ### Task 6: Add one shared Windows compat header only if duplication persists
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** centralize repeated tiny declaration/macro compatibility shims, but do not overuse this pattern for behavioral divergence.
 
@@ -460,6 +460,12 @@ Expected: Linux build passes.
 git add src/util/fd_windows_compat.h src/util/cstr/fd_cstr.c src/ballet/toml/fd_toml.c
 git commit -m "refactor: centralize tiny windows compatibility shims"
 ```
+
+**Resolution:** Duplication was still concentrated in the same two case-insensitive string-call sites, so this slice introduced `src/util/fd_windows_compat.h` and moved the `_stricmp` / `_strnicmp` mappings there instead of leaving the copied shim blocks in both sources.
+
+**Verification used:** `just build-fd`; `grep -R "_stricmp\|_strnicmp" -n src | cat`; `grep -n "strcasecmp\|strncasecmp\|strings.h" src/util/fd_windows_compat.h`
+
+**Commit subject:** `refactor: centralize tiny windows compatibility shims`
 
 ---
 
