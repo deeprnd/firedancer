@@ -152,7 +152,7 @@
 ---
 
 ### Task 2: Create a shared helper for unsupported Windows tile stubs
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Stop repeating the same no-op/unsupported tile boilerplate in multiple `*_windows_stub.c` files.
 
@@ -216,6 +216,12 @@ git add src/disco/common/fd_platform_tile_stub.h \
         src/disco/pack/fd_pack_windows_stub.c
 git commit -m "refactor: centralize windows tile stub boilerplate"
 ```
+
+**Resolution:** Added `src/disco/common/fd_platform_tile_stub.h` as the single home for zero-footprint callbacks, no-op init hooks, and unsupported-tile `run()` generation. The five tile stubs now collapse to tiny wrappers, with only diag/pack keeping local allowed-fd helpers.
+
+**Verification used:** `just build-fd`; `grep -R "unsupported on Windows build lane" -n src/disco/common src/disco/bundle src/disco/diag src/disco/events src/disco/metrics src/disco/pack | cat`; `grep -R "FD_PLATFORM_TILE_STUB(" -n src/disco | cat`
+
+**Commit subject:** `refactor: centralize windows tile stub boilerplate`
 
 ---
 
