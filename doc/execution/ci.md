@@ -64,7 +64,7 @@ Each workflow begins with a `detect-changes` job that compares the PR diff again
 
 ## Planned Windows Lanes
 
-The V2.22 Windows build CI contract is frozen in `doc/execution/V2.22/windows-build-ci.md`.
+The Windows build CI contract is defined in the `win-support` finding plans.
 
 Planned first-pass native Windows jobs:
 
@@ -130,7 +130,7 @@ The ARM job uses the `ubuntu-24.04-arm` GitHub-hosted runner to catch architectu
 
 Compiles the Tickoni Zig harness (`just build-tk`). Runs on `ubuntu-24.04`, `windows-2025-vs2026`, and `windows-11-vs2026-arm`.
 
-The frozen V2.22 contract in `doc/execution/V2.22/windows-build-ci.md` defines the first-pass native Windows harness lanes and their shared entrypoints.
+The Windows build CI contract is documented in the branch history and CI workflows.
 
 ---
 
