@@ -362,7 +362,7 @@ git commit -m "refactor: normalize platform selection in local mk files"
 ---
 
 ### Task 5: Remove Windows behavioral branches from shared files that should stay non-Windows-only under current contract
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Where Windows is intentionally unsupported for a subsystem, remove inline behavioral Windows logic from the real implementation and let the Windows stub own the policy.
 
@@ -416,6 +416,12 @@ Suggested messages:
 - `refactor: keep shred store windows support at build-graph boundary`
 - `refactor: move bundle windows policy out of shared implementation`
 - `refactor: reduce windows branching in shared hosted code`
+
+**Resolution:** Reviewed all listed subsystems. `fd_shredb.c` and `fd_neigh4_netlink.c` already stayed on the build-graph-selected real/stub path, so no code change was needed there. Removed the remaining Windows-only compile shims from shared bundle and diag implementations, and collapsed a redundant nested Windows include guard in `fd_cnc.c`. The only remaining targeted `FD_HAS_WINDOWS` reference is the top-level hosted-policy gate in `fd_cnc.c`.
+
+**Verification used:** `just build-fd`; `grep -R "FD_HAS_WINDOWS" -n src/disco/store/fd_shredb.c src/disco/bundle/fd_bundle_client.c src/disco/bundle/fd_bundle_tile.c src/disco/diag/fd_diag_tile.c src/tango/cnc/fd_cnc.c src/waltz/neigh/fd_neigh4_netlink.c || true`; `git diff --stat -- src/disco/store/fd_shredb.c src/disco/bundle/fd_bundle_client.c src/disco/bundle/fd_bundle_tile.c src/disco/diag/fd_diag_tile.c src/tango/cnc/fd_cnc.c src/waltz/neigh/fd_neigh4_netlink.c`
+
+**Commit subject:** `refactor: move bundle windows policy out of shared implementation`
 
 ---
 

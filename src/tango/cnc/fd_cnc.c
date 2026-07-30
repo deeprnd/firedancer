@@ -115,9 +115,7 @@ fd_cnc_delete( void * shcnc ) {
 
 #include <errno.h>
 #include <signal.h>
-#if !FD_HAS_WINDOWS
 #include <sched.h>
-#endif
 
 int
 fd_cnc_open( fd_cnc_t * cnc ) {
