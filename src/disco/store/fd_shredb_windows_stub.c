@@ -1,4 +1,5 @@
 #include "fd_shredb.h"
+#include "../../util/fd_platform_unsupported.h"
 
 #if FD_HAS_WINDOWS
 
@@ -82,7 +83,7 @@ fd_shredb_query( fd_shredb_t * store,
                  uint          shred_idx,
                  uchar         out[ FD_SHRED_MAX_SZ ] ) {
   (void)store; (void)slot; (void)shred_idx; (void)out;
-  return -1;
+  return fd_windows_unsupported_fail();
 }
 
 int
@@ -91,7 +92,7 @@ fd_shredb_query_highest( fd_shredb_t * store,
                          uint          min_shred_idx,
                          uchar         out[ FD_SHRED_MAX_SZ ] ) {
   (void)store; (void)slot; (void)min_shred_idx; (void)out;
-  return -1;
+  return fd_windows_unsupported_fail();
 }
 
 #endif
