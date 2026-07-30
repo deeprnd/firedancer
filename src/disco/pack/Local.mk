@@ -3,6 +3,7 @@ ifdef FD_HAS_DOUBLE
 $(call add-hdrs,fd_pack.h fd_est_tbl.h fd_compute_budget_program.h fd_microblock.h fd_pack_rebate_sum.h)
 $(call add-objs,fd_pack,fd_ballet)
 ifdef FD_HAS_WINDOWS
+# Windows build lane uses stub; non-Windows keeps the real pack tile.
 $(call add-objs,fd_pack_windows_stub,fd_disco)
 else
 $(call add-objs,fd_pack_tile,fd_disco)

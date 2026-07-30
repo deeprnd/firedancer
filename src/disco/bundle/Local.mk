@@ -6,6 +6,7 @@ $(call run-unit-test,test_bundle_crank)
 $(call add-hdrs,fd_bundle_tile.h)
 ifdef FD_HAS_HOSTED
 ifdef FD_HAS_WINDOWS
+# Windows build lane uses stub tile/client objects; non-Windows keeps the real hosted bundle stack.
 $(call add-objs,fd_bundle_windows_stub,fd_disco)
 else
 $(call add-objs,fd_bundle_auth fd_bundle_client,fd_disco)
@@ -24,7 +25,7 @@ endif
 
 ifdef FD_HAS_HOSTED
 ifdef FD_HAS_WINDOWS
-# fd_bundle_windows_stub already provides fd_tile_bundle for Windows build lanes.
+# Windows build lane reuses fd_bundle_windows_stub for fd_tile_bundle as well.
 else
 ifdef FD_HAS_DOUBLE
 $(call add-objs,fd_bundle_tile,fd_disco)

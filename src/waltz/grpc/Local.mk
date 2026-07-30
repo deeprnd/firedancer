@@ -6,6 +6,7 @@ $(call run-unit-test,test_grpc_codec)
 ifdef FD_HAS_HOSTED
 $(call add-hdrs,fd_grpc_client.h)
 ifdef FD_HAS_WINDOWS
+# Windows build lane uses stub; non-Windows keeps the real gRPC client.
 $(call add-objs,fd_grpc_client_windows_stub,fd_waltz)
 else
 $(call add-objs,fd_grpc_client,fd_waltz)
