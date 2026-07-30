@@ -513,7 +513,7 @@ git commit -m "refactor: keep windows runtime divergence inside tickoni shims"
 ---
 
 ### Task 8: Update this execution tracker after each slice
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** keep this file as the real execution tracker, not a stale design note.
 
@@ -535,6 +535,18 @@ Confirm:
 
 **Suggested commit message:**
 `docs: update windows spill reduction tracker`
+
+**Resolution:** All slices in this tracker are now marked `DONE` with per-slice resolution, verification, and commit subject notes. Final pass confirmed the finding stayed inside build-CI-only Windows scope.
+
+**Verification used:** `grep -R "**Status:** TODO" -n doc/execution/win-support/finding-1-spill-reduction-plan.md || true`; `grep -R "FD_HAS_WINDOWS" -n src --include='*.c' | cat`; `grep -R "unsupported on Windows build lane" -n src | cat`; `just build-fd`; `just build-tk`
+
+**Final metrics:**
+- Task-1 target-set shared files still carrying `FD_HAS_WINDOWS`: `2` (`src/util/io/fd_io.c`, `src/tango/cnc/fd_cnc.c`)
+- Raw `.c` match count for `FD_HAS_WINDOWS`: `24` (now concentrated in stubs, platform files, and Tickoni-owned shims)
+- Raw `unsupported on Windows build lane` match count: `17` (centralized tile message now lives in `src/disco/common/fd_platform_tile_stub.h`)
+- Remaining non-DONE tasks in this tracker: `0`
+
+**Commit subject:** `docs: update windows spill reduction tracker`
 
 ---
 
