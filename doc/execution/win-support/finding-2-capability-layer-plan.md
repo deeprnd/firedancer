@@ -233,7 +233,7 @@ git commit -m "docs: classify windows unsupported-runtime stub families"
 ---
 
 ### Task 2: Add the common unsupported-runtime helper
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Centralize the smallest repeated unsupported-return/logging policy without changing subsystem behavior.
 
@@ -269,6 +269,12 @@ git add src/util/fd_platform_unsupported.h \
         src/waltz/resolv/fd_netdb_windows_stub.c
 git commit -m "refactor: centralize windows unsupported return helpers"
 ```
+
+**Resolution:** Added `src/util/fd_platform_unsupported.h` as the shared home for tiny unsupported-runtime wording and return helpers. Switched `fd_netdb_windows_stub.c` to the shared resolver unsupported string and moved `fd_shredb_windows_stub.c` query failures onto the common `errno = ENOTSUP`/`return -1` helper.
+
+**Verification used:** `just build-fd`; `grep -R "errno = ENOTSUP\|return ENOTSUP\|return ENOENT" -n src | cat`; `grep -R "FD_WINDOWS_UNSUPPORTED_REASON\|fd_windows_unsupported_fail" -n src | cat`
+
+**Commit subject:** `refactor: centralize windows unsupported return helpers`
 
 ---
 

@@ -1,4 +1,5 @@
 #include "fd_netdb.h"
+#include "../../util/fd_platform_unsupported.h"
 
 #if FD_HAS_WINDOWS
 
@@ -32,13 +33,13 @@ char const *
 fd_gai_strerror( int gai ) {
   switch( gai ) {
   case FD_EAI_BADFLAGS: return "bad flags";
-  case FD_EAI_NONAME:   return "resolver unsupported on Windows build lane";
+  case FD_EAI_NONAME:   return FD_WINDOWS_UNSUPPORTED_REASON( "resolver" );
   case FD_EAI_AGAIN:    return "temporary failure";
   case FD_EAI_FAIL:     return "permanent failure";
   case FD_EAI_NODATA:   return "no data";
   case FD_EAI_FAMILY:   return "unsupported address family";
   case FD_EAI_MEMORY:   return "out of memory";
-  default:              return "resolver unsupported on Windows build lane";
+  default:              return FD_WINDOWS_UNSUPPORTED_REASON( "resolver" );
   }
 }
 
