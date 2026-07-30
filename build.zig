@@ -11,14 +11,6 @@
 ///
 /// The existing GNUmakefile (C/Firedancer build) is unchanged.
 const std = @import("std");
-/// Windows C compiler flags shared with config/machine/windows_clang.mk.
-/// If you change these, also update the Makefile Windows profile.
-const windows_cflags: []const []const u8 = .{
-    "-D_CRT_SECURE_NO_WARNINGS",
-    "-DFD_IO_STYLE=1",
-    "-Wno-format",
-    "-Wno-format-extra-args",
-};
 
 
 pub fn build(b: *std.Build) void {
@@ -2070,7 +2062,7 @@ fn shimCFlagsFor(target_os: std.Target.Os.Tag) []const []const u8 {
     return switch (target_os) {
         .linux => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_LINUX=1" },
         .macos => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_MACOS=1" },
-        .windows => .{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1" } ++ windows_cflags,
+        .windows => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1", "-D_CRT_SECURE_NO_WARNINGS", "-DFD_IO_STYLE=1", "-Wno-format", "-Wno-format-extra-args" },
         else => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1" },
     };
 }
