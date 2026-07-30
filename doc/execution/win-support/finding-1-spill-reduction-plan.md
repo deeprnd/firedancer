@@ -470,7 +470,7 @@ git commit -m "refactor: centralize tiny windows compatibility shims"
 ---
 
 ### Task 7: Pull any remaining runtime/product divergence back into Tickoni-owned shims
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** if cleanup discovers Windows runtime/product behavior leaking into shared Firedancer-derived code, move it behind Tickoni-owned boundaries first.
 
@@ -503,6 +503,12 @@ Expected: supervisor/CLI still compile against the same shim contract.
 git add src/tickoni/c_abi/shim/* src/tickoni/util/*
 git commit -m "refactor: keep windows runtime divergence inside tickoni shims"
 ```
+
+**Resolution:** Re-audited the remaining Windows references after Tasks 1-6. The remaining runtime/product semantics already sit in Tickoni-owned boundaries (`src/tickoni/c_abi/shim/os.c`, `src/tickoni/c_abi/shim/sandbox.c`, `src/tickoni/c_abi/shim/windows_crt.c`), so this slice needed no further code movement.
+
+**Verification used:** `just build-tk`; `grep -R "FD_HAS_WINDOWS" -n src/tickoni/c_abi/shim src/tickoni/util | cat`; `grep -R "FD_HAS_WINDOWS" -n src --include='*.c' --include='*.h' | cat`
+
+**Commit subject:** `docs: record windows runtime shim audit`
 
 ---
 
