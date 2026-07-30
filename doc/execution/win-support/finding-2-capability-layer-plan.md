@@ -412,7 +412,7 @@ git commit -m "refactor: share windows runtime capability policy"
 ---
 
 ### Task 6: Final pass on leftover subsystem stubs and tracker update
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Confirm the remaining Windows stubs sit on the intended helper boundaries and this file reflects the real finished state.
 
@@ -448,6 +448,12 @@ Expected: helperized policy is concentrated and both build entrypoints still pas
 git add doc/execution/win-support/finding-2-capability-layer-plan.md
 git commit -m "docs: update finding 2 capability-layer tracker"
 ```
+
+**Resolution:** Ran the final sweep across all Windows stub files, found no remaining raw `unsupported on Windows build lane` / `errno = ENOTSUP` / `return ENOTSUP` / `return ENOENT` boilerplate in `*_windows_stub.c`, and cleaned the last direct `errno = ENOTSUP` sites in the gRPC and UDP socket stubs. The tree now lands on three helper layers: `fd_platform_tile_stub.h`, `fd_platform_stub_object.h`, and the `fd_platform_unsupported.h` + `fd_platform_runtime_caps.h` vocabulary/policy pair.
+
+**Verification used:** `just build-fd`; `just build-tk`; `grep -R "FD_HAS_WINDOWS" -n src --include='*_windows_stub.c' | cat`; `grep -R "unsupported on Windows build lane\|errno = ENOTSUP\|return ENOTSUP\|return ENOENT" -n src --include='*_windows_stub.c' | cat`; `grep -R "FD_PLATFORM_TILE_STUB\|FD_WINDOWS_RUNTIME_CAPS_LOG_WARNING\|fd_platform_stub_object_\|FD_WINDOWS_UNSUPPORTED_REASON\|fd_windows_unsupported_fail" -n src | cat`
+
+**Commit subject:** `docs: update finding 2 capability-layer tracker`
 
 ---
 

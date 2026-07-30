@@ -1,6 +1,7 @@
 #include "fd_grpc_client.h"
 #include "../h2/fd_h2_callback.h"
 #include "../../util/fd_platform_stub_object.h"
+#include "../../util/fd_platform_unsupported.h"
 
 #include <errno.h>
 #include <string.h>
@@ -99,8 +100,7 @@ fd_grpc_client_rxtx_ossl( fd_grpc_client_t * client,
                           int *              charge_busy ) {
   (void)client; (void)ssl;
   if( charge_busy ) *charge_busy = 0;
-  errno = ENOTSUP;
-  return -1;
+  return fd_windows_unsupported_fail();
 }
 #endif
 
@@ -110,8 +110,7 @@ fd_grpc_client_rxtx_socket( fd_grpc_client_t * client,
                             int *              charge_busy ) {
   (void)client; (void)sock_fd;
   if( charge_busy ) *charge_busy = 0;
-  errno = ENOTSUP;
-  return -1;
+  return fd_windows_unsupported_fail();
 }
 
 fd_grpc_h2_stream_t *
