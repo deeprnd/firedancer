@@ -1,5 +1,6 @@
 #include "fd_udpsock.h"
 #include "../../util/fd_platform_stub_object.h"
+#include "../../util/fd_platform_unsupported.h"
 
 #include <errno.h>
 
@@ -15,14 +16,14 @@ struct __attribute__((aligned(FD_UDPSOCK_ALIGN))) fd_udpsock {
 };
 
 static int
-fd_udpsock_send( void *                    ctx,
-                 fd_aio_pkt_info_t const * batch,
+fd_udpsock_send( void *                     ctx,
+                 fd_aio_pkt_info_t const *  batch,
                  ulong                     batch_cnt,
                  ulong *                   opt_batch_idx,
                  int                       flush ) {
   (void)ctx; (void)batch; (void)batch_cnt; (void)flush;
   if( opt_batch_idx ) *opt_batch_idx = 0UL;
-  errno = ENOTSUP;
+  errno = fd_windows_unsupported_enotsup();
   return FD_AIO_ERR_INVAL;
 }
 
