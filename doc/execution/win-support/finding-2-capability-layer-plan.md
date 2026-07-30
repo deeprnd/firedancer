@@ -326,7 +326,7 @@ git commit -m "refactor: reduce windows stub object boilerplate"
 ---
 
 ### Task 4: Refactor the HTTP stub onto the shared helper vocabulary
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Shrink `fd_http_server_windows_stub.c` without hiding meaningful HTTP-specific behavior.
 
@@ -357,6 +357,12 @@ Expected: file is smaller and less repetitive, but still clearly documents the H
 git add src/waltz/http/fd_http_server_windows_stub.c src/util/fd_platform_unsupported.h src/util/fd_platform_stub_object.h
 git commit -m "refactor: simplify windows http server stub policy"
 ```
+
+**Resolution:** Moved HTTP stub lifecycle scaffolding onto `fd_platform_stub_object.h` and switched the listen / websocket send / websocket broadcast failure paths to the shared unsupported helpers. Kept the HTTP-specific staging, method-string, and response-body behavior explicit in the file.
+
+**Verification used:** `just build-fd`; `grep -n "unsupported on Windows build lane\|ENOTSUP\|fd_platform_stub_object_\|fd_windows_unsupported_" src/waltz/http/fd_http_server_windows_stub.c`
+
+**Commit subject:** `refactor: simplify windows http server stub policy`
 
 ---
 

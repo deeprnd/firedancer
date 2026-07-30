@@ -1,4 +1,6 @@
 #include "fd_http_server.h"
+#include "../../util/fd_platform_stub_object.h"
+#include "../../util/fd_platform_unsupported.h"
 
 #include <errno.h>
 #include <stdarg.h>
@@ -19,7 +21,7 @@ struct __attribute__((aligned(FD_HTTP_SERVER_ALIGN))) fd_http_server_private {
 FD_FN_CONST char const *
 fd_http_server_connection_close_reason_str( int reason ) {
   (void)reason;
-  return "http server unsupported on Windows build lane";
+  return FD_WINDOWS_UNSUPPORTED_REASON( "http server" );
 }
 
 FD_FN_CONST char const *
@@ -40,9 +42,8 @@ fd_http_server_align( void ) {
 
 FD_FN_CONST ulong
 fd_http_server_footprint( fd_http_server_params_t params ) {
-  ulong footprint = sizeof(fd_http_server_t) + params.outgoing_buffer_sz;
-  ulong align = fd_http_server_align();
-  return ( footprint + align - 1UL ) & ~( align - 1UL );
+  return fd_platform_stub_object_footprint( fd_http_server_align(),
+                                            sizeof( fd_http_server_t ) + params.outgoing_buffer_sz );
 }
 
 void *
@@ -50,9 +51,10 @@ fd_http_server_new( void *                     shmem,
                     fd_http_server_params_t    params,
                     fd_http_server_callbacks_t callbacks,
                     void *                     callback_ctx ) {
-  if( FD_UNLIKELY( !shmem ) ) return NULL;
-  if( FD_UNLIKELY( (((ulong)shmem) & ( fd_http_server_align() - 1UL )) ) ) return NULL;
-  fd_http_server_t * http = (fd_http_server_t *)shmem;
+  fd_http_server_t * http = fd_platform_stub_object_new( shmem,
+                                                         fd_http_server_align(),
+                                                         fd_http_server_footprint( params ) );
+  if( FD_UNLIKELY( !http ) ) return NULL;
   *http = (fd_http_server_t){
     .params        = params,
     .callbacks     = callbacks,
@@ -67,17 +69,17 @@ fd_http_server_new( void *                     shmem,
 
 fd_http_server_t *
 fd_http_server_join( void * shhttp ) {
-  return (fd_http_server_t *)shhttp;
+  return fd_platform_stub_object_join( shhttp, fd_http_server_align() );
 }
 
 void *
 fd_http_server_leave( fd_http_server_t * http ) {
-  return (void *)http;
+  return fd_platform_stub_object_leave( http );
 }
 
 void *
 fd_http_server_delete( void * shhttp ) {
-  return shhttp;
+  return fd_platform_stub_object_delete( shhttp, fd_http_server_align() );
 }
 
 int
@@ -89,10 +91,9 @@ fd_http_server_t *
 fd_http_server_listen( fd_http_server_t * http,
                        uint               address,
                        ushort             port ) {
-  (void)address; (void)port;
-  if( FD_UNLIKELY( !http ) ) return NULL;
-  errno = ENOTSUP;
-  return NULL;
+  (void)http; (void)address; (void)port;
+  errno = fd_windows_unsupported_enotsup();
+  return fd_windows_unsupported_null();
 }
 
 void
@@ -194,15 +195,13 @@ int
 fd_http_server_ws_send( fd_http_server_t * http,
                         ulong              ws_conn_id ) {
   (void)http; (void)ws_conn_id;
-  errno = ENOTSUP;
-  return -1;
+  return fd_windows_unsupported_fail();
 }
 
 int
 fd_http_server_ws_broadcast( fd_http_server_t * http ) {
   (void)http;
-  errno = ENOTSUP;
-  return -1;
+  return fd_windows_unsupported_fail();
 }
 
 int
