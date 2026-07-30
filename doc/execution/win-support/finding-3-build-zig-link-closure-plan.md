@@ -122,7 +122,7 @@ git commit -m "docs: add windows link closure plan"
 ---
 
 ### Task 2: Emit generated Windows Zig link manifests from the FD build layer
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Move the Windows closure lists out of `build.zig` and into generated FD-side artifacts.
 
@@ -159,6 +159,12 @@ Expected: both manifest files exist and contain non-zero closure entries.
 git add contrib/fd-write-zig-link-manifests.sh contrib/fd-build-lib.sh contrib/fd-build-windows.sh
 git commit -m "build: emit windows zig link manifests"
 ```
+
+**Resolution:** Added `contrib/fd-write-zig-link-manifests.sh` as the FD-side owner of the supervisor and codec closure lists and wired `contrib/fd-build-lib.sh` to emit the manifests after each successful FD build. The generated artifacts now live under `build/<BUILDDIR>/lib/` instead of leaving the closure shape implicit in Zig.
+
+**Verification used:** `just build-fd`; Python existence/entry-count check for `build/fd-tickoni-fd/lib/fd_windows_zig_supervisor_link.txt` and `build/fd-tickoni-fd/lib/fd_windows_zig_codec_link.txt`
+
+**Commit subject:** `build: emit windows zig link manifests`
 
 ---
 
