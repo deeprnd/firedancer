@@ -416,7 +416,7 @@ pub fn build(b: *std.Build) void {
     });
     if (target.result.os.tag == .windows) {
         exe.root_module.linkLibrary(addTickoniSupervisorShimLibrary(b, target, optimize));
-        addWindowsFdSupervisorFixups(exe);
+        addWindowsFdManifestFixups(b, exe, b.fmt("{s}/fd_windows_zig_supervisor_link.txt", .{fd_lib_dir}));
     } else {
         addTickoniCodecShim(b, exe);
         addTickoniFiredancerShims(b, exe);
@@ -1742,7 +1742,7 @@ pub fn build(b: *std.Build) void {
     });
     if (target.result.os.tag == .windows) {
         cli_exe.root_module.linkLibrary(addTickoniCodecShimLibrary(b, target, optimize, "tickoni-codec-shims"));
-        addWindowsFdCodecFixups(cli_exe);
+        addWindowsFdManifestFixups(b, cli_exe, b.fmt("{s}/fd_windows_zig_codec_link.txt", .{fd_lib_dir}));
         linkTickoniSystemLibraries(cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
         cli_exe.root_module.linkSystemLibrary("crypt32", .{});
     } else {
@@ -2215,48 +2215,24 @@ fn addTickoniCodecShimLibrary(
     });
 }
 
-fn addWindowsFdObjectFixups(step: *std.Build.Step.Compile, paths: []const []const u8) void {
+fn addWindowsFdManifestFixups(b: *std.Build, step: *std.Build.Step.Compile, manifest_path: []const u8) void {
     if (step.root_module.resolved_target.?.result.os.tag != .windows) return;
-    for (paths) |path| step.root_module.addObjectFile(.{ .cwd_relative = path });
-}
 
-fn addWindowsFdSupervisorFixups(step: *std.Build.Step.Compile) void {
-    addWindowsFdObjectFixups(step, &.{
-        "build/fd-tickoni-fd/obj/tango/mcache/fd_mcache.o",
-        "build/fd-tickoni-fd/obj/tango/dcache/fd_dcache.o",
-        "build/fd-tickoni-fd/obj/tango/fseq/fd_fseq.o",
-        "build/fd-tickoni-fd/obj/tango/fctl/fd_fctl.o",
-        "build/fd-tickoni-fd/obj/tango/tempo/fd_tempo.o",
-        "build/fd-tickoni-fd/obj/tango/cnc/fd_cnc.o",
-        "build/fd-tickoni-fd/obj/util/wksp/fd_wksp_helper.o",
-        "build/fd-tickoni-fd/obj/util/wksp/fd_wksp_user.o",
-        "build/fd-tickoni-fd/obj/util/shmem/fd_shmem_windows_stub.o",
-        "build/fd-tickoni-fd/obj/disco/topo/fd_topob.o",
-        "build/fd-tickoni-fd/obj/disco/topo/fd_topo.o",
-        "build/fd-tickoni-fd/obj/util/log/fd_log.o",
-        "build/fd-tickoni-fd/obj/util/pod/fd_pod.o",
-        "build/fd-tickoni-fd/obj/util/fd_util.o",
-        "build/fd-tickoni-fd/obj/ballet/siphash13/fd_siphash13.o",
-        "build/fd-tickoni-fd/obj/ballet/pb/fd_pb_tokenize.o",
-        "build/fd-tickoni-fd/obj/third_party/cjson/cJSON.o",
-        "build/fd-tickoni-fd/obj/disco/events/fd_event_report.o",
-        "build/fd-tickoni-fd/obj/disco/metrics/fd_metrics.o",
-        "build/fd-tickoni-fd/obj/util/cstr/fd_cstr.o",
-        "build/fd-tickoni-fd/obj/util/tile/fd_tile_threads.o",
-    });
-}
+    var threaded = std.Io.Threaded.init_single_threaded;
+    const manifest = std.Io.Dir.cwd().readFileAlloc(
+        threaded.io(),
+        manifest_path,
+        b.allocator,
+        .limited(1024 * 1024),
+    ) catch @panic("missing Windows FD Zig link manifest; run just build-fd first");
+    defer b.allocator.free(manifest);
 
-fn addWindowsFdCodecFixups(step: *std.Build.Step.Compile) void {
-    addWindowsFdObjectFixups(step, &.{
-        "build/fd-tickoni-fd/obj/ballet/siphash13/fd_siphash13.o",
-        "build/fd-tickoni-fd/obj/ballet/pb/fd_pb_tokenize.o",
-        "build/fd-tickoni-fd/obj/third_party/cjson/cJSON.o",
-        "build/fd-tickoni-fd/obj/util/log/fd_log.o",
-        "build/fd-tickoni-fd/obj/util/env/fd_env.o",
-        "build/fd-tickoni-fd/obj/util/cstr/fd_cstr.o",
-        "build/fd-tickoni-fd/obj/util/alloc/fd_alloc.o",
-        "build/fd-tickoni-fd/obj/util/wksp/fd_wksp_admin.o",
-    });
+    var lines = std.mem.splitScalar(u8, manifest, '\n');
+    while (lines.next()) |line| {
+        const trimmed = std.mem.trim(u8, line, " \t\r");
+        if (trimmed.len == 0) continue;
+        step.root_module.addObjectFile(.{ .cwd_relative = trimmed });
+    }
 }
 
 /// Links shim/ballet.c (Firedancer siphash/protobuf/JSON primitives). Audit

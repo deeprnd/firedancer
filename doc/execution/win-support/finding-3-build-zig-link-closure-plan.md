@@ -169,7 +169,7 @@ git commit -m "build: emit windows zig link manifests"
 ---
 
 ### Task 3: Teach `build.zig` to consume the generated link contract
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Replace hardcoded Windows object arrays in Zig with one manifest-consuming helper.
 
@@ -202,6 +202,12 @@ Expected: `just build-tk` still passes on Linux, `build.zig` contains zero raw F
 git add build.zig
 git commit -m "refactor: consume windows zig link manifests"
 ```
+
+**Resolution:** Replaced the supervisor and codec Windows fixup arrays with one manifest-reading helper in `build.zig`. Zig now points at `fd_windows_zig_supervisor_link.txt` / `fd_windows_zig_codec_link.txt` under `fd_lib_dir` and no longer embeds raw `build/fd-tickoni-fd/obj/...` paths.
+
+**Verification used:** `just build-tk`; `grep -n "build/fd-tickoni-fd/obj/" build.zig || true`; `grep -n "fd_windows_zig_.*_link.txt" build.zig | cat`
+
+**Commit subject:** `refactor: consume windows zig link manifests`
 
 ---
 
