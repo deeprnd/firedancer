@@ -156,6 +156,7 @@ fd_build_fd() {
   fi
 
   local -a cmd=( "$MAKE" -j"$(fd_nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" )
+  [ -n "${FD_WINDOWS_ARCH:-}" ] && cmd+=( "FD_WINDOWS_ARCH=${FD_WINDOWS_ARCH}" )
   [ -n "${LDFLAGS_EXE}" ] && cmd+=( "LDFLAGS_EXE=${LDFLAGS_EXE}" )
   [ -n "${EXTRAS}" ] && cmd+=( "EXTRAS=${EXTRAS}" )
   cmd+=( "CC=${CC}" )
