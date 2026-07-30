@@ -36,13 +36,17 @@ endif
 # architecture (Apple Silicon vs x86_64) and sets correct flags.
 # On Windows/MSYS, use the dedicated Windows clang profile.
 # On Linux, use native detection (native_config.sh).
+# Windows detection: primarily via uname (MINGW/MSYS/CYGWIN/Windows_NT),
+# with FD_WINDOWS_ARCH env var as fallback (set by fd-build-windows.sh).
 UNAME?=$(shell uname)
 ifeq ($(UNAME), Darwin)
   include config/machine/macos_clang.mk
 else ifneq (,$(filter MINGW% MSYS% CYGWIN% Windows_NT,$(UNAME)))
   include config/machine/windows_clang.mk
+else ifneq (,$(FD_WINDOWS_ARCH))
+  include config/machine/windows_clang.mk
 else
-include config/machine/native.mk
+  include config/machine/native.mk
 endif
 include config/extra/with-hosted.mk
 
