@@ -1,18 +1,5 @@
 #include "fd_io.h"
 
-/* TODO: try to eliminate use of FD_LOG_STYLE in log if possible in
-   favor of FD_IO_STYLE here. */
-
-#ifndef FD_IO_STYLE
-#if FD_HAS_WINDOWS
-#define FD_IO_STYLE 1
-#elif FD_HAS_HOSTED
-#define FD_IO_STYLE 0
-#else
-#error "Define FD_IO_STYLE for this platform"
-#endif
-#endif
-
 #if FD_IO_STYLE==0 /* POSIX style */
 
 #include <errno.h>
