@@ -2172,6 +2172,12 @@ fn addTickoniShimLibrary(
         .files = files,
         .flags = shimCFlagsFor(target.result.os.tag),
     });
+    if (target.result.os.tag == .windows) {
+        mod.addCSourceFiles(.{
+            .files = &.{"src/tickoni/c_abi/shim/windows_crt.c"},
+            .flags = shimCFlagsFor(target.result.os.tag),
+        });
+    }
     return b.addLibrary(.{
         .name = name,
         .linkage = .static,
@@ -2224,7 +2230,7 @@ fn addWindowsFdSupervisorFixups(step: *std.Build.Step.Compile) void {
         "build/fd-tickoni-fd/obj/tango/cnc/fd_cnc.o",
         "build/fd-tickoni-fd/obj/util/wksp/fd_wksp_helper.o",
         "build/fd-tickoni-fd/obj/util/wksp/fd_wksp_user.o",
-        "build/fd-tickoni-fd/obj/util/shmem/fd_shmem_admin.o",
+        "build/fd-tickoni-fd/obj/util/shmem/fd_shmem_windows_stub.o",
         "build/fd-tickoni-fd/obj/disco/topo/fd_topob.o",
         "build/fd-tickoni-fd/obj/disco/topo/fd_topo.o",
         "build/fd-tickoni-fd/obj/util/log/fd_log.o",
@@ -2246,6 +2252,10 @@ fn addWindowsFdCodecFixups(step: *std.Build.Step.Compile) void {
         "build/fd-tickoni-fd/obj/ballet/pb/fd_pb_tokenize.o",
         "build/fd-tickoni-fd/obj/third_party/cjson/cJSON.o",
         "build/fd-tickoni-fd/obj/util/log/fd_log.o",
+        "build/fd-tickoni-fd/obj/util/env/fd_env.o",
+        "build/fd-tickoni-fd/obj/util/cstr/fd_cstr.o",
+        "build/fd-tickoni-fd/obj/util/alloc/fd_alloc.o",
+        "build/fd-tickoni-fd/obj/util/wksp/fd_wksp_admin.o",
     });
 }
 
