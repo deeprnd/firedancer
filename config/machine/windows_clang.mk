@@ -13,8 +13,10 @@ include config/extra/with-hosted.mk
 UNAME?=$(shell uname)
 FD_WINDOWS_ARCH?=$(shell uname -m)
 
-FD_HAS_WINDOWS:=1
-CPPFLAGS+=-DFD_HAS_WINDOWS=1 -D_CRT_SECURE_NO_WARNINGS -DFD_IO_STYLE=1
+# FD_HAS_WINDOWS=1, FD_HAS_HOSTED=1, and _CRT_SECURE_NO_WARNINGS are set
+# by config/base.mk (MACHINE filter) and config/extra/with-hosted.mk.
+# FD_IO_STYLE=1 is applied via -DFD_IO_STYLE=1 in build.zig / Windows
+# toolchain flags (not Makefile, to keep Makefile minimal).
 
 # Firedancer assumes LP64-style ulong-heavy formatting and bit helpers.
 # On Windows/LLP64 we carry a Windows-specific 64-bit ulong typedef in
