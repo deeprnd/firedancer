@@ -18,18 +18,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <inttypes.h> /* PRIu64 for portable uint64 format */
-#if FD_HAS_WINDOWS
-#include <io.h>
-struct pollfd { int fd; short events; short revents; };
-#define POLLOUT 0x0010
-#define POLLERR 0x0008
-#define POLLHUP 0x0010
-#define FD_BUNDLE_SOCKET_CLOSE closesocket
-#else
 #include <unistd.h> /* close */
 #include <poll.h> /* poll */
-#define FD_BUNDLE_SOCKET_CLOSE close
-#endif
 #include <sys/socket.h> /* socket */
 #include <netinet/in.h>
 #if FD_HAS_LINUX
@@ -60,7 +50,7 @@ fd_bundle_now( void ) {
 void
 fd_bundle_client_reset( fd_bundle_tile_t * ctx ) {
   if( FD_UNLIKELY( ctx->tcp_sock >= 0 ) ) {
-    if( FD_UNLIKELY( 0!=FD_BUNDLE_SOCKET_CLOSE( ctx->tcp_sock ) ) ) {
+    if( FD_UNLIKELY( 0!=close( ctx->tcp_sock ) ) ) {
       FD_LOG_ERR(( "close(tcp_sock=%i) failed (%i-%s)", ctx->tcp_sock, errno, fd_io_strerror( errno ) ));
     }
     ctx->tcp_sock = -1;

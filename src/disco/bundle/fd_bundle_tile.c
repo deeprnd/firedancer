@@ -14,13 +14,9 @@
 
 #include <stdio.h> /* snprintf */
 #include <fcntl.h> /* F_SETFL */
-#if FD_HAS_WINDOWS
-#include <io.h>
-#else
 #include <unistd.h> /* close */
 #include <sys/uio.h> /* writev */
 #include <sys/mman.h> /* PROT_READ (seccomp) */
-#endif
 #include <netinet/in.h> /* AF_INET */
 #include <netinet/tcp.h> /* TCP_FASTOPEN_CONNECT (seccomp) */
 #include "../../waltz/resolv/fd_netdb.h"
@@ -353,12 +349,6 @@ fd_ossl_keylog_callback( SSL const *  ssl,
   SSL_CTX * ssl_ctx = SSL_get_SSL_CTX( ssl );
   fd_bundle_tile_t * ctx = SSL_CTX_get_ex_data( ssl_ctx, 0 );
   ulong line_len = strlen( line );
-#if FD_HAS_WINDOWS
-  if( FD_UNLIKELY( _write( ctx->keylog_fd, line, (unsigned)line_len )!=(int)line_len ||
-                   _write( ctx->keylog_fd, "\n", 1U )!=1 ) ) {
-    FD_LOG_WARNING(( "write(keylog) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
-  }
-#else
   struct iovec iovs[2] = {
     { .iov_base=(void *)line, .iov_len=line_len },
     { .iov_base=(void *)"\n", .iov_len=1UL }
@@ -366,7 +356,6 @@ fd_ossl_keylog_callback( SSL const *  ssl,
   if( FD_UNLIKELY( writev( ctx->keylog_fd, iovs, 2 )!=(long)line_len+1 ) ) {
     FD_LOG_WARNING(( "write(keylog) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
   }
-#endif
 }
 
 static void
