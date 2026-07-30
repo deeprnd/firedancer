@@ -367,7 +367,7 @@ git commit -m "refactor: simplify windows http server stub policy"
 ---
 
 ### Task 5: Add a runtime/admin capability helper for shmem + wksp
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Share Windows build-lane runtime capability policy across `shmem` and `wksp` without collapsing their explicit invariant-sensitive behavior into macros.
 
@@ -402,6 +402,12 @@ git add src/util/fd_platform_runtime_caps.h \
         src/util/wksp/fd_wksp_windows_stub.c
 git commit -m "refactor: share windows runtime capability policy"
 ```
+
+**Resolution:** Added `src/util/fd_platform_runtime_caps.h` for the runtime/admin build-lane policy boundary. Moved `shmem` and `wksp` warning strings onto the shared capability macro, reused the common unsupported return helpers, and centralized the singleton NUMA/CPU fallback helpers without hiding the invariant-sensitive explicit behavior in either file.
+
+**Verification used:** `just build-fd`; `grep -R "FD_WINDOWS_RUNTIME_CAPS_LOG_WARNING\|fd_windows_runtime_caps_singleton_\|fd_windows_unsupported_" -n src/util | cat`; `grep -R "unsupported on Windows build lane" -n src/util/shmem src/util/wksp | cat`
+
+**Commit subject:** `refactor: share windows runtime capability policy`
 
 ---
 
