@@ -61,6 +61,13 @@ are stubbed or excluded.
 AF_PACKET and XDP are unavailable on macOS and Windows. Standard sockets are
 used instead. Throughput is bounded by socket I/O, not kernel-bypass ring I/O.
 
+**Stub behavior note:** some retail stubs use a "stub object" pattern
+(`fd_platform_stub_object_new()`) that returns a valid non-NULL pointer so
+callers don't null-crash, but all functional methods are no-ops. A few
+metadata bookkeeping functions (gRPC stream send/close) return 0 to avoid
+polluting errno. The actual data path (socket `rxtx`, HTTP listen, UDP send)
+correctly fails closed with errno.
+
 ### Performance
 
 No shared-memory queues means no Firedancer throughput model. Expected throughput
