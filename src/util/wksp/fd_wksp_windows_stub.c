@@ -1,4 +1,5 @@
 #include "fd_wksp_private.h"
+#include "../fd_platform_runtime_caps.h"
 #include <errno.h>
 #include <string.h>
 
@@ -13,7 +14,7 @@ fd_wksp_private_checkpt_v1( fd_tpool_t * tpool,
                             ulong        mode,
                             char const * uinfo ) {
   (void)tpool; (void)t0; (void)t1; (void)wksp; (void)path; (void)mode; (void)uinfo;
-  FD_LOG_WARNING(( "fd_wksp_private_checkpt_v1 unsupported on Windows build lane" ));
+  FD_WINDOWS_RUNTIME_CAPS_LOG_WARNING( "fd_wksp_private_checkpt_v1" );
   return FD_WKSP_ERR_FAIL;
 }
 
@@ -25,7 +26,7 @@ fd_wksp_private_restore_v1( fd_tpool_t * tpool,
                             char const * path,
                             uint         new_seed ) {
   (void)tpool; (void)t0; (void)t1; (void)wksp; (void)path; (void)new_seed;
-  FD_LOG_WARNING(( "fd_wksp_private_restore_v1 unsupported on Windows build lane" ));
+  FD_WINDOWS_RUNTIME_CAPS_LOG_WARNING( "fd_wksp_private_restore_v1" );
   return FD_WKSP_ERR_FAIL;
 }
 
@@ -39,7 +40,7 @@ fd_wksp_private_checkpt_v2( fd_tpool_t * tpool,
                             char const * uinfo,
                             int          frame_style_compressed ) {
   (void)tpool; (void)t0; (void)t1; (void)wksp; (void)path; (void)mode; (void)uinfo; (void)frame_style_compressed;
-  FD_LOG_WARNING(( "fd_wksp_private_checkpt_v2 unsupported on Windows build lane" ));
+  FD_WINDOWS_RUNTIME_CAPS_LOG_WARNING( "fd_wksp_private_checkpt_v2" );
   return FD_WKSP_ERR_FAIL;
 }
 
@@ -51,7 +52,7 @@ fd_wksp_private_restore_v2( fd_tpool_t * tpool,
                             char const * path,
                             uint         new_seed ) {
   (void)tpool; (void)t0; (void)t1; (void)wksp; (void)path; (void)new_seed;
-  FD_LOG_WARNING(( "fd_wksp_private_restore_v2 unsupported on Windows build lane" ));
+  FD_WINDOWS_RUNTIME_CAPS_LOG_WARNING( "fd_wksp_private_restore_v2" );
   return FD_WKSP_ERR_FAIL;
 }
 
@@ -73,7 +74,7 @@ fd_wksp_checkpt_tpool( fd_tpool_t * tpool,
                        int          style,
                        char const * uinfo ) {
   (void)tpool; (void)t0; (void)t1; (void)wksp; (void)path; (void)mode; (void)style; (void)uinfo;
-  FD_LOG_WARNING(( "fd_wksp_checkpt_tpool unsupported on Windows build lane" ));
+  FD_WINDOWS_RUNTIME_CAPS_LOG_WARNING( "fd_wksp_checkpt_tpool" );
   return FD_WKSP_ERR_FAIL;
 }
 
@@ -85,7 +86,7 @@ fd_wksp_restore_tpool( fd_tpool_t * tpool,
                        char const * path,
                        uint         new_seed ) {
   (void)tpool; (void)t0; (void)t1; (void)wksp; (void)path; (void)new_seed;
-  FD_LOG_WARNING(( "fd_wksp_restore_tpool unsupported on Windows build lane" ));
+  FD_WINDOWS_RUNTIME_CAPS_LOG_WARNING( "fd_wksp_restore_tpool" );
   return FD_WKSP_ERR_FAIL;
 }
 
@@ -95,9 +96,9 @@ fd_wksp_printf( int          fd,
                 int          verbose ) {
   (void)verbose;
   if( FD_UNLIKELY( !path ) ) return -1;
-  errno = ENOTSUP;
+  errno = fd_windows_unsupported_enotsup();
   if( fd>=0 ) {
-    char const * msg = "fd_wksp_printf unsupported on Windows build lane\n";
+    char const * msg = FD_WINDOWS_UNSUPPORTED_REASON( "fd_wksp_printf" ) "\n";
     ulong out_sz = 0UL;
     (void)fd_io_write( fd, msg, 0UL, strlen( msg ), &out_sz );
   }
