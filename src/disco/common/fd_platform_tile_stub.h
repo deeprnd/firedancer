@@ -1,6 +1,8 @@
 #ifndef HEADER_fd_src_disco_common_fd_platform_tile_stub_h
 #define HEADER_fd_src_disco_common_fd_platform_tile_stub_h
 
+#include "../topo/fd_topo.h"
+
 FD_FN_CONST static inline ulong
 fd_platform_tile_stub_scratch_align( void ) {
   return 1UL;

@@ -1954,7 +1954,7 @@ fd_pack_schedule_impl( fd_pack_t          * pack,
     prev = treap_rev_iter_next( _cur, pool );
 
 #   if FD_HAS_X86
-    _mm_prefetch( &(pool[ prev ].prev),      _MM_HINT_T0 );
+    _mm_prefetch( (char const *)&(pool[ prev ].prev), _MM_HINT_T0 );
 #   endif
 
     fd_pack_ord_txn_t * cur = treap_rev_iter_ele( _cur, pool );
