@@ -538,7 +538,7 @@ Confirm:
 
 **Resolution:** All slices in this tracker are now marked `DONE` with per-slice resolution, verification, and commit subject notes. Final pass confirmed the finding stayed inside build-CI-only Windows scope.
 
-**Verification used:** `grep -R "**Status:** TODO" -n doc/execution/win-support/finding-1-spill-reduction-plan.md || true`; `grep -R "FD_HAS_WINDOWS" -n src --include='*.c' | cat`; `grep -R "unsupported on Windows build lane" -n src | cat`; `just build-fd`; `just build-tk`
+**Verification used:** searched the tracker for unfinished status markers; `grep -R "FD_HAS_WINDOWS" -n src --include='*.c' | cat`; `grep -R "unsupported on Windows build lane" -n src | cat`; `just build-fd`; `just build-tk`
 
 **Final metrics:**
 - Task-1 target-set shared files still carrying `FD_HAS_WINDOWS`: `2` (`src/util/io/fd_io.c`, `src/tango/cnc/fd_cnc.c`)
