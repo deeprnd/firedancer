@@ -289,7 +289,7 @@ git commit -m "refactor: split hosted util behavior by platform"
 ---
 
 ### Task 4: Normalize `Local.mk` platform selection for POSIX-heavy subsystems
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Make platform selection explicit and consistent so Windows behavior is owned by the build graph instead of leaking into shared implementation files.
 
@@ -352,6 +352,12 @@ Expected: platform selection remains, but is structurally consistent and easier 
 git add src/**/Local.mk
 git commit -m "refactor: normalize platform selection in local mk files"
 ```
+
+**Resolution:** Normalized the listed `Local.mk` files onto explicit build-graph comments and Windows-stub vs non-Windows-real selection blocks, while preserving the resolver's existing shared-algorithm/per-platform-impl split.
+
+**Verification used:** `just build-fd`; `grep -R "ifdef FD_HAS_WINDOWS" -n src/*/Local.mk src/*/*/Local.mk | cat`; `git diff --stat -- src/disco/*/Local.mk src/util/shmem/Local.mk src/util/wksp/Local.mk src/waltz/*/Local.mk`
+
+**Commit subject:** `refactor: normalize platform selection in local mk files`
 
 ---
 

@@ -1,5 +1,6 @@
 ifdef FD_HAS_HOSTED
 ifdef FD_HAS_WINDOWS
+# Windows build lane uses stub; non-Windows keeps the real diag tile.
 $(call add-objs,fd_diag_windows_stub,fd_disco)
 else
 $(call add-objs,fd_diag_tile,fd_disco)
