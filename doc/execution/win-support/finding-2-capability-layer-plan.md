@@ -279,7 +279,7 @@ git commit -m "refactor: centralize windows unsupported return helpers"
 ---
 
 ### Task 3: Add the opaque-object lifecycle helper
-**Status:** TODO
+**Status:** DONE
 
 **Objective:** Remove repetitive lifecycle scaffolding from the stateful-object Windows stubs while leaving per-subsystem behavior explicit.
 
@@ -316,6 +316,12 @@ git add src/util/fd_platform_stub_object.h \
         src/waltz/http/fd_http_server_windows_stub.c
 git commit -m "refactor: reduce windows stub object boilerplate"
 ```
+
+**Resolution:** Added `src/util/fd_platform_stub_object.h` and exposed it via `src/util/Local.mk`. Moved align/footprint/new/join/leave/delete scaffolding in the event-client, gRPC client, and UDP socket Windows stubs onto the shared helper while keeping their subsystem-specific state and behavior local.
+
+**Verification used:** `just build-fd`; `grep -R "fd_platform_stub_object_" -n src | cat`; `grep -R "join( void \*\|leave( .*\*\|delete( void \*" -n src/*/*_windows_stub.c | cat`
+
+**Commit subject:** `refactor: reduce windows stub object boilerplate`
 
 ---
 

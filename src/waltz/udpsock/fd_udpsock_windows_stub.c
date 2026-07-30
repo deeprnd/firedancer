@@ -1,7 +1,7 @@
 #include "fd_udpsock.h"
+#include "../../util/fd_platform_stub_object.h"
 
 #include <errno.h>
-#include <string.h>
 
 #if FD_HAS_WINDOWS
 
@@ -36,7 +36,7 @@ fd_udpsock_footprint( ulong mtu,
                       ulong rx_pkt_cnt,
                       ulong tx_pkt_cnt ) {
   if( FD_UNLIKELY( !mtu || !rx_pkt_cnt || !tx_pkt_cnt ) ) return 0UL;
-  return fd_ulong_align_up( sizeof(fd_udpsock_t), fd_udpsock_align() );
+  return fd_platform_stub_object_footprint( fd_udpsock_align(), sizeof( fd_udpsock_t ) );
 }
 
 void *
@@ -45,11 +45,11 @@ fd_udpsock_new( void * shmem,
                 ulong  rx_pkt_cnt,
                 ulong  tx_pkt_cnt ) {
   (void)mtu; (void)rx_pkt_cnt; (void)tx_pkt_cnt;
-  if( FD_UNLIKELY( !shmem ) ) return NULL;
-  if( FD_UNLIKELY( !fd_ulong_is_aligned( (ulong)shmem, fd_udpsock_align() ) ) ) return NULL;
+  fd_udpsock_t * sock = fd_platform_stub_object_new( shmem,
+                                                     fd_udpsock_align(),
+                                                     sizeof( fd_udpsock_t ) );
+  if( FD_UNLIKELY( !sock ) ) return NULL;
 
-  fd_udpsock_t * sock = (fd_udpsock_t *)shmem;
-  fd_memset( sock, 0, sizeof(fd_udpsock_t) );
   sock->fd    = -1;
   sock->layer = FD_UDPSOCK_LAYER_ETH;
   sock->aio_self = (fd_aio_t){ .ctx = sock, .send_func = fd_udpsock_send };
@@ -59,20 +59,20 @@ fd_udpsock_new( void * shmem,
 fd_udpsock_t *
 fd_udpsock_join( void * shsock,
                  int    fd ) {
-  if( FD_UNLIKELY( !shsock ) ) return NULL;
-  fd_udpsock_t * sock = (fd_udpsock_t *)shsock;
+  fd_udpsock_t * sock = fd_platform_stub_object_join( shsock, fd_udpsock_align() );
+  if( FD_UNLIKELY( !sock ) ) return NULL;
   sock->fd = fd;
   return sock;
 }
 
 void *
 fd_udpsock_leave( fd_udpsock_t * sock ) {
-  return (void *)sock;
+  return fd_platform_stub_object_leave( sock );
 }
 
 void *
 fd_udpsock_delete( void * shsock ) {
-  return shsock;
+  return fd_platform_stub_object_delete( shsock, fd_udpsock_align() );
 }
 
 void
