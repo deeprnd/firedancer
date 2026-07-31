@@ -66,6 +66,7 @@ pub const VersionInfo = struct {
     policy_schema_version: u16 = 0,
     replay_schema_version: u16 = 0,
     demo_manifest_version: u16 = 0,
+    demo_manifest_version_str: ?[]const u8 = null,
     compiler: []const u8 = "unknown",
 
     pub fn init(gpa: std.mem.Allocator) !VersionInfo {
@@ -83,8 +84,23 @@ pub const VersionInfo = struct {
             .isolation_tier = isolationTierStr(),
             .policy_schema_version = audit_mod.audit_schema_version,
             .replay_schema_version = audit_mod.audit_schema_version,
+            .demo_manifest_version = 0,
+            .demo_manifest_version_str = null,
             .compiler = tier_mod.detectCompilerVersion(),
         };
+    }
+
+    pub fn setDemoManifestVersion(self: *VersionInfo, gpa: std.mem.Allocator, version: ?[]const u8) !void {
+        if (self.demo_manifest_version_str) |s| gpa.free(s);
+        self.demo_manifest_version_str = null;
+        self.demo_manifest_version = 0;
+        if (version) |v| {
+            self.demo_manifest_version_str = try gpa.dupe(u8, v);
+            // Parse major version component
+            var it = std.mem.splitScalar(u8, v, '.');
+            const first = it.next() orelse return;
+            self.demo_manifest_version = std.fmt.parseInt(u16, first, 10) catch 0;
+        }
     }
 
     pub fn deinit(self: *VersionInfo, gpa: std.mem.Allocator) void {
@@ -92,6 +108,10 @@ pub const VersionInfo = struct {
             gpa.free(self.semver);
         }
         self.semver = "";
+        if (self.demo_manifest_version_str) |s| {
+            gpa.free(s);
+        }
+        self.demo_manifest_version_str = null;
     }
 };
 
@@ -127,7 +147,11 @@ pub fn formatVersionInfo(info: VersionInfo, writer: anytype) !void {
     try writer.print("Isolation Tier: {s}\n", .{info.isolation_tier});
     try writer.print("Policy Schema: {d}\n", .{info.policy_schema_version});
     try writer.print("Replay Schema: {d}\n", .{info.replay_schema_version});
-    try writer.print("Demo Manifest: {d}\n", .{info.demo_manifest_version});
+    if (info.demo_manifest_version_str) |str| {
+        try writer.print("Demo Manifest: {s}\n", .{str});
+    } else {
+        try writer.print("Demo Manifest: none\n", .{});
+    }
     try writer.print("Compiler: {s}\n", .{info.compiler});
 }
 
@@ -222,6 +246,7 @@ test "formatVersionInfo contains all required fields" {
         .policy_schema_version = 2,
         .replay_schema_version = 2,
         .demo_manifest_version = 1,
+        .demo_manifest_version_str = "1.0.0",
         .compiler = "clang 15.0",
     };
     var buf: [1024]u8 = undefined;
@@ -237,7 +262,7 @@ test "formatVersionInfo contains all required fields" {
     try std.testing.expect(std.mem.indexOf(u8, output, "Isolation Tier: full") != null);
     try std.testing.expect(std.mem.indexOf(u8, output, "Policy Schema: 2") != null);
     try std.testing.expect(std.mem.indexOf(u8, output, "Replay Schema: 2") != null);
-    try std.testing.expect(std.mem.indexOf(u8, output, "Demo Manifest: 1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, output, "Demo Manifest: 1.0.0") != null);
     try std.testing.expect(std.mem.indexOf(u8, output, "Compiler: clang 15.0") != null);
 }
 
@@ -269,6 +294,41 @@ test "formatVersionInfo validates all Tier enum values" {
         // Verify semver line starts with Tickoni prefix (semver from build_options)
         try std.testing.expect(std.mem.startsWith(u8, output, "Tickoni "));
     }
+}
+
+test "formatVersionInfo shows 'none' when demo manifest version is unset" {
+    const info = VersionInfo{
+        .semver = "1.0.0",
+        .build_id = "test",
+        .git_sha = "abc",
+        .os = "Linux",
+        .arch = "x86_64",
+        .runtime_tier = "linux_full",
+        .isolation_tier = "full",
+        .policy_schema_version = 1,
+        .replay_schema_version = 1,
+        .demo_manifest_version = 0,
+        .demo_manifest_version_str = null,
+        .compiler = "clang 15.0",
+    };
+    var buf: [1024]u8 = undefined;
+    var w = std.Io.Writer.fixed(&buf);
+    try formatVersionInfo(info, &w);
+    const output = w.buffered();
+
+    try std.testing.expect(std.mem.indexOf(u8, output, "Demo Manifest: none") != null);
+}
+
+test "setDemoManifestVersion parses and stores version" {
+    var gpa = std.testing.allocator;
+    const info = VersionInfo.init(gpa) catch unreachable;
+    info.setDemoManifestVersion(gpa, "3.2.1") catch unreachable;
+    try std.testing.expectEqual(@as(u16, 3), info.demo_manifest_version);
+    try std.testing.expectEqualStrings("3.2.1", info.demo_manifest_version_str.?);
+    info.setDemoManifestVersion(gpa, null) catch unreachable;
+    try std.testing.expectEqual(@as(u16, 0), info.demo_manifest_version);
+    try std.testing.expect(info.demo_manifest_version_str == null);
+    info.deinit(gpa);
 }
 
 test "formatVersionInfo ends with newline" {
