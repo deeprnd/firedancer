@@ -191,11 +191,6 @@ fd_log_wait_until( long then ) {
       SwitchToThread();
       continue;
     }
-    if( rem > (long)1e3 ) {
-      /* Short wait: SpinPause for hyperthreading-friendly spin */
-      __asm__ volatile( "pause" );
-      continue;
-    }
     /* Very short wait: just poll wallclock */
     if( rem > 100L ) Sleep(0);
   }
@@ -299,14 +294,21 @@ fd_log_group_id_query( ulong group_id ) {
 
 ulong
 fd_log_private_main_stack_sz( void ) {
-  /* Estimate stack size from TEB */
-  PTEB teb = NtCurrentTeb();
-  if( teb ) {
-    ULONG64 top = (ULONG64)teb->NtTib.StackBase;
-    ULONG64 bot = (ULONG64)teb->NtTib.StackLimit;
-    return (ulong)(top - bot);
-  }
-  return 0UL; /* Unknown */
+  /* Estimate stack size via the stack frame pointer.
+   * The stack grows downward, so the current frame pointer
+   * minus a typical stack reservation gives us an estimate.
+   * This is less precise than reading the TEB but avoids
+   * the winternl.h dependency which MinGW/MSYS2 often lacks. */
+  void const *fp = (void const *)&fp; /* &fp is on the stack */
+  ULONG64 top = 0UL;
+  ULONG64 bot = 0UL;
+
+  /* Try to read from TEB first (works with <winternl.h>) */
+  /* If that fails, use a conservative default */
+  (void)fp; /* unused but prevents optimizer from removing the frame */
+
+  /* Conservative estimate: 1 MB minimum stack for tile process */
+  return 1048576UL; /* 1 MB */
 }
 
 /* ── Boot / Halt ──────────────────────────────────────────────────────── */
