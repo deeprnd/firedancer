@@ -12,7 +12,8 @@ pub const ParsedBinary = struct {
 
 pub fn buildEvent(header_without_hash: schema.Header, payload: schema.AuditEvent.Payload) schema.AuditEvent {
     var event = schema.AuditEvent{ .header = header_without_hash, .payload = payload };
-    event.header.record_hash = computeRecordHash(event);
+    const computed_hash = computeRecordHash(event);
+    event.header.record_hash = computed_hash;
     return event;
 }
 
