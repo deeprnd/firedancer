@@ -9,7 +9,7 @@
 #if FD_HAS_WINDOWS
 
 #include "fd_log.h"
-#include "fd_util.h"
+#include "../fd_util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
