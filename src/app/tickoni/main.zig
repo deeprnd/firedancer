@@ -48,8 +48,9 @@ pub fn main(init: std.process.Init) !void {
     try log.enter("main", "init");
     defer log.exit("main", "init") catch {};
 
-    var it = init.minimal.args.iterate();
-    _ = it.skip(); // skip program name
+    var it = try std.process.Args.iterateAllocator(init.minimal.args, init.gpa);
+    defer it.deinit();
+    _ = it.next(); // skip program name
 
     // Collect args and check for --verbose before processing commands
     var verbose: bool = false;
@@ -248,7 +249,7 @@ fn cmdStartProcess(init: std.process.Init, topo: rt.topology.Topology, run_dir: 
 
     try File.writeStreamingAll(stdout, init.io, "tickoni-supervisor: process-mode pipeline started\ntiles:\n");
     for (sup.monitor()) |h| {
-        const line = try std.fmt.bufPrint(&buf, "  [{d}] {s}  pid={?d}  state={s}\n", .{
+        const line = try std.fmt.bufPrint(&buf, "  [{d}] {s}  pid={?}  state={s}\n", .{
             h.tile_idx,
             topo.tiles[h.tile_idx].name,
             h.pid,

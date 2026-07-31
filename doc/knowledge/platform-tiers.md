@@ -15,7 +15,7 @@ those are scoped to separate stories (S3, S7, etc.).
 | Tier | OS | Arch | What it is |
 | --- | --- | --- | --- |
 | `linux_full` | Linux | x86_64, ARM64 | Shared-memory topology, seccomp/Landlock sandbox, AF_PACKET networking, full tile set |
-| `macos_retail` | macOS | ARM64, Intel | No seccomp/sandbox, no shared-memory topology, socket networking, reduced tile set |
+| `macos_retail` | macOS | ARM64, x86_64 | No seccomp/sandbox, no shared-memory topology, socket networking, reduced tile set |
 | `windows_retail` | Windows | x86_64, ARM64 | No seccomp/sandbox, no shared-memory topology, socket networking, reduced tile set |
 | `container_assisted` | Any hosted OS | varies | Runs inside another OS/host; tier is that of the host, with additional notes about hosting context |
 | `unsupported` | any | any | Not a supported OS or architecture; nothing runs |
@@ -60,6 +60,13 @@ are stubbed or excluded.
 
 AF_PACKET and XDP are unavailable on macOS and Windows. Standard sockets are
 used instead. Throughput is bounded by socket I/O, not kernel-bypass ring I/O.
+
+**Stub behavior note:** some retail stubs use a "stub object" pattern
+(`fd_platform_stub_object_new()`) that returns a valid non-NULL pointer so
+callers don't null-crash, but all functional methods are no-ops. A few
+metadata bookkeeping functions (gRPC stream send/close) return 0 to avoid
+polluting errno. The actual data path (socket `rxtx`, HTTP listen, UDP send)
+correctly fails closed with errno.
 
 ### Performance
 

@@ -1,11 +1,3 @@
-#ifndef FD_LOG_STYLE
-#if FD_HAS_HOSTED
-#define FD_LOG_STYLE 0
-#else
-#error "Define FD_LOG_STYLE for this platform"
-#endif
-#endif
-
 #if FD_LOG_STYLE==0 /* POSIX style */
 
 #if !defined(FD_HAS_BACKTRACE)

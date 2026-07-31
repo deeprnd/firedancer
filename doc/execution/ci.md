@@ -35,7 +35,9 @@ Optional workflows (`benchmark.yml`, `book.yml`) are callable via `workflow_call
 || Workflow                  | Runner(s)                           | Jobs                                                         | Timeout |
 | ------------------------- | ----------------------------------- | ------------------------------------------------------------ | ------- |
 | `build-fd.yml`            | `ubuntu-24.04`, `ubuntu-24.04-arm`  | Engine Build (GCC, Clang, ARM)                               | 20–30 m |
+| `build-fd.yml`            | `windows-2025-vs2026`, `windows-11-vs2026-arm` | Engine Build / Windows x86_64, Engine Build / Windows ARM64  | 20–45 m |
 | `build-tk.yml`            | `ubuntu-24.04`                      | Harness Build                                                | 20–30 m |
+| `build-tk.yml`            | `windows-2025-vs2026`, `windows-11-vs2026-arm` | Harness Build / Windows x86_64, Harness Build / Windows ARM64 | 20–45 m |
 | `quality.yml`             | `ubuntu-24.04`                      | Format Check, Lint Check, Proto Check                        | 20–30 m |
 | `security.yml`            | `ubuntu-24.04`                      | Gitleaks, Sanitizers, SecComp                                | 20–45 m |
 | `tests-short.yml`         | `ubuntu-24.04`                      | Harness Unit Tests, Harness Integration Tests, Harness Coverage | 20 m    |
@@ -57,6 +59,23 @@ Each workflow begins with a `detect-changes` job that compares the PR diff again
 | `security.yml`    | `src/`, `build.zig`, `build.zig.zon`, `justfile`, `contrib/security.sh`, gitleaks config, CodeQL config, `.github/actions/`, workflow file |
 | `tests-short.yml` | `src/app/tickoni/`, `src/tickoni/`, `build.zig`, `build.zig.zon`, `justfile`, quality/security scripts, coverage configs, `.github/actions/`, workflow file |
 | `tests-xlong.yml` | `src/`, `build.zig`, `build.zig.zon`, `justfile`, `contrib/test/`, `contrib/make-j`, `.github/actions/`, workflow file |
+
+---
+
+## Planned Windows Lanes
+
+The Windows build CI contract is defined in the `win-support` finding plans.
+
+Planned first-pass native Windows jobs:
+
+| Workflow | Job | Runner | Entrypoint |
+| --- | --- | --- | --- |
+| `build-fd.yml` | `Engine Build / Windows 2025` | `windows-2025-vs2026` | `just build-fd-windows-x86` |
+| `build-fd.yml` | `Engine Build / Windows 11 ARM` | `windows-11-vs2026-arm` | `just build-fd-windows-arm` |
+| `build-tk.yml` | `Harness Build / Windows 2025` | `windows-2025-vs2026` | `just build-tk` |
+| `build-tk.yml` | `Harness Build / Windows 11 ARM` | `windows-11-vs2026-arm` | `just build-tk` |
+
+These are native Windows runner lanes only. The frozen first-pass contract explicitly excludes WSL, container, or VM fallback lanes as the official support path, and does not claim seccomp, sanitizer, replay, or full runtime parity on Windows.
 
 ---
 
@@ -109,7 +128,9 @@ The ARM job uses the `ubuntu-24.04-arm` GitHub-hosted runner to catch architectu
 
 **File:** `.github/workflows/build-tk.yml`
 
-Compiles the Tickoni Zig harness (`just build-tk`). Runs on `ubuntu-24.04`.
+Compiles the Tickoni Zig harness (`just build-tk`). Runs on `ubuntu-24.04`, `windows-2025-vs2026`, and `windows-11-vs2026-arm`.
+
+The Windows build CI contract is documented in the branch history and CI workflows.
 
 ---
 

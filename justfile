@@ -5,8 +5,8 @@ export PATH := `echo $PATH:/opt/zig`
 # Firedancer's GNUmakefile uses `undefine`, which needs GNU Make >= 3.82.
 make := `command -v gmake || command -v make`
 
-# Firedancer/Tickoni build natively only on Linux. On macOS, build/test/run
-# recipes transparently re-run inside this Linux container (see the `dock` recipe).
+# Firedancer/Tickoni build natively on Linux and Windows. On macOS, build/test/run
+# recipes can still re-run inside the Linux container via the `dock` recipe.
 dev_image := "tickoni-dev:24.04"
 
 # Shared Firedancer lib definitions — used by contrib/fd-build-lib.sh and
@@ -101,10 +101,32 @@ build-fd-tk-libs: build-fd
 # ── Public build recipes ─────────────────────────────────────────────────────
 
 # Auto-detect host platform/arch and route to the correct platform-specific recipe.
-# CI recipes below (build-fd-gcc, build-fd-clang, build-fd-arm, build-fd-macos-*)
-# are called directly with explicit values for reproducibility.
+# CI recipes below (build-fd-gcc, build-fd-clang, build-fd-arm, build-fd-macos-*,
+# build-fd-windows-*) are called directly with explicit values for reproducibility.
 build-fd:
-	exec bash contrib/fd-build-linux.sh
+	#!/usr/bin/env bash
+	set -euo pipefail
+	os="$(uname -s)"
+	arch="$(uname -m)"
+	case "$os" in
+	  Linux)
+	    exec bash contrib/fd-build-linux.sh
+	    ;;
+	  Darwin)
+	    if [[ "$arch" =~ ^(arm64|aarch64)$ ]]; then
+	      exec just build-fd-macos-arm
+	    else
+	      exec just build-fd-macos-x86_64
+	    fi
+	    ;;
+	  MINGW*|MSYS*|CYGWIN*)
+	    exec bash contrib/fd-build-windows.sh "$arch"
+	    ;;
+	  *)
+	    echo "unsupported host OS for build-fd: $os" >&2
+	    exit 1
+	    ;;
+	esac
 
 # Linux GCC (CI: maps to fd-gcc for test/quality/security compatibility)
 build-fd-gcc:
@@ -118,12 +140,12 @@ build-fd-clang:
 build-fd-arm:
 	bash contrib/fd-build-lib.sh fd-arm gcc-14
 
-# macOS Intel build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
+# macOS x86_64 build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
 # EXTRAS="" prevents blst/zstd/lz4 from being built: their vendor sources
-# have path mismatches and platform-specific assembly that fails on macOS Intel.
-build-fd-macos-intel:
-	# macOS Intel: set PATH to Homebrew prefix before invoking build script
-	# GitHub Actions macOS 15 Intel runners use /usr/local/homebrew
+# have path mismatches and platform-specific assembly that fails on macOS x86_64.
+build-fd-macos-x86_64:
+	# macOS x86_64: set PATH to Homebrew prefix before invoking build script
+	# GitHub Actions macOS 15 x86_64 runners use /usr/local/homebrew
 	# Each recipe line runs in a separate shell, so set PATH on each line
 	export PATH="/usr/local/homebrew/bin:/usr/local/bin:$PATH"
 	export JUST_GMAKE="/usr/local/homebrew/bin/gmake"
@@ -133,6 +155,16 @@ build-fd-macos-intel:
 # macOS ARM build — use fd-tickoni-fd as BUILDDIR so Zig can find the libs
 build-fd-macos-arm:
 	bash contrib/fd-build-lib.sh fd-tickoni-fd clang libs "lz4 blst zstd"
+
+# Windows x86_64 build — native Windows runner path backed by the Windows
+# machine profile and GNU make under bash.
+build-fd-windows-x86:
+	bash contrib/fd-build-windows.sh x86_64
+
+# Windows ARM64 build — native Windows runner path backed by the Windows
+# machine profile and GNU make under bash.
+build-fd-windows-arm:
+	bash contrib/fd-build-windows.sh arm64
 
 build-fd-dev:
 	make -j"$(nproc)" all
@@ -223,13 +255,13 @@ test-unit-fd:
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.
 test-unit-tk:
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
 
 # Print computed hash and wire bytes for every audit fixture event, and emit audit JSONL.
 # Use the output to understand or snapshot the current encoding after intentional changes.
 gen-audit-fixtures:
-	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build test 2>&1
-	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build integration-test 2>&1
+	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true test 2>&1
+	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true integration-test 2>&1
 
 test-unit-all:
 	python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
@@ -248,7 +280,7 @@ test-integration-fd:
 
 # Tickoni integration lane: transport and boundary wiring against local mocks.
 test-integration-tk:
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # Deterministic offline investment conformance suite — fixture-backed, no llama.cpp required.
 test-demo-tk:

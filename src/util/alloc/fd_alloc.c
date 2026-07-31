@@ -411,7 +411,7 @@ fd_alloc_new( void * shmem,
     return NULL;
   }
 
-  if( FD_UNLIKELY( fd_wksp_gaddr_hi( wksp ) > (1UL<<(fd_alloc_vgaddr_OFF_WIDTH + FD_ALLOC_SUPERBLOCK_LG_ALIGN)) ) ) {
+  if( FD_UNLIKELY( fd_wksp_gaddr_hi( wksp ) > (1ULL<<(fd_alloc_vgaddr_OFF_WIDTH + FD_ALLOC_SUPERBLOCK_LG_ALIGN)) ) ) {
     FD_LOG_WARNING(( "wksp too large for current fd_alloc implementation" ));
     return NULL;
   }

@@ -168,8 +168,8 @@ static inline vv_t vv_ror_vector( vv_t a, vl_t b ) {
 #define vv_lnotnot(a) _mm_xor_si128( _mm_set1_epi64x( -1L ), _mm_cmpeq_epi64( (a), _mm_setzero_si128() ) ) /* [ !!a0 !!a1 ] */
 
 #define vv_eq(a,b) _mm_cmpeq_epi64( (a), (b) )                                                 /* [ a0==b0 a1==b1 ] */
-#define vv_gt(a,b) _mm_cmpgt_epi64( _mm_sub_epi64( (a), _mm_set1_epi64x( (long)(1UL<<63) ) ),  /* [ a0> b0 a1> b1 ] */ \
-                                    _mm_sub_epi64( (b), _mm_set1_epi64x( (long)(1UL<<63) ) ) )
+#define vv_gt(a,b) _mm_cmpgt_epi64( _mm_sub_epi64( (a), _mm_set1_epi64x( (long)(1ULL<<63) ) ), /* [ a0> b0 a1> b1 ] */ \
+                                    _mm_sub_epi64( (b), _mm_set1_epi64x( (long)(1ULL<<63) ) ) )
 #define vv_lt(a,b) vv_gt( (b), (a) )                                                           /* [ a0< b0 a1< b1 ] */
 #define vv_ne(a,b) _mm_xor_si128( _mm_set1_epi64x( -1L ), _mm_cmpeq_epi64( (a), (b) ) )        /* [ a0!=b0 a1!=b1 ] */
 #define vv_ge(a,b) _mm_xor_si128( _mm_set1_epi64x( -1L ), vv_gt( (b), (a) ) )                  /* [ a0>=b0 a1>=b1 ] */

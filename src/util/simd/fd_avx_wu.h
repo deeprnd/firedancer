@@ -266,7 +266,7 @@ static inline __m256d wu_to_wd( wu_t u, int imm_hi ) { /* FIXME: workaround wd_t
   __m128i i  = imm_hi ? _mm256_extractf128_si256( u, 1 ) : _mm256_extractf128_si256( u, 0 ); // u      if u<2^31, u-2^32 o.w
   __m128i c  = _mm_cmpgt_epi32( _mm_setzero_si128(), i );                                    // 0      if u<2^31, -1     o.w
   __m256d d  = _mm256_cvtepi32_pd( i );                                                      // u      if u<2^31, u-2^32 o.w, exact
-  __m256d ds = _mm256_add_pd( d, _mm256_set1_pd( (double)(1UL<<32) ) );                      // u+2^32 if u<2^31, u      o.w, exact
+  __m256d ds = _mm256_add_pd( d, _mm256_set1_pd( (double)(1ULL<<32) ) );                     // u+2^32 if u<2^31, u      o.w, exact
   __m256i cl = _mm256_cvtepi32_epi64( c );                                                   // 0L     if u<2^31, -1L    o.w
   return _mm256_blendv_pd( d, ds, _mm256_castsi256_pd( cl ) );                               // u
 }

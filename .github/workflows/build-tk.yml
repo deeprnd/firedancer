@@ -27,7 +27,7 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
-          paths: '^((src/tickoni/|src/app/tickoni/|contrib/fd-build-lib\.sh$|contrib/fd-tk-libs\.sh$|build\.zig$|\.zig-version$|GNUmakefile$|\.github/actions/build-fd-tk-libs/|\.github/workflows/build-tk\.yml$)|deps\.sh$)'
+          paths: '^((src/tickoni/|src/app/tickoni/|config/|contrib/fd-build-lib\.sh$|contrib/fd-build-windows\.(sh|ps1)$|contrib/fd-tk-libs\.sh$|justfile$|build\.zig$|\.zig-version$|GNUmakefile$|\.github/actions/build-fd-tk-libs/|\.github/workflows/build-tk\.yml$)|deps\.sh$)'
 
   # ── Linux: build FD libs + Zig tickoni ──────────────────────────────────────
   build-tk-linux:
@@ -48,11 +48,12 @@ jobs:
         uses: ./.github/actions/build-fd-tk-libs
 
       - name: Run Zig build
-        run: just build-tk
+        shell: bash
+        run: bash contrib/ci-run-build-tk.sh
 
   # ── macOS: Clang (x86_64) ──────────────────────────────────────────────────
-  build-tk-macos-15-intel:
-    name: Harness Build / macOS 15 (Intel)
+  build-tk-macos-15-x86_64:
+    name: Harness Build / macOS 15 (x86_64)
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: macos-15-intel
@@ -70,10 +71,11 @@ jobs:
         run: brew install make
 
       - name: Build FD libs
-        run: just build-fd-macos-intel
+        run: just build-fd-macos-x86_64
 
       - name: Run Zig build
-        run: just build-tk
+        shell: bash
+        run: bash contrib/ci-run-build-tk.sh
 
   # ── macOS: Clang (ARM64) ───────────────────────────────────────────────────
   build-tk-macos-15-arm:
@@ -98,11 +100,12 @@ jobs:
         run: just build-fd-macos-arm
 
       - name: Run Zig build
-        run: just build-tk
+        shell: bash
+        run: bash contrib/ci-run-build-tk.sh
 
   # ── macOS: Clang (x86_64, macOS 26) ────────────────────────────────────────
-  build-tk-macos-26-intel:
-    name: Harness Build / macOS 26 (Intel)
+  build-tk-macos-26-x86_64:
+    name: Harness Build / macOS 26 (x86_64)
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: macos-26-intel
@@ -120,10 +123,11 @@ jobs:
         run: brew install make
 
       - name: Build FD libs
-        run: just build-fd-macos-intel
+        run: just build-fd-macos-x86_64
 
       - name: Run Zig build
-        run: just build-tk
+        shell: bash
+        run: bash contrib/ci-run-build-tk.sh
 
   # ── macOS: Clang (ARM64, macOS 26) ─────────────────────────────────────────
   build-tk-macos-26-arm:
@@ -148,4 +152,55 @@ jobs:
         run: just build-fd-macos-arm
 
       - name: Run Zig build
-        run: just build-tk
+        shell: bash
+        run: bash contrib/ci-run-build-tk.sh
+
+  # ── Windows: x86_64 ─────────────────────────────────────────────────────────
+  build-tk-windows-x86:
+    name: Harness Build / Windows x86_64
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup deps + Zig
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+          fd-deps: 'false'
+          compiler: clang
+          compiler-version: system
+
+      - name: Build FD libs
+        run: just build-fd-windows-x86
+
+      - name: Run Zig build
+        shell: bash
+        run: bash contrib/ci-run-build-tk.sh
+
+  # ── Windows: ARM64 ──────────────────────────────────────────────────────────
+  build-tk-windows-arm:
+    name: Harness Build / Windows ARM64
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: windows-11-vs2026-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup deps + Zig
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+          fd-deps: 'false'
+          compiler: clang
+          compiler-version: system
+
+      - name: Build FD libs
+        run: just build-fd-windows-arm
+
+      - name: Run Zig build
+        shell: bash
+        run: bash contrib/ci-run-build-tk.sh

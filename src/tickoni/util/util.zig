@@ -5,6 +5,7 @@
 /// Import as @import("util") in files that use the build module system.
 pub const cpu = @import("cpu.zig");
 pub const process = @import("process.zig");
+pub const process_api = @import("process_api.zig");
 pub const os_api = @import("os_api.zig");
 pub const linux_ids = @import("linux_ids.zig");
 pub const sizes = @import("sizes.zig");

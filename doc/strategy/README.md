@@ -163,7 +163,7 @@ The runtime must preserve strict control over high-volume events such as:
 | [`roadmap/`](roadmap/) | Consumer-finance increment sequence, story files, evidence gates, increment status, backlog work | Market narrative or tile topology |
 | [`templates/`](templates/) | GitHub issue templates for epics, stories, tasks, proposals, and status | Runtime or policy source of truth |
 | [`capabilities.md`](capabilities.md) | Finance-native permission model, action classes, policy outcomes, scopes, destination allowlists, and capability roadmap | OS sandbox permissions or implementation-specific tile APIs |
-| [`lore.md`](lore/lore.md) | Origin story and mythological framing for Tickoni — brand narrative, milestone connections, competitive metaphors | Implementation facts, tile topology, or roadmap sequencing |
+| [`lore/`](lore/) | Origin story and mythological framing for Tickoni — brand narrative, milestone connections, competitive metaphors | Implementation facts, tile topology, or roadmap sequencing |
 | [`doc/knowledge/architecture.md`](../knowledge/architecture.md) | System layers, runtime model, event path, attached systems, audit/replay architecture | Product backlog sequencing |
 | [`doc/knowledge/tile-topology.md`](../knowledge/tile-topology.md) | Tile IDs, tile ownership, topology, reuse boundary, validator-tile replacement decisions | Product backlog, roadmap sequencing, WBS tasks |
 | [`doc/knowledge/platform-tiers.md`](../knowledge/platform-tiers.md) | Official runtime support tiers, workflow-to-tier mapping, degraded-guarantee definitions, visibility rules | Tier implementation (S3), CaseOps integration (S7), or testing per tier |

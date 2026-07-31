@@ -16,7 +16,9 @@
 #include "../../../util/fd_util.h"
 #include "../../../disco/topo/fd_topo.h"
 
+#if FD_HAS_LINUX || FD_HAS_MACOS
 #include <unistd.h>
+#endif
 
 /* fd_topo_run_tile_t's callbacks have a fixed C signature
    (fd_topo_t*, fd_topo_tile_t*) with no room for Zig closure state.
@@ -70,14 +72,14 @@ static fd_topo_run_tile_t TK_TILE_RUN = {
 
 /* Simplified entry point for Tickoni's one-tile-per-process model:
    explicit sandbox=none, keep_controlling_terminal=1, regular core dumps,
-   current process's real uid/gid, no extra allowed fd. Linux must dispatch
-   directly to upstream fd_topo_run_tile() so process mode stays on
+   current process's real uid/gid on hosted Unix, no extra allowed fd.
+   Linux must dispatch directly to upstream fd_topo_run_tile() so process mode stays on
    Firedancer's canonical runtime path; non-Linux targets fall back to
    tk_topo_run_tile(), which mirrors the same launch order where upstream's
    Linux-only implementation is unavailable. */
 int
  tk_topo_run_tile_simple_uses_upstream( void ) {
-#if defined(__linux__)
+#if FD_HAS_LINUX
   return 1;
 #else
   return 0;
@@ -86,8 +88,14 @@ int
 
 void
 tk_topo_run_tile_simple( void * topo, void * tile ) {
-#if defined(__linux__)
+#if FD_HAS_LINUX
   fd_topo_run_tile( (fd_topo_t *)topo, (fd_topo_tile_t *)tile,
+                    TK_PROCESS_MODE_SANDBOX_NONE, TK_KEEP_CONTROLLING_TERMINAL,
+                    FD_TOPO_CORE_DUMP_LEVEL_REGULAR,
+                    (uint)getuid(), (uint)getgid(), /* allow_fd */ -1,
+                    &TK_TILE_RUN );
+#elif FD_HAS_MACOS
+  tk_topo_run_tile( topo, tile,
                     TK_PROCESS_MODE_SANDBOX_NONE, TK_KEEP_CONTROLLING_TERMINAL,
                     FD_TOPO_CORE_DUMP_LEVEL_REGULAR,
                     (uint)getuid(), (uint)getgid(), /* allow_fd */ -1,
@@ -96,7 +104,7 @@ tk_topo_run_tile_simple( void * topo, void * tile ) {
   tk_topo_run_tile( topo, tile,
                     TK_PROCESS_MODE_SANDBOX_NONE, TK_KEEP_CONTROLLING_TERMINAL,
                     FD_TOPO_CORE_DUMP_LEVEL_REGULAR,
-                    (uint)getuid(), (uint)getgid(), /* allow_fd */ -1,
+                    0U, 0U, /* allow_fd */ -1,
                     &TK_TILE_RUN );
 #endif
 }

@@ -119,7 +119,7 @@
 #endif
 
 
-#if defined(__linux__)
+#if defined(__linux__) || FD_HAS_WINDOWS
 .section .rodata
 #else
 	.section __TEXT,__const

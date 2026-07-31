@@ -322,7 +322,11 @@ typedef signed char schar; /* See above note of sadness */
 typedef unsigned char  uchar;
 typedef unsigned short ushort;
 typedef unsigned int   uint;
+#if FD_HAS_WINDOWS
+typedef unsigned long long ulong;
+#else
 typedef unsigned long  ulong;
+#endif
 
 #ifdef __SIZEOF_INT128__
 
@@ -336,6 +340,19 @@ __extension__ typedef unsigned __int128 uint128;
 #endif
 
 //#pragma GCC diagnostic pop
+
+#if FD_HAS_WINDOWS
+/* Windows uses LLP64: long stays 32-bit while Tickoni/Firedancer's ulong-heavy
+   code expects 64-bit width. Route the long-suffixed unsigned builtins and
+   bit-count builtins through their 64-bit variants when compiling the Windows
+   compatibility profile. */
+#define __builtin_uaddl_overflow __builtin_uaddll_overflow
+#define __builtin_usubl_overflow __builtin_usubll_overflow
+#define __builtin_umull_overflow __builtin_umulll_overflow
+#define __builtin_clzl          __builtin_clzll
+#define __builtin_ctzl          __builtin_ctzll
+#define __builtin_popcountl     __builtin_popcountll
+#endif
 
 /* Compiler tricks ****************************************************/
 

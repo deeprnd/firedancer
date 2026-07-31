@@ -73,13 +73,13 @@ add_neighbor( fd_neigh4_hmap_t * join,
               uchar mac3, uchar mac4, uchar mac5 ) {
   fd_neigh4_entry_t * e = fd_neigh4_hmap_upsert( join, &ip4_addr );
   FD_TEST( e );
-  ulong suppress_until = e->probe_suppress_until;
+  ulong suppress_until = FD_NEIGH4_PROBE_SUPPRESS_RAW_GET( e );
   fd_neigh4_entry_t to_insert = (fd_neigh4_entry_t) {
-    .ip4_addr             = ip4_addr,
-    .state                = FD_NEIGH4_STATE_ACTIVE,
-    .mac_addr             = { mac0, mac1, mac2, mac3, mac4, mac5 },
-    .probe_suppress_until = suppress_until&FD_NEIGH4_PROBE_SUPPRESS_MASK
+    .ip4_addr = ip4_addr,
+    .mac_addr = { mac0, mac1, mac2, mac3, mac4, mac5 },
+    .state    = FD_NEIGH4_STATE_ACTIVE,
   };
+  FD_NEIGH4_PROBE_SUPPRESS_RAW_SET( &to_insert, suppress_until );
   fd_neigh4_entry_atomic_st( e, &to_insert );
 }
 

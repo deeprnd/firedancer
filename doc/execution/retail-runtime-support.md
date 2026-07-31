@@ -9,7 +9,7 @@ It explains what a retail user can run today, which binary is the supported prod
 | Tier | OS / host | Supported in V2.21 | What it is for | What it is not for |
 | --- | --- | --- | --- | --- |
 | `linux_full` | Linux x86_64 | Yes | Full Tickoni runtime, supervisor flows, deterministic demo, audit/replay evidence | macOS retail UX |
-| `macos_retail` | macOS ARM64 / Intel | Yes | Deterministic paper/sandbox demo, version/doctor trust surface, audit/replay proof artifacts | Linux throughput parity, shared-memory topology parity, live execution |
+| `macos_retail` | macOS ARM64 / x86_64 | Yes | Deterministic paper/sandbox demo, version/doctor trust surface, audit/replay proof artifacts | Linux throughput parity, shared-memory topology parity, live execution |
 | `windows_retail` | Windows | No, belongs to V2.22 | N/A in this epic | Any V2.21 claim of shipped support |
 | `container_assisted` / VM-assisted | Hosted or layered environments | Not an official V2.21 primary path | Context that may be documented later | A silently supported parity tier |
 | `unsupported` | Any unsupported OS / architecture | Yes, as a fail-closed result | Explicit diagnostics only | Demo or live workflows |

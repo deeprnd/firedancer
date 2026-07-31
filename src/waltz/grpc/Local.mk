@@ -5,6 +5,10 @@ $(call run-unit-test,test_grpc_codec)
 
 ifdef FD_HAS_HOSTED
 $(call add-hdrs,fd_grpc_client.h)
+ifdef FD_HAS_WINDOWS
+# Windows build lane uses stub; non-Windows keeps the real gRPC client.
+$(call add-objs,fd_grpc_client_windows_stub,fd_waltz)
+else
 $(call add-objs,fd_grpc_client,fd_waltz)
 
 $(call make-unit-test,test_grpc_client,test_grpc_client,fd_waltz fd_ballet fd_util,$(OPENSSL_LIBS))
@@ -14,4 +18,5 @@ $(call make-fuzz-test,fuzz_grpc_codec,fuzz_grpc_codec,fd_waltz fd_ballet fd_util
 $(call make-fuzz-test,fuzz_grpc_h2_gen_req_hdr,fuzz_grpc_h2_gen_req_hdr,fd_waltz fd_ballet fd_util)
 $(call make-fuzz-test,fuzz_grpc_client,fuzz_grpc_client,fd_waltz fd_ballet fd_util,$(OPENSSL_LIBS))
 $(call make-fuzz-test,fuzz_grpc_actor,fuzz_grpc_actor,fd_waltz fd_ballet fd_util,$(OPENSSL_LIBS))
+endif
 endif

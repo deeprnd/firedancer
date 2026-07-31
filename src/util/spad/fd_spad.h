@@ -175,7 +175,7 @@ fd_spad_reset( fd_spad_t * spad );
 FD_FN_CONST static inline ulong
 fd_spad_mem_max_max( ulong footprint ) {
   ulong mem_max = fd_ulong_max( fd_ulong_align_dn( footprint, FD_SPAD_ALIGN ), sizeof(fd_spad_t) ) - sizeof(fd_spad_t);
-  return fd_ulong_if( mem_max<=(1UL<<63), mem_max, 0UL );
+  return fd_ulong_if( mem_max<=(1ULL<<63), mem_max, 0UL );
 }
 
 /* fd_spad_{align,footprint} give the required alignment and footprint
@@ -191,7 +191,7 @@ fd_spad_align( void ) {
 
 FD_FN_CONST static inline ulong
 fd_spad_footprint( ulong mem_max ) {
-  return fd_ulong_if( mem_max<=(1UL<<63), FD_SPAD_FOOTPRINT( mem_max ), 0UL );
+  return fd_ulong_if( mem_max<=(1ULL<<63), FD_SPAD_FOOTPRINT( mem_max ), 0UL );
 }
 
 /* fd_spad_new formats an unused memory region with the appropriate
