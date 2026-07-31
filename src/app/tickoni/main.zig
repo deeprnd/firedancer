@@ -329,6 +329,14 @@ fn cmdDemo(init: std.process.Init, demo_cmd: demo_cli.Command) !void {
     };
     defer version_info.deinit(init.gpa);
 
+    // T6: wire manifest version into VersionInfo
+    version_info.setDemoManifestVersion(init.gpa, m.demo_manifest_version) catch |err| {
+        var buf: [256]u8 = undefined;
+        const msg = try std.fmt.bufPrint(&buf, "error: failed to set demo manifest version: {}\n", .{err});
+        try File.writeStreamingAll(File.stderr(), init.io, msg);
+        std.process.exit(1);
+    };
+
     // Run preflight — fail-closed
     const preflight_result = demo_preflight.evaluate(
         init.gpa,
