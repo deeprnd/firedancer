@@ -1,5 +1,5 @@
 #include "fd_genesis_client_private.h"
-#include "../../../../util/fd_windows_compat.h"
+#include "../../util/fd_windows_compat.h"
 
 #include "../../third_party/picohttpparser/picohttpparser.h"
 #include "../../util/fd_util.h"
