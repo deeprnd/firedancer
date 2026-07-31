@@ -532,8 +532,13 @@ test "runAll fills results array" {
     try std.testing.expectEqual(.pass, results[9].status);
     try std.testing.expectEqualStrings("source_build", results[10].name);
     try std.testing.expectEqual(.warn, results[10].status);
+    // wsl2 — returns .pass on Linux (native), .warn on macOS/Windows
     try std.testing.expectEqualStrings("wsl2", results[11].name);
-    try std.testing.expectEqual(.pass, results[11].status);
+    const wsl2_status = switch (builtin.target.os.tag) {
+        .linux => .pass,
+        else => .warn,
+    };
+    try std.testing.expectEqual(wsl2_status, results[11].status);
     try std.testing.expectEqualStrings("docker", results[12].name);
     try std.testing.expectEqualStrings("cpu_features", results[13].name);
     try std.testing.expectEqual(.pass, results[13].status);
