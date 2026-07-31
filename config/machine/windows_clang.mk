@@ -18,6 +18,8 @@ FD_WINDOWS_ARCH?=$(shell uname -m)
 # It is NOT set by base.mk or with-hosted.mk — only the Windows profile
 # needs this flag, so we keep it here.
 CPPFLAGS+=-D_CRT_SECURE_NO_WARNINGS -DFD_IO_STYLE=1 -DFD_LOG_STYLE=1
+FD_HAS_THREADS:=1
+FD_HAS_ATOMIC:=1
 
 # Firedancer assumes LP64-style ulong-heavy formatting and bit helpers.
 # On Windows/LLP64 we carry a Windows-specific 64-bit ulong typedef in
