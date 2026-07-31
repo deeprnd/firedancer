@@ -19,8 +19,12 @@
 #include <syscall.h>
 #include <sys/prctl.h>
 #endif
+#if !FD_HAS_WINDOWS
 #include <sys/resource.h>
 #include <sys/mman.h>
+#else
+#include <windows.h>
+#endif
 
 #ifndef MAP_ANONYMOUS
 #define MAP_ANONYMOUS MAP_ANON
