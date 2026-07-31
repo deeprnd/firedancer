@@ -282,6 +282,28 @@ test-integration-fd:
 test-integration-tk:
 	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
+# ── Windows-specific test recipes ────────────────────────────────────────────
+
+# Windows x86_64 unit test: build FD libs for Windows x86_64, then run Zig tests.
+test-unit-tk-windows-x86:
+	just build-fd-windows-x86
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
+
+# Windows ARM64 unit test: build FD libs for Windows ARM64, then run Zig tests.
+test-unit-tk-windows-arm:
+	just build-fd-windows-arm
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
+
+# Windows x86_64 integration test: build FD libs for Windows x86_64, then run Zig integration tests.
+test-integration-tk-windows-x86:
+	just build-fd-windows-x86
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+
+# Windows ARM64 integration test: build FD libs for Windows ARM64, then run Zig integration tests.
+test-integration-tk-windows-arm:
+	just build-fd-windows-arm
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+
 # Deterministic offline investment conformance suite — fixture-backed, no llama.cpp required.
 test-demo-tk:
 	bash contrib/test/run_cli_demo_tests.sh
