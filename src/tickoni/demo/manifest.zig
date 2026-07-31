@@ -135,6 +135,18 @@ pub const Manifest = struct {
     expected_no_live_effect: bool = true,
     demo_manifest_version: ?[]const u8 = null,
 
+    /// Return the demo manifest version as a parsed u16 (major component only).
+    /// Returns 0 if the version field is null or cannot be parsed.
+    pub fn manifestVersionMajor(self: *const Manifest) u16 {
+        if (self.demo_manifest_version) |v| {
+            if (std.mem.eql(u8, v, "0.0.0")) return 0;
+            var it = std.mem.splitScalar(u8, v, '.');
+            const first = it.next() orelse return 0;
+            return std.fmt.parseInt(u16, first, 10) catch 0;
+        }
+        return 0;
+    }
+
     /// Free heap-allocated fields. For slice fields, also frees each element
     /// since loadManifest allocates individual strings with dupe().
     pub fn deinit(self: *Manifest, gpa: std.mem.Allocator) void {
@@ -273,6 +285,12 @@ fn parseManifestJson(gpa: std.mem.Allocator, raw: []const u8) Error!*Manifest {
         j.required_isolation_by_tier.windows_retail != null or
         j.required_isolation_by_tier.unsupported != null;
     if (j.required_isolation_tier == null and !has_per_tier_isolation) return Error.MissingField;
+
+    // Required field: demo_manifest_version
+    const demo_manifest_ver = j.demo_manifest_version orelse return Error.MissingField;
+    if (std.mem.eql(u8, demo_manifest_ver, "0.0.0") == false) {
+        try parseSemver(demo_manifest_ver);
+    }
 
     // Allocate tier list
     var tier_list: std.ArrayList([]const u8) = .empty;
@@ -547,4 +565,77 @@ test "loadManifest parses required_isolation_by_tier JSON" {
 
     try std.testing.expectEqualStrings("full", m.requiredIsolationTierFor("linux_full").?);
     try std.testing.expectEqualStrings("retail", m.requiredIsolationTierFor("macos_retail").?);
+}
+
+test "loadManifest rejects manifest without demo_manifest_version" {
+    const gpa = std.testing.allocator;
+    const json =
+        \\{
+        \\  "min_tickoni_version": "0.1.0",
+        \\  "supported_runtime_tiers": ["linux_full", "macos_retail"],
+        \\  "required_isolation_tier": "retail",
+        \\  "required_fixtures": [],
+        \\  "replay_schema_version": "2",
+        \\  "policy_schema_version": "2"
+        \\}
+    ;
+
+    const err = parseManifestJson(gpa, json) catch |e| e;
+    try std.testing.expect(err == Error.MissingField);
+}
+
+test "loadManifest rejects invalid demo_manifest_version semver" {
+    const gpa = std.testing.allocator;
+    const json =
+        \\{
+        \\  "demo_manifest_version": "not-a-version",
+        \\  "min_tickoni_version": "0.1.0",
+        \\  "supported_runtime_tiers": ["linux_full"],
+        \\  "required_isolation_tier": "retail",
+        \\  "required_fixtures": [],
+        \\  "replay_schema_version": "2",
+        \\  "policy_schema_version": "2"
+        \\}
+    ;
+
+    const err = parseManifestJson(gpa, json) catch |e| e;
+    try std.testing.expect(err == Error.InvalidSemver);
+}
+
+test "Manifest.manifestVersionMajor returns correct major version" {
+    var m = Manifest{ .demo_manifest_version = "2.1.0" };
+    try std.testing.expectEqual(@as(u16, 2), m.manifestVersionMajor());
+
+    m = Manifest{ .demo_manifest_version = "0.0.0" };
+    try std.testing.expectEqual(@as(u16, 0), m.manifestVersionMajor());
+
+    m = Manifest{ .demo_manifest_version = null };
+    try std.testing.expectEqual(@as(u16, 0), m.manifestVersionMajor());
+
+    m = Manifest{ .demo_manifest_version = "0.1.0" };
+    try std.testing.expectEqual(@as(u16, 0), m.manifestVersionMajor());
+}
+
+test "loadManifest with demo_manifest_version returns correct value" {
+    const gpa = std.testing.allocator;
+    const json =
+        \\{
+        \\  "demo_manifest_version": "1.0.0",
+        \\  "min_tickoni_version": "0.1.0",
+        \\  "supported_runtime_tiers": ["linux_full"],
+        \\  "required_isolation_tier": "retail",
+        \\  "required_fixtures": [],
+        \\  "replay_schema_version": "2",
+        \\  "policy_schema_version": "2"
+        \\}
+    ;
+
+    const m = parseManifestJson(gpa, json) catch unreachable;
+    defer {
+        m.deinit(gpa);
+        gpa.destroy(m);
+    }
+
+    try std.testing.expectEqualStrings("1.0.0", m.demo_manifest_version.?);
+    try std.testing.expectEqual(@as(u16, 1), m.manifestVersionMajor());
 }
