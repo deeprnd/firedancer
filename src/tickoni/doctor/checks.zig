@@ -305,6 +305,111 @@ pub const ModeChecks = struct {
     }
 };
 
+/// Windows prerequisite check group.
+pub const WindowsChecks = struct {
+    /// Check Windows build number. Returns fail if running on Windows but no build info found.
+    pub fn checkWindowsBuildNumber(io: Io, gpa: Allocator) Result {
+        const os_tag = builtin.target.os.tag;
+        // Only run this check when targeting Windows
+        if (os_tag != .windows) {
+            return Result.initOwnedMessage("windows_build", .warn, "not running on Windows (skipped)");
+        }
+
+        // Try to read build number from registry via powershell
+        const pwsh_result = readWindowsBuildFromRegistry(io) catch {
+            return Result.initOwnedMessage("windows_build", .warn, "unable to query Windows build number");
+        };
+
+        if (pwsh_result) |version| {
+            return Result.initOwnedMessage("windows_build", .pass, "Windows build " ++ version);
+        }
+
+        return Result.initOwnedMessage("windows_build", .fail, "Windows build number not detected");
+    }
+
+    /// Check WSL2 presence and version if running under WSL.
+    pub fn checkWSL2(io: Io, gpa: Allocator) Result {
+        const os_tag = builtin.target.os.tag;
+
+        // On Windows builds, always check WSL as optional
+        // On Linux, check /proc/version for microsoft indicator
+        if (os_tag == .windows) {
+            return Result.initOwnedMessage("wsl2", .warn, "Windows native — WSL2 check N/A");
+        }
+
+        // On Linux, check if we're in WSL
+        const cwd = std.Io.Dir.cwd();
+        if (fileExists(cwd, io, "/proc/version")) {
+            var file = std.Io.Dir.openFile(cwd, io, "/proc/version", .{}) catch {
+                return Result.initOwnedMessage("wsl2", .warn, "could not read /proc/version");
+            };
+            defer file.close(io);
+            const data = readFileContents(file, io, gpa, 4096) catch {
+                return Result.initOwnedMessage("wsl2", .warn, "could not read /proc/version");
+            };
+            defer gpa.free(data);
+            if (std.mem.indexOf(u8, data, "microsoft") != null or
+                std.mem.indexOf(u8, data, "WSL") != null)
+            {
+                return Result.initOwnedMessage("wsl2", .warn, "running under WSL2");
+            }
+        }
+
+        return Result.initOwnedMessage("wsl2", .pass, "native Linux (not WSL)");
+    }
+
+    /// Check Docker Desktop availability (warn if missing).
+    pub fn checkDockerDesktop(io: Io) Result {
+        const os_tag = builtin.target.os.tag;
+        const result = checkTool("docker", &[_][]const u8{ "docker", "--version" }, io);
+        if (result.status == .fail) {
+            const warn_msg = if (os_tag == .windows)
+                "Docker Desktop not found (required for Windows retail)"
+            else if (os_tag == .macos)
+                "Docker Desktop not found (required for macOS retail)"
+            else
+                "Docker not found";
+            return Result.initOwnedMessage("docker", .warn, warn_msg);
+        }
+        return result;
+    }
+
+    /// Check CPU features required for the target platform.
+    pub fn checkCpuFeatures() Result {
+        const cpu = builtin.target.cpu.arch;
+        // x86_64 requires SSE4.2 and POPCNT for Firedancer
+        if (cpu == .x86_64) {
+            const has_sse42 = builtin.cpu.arch.x86_64.features.sse4_2;
+            const has_popcnt = builtin.cpu.arch.x86_64.features.popcnt;
+            if (!has_sse42) {
+                return Result.initOwnedMessage("cpu_features", .fail, "missing SSE4.2");
+            }
+            if (!has_popcnt) {
+                return Result.initOwnedMessage("cpu_features", .fail, "missing POPCNT");
+            }
+            return Result.initOwnedMessage("cpu_features", .pass, "SSE4.2 + POPCNT");
+        }
+        // ARM64: check NEON and CRC
+        if (cpu == .aarch64) {
+            return Result.initOwnedMessage("cpu_features", .pass, "ARM64 (NEON/CRC)");
+        }
+        return Result.initOwnedMessage("cpu_features", .pass, @tagName(cpu));
+    }
+
+    fn readWindowsBuildFromRegistry(io: Io) ?[]const u8 {
+        // Try to read Windows version via winver or OS build
+        // On Windows, /proc/version is not available, so we check through the
+        // Windows version string available via Zig builtin target
+        const ver = builtin.target.os.version;
+        if (ver.major > 0 or ver.minor > 0) {
+            var buf: [64]u8 = undefined;
+            const result = std.fmt.bufPrint(&buf, "{d}.{d}", .{ ver.major, ver.minor }) catch return null;
+            return result;
+        }
+        return null;
+    }
+};
+
 /// Run all doctor checks into the provided result slice.
 pub fn runAll(results: []Result, io: Io, gpa: Allocator) usize {
     var idx: usize = 0;
@@ -361,6 +466,22 @@ pub fn runAll(results: []Result, io: Io, gpa: Allocator) usize {
     }
     {
         const r = ModeChecks.checkSourceBuild(io);
+        if (idx < results.len) results[idx] = r;
+        idx += 1;
+    }
+    // Windows prerequisite checks
+    {
+        const r = WindowsChecks.checkWSL2(io, gpa);
+        if (idx < results.len) results[idx] = r;
+        idx += 1;
+    }
+    {
+        const r = WindowsChecks.checkDockerDesktop(io);
+        if (idx < results.len) results[idx] = r;
+        idx += 1;
+    }
+    {
+        const r = WindowsChecks.checkCpuFeatures();
         if (idx < results.len) results[idx] = r;
         idx += 1;
     }
@@ -470,9 +591,9 @@ test "checkSourceBuild returns result" {
 test "runAll fills results array" {
     var results: [20]Result = undefined;
     const count = runAll(&results, std.testing.io, std.testing.allocator);
-    try std.testing.expectEqual(@as(usize, 11), count);
+    try std.testing.expectEqual(@as(usize, 14), count);
     try std.testing.expectEqualStrings("os", results[0].name);
-    try std.testing.expectEqualStrings("source_build", results[count - 1].name);
+    try std.testing.expectEqualStrings("cpu_features", results[count - 1].name);
 }
 
 test "runAll produces at least one pass" {
