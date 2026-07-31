@@ -521,3 +521,32 @@ test "per-tier isolation requirement lets linux_full require full" {
     defer deinit(result, std.testing.allocator);
     try std.testing.expect(result.passed);
 }
+
+test "preflight passes on windows_retail" {
+    var m = demo_manifest.Manifest{
+        .min_tickoni_version = "0.1.0",
+        .supported_runtime_tiers = &.{ "linux_full", "macos_retail", "windows_retail" },
+        .required_isolation_tier = "retail",
+        .required_isolation_by_tier = .{
+            .linux_full = "full",
+            .macos_retail = "retail",
+            .windows_retail = "retail",
+        },
+        .expected_no_live_effect = true,
+        .required_fixtures = &[_][]const u8{},
+    };
+    const result = run(std.testing.allocator, std.testing.io, &m, std.Io.Dir.cwd(), "0.1.0", "windows_retail", "retail", "/tmp/fixtures") catch unreachable;
+    defer deinit(result, std.testing.allocator);
+    try std.testing.expect(result.passed);
+}
+
+test "preflight fails on unsupported tier" {
+    var m = demo_manifest.Manifest{
+        .min_tickoni_version = "0.1.0",
+        .supported_runtime_tiers = &.{ "linux_full", "macos_retail" },
+        .required_isolation_tier = "retail",
+        .expected_no_live_effect = true,
+        .required_fixtures = &[_][]const u8{},
+    };
+    try std.testing.expectError(PreflightError.PreflightFailed, run(std.testing.allocator, std.testing.io, &m, std.Io.Dir.cwd(), "0.1.0", "unsupported", "degraded", "/tmp/fixtures"));
+}
