@@ -173,7 +173,7 @@ test "computeRecordHash excludes timestamp_ns" {
 }
 
 test "hash chain mutation changes downstream records" {
-    const first = codec.buildEvent(fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0, 0), .{ .policy_decision = .{
+    const first = codec.buildEvent(fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0, 0, "linux_full", "full", "abc", "demo.v1", "0.1.0"), .{ .policy_decision = .{
         .outcome = .allow,
         .rule_id = 1,
         .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
@@ -183,7 +183,7 @@ test "hash chain mutation changes downstream records" {
         .taxonomy_version = 0,
         .classification_code = [_]u8{0} ** 32,
     } });
-    var second_header = fixtureHeader(1, 1, "tkpoly", 0, "policy", 0, 0, first.header.record_hash, 0);
+    var second_header = fixtureHeader(1, 1, "tkpoly", 0, "policy", 0, 0, first.header.record_hash, 0, "linux_full", "full", "abc", "demo.v1", "0.1.0");
     const second = codec.buildEvent(second_header, .{ .policy_decision = .{
         .outcome = .allow,
         .rule_id = 1,
@@ -195,7 +195,7 @@ test "hash chain mutation changes downstream records" {
         .classification_code = [_]u8{0} ** 32,
     } });
 
-    const mutated_first = codec.buildEvent(fixtureHeader(0, 9, "tkpoly", 0, "policy", 0, 0, 0, 0), .{ .policy_decision = .{
+    const mutated_first = codec.buildEvent(fixtureHeader(0, 9, "tkpoly", 0, "policy", 0, 0, 0, 0, "linux_full", "full", "abc", "demo.v1", "0.1.0"), .{ .policy_decision = .{
         .outcome = .allow,
         .rule_id = 1,
         .failed_scope_dim = parseFixedAsciiBytes(32, "scope") catch unreachable,
@@ -225,7 +225,7 @@ test "binary and wire format pinned" {
 }
 
 test "policy_decision and denial classification evidence survives binary round-trip" {
-    const h = fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0, 0);
+    const h = fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0, 0, "linux_full", "full", "abc", "demo.v1", "0.1.0");
 
     const policy_event = codec.buildEvent(h, .{ .policy_decision = .{
         .outcome = .deny,

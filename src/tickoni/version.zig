@@ -320,7 +320,7 @@ test "formatVersionInfo shows 'none' when demo manifest version is unset" {
 }
 
 test "setDemoManifestVersion parses and stores version" {
-    const info = VersionInfo.init(std.testing.allocator) catch unreachable;
+    var info = VersionInfo.init(std.testing.allocator) catch unreachable;
     info.setDemoManifestVersion(std.testing.allocator, "3.2.1") catch unreachable;
     try std.testing.expectEqual(@as(u16, 3), info.demo_manifest_version);
     try std.testing.expectEqualStrings("3.2.1", info.demo_manifest_version_str.?);
