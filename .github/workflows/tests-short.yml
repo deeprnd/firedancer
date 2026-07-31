@@ -164,9 +164,9 @@ jobs:
       - name: Run deterministic demo CLI conformance suite
         run: just test-demo-tk
 
-  # ── Windows: Clang (x86_64, Windows Server 2025) ──────────────────────────
-  short-tests-windows-2025-x86_64:
-    name: Harness Unit Tests / Windows 2025 (x86_64)
+  # ── Windows: Clang (x86_64) ────────────────────────────────────────────────
+  short-tests-windows-x86_64:
+    name: Harness Unit Tests / Windows x86_64
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: windows-2025-vs2026
@@ -192,65 +192,9 @@ jobs:
       - name: Run deterministic demo CLI conformance suite
         run: just test-demo-tk
 
-  # ── Windows: Clang (ARM64, Windows Server 2025) ───────────────────────────
-  short-tests-windows-2025-arm:
-    name: Harness Unit Tests / Windows 2025 (ARM64)
-    needs: detect-changes
-    if: needs.detect-changes.outputs.run == 'true'
-    runs-on: windows-2025-vs2026-arm
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup public GitHub runner
-        uses: ./.github/actions/setup-public-gh-runner
-        with:
-          zig: 'true'
-          fd-deps: 'false'
-          compiler: clang
-          compiler-version: system
-
-      - name: Build FD libs
-        run: just build-fd-windows-arm
-
-      - name: Run test suite
-        run: just test-unit-tk-windows-arm
-
-      - name: Run deterministic demo CLI conformance suite
-        run: just test-demo-tk
-
-  # ── Windows: Clang (x86_64, Windows 11) ────────────────────────────────────
-  short-tests-windows-11-x86_64:
-    name: Harness Unit Tests / Windows 11 (x86_64)
-    needs: detect-changes
-    if: needs.detect-changes.outputs.run == 'true'
-    runs-on: windows-2025-vs2026
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup public GitHub runner
-        uses: ./.github/actions/setup-public-gh-runner
-        with:
-          zig: 'true'
-          fd-deps: 'false'
-          compiler: clang
-          compiler-version: system
-
-      - name: Build FD libs
-        run: just build-fd-windows-x86
-
-      - name: Run test suite
-        run: just test-unit-tk-windows-x86
-
-      - name: Run deterministic demo CLI conformance suite
-        run: just test-demo-tk
-
-  # ── Windows: Clang (ARM64, Windows 11) ─────────────────────────────────────
-  short-tests-windows-11-arm:
-    name: Harness Unit Tests / Windows 11 (ARM64)
+  # ── Windows: Clang (ARM64) ─────────────────────────────────────────────────
+  short-tests-windows-arm:
+    name: Harness Unit Tests / Windows ARM64
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: windows-11-vs2026-arm
@@ -376,9 +320,9 @@ jobs:
       - name: Run integration tests
         run: just test-integration-tk
 
-  # ── Windows: Clang (x86_64, Windows Server 2025) ──────────────────────────
-  integration-tests-windows-2025-x86_64:
-    name: Integration Tests / Windows 2025 (x86_64)
+  # ── Windows: Clang (x86_64) ────────────────────────────────────────────────
+  integration-tests-windows-x86_64:
+    name: Integration Tests / Windows x86_64
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: windows-2025-vs2026
@@ -401,59 +345,9 @@ jobs:
       - name: Run integration tests
         run: just test-integration-tk-windows-x86
 
-  # ── Windows: Clang (ARM64, Windows Server 2025) ───────────────────────────
-  integration-tests-windows-2025-arm:
-    name: Integration Tests / Windows 2025 (ARM64)
-    needs: detect-changes
-    if: needs.detect-changes.outputs.run == 'true'
-    runs-on: windows-2025-vs2026-arm
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup public GitHub runner
-        uses: ./.github/actions/setup-public-gh-runner
-        with:
-          zig: 'true'
-          fd-deps: 'false'
-          compiler: clang
-          compiler-version: system
-
-      - name: Build FD libs
-        run: just build-fd-windows-arm
-
-      - name: Run integration tests
-        run: just test-integration-tk-windows-arm
-
-  # ── Windows: Clang (x86_64, Windows 11) ────────────────────────────────────
-  integration-tests-windows-11-x86_64:
-    name: Integration Tests / Windows 11 (x86_64)
-    needs: detect-changes
-    if: needs.detect-changes.outputs.run == 'true'
-    runs-on: windows-2025-vs2026
-    timeout-minutes: 25
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup public GitHub runner
-        uses: ./.github/actions/setup-public-gh-runner
-        with:
-          zig: 'true'
-          fd-deps: 'false'
-          compiler: clang
-          compiler-version: system
-
-      - name: Build FD libs
-        run: just build-fd-windows-x86
-
-      - name: Run integration tests
-        run: just test-integration-tk-windows-x86
-
-  # ── Windows: Clang (ARM64, Windows 11) ─────────────────────────────────────
-  integration-tests-windows-11-arm:
-    name: Integration Tests / Windows 11 (ARM64)
+  # ── Windows: Clang (ARM64) ─────────────────────────────────────────────────
+  integration-tests-windows-arm:
+    name: Integration Tests / Windows ARM64
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: windows-11-vs2026-arm
