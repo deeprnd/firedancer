@@ -334,12 +334,16 @@ pub const WindowsChecks = struct {
         const os_tag = builtin.target.os.tag;
 
         // On Windows builds, always check WSL as optional
-        // On Linux, check /proc/version for microsoft indicator
         if (os_tag == .windows) {
             return Result.initOwnedMessage("wsl2", .warn, "Windows native — WSL2 check N/A");
         }
 
-        // On Linux, check if we're in WSL
+        // WSL2 check is not applicable on macOS
+        if (os_tag == .macos) {
+            return Result.initOwnedMessage("wsl2", .warn, "macOS — WSL2 check N/A");
+        }
+
+        // On Linux, check /proc/version for microsoft indicator
         const cwd = std.Io.Dir.cwd();
         if (fileExists(cwd, io, "/proc/version")) {
             var file = std.Io.Dir.openFile(cwd, io, "/proc/version", .{}) catch {
