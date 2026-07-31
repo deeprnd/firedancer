@@ -22,6 +22,11 @@ fn fixtureHeader(
     timestamp_ns: u64,
     prev_hash: u64,
     run_id: u64,
+    runtime_tier: []const u8,
+    isolation_tier: []const u8,
+    release_digest: []const u8,
+    demo_manifest_id: []const u8,
+    tickoni_version: []const u8,
 ) schema.Header {
     var hdr = std.mem.zeroes(schema.Header);
     hdr.schema_version = schema.audit_schema_version;
@@ -35,23 +40,35 @@ fn fixtureHeader(
     hdr.timestamp_ns = timestamp_ns;
     hdr.prev_hash = prev_hash;
     hdr.record_hash = 0;
+    // T5: Populate runtime metadata from VersionInfo
+    hdr.version = parseFixedAsciiBytes(64, tickoni_version) catch unreachable;
+    hdr.platform_tier = parseFixedAsciiBytes(64, runtime_tier) catch unreachable;
+    hdr.isolation_tier = parseFixedAsciiBytes(64, isolation_tier) catch unreachable;
+    hdr.release_digest = parseFixedAsciiBytes(64, release_digest) catch unreachable;
+    hdr.demo_manifest_id = parseFixedAsciiBytes(64, demo_manifest_id) catch unreachable;
     return hdr;
 }
 
 pub fn makeFixtures() [12]schema.AuditEvent {
+    // Runtime metadata populated from VersionInfo (T5)
+    const version = "0.1.0-dev";
+    const runtime = "linux_full";
+    const isolation = "full";
+    const digest = "abc123";
+    const manifest_id = "demo.investment.v1";
     const headers = [_]schema.Header{
-        fixtureHeader(1, 10, "tkings", 1001, "policy_ingress_v1", 1, 111, 500, 0),
-        fixtureHeader(2, 11, "tknorm", 1002, "policy_norm_v1", 2, 222, 501, 0),
-        fixtureHeader(3, 12, "tkpoly", 1003, "policy_poly_v1", 3, 333, 502, 0),
-        fixtureHeader(4, 13, "tkmodl", 1004, "policy_model_v1", 4, 444, 503, 0),
-        fixtureHeader(5, 14, "tkadpt", 1005, "policy_adpt_v1", 5, 555, 504, 0),
-        fixtureHeader(6, 15, "tkagnt", 1006, "policy_prop_v1", 6, 666, 505, 0),
-        fixtureHeader(7, 16, "tkpoly", 1007, "policy_dest_v1", 7, 777, 506, 0),
-        fixtureHeader(8, 17, "tkpoly", 1008, "policy_limt_v1", 8, 888, 507, 0),
-        fixtureHeader(9, 18, "tkpoly", 1009, "policy_aprv_v1", 9, 999, 508, 0),
-        fixtureHeader(10, 19, "tkpoly", 1010, "policy_deny_v1", 10, 1110, 509, 0),
-        fixtureHeader(11, 20, "tkmetr", 1011, "policy_metr_v1", 11, 1221, 510, 0),
-        fixtureHeader(12, 21, "tkrepl", 1012, "policy_repl_v1", 12, 1332, 511, 0),
+        fixtureHeader(1, 10, "tkings", 1001, "policy_ingress_v1", 1, 111, 500, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(2, 11, "tknorm", 1002, "policy_norm_v1", 2, 222, 501, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(3, 12, "tkpoly", 1003, "policy_poly_v1", 3, 333, 502, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(4, 13, "tkmodl", 1004, "policy_model_v1", 4, 444, 503, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(5, 14, "tkadpt", 1005, "policy_adpt_v1", 5, 555, 504, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(6, 15, "tkagnt", 1006, "policy_prop_v1", 6, 666, 505, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(7, 16, "tkpoly", 1007, "policy_dest_v1", 7, 777, 506, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(8, 17, "tkpoly", 1008, "policy_limt_v1", 8, 888, 507, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(9, 18, "tkpoly", 1009, "policy_aprv_v1", 9, 999, 508, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(10, 19, "tkpoly", 1010, "policy_deny_v1", 10, 1110, 509, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(11, 20, "tkmetr", 1011, "policy_metr_v1", 11, 1221, 510, 0, runtime, isolation, digest, manifest_id, version),
+        fixtureHeader(12, 21, "tkrepl", 1012, "policy_repl_v1", 12, 1332, 511, 0, runtime, isolation, digest, manifest_id, version),
     };
 
     const events = [_]schema.AuditEvent{
@@ -137,7 +154,7 @@ pub fn makeFixtures() [12]schema.AuditEvent {
 }
 
 test "computeRecordHash excludes timestamp_ns" {
-    const header = fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0, 0);
+    const hdr = fixtureHeader(0, 0, "tkpoly", 0, "policy", 0, 0, 0, 0, "linux_full", "full", "abc", "demo.v1", "0.1.0");
     const payload = schema.AuditEvent.Payload{ .policy_decision = .{
         .outcome = .allow,
         .rule_id = 1,
@@ -148,9 +165,9 @@ test "computeRecordHash excludes timestamp_ns" {
         .taxonomy_version = 0,
         .classification_code = [_]u8{0} ** 32,
     } };
-    var header_with_timestamp = header;
+    var header_with_timestamp = hdr;
     header_with_timestamp.timestamp_ns = 999_999;
-    const e0 = codec.buildEvent(header, payload);
+    const e0 = codec.buildEvent(hdr, payload);
     const e1 = codec.buildEvent(header_with_timestamp, payload);
     try std.testing.expectEqual(e0.header.record_hash, e1.header.record_hash);
 }
