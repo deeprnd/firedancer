@@ -1,5 +1,5 @@
 #include "fd_ssresolve.h"
-#include "../../util/fd_windows_compat.h"
+#include "../../../util/fd_windows_compat.h"
 #include "fd_ssarchive.h"
 
 #include "../../../third_party/picohttpparser/picohttpparser.h"
