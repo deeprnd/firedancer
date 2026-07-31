@@ -19,6 +19,10 @@ case "$OS" in
       source /etc/os-release
     fi
     ;;
+  MINGW*|MSYS*|CYGWIN*)
+    MAKE=( make -j )
+    ID=windows
+    ;;
   *)
     echo "[!] Unsupported OS $OS"
     ;;
@@ -300,6 +304,70 @@ check_arch_pkgs () {
   fi
 }
 
+check_windows_pkgs () {
+  local REQUIRED_CMDS=(
+    curl
+    git
+    make
+    cmake
+    tar
+  )
+
+  local PERL_OK=0
+  if command -v perl >/dev/null 2>&1; then
+    if perl -MLocale::Maketext::Simple -e1 >/dev/null 2>&1; then
+      PERL_OK=1
+    fi
+  fi
+
+  if command -v pkg-config >/dev/null 2>&1; then
+    :
+  elif command -v pkgconf >/dev/null 2>&1; then
+    :
+  else
+    REQUIRED_CMDS+=( pkg-config )
+  fi
+
+  if [[ "${_CC}" == clang* ]]; then
+    REQUIRED_CMDS+=( clang clang++ )
+  else
+    REQUIRED_CMDS+=( gcc g++ )
+  fi
+
+  if [[ $DEVMODE == 1 ]]; then
+    REQUIRED_CMDS+=( protoc )
+  fi
+
+  echo "[~] Checking for required Windows build tools"
+
+  local MISSING_CMDS=( )
+  for cmd in "${REQUIRED_CMDS[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      MISSING_CMDS+=( "$cmd" )
+    fi
+  done
+  if [[ $PERL_OK -ne 1 ]]; then
+    MISSING_CMDS+=( perl-with-Locale-Maketext-Simple )
+  fi
+
+  if [[ ${#MISSING_CMDS[@]} -eq 0 ]]; then
+    echo "[~] OK: Windows build tools required for build are installed"
+    return 0
+  fi
+
+  local CHOCO_PKGS=( make strawberryperl pkgconfiglite cmake )
+  if [[ "${_CC}" == clang* ]]; then
+    CHOCO_PKGS+=( llvm )
+  else
+    CHOCO_PKGS+=( mingw )
+  fi
+  if [[ $DEVMODE == 1 ]]; then
+    CHOCO_PKGS+=( protoc )
+  fi
+
+  PACKAGE_INSTALL_CMD=( choco install -y --no-progress ${CHOCO_PKGS[*]} )
+}
+
 check () {
   # Initialize to avoid 'unbound variable' with set -u when all packages are present.
   PACKAGE_INSTALL_CMD=( )
@@ -307,6 +375,8 @@ check () {
   # macOS has no /etc/os-release — must be handled separately.
   if [[ "$OS" = "Darwin" ]]; then
     check_macos_pkgs
+  elif [[ "$ID" = "windows" ]]; then
+    check_windows_pkgs
   else
     DISTRO="${ID_LIKE:-${ID:-}}"
     for word in $DISTRO ; do
@@ -439,7 +509,33 @@ install_openssl () {
     CONFIG_OPTS+=( enable-msan no-asm )
   fi
 
-  CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" ./config "${CONFIG_OPTS[@]}"
+  if [[ "$ID" = windows ]]; then
+    local openssl_target
+    local windows_arch="${FD_WINDOWS_ARCH:-$(uname -m)}"
+    local openssl_perl="perl"
+
+    # In the MSYS/Git-Bash build path, OpenSSL Configure expects a Perl that
+    # speaks Unix-style paths. Prefer the shell-matched /usr/bin/perl when it
+    # exists; only fall back to Strawberry if no MSYS/Git Perl is available.
+    if [[ -x /usr/bin/perl ]]; then
+      openssl_perl="/usr/bin/perl"
+    elif [[ -x /c/Strawberry/perl/bin/perl.exe ]]; then
+      openssl_perl="/c/Strawberry/perl/bin/perl.exe"
+    elif [[ -x /c/Strawberry/perl/bin/perl ]]; then
+      openssl_perl="/c/Strawberry/perl/bin/perl"
+    elif command -v perl >/dev/null 2>&1; then
+      openssl_perl="$(command -v perl)"
+    fi
+
+    if [[ "$windows_arch" =~ ^(arm64|aarch64)$ ]]; then
+      openssl_target="mingwarm64"
+    else
+      openssl_target="mingw64"
+    fi
+    CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" "$openssl_perl" ./Configure "$openssl_target" "${CONFIG_OPTS[@]}"
+  else
+    CFLAGS="$EXTRA_CFLAGS" CXXFLAGS="$EXTRA_CXXFLAGS" ./config "${CONFIG_OPTS[@]}"
+  fi
   echo "[+] Configured OpenSSL"
 
   echo "[+] Building OpenSSL"
@@ -458,11 +554,15 @@ install_rocksdb () {
   NJOBS=$((NJOBS>0 ? NJOBS : 1))
   make clean-ext-libraries-all clean-rocks
 
+  # Avoid RocksDB's default -march=native CPU probing. On newer GitHub
+  # runners with clang 18 this can resolve to AVX10 feature sets that clang
+  # then rejects under -Werror=invalid-feature-combination.
   ROCKSDB_DISABLE_NUMA=1 \
   ROCKSDB_DISABLE_ZLIB=1 \
   ROCKSDB_DISABLE_BZIP=1 \
   ROCKSDB_DISABLE_GFLAGS=1 \
   ROCKSDB_USE_IO_URING=0 \
+  PORTABLE=1 \
   CFLAGS="-isystem $(pwd)/../../include -isystem $(pwd)/../../../src/third_party/lz4/lib -isystem $(pwd)/../../../src/third_party/zstd/lib -g0 -DSNAPPY -DZSTD -DLZ4 -Wno-unknown-warning-option -Wno-uninitialized -Wno-array-bounds -Wno-stringop-overread -fPIC $EXTRA_CXXFLAGS" \
   make -j $NJOBS \
     LITE=1 \

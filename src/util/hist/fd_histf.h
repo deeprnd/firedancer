@@ -115,7 +115,7 @@ fd_histf_new( void * mem,
   }
   left_edge[ FD_HISTF_BUCKET_CNT - 1UL ] = max_value;
 
-  for( ulong i=0UL; i<FD_HISTF_BUCKET_CNT; i++ ) hist->left_edge[ i ] = (long)(left_edge[ i ] - (1UL<<63));
+  for( ulong i=0UL; i<FD_HISTF_BUCKET_CNT; i++ ) hist->left_edge[ i ] = (long)(left_edge[ i ] - (1ULL<<63));
   hist->left_edge[ FD_HISTF_BUCKET_CNT ] = LONG_MAX;
 
   return (void*)hist;
@@ -135,7 +135,7 @@ static inline void
 fd_histf_sample( fd_histf_t * hist,
                  ulong        value ) {
   hist->sum += value;
-  long shifted_v = (long)(value - (1UL<<63));
+  long shifted_v = (long)(value - (1ULL<<63));
 #if FD_HAS_AVX
   fd_histf_v4l_t x = { shifted_v, shifted_v, shifted_v, shifted_v };
   /* !(x-2^63 < left_edge[i]) & (x-2^63 < left_edge[i+1])  <=>
@@ -172,8 +172,8 @@ fd_histf_sample( fd_histf_t * hist,
 
    For these functions, b, the bucket index is in [0, 16). */
 FD_FN_PURE static inline ulong fd_histf_cnt  ( fd_histf_t const * hist, ulong b ) { return        hist->counts   [ b     ];           }
-FD_FN_PURE static inline ulong fd_histf_left ( fd_histf_t const * hist, ulong b ) { return (ulong)hist->left_edge[ b     ]+(1UL<<63); }
-FD_FN_PURE static inline ulong fd_histf_right( fd_histf_t const * hist, ulong b ) { return (ulong)hist->left_edge[ b+1UL ]+(1UL<<63); }
+FD_FN_PURE static inline ulong fd_histf_left ( fd_histf_t const * hist, ulong b ) { return (ulong)hist->left_edge[ b     ]+(1ULL<<63); }
+FD_FN_PURE static inline ulong fd_histf_right( fd_histf_t const * hist, ulong b ) { return (ulong)hist->left_edge[ b+1UL ]+(1ULL<<63); }
 FD_FN_PURE static inline ulong fd_histf_sum  ( fd_histf_t const * hist          ) { return        hist->sum;                          }
 
 /* fd_histf_percentile computes a percentile estimate.  Note that for

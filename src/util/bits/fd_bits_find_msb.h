@@ -4,7 +4,11 @@
 FD_FN_CONST static inline int fd_uchar_find_msb ( uchar  x ) { return 31 - __builtin_clz ( (uint)x ); }
 FD_FN_CONST static inline int fd_ushort_find_msb( ushort x ) { return 31 - __builtin_clz ( (uint)x ); }
 FD_FN_CONST static inline int fd_uint_find_msb  ( uint   x ) { return 31 - __builtin_clz (       x ); }
+#if FD_HAS_WINDOWS
+FD_FN_CONST static inline int fd_ulong_find_msb ( ulong  x ) { return 63 - __builtin_clzll( (unsigned long long)x ); }
+#else
 FD_FN_CONST static inline int fd_ulong_find_msb ( ulong  x ) { return 63 - __builtin_clzl(       x ); }
+#endif
 
 #if FD_HAS_INT128
 
@@ -112,6 +116,9 @@ fd_uint_find_msb_w_default( uint x,
 # endif
 }
 
+#if FD_HAS_WINDOWS
+FD_FN_CONST static inline int fd_ulong_find_msb_w_default( ulong x, int d ) { return (!x) ? d : fd_ulong_find_msb( x ); }
+#else
 FD_FN_CONST static inline int
 fd_ulong_find_msb_w_default( ulong x,
                              int   d ) {
@@ -132,6 +139,7 @@ fd_ulong_find_msb_w_default( ulong x,
   return (int)r.l;
 # endif
 }
+#endif
 
 #else /* other architectures */
 

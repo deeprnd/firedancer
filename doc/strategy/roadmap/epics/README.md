@@ -60,7 +60,6 @@ Use these project docs to fill and implement issues:
 || [V5.9](v5.9.md) | Crypto Thesis To Guarded Spot Trade |
 || [V6.12](v6.12.md) | Runtime Hooks |
 || [V6.15](v6.15.md) | Bounded Agent Run Governance |
-|| [V6.16](v6.16.md) | Tool Broker And MCP-Compatible Dispatch |
 || [V6.17](v6.17.md) | Tkmodl Budget And Call-Limit Governance |
 || [V6.18](v6.18.md) | Replay Proof Bundle And Evidence Integrity |
 || [V6.7](v6.7.md) | Trust Layer |
@@ -68,7 +67,6 @@ Use these project docs to fill and implement issues:
 || [V7.13](v7.13.md) | Non-Investment Operations Workflows |
 || [V7.22](v7.22.md) | Financial Telemetry, Audit, And Observability Governance |
 || [V7.6](v7.6.md) | Guarded Broker, Payment, And Crypto Sandbox |
-|| [V8.4](v8.4.md) | Social Thesis And Money Feed |
 
 ## How Roadmap Files Are Organized
 

@@ -2,6 +2,10 @@ ifdef FD_HAS_HOSTED
 
 # High level API
 $(call add-hdrs,fd_netdb.h)
+ifdef FD_HAS_WINDOWS
+# Windows build lane uses stub; non-Windows keeps the resolver stack.
+$(call add-objs,fd_netdb_windows_stub,fd_waltz)
+else
 $(call add-objs,fd_getaddrinfo,fd_waltz)
 
 # Config
@@ -12,7 +16,7 @@ $(call add-hdrs,fd_lookup.h)
 $(call add-objs,fd_resolvconf,fd_waltz)
 $(call add-objs,fd_lookup_name fd_lookup_ipliteral,fd_waltz)
 
-# Platform-abstracted DNS send (algorithm + Linux/macos impls)
+# Shared algorithm + platform implementation selected here.
 $(call add-hdrs,fd_res_msend.h,fd_resolv_endianness.h)
 $(call add-objs,fd_res_msend,fd_waltz)
 ifdef FD_HAS_LINUX
@@ -34,5 +38,6 @@ $(call make-fuzz-test,fuzz_dns_parse,fuzz_dns_parse,fd_waltz fd_util)
 
 $(call make-unit-test,test_resolv,test_resolv,fd_waltz fd_util)
 $(call run-unit-test,test_resolv)
+endif
 
 endif

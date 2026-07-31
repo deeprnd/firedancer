@@ -331,7 +331,7 @@ fd_tempo_async_min( long  lazy,
     return 0UL;
   }
 
-  if( FD_UNLIKELY( !(_async_target<((float)(1UL<<32))) ) ) {
+  if( FD_UNLIKELY( !(_async_target<((float)(1ULL<<32))) ) ) {
     FD_LOG_WARNING(( "lazy, event_cnt and tick_per_ns imply an unreasonably large async_min" ));
     return 0UL;
   }

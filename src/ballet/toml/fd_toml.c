@@ -3,7 +3,8 @@
 #include "../../util/fd_util.h"
 #include <ctype.h>
 #include <math.h>
-#include <strings.h>
+#include <string.h>
+#include "../../util/fd_windows_compat.h"
 
 /* Implementation note:
 

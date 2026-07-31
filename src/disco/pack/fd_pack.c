@@ -1787,7 +1787,7 @@ insert_bundle_impl( fd_pack_t           * pack,
                     fd_pack_ord_txn_t * * bundle,
                     ulong                 expires_at ) {
   ulong prev_reward = ((BUNDLE_L_PRIME * (BUNDLE_N - bundle_idx))) - 1UL;
-  ulong prev_cost = 1UL<<32;
+  ulong prev_cost = 1ULL<<32;
 
   /* Assign last to first */
   for( ulong i=0UL; i<txn_cnt; i++ ) {
@@ -1954,7 +1954,7 @@ fd_pack_schedule_impl( fd_pack_t          * pack,
     prev = treap_rev_iter_next( _cur, pool );
 
 #   if FD_HAS_X86
-    _mm_prefetch( &(pool[ prev ].prev),      _MM_HINT_T0 );
+    _mm_prefetch( (char const *)&(pool[ prev ].prev), _MM_HINT_T0 );
 #   endif
 
     fd_pack_ord_txn_t * cur = treap_rev_iter_ele( _cur, pool );

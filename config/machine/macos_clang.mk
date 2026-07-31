@@ -1,10 +1,10 @@
-# Clang on macOS (Apple Silicon ARM64 or Intel x86_64).
+# Clang on macOS (Apple Silicon ARM64 or x86_64).
 # Auto-detects the target arch at build time.
 #
 # Usage: MACHINE=macos_clang make ...
 #
 # On ARM (Apple Silicon): -mcpu=apple-m1 (or newer) with NEON/CRYPTO.
-# On Intel: -march=skylake with SSE4.2/AVX2.
+# On x86_64: -march=skylake with SSE4.2/AVX2.
 # On both: FD_HAS_THREADS and FD_HAS_ATOMIC for tile threading support.
 
 BUILDDIR?=macos/clang
@@ -29,7 +29,7 @@ ifeq ($(UNAME), Darwin)
 FD_HAS_MACOS:=1
 CPPFLAGS+=-DFD_HAS_MACOS=1
 
-# ARM vs Intel detection
+# ARM vs x86_64 detection
 IS_ARM?=$(shell uname -m | grep -qE 'aarch64|arm64' && echo 1 || echo 0)
 
 ifeq ($(IS_ARM),1)
@@ -42,7 +42,7 @@ FD_HAS_THREADS:=1
 CPPFLAGS+=-mcpu=apple-m1
 CPPFLAGS+=-DFD_HAS_ARM64=1 -DFD_HAS_INT128=1 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1 -DFD_HAS_THREADS=1
 else
-# Intel x86_64 — macOS runners are 2018-era Intel (Coffee Lake/Skylake)
+# x86_64 — macOS runners are 2018-era Intel (Coffee Lake/Skylake)
 # with AVX2 but no AVX-512. Use skylake to match GitHub Actions runners.
 FD_HAS_INT128:=1
 FD_HAS_DOUBLE:=1

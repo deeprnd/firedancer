@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <strings.h>
+#include <string.h>
+#include "../fd_windows_compat.h"
 #include <ctype.h>
 
 char const * fd_cstr_to_cstr  ( char const * cstr ) { return cstr;                             }

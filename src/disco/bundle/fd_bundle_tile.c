@@ -12,12 +12,11 @@
 #include <errno.h>
 #endif
 
-#include <dirent.h> /* opendir */
 #include <stdio.h> /* snprintf */
 #include <fcntl.h> /* F_SETFL */
 #include <unistd.h> /* close */
-#include <sys/mman.h> /* PROT_READ (seccomp) */
 #include <sys/uio.h> /* writev */
+#include <sys/mman.h> /* PROT_READ (seccomp) */
 #include <netinet/in.h> /* AF_INET */
 #include <netinet/tcp.h> /* TCP_FASTOPEN_CONNECT (seccomp) */
 #include "../../waltz/resolv/fd_netdb.h"

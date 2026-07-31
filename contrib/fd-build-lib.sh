@@ -100,3 +100,5 @@ if [ "$MODE" = "cov" ]; then
   make -j"$(fd_nproc)" MACHINE=tickoni_fd BUILDDIR="${BUILDDIR}" CC="${CC}" \
     run-unit-test TEST_OPTS="--page-sz normal --job-mem 268435456 -j ${COV_JOBS}"
 fi
+
+bash contrib/fd-write-zig-link-manifests.sh "${BUILDDIR}"

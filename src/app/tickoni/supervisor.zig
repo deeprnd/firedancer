@@ -66,9 +66,9 @@ const ProcessState = struct {
     cncs: [8]?*c_abi.cnc.Cnc,
     children: [8]?std.process.Child,
     heartbeat_stale_after_ns: u64,
-    /// Grace period between requesting HALT and force-killing tiles already
+    /// Grace period between requesting HALT and force-terminating tiles already
     /// classified stale. Lets slow but healthy children observe HALT and exit
-    /// cleanly before stopProcess escalates to SIGKILL.
+    /// cleanly before stopProcess escalates to the platform kill path.
     stop_grace_ns: u64,
     /// v2.14.S1.T14 visibility: whether this run's layout is shared-core
     /// and how many tiles are exclusive/shared/floating.
@@ -395,28 +395,31 @@ pub const Supervisor = struct {
             h.state = .running;
             state.children[i] = child;
 
-            switch (tile.cpu_placement) {
-                .exclusive, .shared => |cpu| {
-                    var cpu_set: util.cpu.CpuSet = undefined;
-                    util.cpu.zero(&cpu_set);
-                    util.cpu.set(&cpu_set, cpu);
-                    try util.cpu.setAffinity(@intCast(child.id.?), &cpu_set);
-                },
-                .floating => {},
+            if (@import("builtin").os.tag == .linux) {
+                switch (tile.cpu_placement) {
+                    .exclusive, .shared => |cpu| {
+                        var cpu_set: util.cpu.CpuSet = undefined;
+                        util.cpu.zero(&cpu_set);
+                        util.cpu.set(&cpu_set, cpu);
+                        try util.cpu.setAffinity(@intCast(child.id.?), &cpu_set);
+                    },
+                    .floating => {},
+                }
             }
         }
     }
 
-    fn updateHandleForTerm(self: *Supervisor, i: usize, term: std.process.Child.Term) void {
-        switch (term) {
-            .exited => |code| {
-                if (code == 0) {
-                    // A clean exit after stopProcess() should be treated as a
-                    // normal stop even if refreshProcessHealth() transiently
-                    // marked the tile stale before the halt/reap completed.
-                    self.handles[i].state = .stopped;
-                    self.handles[i].crashed_because = .none;
-                } else if (self.handles[i].state == .stale) {
+    fn updateHandleForOutcome(self: *Supervisor, i: usize, outcome: util.process_api.ProcessOutcome) void {
+        switch (outcome) {
+            .exited_ok => {
+                // A clean exit after stopProcess() should be treated as a
+                // normal stop even if refreshProcessHealth() transiently
+                // marked the tile stale before the halt/reap completed.
+                self.handles[i].state = .stopped;
+                self.handles[i].crashed_because = .none;
+            },
+            .exited_code => |code| {
+                if (self.handles[i].state == .stale) {
                     self.handles[i].crashed_because = .stale;
                 } else {
                     self.handles[i].state = .crashed;
@@ -424,7 +427,7 @@ pub const Supervisor = struct {
                     self.handles[i].crashed_because = .exit_code;
                 }
             },
-            .signal => {
+            .crashed, .force_terminated => {
                 if (self.handles[i].state == .stale) {
                     self.handles[i].crashed_because = .stale;
                 } else {
@@ -443,44 +446,20 @@ pub const Supervisor = struct {
         }
     }
 
-    fn statusToTerm(status: u32) std.process.Child.Term {
-        return if (std.posix.W.IFEXITED(status))
-            .{ .exited = std.posix.W.EXITSTATUS(status) }
-        else if (std.posix.W.IFSIGNALED(status))
-            .{ .signal = std.posix.W.TERMSIG(status) }
-        else if (std.posix.W.IFSTOPPED(status))
-            .{ .stopped = std.posix.W.STOPSIG(status) }
-        else
-            .{ .unknown = status };
-    }
-
     fn reapExitedChildrenNoHang(self: *Supervisor) void {
         const state = self.process_state orelse return;
         for (&state.children, 0..) |*maybe_child, i| {
             var child = maybe_child.* orelse continue;
-            const pid = child.id orelse {
-                maybe_child.* = null;
-                continue;
-            };
-
-            var status: c_int = 0;
-            while (true) {
-                const rc = std.posix.system.waitpid(pid, &status, std.c.W.NOHANG);
-                switch (std.posix.errno(rc)) {
-                    .SUCCESS => {
-                        if (rc == 0) break;
-                        self.updateHandleForTerm(i, statusToTerm(@bitCast(@as(c_uint, @intCast(status)))));
-                        child.id = null;
-                        maybe_child.* = null;
-                        break;
-                    },
-                    .INTR => continue,
-                    .CHILD => {
-                        maybe_child.* = null;
-                        break;
-                    },
-                    else => break,
-                }
+            switch (util.process_api.tryReapNoHang(&child)) {
+                .running => {},
+                .reaped => |term| {
+                    self.updateHandleForOutcome(i, util.process_api.outcomeFromTerm(term, false));
+                    maybe_child.* = null;
+                },
+                .detached => {
+                    maybe_child.* = null;
+                },
+                .failed => {},
             }
         }
     }
@@ -488,7 +467,7 @@ pub const Supervisor = struct {
     /// Blocks until every spawned tile process exits (without requesting an
     /// early halt) and records final state/exit_code/crashed_because.
     /// Leaves process_state intact; pairs with the thread-mode wait().
-    pub fn waitProcess(self: *Supervisor, io: std.Io) void {
+    pub fn waitProcess(self: *Supervisor, io: std.Io, forced_termination: ?[]const bool) void {
         const state = self.process_state orelse return;
         for (&state.children, 0..) |*maybe_child, i| {
             var child = maybe_child.* orelse continue;
@@ -498,7 +477,8 @@ pub const Supervisor = struct {
                 maybe_child.* = null;
                 continue;
             };
-            self.updateHandleForTerm(i, term);
+            const was_forced = if (forced_termination) |forced| forced[i] else false;
+            self.updateHandleForOutcome(i, util.process_api.outcomeFromTerm(term, was_forced));
             maybe_child.* = null;
         }
     }
@@ -597,16 +577,19 @@ pub const Supervisor = struct {
                 util.process.sleepNanos(5 * std.time.ns_per_ms);
             }
             self.reapExitedChildrenNoHang();
-
-            for (stale_before_stop, 0..) |was_stale, i| {
-                if (!was_stale) continue;
-                const maybe_child = &state.children[i];
-                const child = maybe_child.* orelse continue;
-                const pid = child.id orelse continue;
-                std.posix.kill(pid, std.posix.SIG.KILL) catch {};
-            }
         }
-        self.waitProcess(io);
+
+        var forced_termination = [_]bool{false} ** 8;
+        for (stale_before_stop, 0..) |was_stale, i| {
+            if (!was_stale) continue;
+            const maybe_child = &state.children[i];
+            const child = maybe_child.* orelse continue;
+            const pid = child.id orelse continue;
+            util.process_api.forceTerminate(pid);
+            forced_termination[i] = true;
+        }
+
+        self.waitProcess(io, &forced_termination);
         state.deinit(io, self.allocator);
         self.allocator.destroy(state);
         self.process_state = null;

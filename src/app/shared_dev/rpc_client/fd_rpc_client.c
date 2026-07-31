@@ -1,4 +1,5 @@
 #include "fd_rpc_client.h"
+#include "../../../../util/fd_windows_compat.h"
 #include "fd_rpc_client_private.h"
 
 #include "../../../third_party/picohttpparser/picohttpparser.h"

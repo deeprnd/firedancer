@@ -268,10 +268,10 @@ FD_FN_CONST static inline float  fd_rng_uint_to_float_c   ( uint  u ) { return (
 FD_FN_CONST static inline float  fd_rng_uint_to_float_o   ( uint  u ) { return (1.f/(float )(1 <<24))*(float )(int )((u>>(32-24))|   1U  ); }
 
 #if FD_HAS_DOUBLE
-FD_FN_CONST static inline double fd_rng_ulong_to_double_c0( ulong u ) { return (1. /(double)(1L<<53))*(double)(long)( u>>(64-53)         ); }
-FD_FN_CONST static inline double fd_rng_ulong_to_double_c1( ulong u ) { return (1. /(double)(1L<<53))*(double)(long)((u>>(64-53))+   1UL ); }
-FD_FN_CONST static inline double fd_rng_ulong_to_double_c ( ulong u ) { return (1. /(double)(1L<<53))*(double)(long)((u>>(64-53))+(u&1UL)); }
-FD_FN_CONST static inline double fd_rng_ulong_to_double_o ( ulong u ) { return (1. /(double)(1L<<53))*(double)(long)((u>>(64-53))|   1UL ); }
+FD_FN_CONST static inline double fd_rng_ulong_to_double_c0( ulong u ) { return (1. /(double)(1ULL<<53))*(double)(long long)( u>>(64-53)         ); }
+FD_FN_CONST static inline double fd_rng_ulong_to_double_c1( ulong u ) { return (1. /(double)(1ULL<<53))*(double)(long long)((u>>(64-53))+   1UL ); }
+FD_FN_CONST static inline double fd_rng_ulong_to_double_c ( ulong u ) { return (1. /(double)(1ULL<<53))*(double)(long long)((u>>(64-53))+(u&1UL)); }
+FD_FN_CONST static inline double fd_rng_ulong_to_double_o ( ulong u ) { return (1. /(double)(1ULL<<53))*(double)(long long)((u>>(64-53))|   1UL ); }
 #endif
 
 /* fd_rng_{float,double}_{c0,c1,c,o} are basic uniform generators on the

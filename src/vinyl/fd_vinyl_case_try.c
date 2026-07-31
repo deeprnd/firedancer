@@ -1,6 +1,6 @@
   case FD_VINYL_REQ_TYPE_TRY: {
 
-    FD_STATIC_ASSERT( FD_VINYL_LINE_VER_MAX==((1UL<<32)-1UL), update_impl_for_ver_max );
+    FD_STATIC_ASSERT( FD_VINYL_LINE_VER_MAX==((1ULL<<32)-1ULL), update_impl_for_ver_max );
 
     ulong                  req_flags     = (ulong)req->flags;
     fd_vinyl_key_t const * req_key       = MAP_REQ_GADDR( req->key_gaddr,       fd_vinyl_key_t,     batch_cnt );

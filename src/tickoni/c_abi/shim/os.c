@@ -1,15 +1,35 @@
 /* Cross-platform OS operations shim.
  * Linux: uses native syscalls
  * macOS: uses Darwin equivalents via system headers
+ * Windows: uses Win32 APIs and CRT file-descriptor helpers
  * Zig callers just call these — no platform forks in .zig files.
  */
 
+#if FD_HAS_LINUX
 #define _GNU_SOURCE
-#include <signal.h>
+#endif
+
 #include <stdint.h>
-#include <time.h>
-#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#if FD_HAS_LINUX
+#include <signal.h>
+#include <unistd.h>
+#elif FD_HAS_MACOS
+#include <signal.h>
+#include <unistd.h>
+#include <mach-o/dyld.h>
+#include <sys/sysctl.h>
+#elif FD_HAS_WINDOWS
+#include <limits.h>
+#include <io.h>
+#include <windows.h>
+#include <tlhelp32.h>
+#endif
+
 #include "../../../util/fd_util.h"
 
 #if FD_HAS_LINUX
@@ -28,24 +48,24 @@ void tk_sleep_nanos( uint64_t ns ) {
 
 int tk_self_exe_path( char * buf, size_t buf_len ) {
   ssize_t n = readlink( "/proc/self/exe", buf, buf_len - 1 );
-  if (n < 0) return -1;
-  buf[n] = '\0';
+  if( n<0 ) return -1;
+  buf[ n ] = '\0';
   return (int)n;
 }
 
 int tk_parent_pid( int pid ) {
-  char path[64];
+  char path[ 64 ];
   int n = snprintf( path, sizeof(path), "/proc/%d/status", pid );
-  if (n < 0 || n >= (int)sizeof(path)) return -1;
+  if( (n<0) | (n>=(int)sizeof(path)) ) return -1;
 
-  FILE *f = fopen( path, "r" );
-  if (!f) return -1;
+  FILE * f = fopen( path, "r" );
+  if( !f ) return -1;
 
-  char line[256];
+  char line[ 256 ];
   int ppid = -1;
-  while (fgets(line, sizeof(line), f)) {
-    if (strncmp(line, "PPid:", 5) == 0) {
-      ppid = atoi( line + 5 );
+  while( fgets( line, sizeof(line), f ) ) {
+    if( strncmp( line, "PPid:", 5 )==0 ) {
+      ppid = atoi( line+5 );
       break;
     }
   }
@@ -59,12 +79,10 @@ int tk_kill_process( int pid ) {
 
 int tk_write( int fd, void const * buf, size_t count ) {
   ssize_t n = write( fd, buf, count );
-  return n < 0 ? 0 : (int)n;
+  return n<0 ? 0 : (int)n;
 }
 
-#elif defined(__APPLE__)
-#include <mach-o/dyld.h>
-#include <sys/sysctl.h>
+#elif FD_HAS_MACOS
 
 int64_t tk_monotonic_nanos( void ) {
   struct timespec ts;
@@ -80,7 +98,7 @@ void tk_sleep_nanos( uint64_t ns ) {
 
 int tk_self_exe_path( char * buf, size_t buf_len ) {
   uint32_t size = (uint32_t)buf_len;
-  if ( _NSGetExecutablePath( buf, &size ) == 0 ) return (int)strlen( buf );
+  if( _NSGetExecutablePath( buf, &size )==0 ) return (int)strlen( buf );
   return -1;
 }
 
@@ -88,7 +106,7 @@ int tk_parent_pid( int pid ) {
   struct kinfo_proc info;
   size_t size = sizeof(info);
   int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, pid };
-  if ( sysctl( mib, 4, &info, &size, NULL, 0 ) != 0 ) return -1;
+  if( sysctl( mib, 4, &info, &size, NULL, 0 )!=0 ) return -1;
   return (int)info.kp_eproc.e_ppid;
 }
 
@@ -98,11 +116,70 @@ int tk_kill_process( int pid ) {
 
 int tk_write( int fd, void const * buf, size_t count ) {
   ssize_t n = write( fd, buf, count );
-  return n < 0 ? 0 : (int)n;
+  return n<0 ? 0 : (int)n;
+}
+
+#elif FD_HAS_WINDOWS
+
+int64_t tk_monotonic_nanos( void ) {
+  LARGE_INTEGER counter;
+  LARGE_INTEGER freq;
+  if( FD_UNLIKELY( !QueryPerformanceFrequency( &freq ) ) ) return 0;
+  if( FD_UNLIKELY( !QueryPerformanceCounter( &counter ) ) ) return 0;
+  return (int64_t)((counter.QuadPart * 1000000000LL) / freq.QuadPart);
+}
+
+void tk_sleep_nanos( uint64_t ns ) {
+  DWORD ms = (DWORD)((ns + 999999ULL) / 1000000ULL);
+  if( (ms==0U) & (ns>0UL) ) ms = 1U;
+  Sleep( ms );
+}
+
+int tk_self_exe_path( char * buf, size_t buf_len ) {
+  DWORD n = GetModuleFileNameA( NULL, buf, (DWORD)buf_len );
+  if( FD_UNLIKELY( (!n) | (n>=buf_len) ) ) return -1;
+  return (int)n;
+}
+
+int tk_parent_pid( int pid ) {
+  HANDLE snap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );
+  if( FD_UNLIKELY( snap==INVALID_HANDLE_VALUE ) ) return -1;
+
+  PROCESSENTRY32 entry;
+  memset( &entry, 0, sizeof(entry) );
+  entry.dwSize = sizeof(entry);
+
+  int parent = -1;
+  if( Process32First( snap, &entry ) ) {
+    do {
+      if( entry.th32ProcessID==(DWORD)pid ) {
+        parent = (int)entry.th32ParentProcessID;
+        break;
+      }
+    } while( Process32Next( snap, &entry ) );
+  }
+
+  CloseHandle( snap );
+  return parent;
+}
+
+int tk_kill_process( int pid ) {
+  HANDLE process = OpenProcess( PROCESS_TERMINATE, FALSE, (DWORD)pid );
+  if( FD_UNLIKELY( !process ) ) return -1;
+
+  int rc = TerminateProcess( process, 1U ) ? 0 : -1;
+  CloseHandle( process );
+  return rc;
+}
+
+int tk_write( int fd, void const * buf, size_t count ) {
+  unsigned int nbytes = count>(size_t)INT_MAX ? (unsigned int)INT_MAX : (unsigned int)count;
+  int n = _write( fd, buf, nbytes );
+  return n<0 ? 0 : n;
 }
 
 #else
-/* Fallback for other Unix-like systems */
+/* Fallback for other hosted platforms */
 int64_t tk_monotonic_nanos( void ) {
   struct timespec ts;
   clock_gettime( CLOCK_MONOTONIC, &ts );
@@ -126,12 +203,13 @@ int tk_parent_pid( int pid ) {
 }
 
 int tk_kill_process( int pid ) {
-  return kill( pid, SIGKILL );
+  (void)pid;
+  return -1;
 }
 
 int tk_write( int fd, void const * buf, size_t count ) {
-  ssize_t n = write( fd, buf, count );
-  return n < 0 ? 0 : (int)n;
+  (void)fd; (void)buf; (void)count;
+  return 0;
 }
 
 #endif
