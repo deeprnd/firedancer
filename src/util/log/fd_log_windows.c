@@ -410,6 +410,8 @@ fd_log_private_1( int          level,
   /* No-op: actual log output deferred to fd_log_private_1_formatted */
 }
 
+/* FD_LOG_PRIVATE_2 is noreturn — the caller never expects a return.
+   On Windows we use ExitProcess to abort the process. */
 void
 fd_log_private_2( int          level,
                   long         now,
@@ -423,7 +425,9 @@ fd_log_private_2( int          level,
   (void)line;
   (void)func;
   (void)msg;
-  /* No-op: actual log output deferred to fd_log_private_2_formatted */
+  /* noreturn: abort the process */
+  OutputDebugStringA( "fd_log_private_2: fatal\n" );
+  ExitProcess( (UINT)1 );
 }
 
 char const *
