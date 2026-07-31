@@ -18,7 +18,7 @@
 
 /* ── Thread-local storage helpers ─────────────────────────────────────── */
 
-#define FD_TL __declspec(thread)
+/* FD_TL is already defined in fd_util_base.h — do not redefine */
 
 /* ── Log private state ────────────────────────────────────────────────── */
 
@@ -62,9 +62,11 @@ fd_log_wallclock( void ) {
     ui.HighPart = ft.dwHighDateTime;
     /* File time = 100-ns intervals since 1601-01-01 UTC
      * UNIX epoch = 1970-01-01 UTC
-     * Difference = 11644473600 seconds */
-    long unix_offset_ns = 116444736000000000L;
-    return (long)(ui.QuadPart * 100L - unix_offset_ns);
+     * Difference = 11644473600 seconds
+     * Use long long to avoid 32-bit truncation, then cast to long for return.
+     * On Windows x64/ARM64, long is 64-bit so this fits. */
+    long long offset_ns = 116444736000000000LL;
+    return (long)( ui.QuadPart * 100LL - offset_ns );
   }
   return fd_log_private_clock_func( fd_log_private_clock_args );
 }
@@ -77,8 +79,8 @@ fd_log_wallclock_host( void const * _ ) {
   ULARGE_INTEGER ui;
   ui.LowPart  = ft.dwLowDateTime;
   ui.HighPart = ft.dwHighDateTime;
-  long unix_offset_ns = 116444736000000000L;
-  return (long)(ui.QuadPart * 100L - unix_offset_ns);
+  long long offset_ns = 116444736000000000LL;
+  return (long)( ui.QuadPart * 100LL - offset_ns );
 }
 
 void
@@ -294,21 +296,19 @@ fd_log_group_id_query( ulong group_id ) {
 
 ulong
 fd_log_private_main_stack_sz( void ) {
-  /* Estimate stack size via the stack frame pointer.
-   * The stack grows downward, so the current frame pointer
-   * minus a typical stack reservation gives us an estimate.
-   * This is less precise than reading the TEB but avoids
-   * the winternl.h dependency which MinGW/MSYS2 often lacks. */
-  void const *fp = (void const *)&fp; /* &fp is on the stack */
-  ULONG64 top = 0UL;
-  ULONG64 bot = 0UL;
-
-  /* Try to read from TEB first (works with <winternl.h>) */
-  /* If that fails, use a conservative default */
-  (void)fp; /* unused but prevents optimizer from removing the frame */
-
   /* Conservative estimate: 1 MB minimum stack for tile process */
   return 1048576UL; /* 1 MB */
+}
+
+/* ── Stack discovery (from pthread) ───────────────────────────────────── */
+
+void
+fd_log_private_stack_discover( ulong stack_sz,
+                               ulong * opt_stack0,
+                               ulong * opt_stack1 ) {
+  (void)stack_sz;
+  *opt_stack0 = 0UL;
+  *opt_stack1 = 0UL;
 }
 
 /* ── Boot / Halt ──────────────────────────────────────────────────────── */
@@ -331,20 +331,48 @@ fd_log_private_boot( int *    pargc,
 
 void
 fd_log_private_boot_custom( ulong        app_id,
-                            int *        pargc,
-                            char ***     pargv,
-                            int          (* log_init )( char const ** ),
-                            ulong *      opt_thread_id,
-                            char const ** opt_thread_name,
-                            ulong        thread_cnt ) {
-  (void)pargc;
-  (void)pargv;
-  (void)log_init;
-  (void)opt_thread_id;
-  (void)opt_thread_name;
-  (void)thread_cnt;
+                            char const * app,
+                            ulong        thread_id,
+                            char const * thread,
+                            ulong        host_id,
+                            char const * host,
+                            ulong        cpu_id,
+                            char const * cpu,
+                            ulong        group_id,
+                            char const * group,
+                            ulong        tid,
+                            ulong        user_id,
+                            char const * user,
+                            int          dedup,
+                            int          colorize,
+                            int          level_logfile,
+                            int          level_stderr,
+                            int          level_flush,
+                            int          level_core,
+                            int          log_fd,
+                            char const * log_path ) {
+  (void)app;
+  (void)thread_id;
+  (void)thread;
+  (void)host_id;
+  (void)host;
+  (void)cpu_id;
+  (void)cpu;
+  (void)group_id;
+  (void)group;
+  (void)tid;
+  (void)user_id;
+  (void)user;
+  (void)dedup;
+  (void)colorize;
+  (void)level_logfile;
+  (void)level_stderr;
+  (void)level_flush;
+  (void)level_core;
+  (void)log_fd;
+  (void)log_path;
 
-  fd_log_private_boot( pargc, pargv );
+  fd_log_private_boot( NULL, NULL );
   fd_log_private_app_id_set( app_id );
 }
 
@@ -353,76 +381,69 @@ fd_log_private_halt( void ) {
   /* No-op on Windows (no persistent state to clean up) */
 }
 
-/* ── fd_log_private_0 / fd_log_private_2 stubs ────────────────────────── */
+/* ── fd_log_private_0 / fd_log_private_1 / fd_log_private_2 / hexdump / fprintf ── */
 
-/*
- * These are the real formatting functions that produce the log message string.
- * On Windows, we provide minimal implementations that write to stderr.
- */
-
-long
+char const *
 fd_log_private_0( char const * fmt,
                   ... ) {
+  static char buf[ 4096 ];
   va_list args;
   va_start( args, fmt );
-  char buf[ 4096 ];
   vsnprintf( buf, sizeof(buf), fmt, args );
   va_end( args );
-  return (long)strlen( buf );
+  return buf;
 }
 
-long
+void
 fd_log_private_1( int          level,
-                  long         wallclock,
-                  char const * file_name,
+                  long         now,
+                  char const * file,
                   int          line,
-                  char const * func_name,
-                  long         fmt0 ) {
+                  char const * func,
+                  char const * msg ) {
   (void)level;
-  (void)wallclock;
-  (void)file_name;
+  (void)now;
+  (void)file;
   (void)line;
-  (void)func_name;
-  (void)fmt0;
+  (void)func;
+  (void)msg;
   /* No-op: actual log output deferred to fd_log_private_1_formatted */
-  return 0L;
 }
 
 void
 fd_log_private_2( int          level,
-                  long         wallclock,
-                  char const * file_name,
+                  long         now,
+                  char const * file,
                   int          line,
-                  char const * func_name,
-                  long         fmt0 ) {
+                  char const * func,
+                  char const * msg ) {
   (void)level;
-  (void)wallclock;
-  (void)file_name;
+  (void)now;
+  (void)file;
   (void)line;
-  (void)func_name;
-  (void)fmt0;
+  (void)func;
+  (void)msg;
   /* No-op: actual log output deferred to fd_log_private_2_formatted */
 }
 
-long
-fd_log_private_hexdump_msg( char const * desc,
-                            void const * data,
-                            ulong        data_sz ) {
-  (void)desc;
-  (void)data;
-  (void)data_sz;
-  return 0L;
+char const *
+fd_log_private_hexdump_msg( char const * tag,
+                            void const * mem,
+                            ulong        sz ) {
+  (void)tag;
+  (void)mem;
+  (void)sz;
+  return "";
 }
 
-long
+void
 fd_log_private_fprintf_0( int     fd,
                           char const * fmt,
                           ... ) {
   va_list args;
   va_start( args, fmt );
-  long sz = vfprintf( fd==1 ? stdout : stderr, fmt, args );
+  vfprintf( fd==1 ? stdout : stderr, fmt, args );
   va_end( args );
-  return sz;
 }
 
 #endif /* FD_HAS_WINDOWS */

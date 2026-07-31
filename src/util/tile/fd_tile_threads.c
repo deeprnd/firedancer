@@ -7,9 +7,14 @@
 
 #include <ctype.h>
 #include <errno.h>
+#if !FD_HAS_WINDOWS
 #include <pthread.h>
 #include <unistd.h>
 #include <sched.h>
+#else
+#include <windows.h>
+#include <process.h>
+#endif
 #if defined(__linux__)
 #include <syscall.h>
 #include <sys/prctl.h>
