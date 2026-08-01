@@ -2300,8 +2300,12 @@ fn addWindowsLibUuidStub(b: *std.Build, step: *std.Build.Step.Compile) void {
     var create_lib = b.addSystemCommand(&args);
     create_lib.step.dependOn(&compile_stub.step);
 
-    // Step 4: add libuuid.a to the link search path
-    step.root_module.addLibraryPath(.{ .cwd_relative = stub_dir });
+    // Connect the stub library to the build graph so it's generated before linking.
+    step.step.dependOn(&create_lib.step);
+
+    // Step 4: add libuuid.a to the link search path.
+    // Use the absolute path so the linker finds the .a file where the archiver wrote it.
+    step.root_module.addLibraryPath(.{ .cwd_relative = std.fs.path.dirname(stub_a_path).? });
     step.root_module.linkSystemLibrary("libuuid", .{});
 }
 
