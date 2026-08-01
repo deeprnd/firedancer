@@ -1,4 +1,6 @@
+#if FD_HAS_LINUX
 #define _GNU_SOURCE
+#endif
 #include "topo_run_platform.h"
 
 #include "../../../disco/events/fd_event_report.h"
