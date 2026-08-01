@@ -237,6 +237,13 @@
 /* FD_LOG_STDOUT(()) is used for writing formatted messages to STDOUT, it does not
    take a lock and might interleave with other messages to the same pipe.  It
    should only be used for command output. */
+
+/* STDOUT_FILENO from <unistd.h> on POSIX; provide fallback on Windows
+   where <unistd.h> is unavailable. */
+#if !defined(STDOUT_FILENO)
+#define STDOUT_FILENO 1
+#endif
+
 #define FD_LOG_STDOUT(a) do { fd_log_private_fprintf_0( STDOUT_FILENO, "%s", fd_log_private_0 a ); } while(0)
 
 /* FD_CHECK_ERR is a single statement that evaluates c and, if c

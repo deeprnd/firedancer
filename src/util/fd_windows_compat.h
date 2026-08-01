@@ -12,6 +12,11 @@
 #define snprintf    _snprintf
 #define vsnprintf   _vsnprintf
 
+/* STDOUT_FILENO — Windows CRT uses _fileno(stderr), but the numeric
+   value is the same on both platforms. Provide it here so
+   fd_log.h can use FD_LOG_STDOUT() without including <unistd.h>. */
+#define STDOUT_FILENO 1
+
 /* Windows CRT errno helper — returns EOPNOTSUPP for unsupported
    POSIX features in Windows stub code. */
 #include <errno.h>
