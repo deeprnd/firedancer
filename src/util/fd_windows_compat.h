@@ -15,12 +15,19 @@
 /* STDOUT_FILENO — Windows CRT uses _fileno(stderr), but the numeric
    value is the same on both platforms. Provide it here so
    fd_log.h can use FD_LOG_STDOUT() without including <unistd.h>. */
+#if !defined(STDOUT_FILENO)
 #define STDOUT_FILENO 1
+#endif
 
 /* POSIX file permission mode bits — Windows doesn't expose these
-   in sys/stat.h. Provide them here for consistency. */
+   in sys/stat.h. Provide fallbacks on all platforms so code that
+   uses S_IRUSR/S_IWUSR compiles regardless of _XOPEN_SOURCE level. */
+#if !defined(S_IRUSR)
 #define S_IRUSR 0600
+#endif
+#if !defined(S_IWUSR)
 #define S_IWUSR 0600
+#endif
 
 /* Windows CRT errno helper — returns EOPNOTSUPP for unsupported
    POSIX features in Windows stub code. */
