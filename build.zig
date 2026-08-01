@@ -424,7 +424,7 @@ pub fn build(b: *std.Build) void {
         addTickoniTopoRunShims(b, exe);
         addTickoniTileRunShim(b, exe);
     }
-    linkTickoniSystemLibraries(exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" }, b);
+    linkTickoniSystemLibraries(exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" });
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -1744,7 +1744,7 @@ pub fn build(b: *std.Build) void {
     if (target.result.os.tag == .windows) {
         cli_exe.root_module.linkLibrary(addTickoniCodecShimLibrary(b, target, optimize, "tickoni-codec-shims"));
         addWindowsFdManifestFixups(b, cli_exe, b.fmt("{s}/fd_windows_zig_codec_link.txt", .{fd_lib_dir}));
-        linkTickoniSystemLibraries(cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" }, b);
+        linkTickoniSystemLibraries(cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
         cli_exe.root_module.linkSystemLibrary("crypt32", .{});
     } else {
         linkTickoniCodec(b, cli_exe, fd_lib_dir);
@@ -2069,7 +2069,7 @@ fn shimCFlagsFor(target_os: std.Target.Os.Tag) []const []const u8 {
 
 fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniFiredancerShims(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_tango", "fd_util" }, b);
+    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_tango", "fd_util" });
 }
 
 fn addTickoniFiredancerShims(b: *std.Build, step: *std.Build.Step.Compile) void {
@@ -2088,7 +2088,7 @@ fn addTickoniFiredancerShims(b: *std.Build, step: *std.Build.Step.Compile) void 
     });
 }
 
-fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const u8, libs: []const []const u8, b: *std.Build) void {
+fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const u8, libs: []const []const u8) void {
     step.root_module.addLibraryPath(.{ .cwd_relative = fd_lib_dir });
     for (libs) |lib| step.root_module.linkSystemLibrary(lib, .{});
     if (step.root_module.resolved_target.?.result.os.tag == .windows) {
@@ -2097,13 +2097,6 @@ fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const
         // closure so later unresolveds can pull additional members from the
         // same Firedancer archives.
         for (libs) |lib| step.root_module.linkSystemLibrary(lib, .{});
-        // RocksDB Windows port (opt/git/rocksdb/port/win/port_win.cc) calls
-        // UuidCreateSequential() which requires the Windows RPC runtime.
-        // On Windows the library is rpcrt4.lib (not libuuid.a).
-        step.root_module.linkSystemLibrary("rpcrt4", .{});
-        // Pre-built RocksDB static lib from Linux depends on libuuid.a.
-        // Inject a stub so lld-link can resolve it.
-        addWindowsLibUuidStub(b, step);
     }
     step.root_module.linkSystemLibrary("stdc++", .{});
 }
@@ -2118,7 +2111,7 @@ fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const
 /// src/disco/topo/Local.mk's own test_topob unit test.
 fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniTopoRunShims(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" }, b);
+    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
 }
 
 fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
@@ -2150,7 +2143,7 @@ fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
 /// linkTickoniFiredancer and linkTickoniTopoRun.
 fn linkTickoniTileRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniTileRunShim(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" }, b);
+    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
 }
 
 fn addTickoniTileRunShim(b: *std.Build, step: *std.Build.Step.Compile) void {
@@ -2226,8 +2219,6 @@ fn addTickoniCodecShimLibrary(
 fn addWindowsFdManifestFixups(b: *std.Build, step: *std.Build.Step.Compile, manifest_path: []const u8) void {
     if (step.root_module.resolved_target.?.result.os.tag != .windows) return;
 
-    addWindowsLibUuidStub(b, step);
-
     // Read and apply Windows FD manifest fixups
     var threaded = std.Io.Threaded.init_single_threaded;
     const manifest = std.Io.Dir.cwd().readFileAlloc(
@@ -2246,75 +2237,12 @@ fn addWindowsFdManifestFixups(b: *std.Build, step: *std.Build.Step.Compile, mani
     }
 }
 
-/// Creates a libuuid.a stub so lld-link can resolve references from
-/// the pre-built RocksDB static lib (librocksdb.a), which was built
-/// on Linux and depends on libuuid.a.  The actual UUID functions are
-/// supplied by rpcrt4.lib on Windows (added in
-/// linkTickoniSystemLibraries).  We compile a stub .obj, archive it
-/// as libuuid.a using 'ar', and add the archive to the lib search path.
-fn addWindowsLibUuidStub(b: *std.Build, step: *std.Build.Step.Compile) void {
-    // Use b.cache_root.path.? to construct the stub directory path.
-    // b.cache_root is always Build.Cache.Directory (unlike b.build_root
-    // which is []const u8 in Zig 0.16.0 CI and Build.Cache.Directory locally).
-    const stub_dir = b.cache_root.join(b.allocator, &.{ ".zig-stub-uuid" }) catch @panic("OOM");
-    defer b.allocator.free(stub_dir);
-    const stub_file_name = "libuuid_stub.c";
-    const stub_file_path = b.cache_root.join(b.allocator, &.{ ".zig-stub-uuid", stub_file_name }) catch @panic("OOM");
-    defer b.allocator.free(stub_file_path);
-    const stub_obj_path = b.cache_root.join(b.allocator, &.{ ".zig-stub-uuid", "libuuid_stub.obj" }) catch @panic("OOM");
-    defer b.allocator.free(stub_obj_path);
-
-    // Step 1: write stub C source
-    const uuid_stub_c =
-        \\#include <stdint.h>
-        \\
-        \\int uuid_generate(char *out) { (void)out; return 0; }
-        \\int uuid_generate_time(char *out) { (void)out; return 0; }
-        \\int uuid_generate_random(char *out) { (void)out; return 0; }
-        \\int uuid_unpack(const void *in, struct uu *uu) { (void)in; (void)uu; return 0; }
-        \\int uuid_compare(const void *u1, const void *u2) { (void)u1; (void)u2; return 0; }
-        \\int uuid_is_null(const void *uu) { (void)uu; return 0; }
-        \\int uuid_parse(const char *in, void *uu) { (void)in; (void)uu; return 0; }
-        \\void uuid_unparse(const void *uu, char *out) { (void)uu; (void)out; }
-    ;
-    var write_files = b.addWriteFiles();
-    _ = write_files.add(stub_file_name, uuid_stub_c);
-
-    // Step 2: compile stub to .obj using clang
-    const src_path = b.cache_root.join(b.allocator, &.{ "src" }) catch @panic("OOM");
-    defer b.allocator.free(src_path);
-    var compile_stub = b.addSystemCommand(&.{ "clang", "-c", stub_file_path, "-I", src_path, "-o", stub_obj_path });
-    compile_stub.step.dependOn(&write_files.step);
-
-    // Step 3: archive .obj into libuuid.a using llvm-lib (MSVC-style archiver)
-    // llvm-lib on Windows creates COFF archives which lld-link can read as .a files
-    // Use absolute path so the output lands in stub_dir (not CWD).
-    const stub_a_path = b.cache_root.join(b.allocator, &.{ ".zig-stub-uuid", "libuuid.a" }) catch @panic("OOM");
-    defer b.allocator.free(stub_a_path);
-
-    // Build the /OUT: argument dynamically since stub_a_path is runtime.
-    const out_arg = std.fmt.allocPrint(b.allocator, "/OUT:{s}", .{stub_a_path}) catch @panic("OOM");
-    defer b.allocator.free(out_arg);
-
-    var args = [_][]const u8{ "llvm-lib", out_arg, stub_obj_path };
-    var create_lib = b.addSystemCommand(&args);
-    create_lib.step.dependOn(&compile_stub.step);
-
-    // Connect the stub library to the build graph so it's generated before linking.
-    step.step.dependOn(&create_lib.step);
-
-    // Step 4: add libuuid.a to the link search path.
-    // Use the absolute path so the linker finds the .a file where the archiver wrote it.
-    step.root_module.addLibraryPath(.{ .cwd_relative = std.fs.path.dirname(stub_a_path).? });
-    step.root_module.linkSystemLibrary("libuuid", .{});
-}
-
 /// Links shim/ballet.c (Firedancer siphash/protobuf/JSON primitives). Audit
 /// and canonical consumer-money hash codec logic is Zig; see
 /// src/tickoni/codec/audit.zig and src/tickoni/codec/thesis.zig.
 fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniCodecShim(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_ballet", "fd_util" }, b);
+    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
 }
 
 fn addTickoniCodecShim(b: *std.Build, step: *std.Build.Step.Compile) void {
