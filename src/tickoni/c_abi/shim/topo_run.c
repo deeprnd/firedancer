@@ -5,7 +5,10 @@
    via topo_run_platform.h. The orchestration below stays identical across
    Linux and macOS; only the leaf operations vary. */
 
+#if FD_HAS_LINUX
 #define _GNU_SOURCE
+#endif
+
 #include "../../../util/fd_util.h"
 #include "../../../disco/events/fd_event_report.h"
 #include "../../../disco/metrics/fd_metrics.h"
