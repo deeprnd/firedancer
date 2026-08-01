@@ -2250,12 +2250,11 @@ fn addWindowsFdManifestFixups(b: *std.Build, step: *std.Build.Step.Compile, mani
 /// linkTickoniSystemLibraries).  We compile a stub .obj, archive it
 /// as libuuid.a using 'ar', and add the archive to the lib search path.
 fn addWindowsLibUuidStub(b: *std.Build, step: *std.Build.Step.Compile) void {
-    const stub_dir = b.cacheRootPath(.{ .cwd_relative = ".zig-stub-uuid" }) orelse
-        b.fmt("{s}/.zig-stub-uuid", .{b.build_root.path.?});
+    const stub_root = b.build_root.path.?.path;
+    const stub_dir = b.fmt("{s}/.zig-stub-uuid", .{stub_root});
     const stub_file_name = "libuuid_stub.c";
     const stub_file_path = b.fmt("{s}/{s}", .{ stub_dir, stub_file_name });
     const stub_obj_path = b.fmt("{s}/libuuid_stub.obj", .{ stub_dir });
-    const stub_lib_path = b.fmt("{s}/libuuid.a", .{ stub_dir });
 
     // Step 1: write stub C source
     const uuid_stub_c =
