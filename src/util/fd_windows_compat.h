@@ -17,6 +17,11 @@
    fd_log.h can use FD_LOG_STDOUT() without including <unistd.h>. */
 #define STDOUT_FILENO 1
 
+/* POSIX file permission mode bits — Windows doesn't expose these
+   in sys/stat.h. Provide them here for consistency. */
+#define S_IRUSR 0600
+#define S_IWUSR 0600
+
 /* Windows CRT errno helper — returns EOPNOTSUPP for unsupported
    POSIX features in Windows stub code. */
 #include <errno.h>

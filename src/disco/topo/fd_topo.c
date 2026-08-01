@@ -5,6 +5,8 @@
 #include "../../util/wksp/fd_wksp_private.h"
 #include "../../util/shmem/fd_shmem_private.h"
 
+#include "../../util/fd_windows_compat.h"
+
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
