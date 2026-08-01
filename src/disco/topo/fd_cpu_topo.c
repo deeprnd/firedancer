@@ -1,3 +1,5 @@
+#if !FD_HAS_WINDOWS
+
 #include "fd_cpu_topo.h"
 
 #include "../../util/shmem/fd_shmem_private.h"
@@ -80,3 +82,24 @@ fd_topo_cpus_printf( fd_topo_cpus_t * cpus ) {
     FD_LOG_NOTICE(( "cpu%lu: online=%i sibling=%lu numa_node=%lu", i, cpus->cpu[ i ].online, cpus->cpu[ i ].sibling, cpus->cpu[ i ].numa_node ));
   }
 }
+
+#else /* FD_HAS_WINDOWS */
+
+#include "fd_cpu_topo.h"
+
+void
+fd_topo_cpus_init( fd_topo_cpus_t * cpus ) {
+  cpus->numa_node_cnt = 1UL;
+  cpus->cpu_cnt = 1UL;
+  cpus->cpu[0].idx = 0UL;
+  cpus->cpu[0].online = 1;
+  cpus->cpu[0].numa_node = 0UL;
+  cpus->cpu[0].sibling = ULONG_MAX;
+}
+
+void
+fd_topo_cpus_printf( fd_topo_cpus_t * cpus ) {
+  FD_LOG_NOTICE(( "cpu0: online=1 sibling=%lu numa_node=0", cpus->cpu[0].sibling ));
+}
+
+#endif /* FD_HAS_WINDOWS */
