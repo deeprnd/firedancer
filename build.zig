@@ -2278,7 +2278,9 @@ fn addWindowsLibUuidStub(b: *std.Build, step: *std.Build.Step.Compile) void {
     _ = write_files.add(stub_file_name, uuid_stub_c);
 
     // Step 2: compile stub to .obj using clang
-    var compile_stub = b.addSystemCommand(&.{ "clang", "-c", stub_file_path, "-I", b.path("src").path.?, "-o", stub_obj_path });
+    const src_path = b.cache_root.join(b.allocator, &.{ "src" }) catch @panic("OOM");
+    defer b.allocator.free(src_path);
+    var compile_stub = b.addSystemCommand(&.{ "clang", "-c", stub_file_path, "-I", src_path, "-o", stub_obj_path });
     compile_stub.step.dependOn(&write_files.step);
 
     // Step 3: archive .obj into libuuid.a using llvm-lib (MSVC-style archiver)
