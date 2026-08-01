@@ -2278,8 +2278,9 @@ fn addWindowsLibUuidStub(b: *std.Build, step: *std.Build.Step.Compile) void {
     compile_stub.step.dependOn(&write_files.step);
     compile_stub.addIncludePath(b.path("src"));
 
-    // Step 3: archive .obj into libuuid.a using 'ar' (MinGW/MSYS2 ar)
-    var create_lib = b.addSystemCommand(&.{ "ar", "rcs", "libuuid.a", "libuuid_stub.obj" });
+    // Step 3: archive .obj into libuuid.a using llvm-lib (MSVC-style archiver)
+    // llvm-lib on Windows creates COFF archives which lld-link can read as .a files
+    var create_lib = b.addSystemCommand(&.{ "llvm-lib", "/OUT:libuuid.a", "libuuid_stub.obj" });
     create_lib.step.dependOn(&compile_stub.step);
 
     // Step 4: add libuuid.a to the link search path
