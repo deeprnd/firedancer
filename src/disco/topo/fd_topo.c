@@ -7,7 +7,6 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include <unistd.h>
 #include <limits.h>
 #include <sys/stat.h>
 
