@@ -2223,6 +2223,42 @@ fn addTickoniCodecShimLibrary(
 fn addWindowsFdManifestFixups(b: *std.Build, step: *std.Build.Step.Compile, manifest_path: []const u8) void {
     if (step.root_module.resolved_target.?.result.os.tag != .windows) return;
 
+    // Create a libuuid.a stub so lld-link can resolve references from
+    // the pre-built RocksDB static lib (librocksdb.a), which was built
+    // on Linux and depends on libuuid.a.  The UUID functions are
+    // supplied by rpcrt4.lib on Windows (added in
+    // linkTickoniSystemLibraries).  We compile a stub .obj and add it
+    // to the step as an object file — no separate archiver needed.
+    const uuid_stub_c =
+        \\#include <stdint.h>
+        \\
+        \\int uuid_generate(char *out) { (void)out; return 0; }
+        \\int uuid_generate_time(char *out) { (void)out; return 0; }
+        \\int uuid_generate_random(char *out) { (void)out; return 0; }
+        \\int uuid_unpack(const void *in, struct uu *uu) { (void)in; (void)uu; return 0; }
+        \\int uuid_compare(const void *u1, const void *u2) { (void)u1; (void)u2; return 0; }
+        \\int uuid_is_null(const void *uu) { (void)uu; return 0; }
+        \\int uuid_parse(const char *in, void *uu) { (void)in; (void)uu; return 0; }
+        \\void uuid_unparse(const void *uu, char *out) { (void)uu; (void)out; }
+    ;
+
+    // Step 1: write stub source to a temp dir
+    const stub_dir = b.cacheRootPath(.{ .cwd_relative = ".zig-stub-uuid" }) orelse
+        b.fmt("{s}/.zig-stub-uuid", .{b.build_root.path.?});
+    const stub_file_name = "libuuid_stub.c";
+    const stub_file_path = b.fmt("{s}/{s}", .{ stub_dir, stub_file_name });
+    var write_files = b.addWriteFiles();
+    _ = write_files.add(stub_file_name, uuid_stub_c);
+
+    // Step 2: compile stub to .obj using clang directly (no Zig addCompile)
+    const clang_cmd = b.addSystemCommand(&.{ "clang", "-c", stub_file_path, "-o", b.fmt("{s}/libuuid_stub.obj", .{stub_dir}) });
+    clang_cmd.step.dependOn(&write_files.step);
+    clang_cmd.addIncludePath(b.path("src"));
+
+    // Step 3: add the stub .obj to the link step
+    step.root_module.addObjectFile(.{ .cwd_relative = b.fmt("{s}/libuuid_stub.obj", .{stub_dir}) });
+
+    // Step 4: read and apply Windows FD manifest fixups
     var threaded = std.Io.Threaded.init_single_threaded;
     const manifest = std.Io.Dir.cwd().readFileAlloc(
         threaded.io(),
