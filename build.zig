@@ -2097,6 +2097,10 @@ fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const
         // closure so later unresolveds can pull additional members from the
         // same Firedancer archives.
         for (libs) |lib| step.root_module.linkSystemLibrary(lib, .{});
+        // RocksDB Windows port (opt/git/rocksdb/port/win/port_win.cc) calls
+        // UuidCreateSequential() which requires the Windows RPC runtime.
+        // On Windows the library is rpcrt4.lib (not libuuid.a).
+        step.root_module.linkSystemLibrary("rpcrt4", .{});
     }
     step.root_module.linkSystemLibrary("stdc++", .{});
 }
