@@ -2250,11 +2250,16 @@ fn addWindowsFdManifestFixups(b: *std.Build, step: *std.Build.Step.Compile, mani
 /// linkTickoniSystemLibraries).  We compile a stub .obj, archive it
 /// as libuuid.a using 'ar', and add the archive to the lib search path.
 fn addWindowsLibUuidStub(b: *std.Build, step: *std.Build.Step.Compile) void {
-    const stub_root = b.build_root.path.?.path;
-    const stub_dir = b.fmt("{s}/.zig-stub-uuid", .{stub_root});
+    // Use b.cache_root.path.? to construct the stub directory path.
+    // b.cache_root is always Build.Cache.Directory (unlike b.build_root
+    // which is []const u8 in Zig 0.16.0 CI and Build.Cache.Directory locally).
+    const stub_dir = b.cache_root.join(b.allocator, &.{ ".zig-stub-uuid" }) catch @panic("OOM");
+    defer b.allocator.free(stub_dir);
     const stub_file_name = "libuuid_stub.c";
-    const stub_file_path = b.fmt("{s}/{s}", .{ stub_dir, stub_file_name });
-    const stub_obj_path = b.fmt("{s}/libuuid_stub.obj", .{ stub_dir });
+    const stub_file_path = b.cache_root.join(b.allocator, &.{ ".zig-stub-uuid", stub_file_name }) catch @panic("OOM");
+    defer b.allocator.free(stub_file_path);
+    const stub_obj_path = b.cache_root.join(b.allocator, &.{ ".zig-stub-uuid", "libuuid_stub.obj" }) catch @panic("OOM");
+    defer b.allocator.free(stub_obj_path);
 
     // Step 1: write stub C source
     const uuid_stub_c =
@@ -2273,9 +2278,8 @@ fn addWindowsLibUuidStub(b: *std.Build, step: *std.Build.Step.Compile) void {
     _ = write_files.add(stub_file_name, uuid_stub_c);
 
     // Step 2: compile stub to .obj using clang
-    var compile_stub = b.addSystemCommand(&.{ "clang", "-c", stub_file_path, "-o", stub_obj_path });
+    var compile_stub = b.addSystemCommand(&.{ "clang", "-c", stub_file_path, "-I", b.path("src").path.?, "-o", stub_obj_path });
     compile_stub.step.dependOn(&write_files.step);
-    compile_stub.addIncludePath(b.path("src"));
 
     // Step 3: archive .obj into libuuid.a using llvm-lib (MSVC-style archiver)
     // llvm-lib on Windows creates COFF archives which lld-link can read as .a files
