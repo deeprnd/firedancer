@@ -596,7 +596,6 @@ pub fn build(b: *std.Build) void {
             "tile_run.c",
             "ballet.c",
             "libuuid_stub.c",
-            "compiler_version.c",
         };
         const shim_flags = shimCFlagsFor(target.result.os.tag);
         const arch_name = switch (target.result.cpu.arch) {
