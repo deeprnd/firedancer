@@ -585,7 +585,6 @@ pub fn build(b: *std.Build) void {
         // prints errors to stdout (not stderr) so CI can surface them. Zig's
         // C compiler writes to stderr via --listen=- which CI captures as
         // opaque; this step forces compilation output into stdout.
-        const c_compile_check_step = b.step("check-c-compile", "Compile-check all C shim files and print errors to stdout");
         const shim_c_files = &.{
             "tango.c",
             "util.c",
@@ -623,6 +622,7 @@ pub fn build(b: *std.Build) void {
             b.fmt("{s}-{s}-{s}", .{ arch_name, os_name, abi_name })
         else
             b.fmt("{s}-{s}", .{ arch_name, os_name });
+        const c_compile_check_step = b.step("check-c-compile", "Compile-check all C shim files and print errors to stdout");
         inline for (shim_c_files) |shim_file| {
             const c_check = b.addSystemCommand(&.{
                 "sh", "-c",
@@ -636,6 +636,7 @@ pub fn build(b: *std.Build) void {
         }
 
         const test_step = b.step("test", "Run offline Tickoni unit tests");
+        test_step.dependOn(c_compile_check_step);
 
         // Files with no cross-module imports: standalone test binaries.
         for ([_][]const u8{
