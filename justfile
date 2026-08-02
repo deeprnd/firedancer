@@ -256,7 +256,7 @@ test-unit-fd:
 # No running servers belong here.
 test-unit-tk:
 	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all || exit $$?
-ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
 
 # Print computed hash and wire bytes for every audit fixture event, and emit audit JSONL.
 # Use the output to understand or snapshot the current encoding after intentional changes.
@@ -289,13 +289,13 @@ test-integration-tk:
 test-unit-tk-windows-x86:
 	just build-fd-windows-x86
 	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all || exit $$?
-ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
 
 # Windows ARM64 unit test: build FD libs for Windows ARM64, then run Zig tests.
 test-unit-tk-windows-arm:
 	just build-fd-windows-arm
 	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all || exit $$?
-ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
 
 # Windows x86_64 integration test: build FD libs for Windows x86_64, then run Zig integration tests.
 test-integration-tk-windows-x86:
