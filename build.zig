@@ -580,6 +580,61 @@ pub fn build(b: *std.Build) void {
         // Pure logic and fixture/mock-backed proofs belong here; no running servers.
         // Run with: zig build -Dtest=true test
         // ---------------------------------------------------------------------------
+
+        // Diagnostic C compile-check: compiles each shim file individually and
+        // prints errors to stdout (not stderr) so CI can surface them. Zig's
+        // C compiler writes to stderr via --listen=- which CI captures as
+        // opaque; this step forces compilation output into stdout.
+        const c_compile_check_step = b.step("check-c-compile", "Compile-check all C shim files and print errors to stdout");
+        const shim_c_files = &.{
+            "tango.c",
+            "util.c",
+            "wksp.c",
+            "sandbox.c",
+            "os.c",
+            "topo_run.c",
+            "topob.c",
+            "tile_run.c",
+            "ballet.c",
+            "libuuid_stub.c",
+        };
+        const shim_flags = shimCFlagsFor(target.result.os.tag);
+        const arch_name = switch (target.result.cpu.arch) {
+            .x86_64 => "x86_64",
+            .aarch64 => "aarch64",
+            .x86 => "x86",
+            .arm => "arm",
+            else => b.fmt("{s}", .{@tagName(target.result.cpu.arch)}),
+        };
+        const os_name = switch (target.result.os.tag) {
+            .linux => "linux",
+            .windows => "windows",
+            .macos => "darwin",
+            else => b.fmt("{s}", .{@tagName(target.result.os.tag)}),
+        };
+        const abi_name = switch (target.result.abi) {
+            .gnu => "gnu",
+            .gnuabi64 => "gnu",
+            .musl => "musl",
+            .msvc => "msvc",
+            else => "",
+        };
+        const triple = if (abi_name.len > 0)
+            b.fmt("{s}-{s}-{s}", .{ arch_name, os_name, abi_name })
+        else
+            b.fmt("{s}-{s}", .{ arch_name, os_name });
+        inline for (shim_c_files) |shim_file| {
+            const c_check = b.addSystemCommand(&.{
+                "sh", "-c",
+                b.fmt("zig cc -target {s} -c -I src -std=c17 -UBMI2 -ULZCNT -DFD_HAS_HOSTED=1 {s} {s} 2>&1 || true", .{
+                    triple,
+                    shim_flags[0],
+                    b.fmt("src/tickoni/c_abi/shim/{s}", .{shim_file}),
+                }),
+            });
+            c_compile_check_step.dependOn(&c_check.step);
+        }
+
         const test_step = b.step("test", "Run offline Tickoni unit tests");
 
         // Files with no cross-module imports: standalone test binaries.
