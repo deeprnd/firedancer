@@ -424,7 +424,7 @@ pub fn build(b: *std.Build) void {
         addTickoniTopoRunShims(b, exe);
         addTickoniTileRunShim(b, exe);
     }
-    linkTickoniSystemLibraries(exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" });
+    linkTickoniSystemLibraries(b, exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" });
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -1770,7 +1770,7 @@ pub fn build(b: *std.Build) void {
     if (target.result.os.tag == .windows) {
         cli_exe.root_module.linkLibrary(addTickoniCodecShimLibrary(b, target, optimize, "tickoni-codec-shims"));
         addWindowsFdManifestFixups(b, cli_exe, b.fmt("{s}/fd_windows_zig_codec_link.txt", .{fd_lib_dir}));
-        linkTickoniSystemLibraries(cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
+        linkTickoniSystemLibraries(b, cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
         cli_exe.root_module.linkSystemLibrary("crypt32", .{});
     } else {
         linkTickoniCodec(b, cli_exe, fd_lib_dir);
@@ -2095,7 +2095,7 @@ fn shimCFlagsFor(target_os: std.Target.Os.Tag) []const []const u8 {
 
 fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniFiredancerShims(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_tango", "fd_util" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_tango", "fd_util" });
 }
 
 fn addTickoniFiredancerShims(b: *std.Build, step: *std.Build.Step.Compile) void {
@@ -2114,7 +2114,7 @@ fn addTickoniFiredancerShims(b: *std.Build, step: *std.Build.Step.Compile) void 
     });
 }
 
-fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const u8, libs: []const []const u8) void {
+fn linkTickoniSystemLibraries(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8, libs: []const []const u8) void {
     step.root_module.addLibraryPath(.{ .cwd_relative = fd_lib_dir });
     for (libs) |lib| step.root_module.linkSystemLibrary(lib, .{});
     if (step.root_module.resolved_target.?.result.os.tag == .windows) {
@@ -2123,6 +2123,12 @@ fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const
         // closure so later unresolveds can pull additional members from the
         // same Firedancer archives.
         for (libs) |lib| step.root_module.linkSystemLibrary(lib, .{});
+        // Windows prebuilt FD libs (from CI) carry RocksDB metadata that
+        // references libuuid.a — add the stub source so the symbol is present.
+        step.root_module.addCSourceFile(.{
+            .file = b.path("src/tickoni/c_abi/shim/libuuid_stub.c"),
+            .flags = shimCFlagsFor(.windows),
+        });
     }
     step.root_module.linkSystemLibrary("stdc++", .{});
 }
@@ -2137,7 +2143,7 @@ fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const
 /// src/disco/topo/Local.mk's own test_topob unit test.
 fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniTopoRunShims(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
 }
 
 fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
@@ -2169,7 +2175,7 @@ fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
 /// linkTickoniFiredancer and linkTickoniTopoRun.
 fn linkTickoniTileRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniTileRunShim(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
 }
 
 fn addTickoniTileRunShim(b: *std.Build, step: *std.Build.Step.Compile) void {
