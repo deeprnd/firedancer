@@ -1609,6 +1609,31 @@ pub fn build(b: *std.Build) void {
         });
         test_step.dependOn(&mock_servers_test.step);
 
+        // run-tests — all unit tests compile with `zig build test`; this step
+        // executes them.  CI uses the two-phase sequence: `zig build test`
+        // first (errors are visible), then `zig build run-tests` (exit codes).
+        const run_tests_step = b.step("run-tests", "Run all compiled Tickoni unit tests");
+        const unit_tests = .{
+            version_test, doctor_checks_test, doctor_output_test,
+            demo_manifest_test, demo_preflight_test, demo_diagnostic_test,
+            demo_conformance_test, demo_comparator_test, demo_runner_test,
+            demo_substitution_test, thesis_codec_test, thesis_test,
+            catalog_test, catalog_schema_test, basket_test, portfolio_test,
+            fixture_portfolio_test, model_messages_test, mock_model_test,
+            link_handles_test, link_types_test, boot_test, cnc_counters_test,
+            cpu_placement_test, launch_spec_test, topology_spec_test,
+            topo_run_test, topob_test, topo_build_test, model_test,
+            adapter_test, mock_adapter_test, trade_ticket_test, impact_test,
+            cards_test, drift_test, allowed_trade_fixture_test,
+            denied_trade_fixture_test, tool_test, agent_test, replay_test,
+            sup_test, tile_registry_test, topologies_test, investment_demo_test,
+            mock_servers_test,
+        };
+        inline for (unit_tests) |tt| {
+            const tt_run = b.addRunArtifact(tt);
+            run_tests_step.dependOn(&tt_run.step);
+        }
+
         const model_tile_http_test = b.addTest(.{
             .root_module = b.createModule(.{
                 .root_source_file = b.path("src/tickoni/test/integration/test_model_tile_http.zig"),
