@@ -14,19 +14,7 @@ const std = @import("std");
 
 
 pub fn build(b: *std.Build) void {
-    // When building on a Windows ARM64 host (GitHub Actions `windows-11-vs2026-arm`),
-    // the host target is `aarch64-windows-msvc` which Zig 0.16.0 does not support.
-    // Override to `aarch64-windows-gnu` (MinGW-w64) to avoid missing stdlib modules.
-    var default_target: std.Target.Query = .{};
-    const host_result = std.Target.current;
-    if (host_result.os.tag == .windows and host_result.cpu.arch == .aarch64) {
-        default_target.cpu_arch = .aarch64;
-        default_target.os_tag = .windows;
-        default_target.abi = .gnu;
-    }
-    const target = b.standardTargetOptions(.{
-        .default_target = default_target,
-    });
+    const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const fd_lib_dir = b.option([]const u8, "fd-lib-dir", "Firedancer lib dir (default: build/native/gcc/lib)") orelse "build/native/gcc/lib";
     const build_tests = b.option(bool, "test", "Compile and run Tickoni test binaries") orelse false;
