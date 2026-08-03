@@ -47,8 +47,12 @@ CPPFLAGS+=--target=$(WINDOWS_CLANG_TRIPLE)
 CPPFLAGS+=-march=skylake
 CPPFLAGS+=-DFD_HAS_X86=1 -DFD_HAS_SSE=1 -DFD_HAS_AVX=1 -DFD_HAS_AVX2=1 -DFD_HAS_AESNI=1 -DFD_IS_X86_64=1 -DFD_HAS_INT128=0 -DFD_HAS_DOUBLE=1 -DFD_HAS_ALLOCA=1 -DFD_HAS_ATOMIC=1
 else
-# Windows ARM64
-WINDOWS_CLANG_TRIPLE:=aarch64-pc-windows-gnu
+# Windows ARM64 — use aarch64-pc-windows-msvc (runner ships MSVC CRT headers).
+# The Zig build below this still overrides to aarch64-windows-gnu via build.zig
+# because Zig 0.16.0 doesn't define the MSVC target for ARM64. C and Zig are
+# compiled separately here; the C .a archives are ABI-compatible at the object
+# level regardless of CRT linkage.
+WINDOWS_CLANG_TRIPLE:=aarch64-pc-windows-msvc
 FD_HAS_ARM64:=1
 FD_HAS_INT128:=0
 FD_HAS_DOUBLE:=1
