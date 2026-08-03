@@ -49,7 +49,7 @@ printf '\n' | "$@" -march=native -E -dM - | awk '
     emit_feature( "FD_HAS_AESNI",   "__AES__" )
 
     # Older versions of GCC (<10) do not fully support AVX512.
-    if( !( "__GNUC__" in define && !( "__clang__" in define ) && define["__GNUC__"]<10 ) )
+    if( !("__GNUC__" in define && !("__clang__" in define) && define["__GNUC__"]<10) )
       emit_feature( "FD_HAS_AVX512", "__AVX512IFMA__" )
 
     print "FD_HAS_DOUBLE:=1"
@@ -57,6 +57,10 @@ printf '\n' | "$@" -march=native -E -dM - | awk '
     print "CPPFLAGS_NATIVE:="
     print "CPPFLAGS_NATIVE+=-march=native -mtune=native"
     print "CPPFLAGS_NATIVE+=-DFD_HAS_DOUBLE=1"
+    # Clang 18 has a bug where -march=native defaults -mavx10.1 to -256
+    # which is invalid; the combination +avx10.1-256 triggers
+    # [-Werror,-Winvalid-feature-combination]. Override to 512.
+    print "CPPFLAGS_NATIVE+=-mavx10.1-512"
     printf "%s", cppflags
   }
 ' > "$OUT"
