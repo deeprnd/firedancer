@@ -57,10 +57,13 @@ printf '\n' | "$@" -march=native -E -dM - | awk '
     print "CPPFLAGS_NATIVE:="
     print "CPPFLAGS_NATIVE+=-march=native -mtune=native"
     print "CPPFLAGS_NATIVE+=-DFD_HAS_DOUBLE=1"
-    # Clang 18 has a bug where -march=native defaults -mavx10.1 to -256
+    # Clang 18 has a bug where -march=native defaults -mavx10.1 to VL=256
     # which is invalid; the combination +avx10.1-256 triggers
     # [-Werror,-Winvalid-feature-combination]. Override to 512.
-    print "CPPFLAGS_NATIVE+=-mavx10.1-512"
+    # Gate on both __clang__ (Clang-only) and __x86_64__ (x86-only).
+    if( ("__clang__" in define && "__x86_64__" in define) ) {
+      print "CPPFLAGS_NATIVE+=-mavx10.1-512"
+    }
     printf "%s", cppflags
   }
 ' > "$OUT"
