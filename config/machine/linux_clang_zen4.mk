@@ -11,6 +11,8 @@ include config/extra/with-optimization.mk
 include config/extra/with-threads.mk
 
 CPPFLAGS+=-march=znver4 -mtune=znver4
+# Clang 18 defaults -mavx10.1 to VL=256 which is invalid with -Werror.
+CPPFLAGS+=-mavx10.1-512
 
 CPPFLAGS+=\
   -DFD_HAS_INT128=1 \
