@@ -18,7 +18,9 @@ pub fn build(b: *std.Build) void {
     // the host target is `aarch64-windows-msvc` which Zig 0.16.0 does not support.
     // Override to `aarch64-windows-gnu` (MinGW-w64) to avoid missing stdlib modules.
     var default_target: std.Target.Query = .{};
-    if (b.host.result.os.tag == .windows and b.host.result.cpu.arch == .aarch64) {
+    const host_cpu = std.Target.current.cpu.arch;
+    const host_os = std.Target.current.os.tag;
+    if (host_os == .windows and host_cpu == .aarch64) {
         default_target.cpu_arch = .aarch64;
         default_target.os_tag = .windows;
         default_target.abi = .gnu;
