@@ -305,9 +305,11 @@ test-integration-tk-windows-x86:
 	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # Windows ARM64 integration test: build FD libs for Windows ARM64, then run Zig integration tests.
+# Pass --target aarch64-windows-gnu because Zig 0.16.0 lacks
+# aarch64-windows-msvc support on ARM64 runners.
 test-integration-tk-windows-arm:
 	just build-fd-windows-arm
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build --target aarch64-windows-gnu -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # Deterministic offline investment conformance suite — fixture-backed, no llama.cpp required.
 test-demo-tk:
