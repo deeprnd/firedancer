@@ -34,6 +34,14 @@ inputs:
     description: Install Zig
     required: false
     default: 'false'
+  zig-bootstrap-ref:
+    description: zig-bootstrap ref or tag to build from
+    required: false
+    default: 'master'
+  zig-bootstrap-mcpu:
+    description: zig-bootstrap mcpu argument
+    required: false
+    default: 'baseline'
 
 runs:
   using: composite
@@ -54,11 +62,17 @@ runs:
       run: |
         .github/actions/setup-public-gh-runner/scripts/setup-windows.ps1 -AptPackages '${{ inputs.apt-packages }}' -InstallGnuMake -InstallGitleaks:('${{ inputs.gitleaks }}' -eq 'true') -GitleaksVersion '8.30.1' -InstallKcov:('${{ inputs.kcov }}' -eq 'true')
 
-    - name: Setup Zig
-      if: inputs.zig == 'true'
-      uses: mlugg/setup-zig@v2
-      with:
-        version: 0.16.0
+    - name: Setup Zig via zig-bootstrap (Windows)
+      if: inputs.zig == 'true' && runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        python "$env:GITHUB_WORKSPACE/contrib/install-zig-bootstrap.py" --bootstrap-ref '${{ inputs.zig-bootstrap-ref }}' --mcpu '${{ inputs.zig-bootstrap-mcpu }}'
+
+    - name: Setup Zig via zig-bootstrap (POSIX)
+      if: inputs.zig == 'true' && runner.os != 'Windows'
+      shell: bash
+      run: |
+        python3 "$GITHUB_WORKSPACE/contrib/install-zig-bootstrap.py" --bootstrap-ref '${{ inputs.zig-bootstrap-ref }}' --mcpu '${{ inputs.zig-bootstrap-mcpu }}'
 
     - name: Setup Python
       if: inputs.python-tools != ''
