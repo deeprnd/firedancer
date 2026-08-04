@@ -424,7 +424,7 @@ pub fn build(b: *std.Build) void {
         addTickoniTopoRunShims(b, exe);
         addTickoniTileRunShim(b, exe);
     }
-    linkTickoniSystemLibraries(b, exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" });
+    linkTickoniSystemLibraries(exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" });
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -1826,7 +1826,7 @@ pub fn build(b: *std.Build) void {
     if (target.result.os.tag == .windows) {
         cli_exe.root_module.linkLibrary(addTickoniCodecShimLibrary(b, target, optimize, "tickoni-codec-shims"));
         addWindowsFdManifestFixups(b, cli_exe, b.fmt("{s}/fd_windows_zig_codec_link.txt", .{fd_lib_dir}));
-        linkTickoniSystemLibraries(b, cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
+        linkTickoniSystemLibraries(cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
         cli_exe.root_module.linkSystemLibrary("crypt32", .{});
     } else {
         linkTickoniCodec(b, cli_exe, fd_lib_dir);
@@ -2151,7 +2151,7 @@ fn shimCFlagsFor(target_os: std.Target.Os.Tag) []const []const u8 {
 
 fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniFiredancerShims(b, step);
-    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_tango", "fd_util" });
+    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_tango", "fd_util" });
 }
 
 fn addTickoniFiredancerShims(b: *std.Build, step: *std.Build.Step.Compile) void {
@@ -2170,7 +2170,7 @@ fn addTickoniFiredancerShims(b: *std.Build, step: *std.Build.Step.Compile) void 
     });
 }
 
-fn linkTickoniSystemLibraries(_b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8, libs: []const []const u8) void {
+fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const u8, libs: []const []const u8) void {
     step.root_module.addLibraryPath(.{ .cwd_relative = fd_lib_dir });
     for (libs) |lib| step.root_module.linkSystemLibrary(lib, .{});
     if (step.root_module.resolved_target.?.result.os.tag == .windows) {
@@ -2198,7 +2198,7 @@ fn linkTickoniSystemLibraries(_b: *std.Build, step: *std.Build.Step.Compile, fd_
 /// src/disco/topo/Local.mk's own test_topob unit test.
 fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniTopoRunShims(b, step);
-    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
+    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
 }
 
 fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
@@ -2230,7 +2230,7 @@ fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
 /// linkTickoniFiredancer and linkTickoniTopoRun.
 fn linkTickoniTileRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniTileRunShim(b, step);
-    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
+    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
 }
 
 fn addTickoniTileRunShim(b: *std.Build, step: *std.Build.Step.Compile) void {
@@ -2329,7 +2329,7 @@ fn addWindowsFdManifestFixups(b: *std.Build, step: *std.Build.Step.Compile, mani
 /// src/tickoni/codec/audit.zig and src/tickoni/codec/thesis.zig.
 fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniCodecShim(b, step);
-    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
+    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
 }
 
 fn addTickoniCodecShim(b: *std.Build, step: *std.Build.Step.Compile) void {
