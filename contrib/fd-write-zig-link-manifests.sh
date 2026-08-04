@@ -17,6 +17,11 @@ write_manifest() {
   printf '%s\n' "$@" > "$path"
 }
 
+log_obj="build/${BUILDDIR}/obj/util/log/fd_log.o"
+if [ -f "build/${BUILDDIR}/obj/util/log/fd_log_windows.o" ]; then
+  log_obj="build/${BUILDDIR}/obj/util/log/fd_log_windows.o"
+fi
+
 write_manifest "$supervisor_manifest" \
   "build/${BUILDDIR}/obj/tango/mcache/fd_mcache.o" \
   "build/${BUILDDIR}/obj/tango/dcache/fd_dcache.o" \
@@ -29,7 +34,7 @@ write_manifest "$supervisor_manifest" \
   "build/${BUILDDIR}/obj/util/shmem/fd_shmem_windows_stub.o" \
   "build/${BUILDDIR}/obj/disco/topo/fd_topob.o" \
   "build/${BUILDDIR}/obj/disco/topo/fd_topo.o" \
-  "build/${BUILDDIR}/obj/util/log/fd_log.o" \
+  "$log_obj" \
   "build/${BUILDDIR}/obj/util/pod/fd_pod.o" \
   "build/${BUILDDIR}/obj/util/fd_util.o" \
   "build/${BUILDDIR}/obj/ballet/siphash13/fd_siphash13.o" \
@@ -44,7 +49,7 @@ write_manifest "$codec_manifest" \
   "build/${BUILDDIR}/obj/ballet/siphash13/fd_siphash13.o" \
   "build/${BUILDDIR}/obj/ballet/pb/fd_pb_tokenize.o" \
   "build/${BUILDDIR}/obj/third_party/cjson/cJSON.o" \
-  "build/${BUILDDIR}/obj/util/log/fd_log.o" \
+  "$log_obj" \
   "build/${BUILDDIR}/obj/util/env/fd_env.o" \
   "build/${BUILDDIR}/obj/util/cstr/fd_cstr.o" \
   "build/${BUILDDIR}/obj/util/alloc/fd_alloc.o" \
