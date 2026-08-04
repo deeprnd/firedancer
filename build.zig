@@ -595,7 +595,6 @@ pub fn build(b: *std.Build) void {
             "topob.c",
             "tile_run.c",
             "ballet.c",
-            "libuuid_stub.c",
         };
         const shim_flags = shimCFlagsFor(target.result.os.tag);
         const arch_name = switch (target.result.cpu.arch) {
@@ -2180,12 +2179,11 @@ fn linkTickoniSystemLibraries(b: *std.Build, step: *std.Build.Step.Compile, fd_l
         // closure so later unresolveds can pull additional members from the
         // same Firedancer archives.
         for (libs) |lib| step.root_module.linkSystemLibrary(lib, .{});
-        // Windows prebuilt FD libs (from CI) carry RocksDB metadata that
-        // references libuuid.a — add the stub source so the symbol is present.
-        step.root_module.addCSourceFile(.{
-            .file = b.path("src/tickoni/c_abi/shim/libuuid_stub.c"),
-            .flags = shimCFlagsFor(.windows),
-        });
+        // Windows prebuilt FD libs (from CI) reference libuuid.a.
+        // contrib/fd-build-windows.sh post-build step compiles
+        // libuuid_stub.c and archives it as libuuid.a so the library lookup
+        // succeeds. Do NOT add libuuid_stub.c as a raw C source file here —
+        // that would create duplicate symbols with the .a archive.
     }
     step.root_module.linkSystemLibrary("stdc++", .{});
 }
