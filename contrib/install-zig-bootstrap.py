@@ -191,8 +191,11 @@ def detect_vsdevcmd():
 def build_zig_bootstrap(source_dir, target, mcpu, dry_run=False):
     if os.name == "nt":
         vsdevcmd = detect_vsdevcmd()
-        cmdline = f'call "{vsdevcmd}" -arch=amd64 -host_arch=amd64 && build.bat {target} {mcpu}'
-        run(["cmd.exe", "/d", "/s", "/c", cmdline], cwd=source_dir, dry_run=dry_run)
+        cmdline = f'cmd.exe /d /s /c call "{vsdevcmd}" -arch=amd64 -host_arch=amd64 && build.bat {target} {mcpu}'
+        print(f"[run] {cmdline}")
+        if dry_run:
+            return
+        subprocess.run(cmdline, cwd=source_dir, check=True, shell=True)
     else:
         run(["bash", "build", target, mcpu], cwd=source_dir, dry_run=dry_run)
 
