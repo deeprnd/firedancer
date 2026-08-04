@@ -191,7 +191,14 @@ def detect_vsdevcmd():
 def build_zig_bootstrap(source_dir, target, mcpu, dry_run=False):
     if os.name == "nt":
         vsdevcmd = detect_vsdevcmd()
-        wrapper = Path(tempfile.mkstemp(prefix="zig-bootstrap-build-", suffix=".cmd", dir=source_dir)[1])
+        wrapper_name = "zig-bootstrap-build.cmd" if dry_run else Path(
+            tempfile.mkstemp(prefix="zig-bootstrap-build-", suffix=".cmd", dir=source_dir)[1]
+        ).name
+        wrapper = source_dir / wrapper_name
+        cmd = ["cmd.exe", "/d", "/s", "/c", str(wrapper)]
+        print(f"[run] {' '.join(cmd)}")
+        if dry_run:
+            return
         wrapper.write_text(
             textwrap.dedent(
                 f"""\
@@ -204,11 +211,6 @@ def build_zig_bootstrap(source_dir, target, mcpu, dry_run=False):
             encoding="utf-8",
             newline="\r\n",
         )
-        cmd = ["cmd.exe", "/d", "/s", "/c", str(wrapper)]
-        print(f"[run] {' '.join(cmd)}")
-        if dry_run:
-            wrapper.unlink(missing_ok=True)
-            return
         try:
             subprocess.run(cmd, cwd=source_dir, check=True)
         finally:
