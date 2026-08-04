@@ -27,9 +27,53 @@ def run(cmd, *, cwd=None, dry_run=False, env=None):
     subprocess.run(cmd, cwd=cwd, env=env, check=True)
 
 
+def detect_windows_native_machine():
+    arch_map = {
+        "ARM64": "arm64",
+        "AMD64": "x86_64",
+        "X86": "x86",
+    }
+    try:
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                "(Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Architecture)",
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        code = result.stdout.strip()
+        mapped = {
+            "0": "x86",
+            "9": "x86_64",
+            "12": "arm64",
+        }.get(code)
+        if mapped:
+            return mapped
+    except Exception:
+        pass
+    wow64 = os.environ.get("PROCESSOR_ARCHITEW6432")
+    if wow64:
+        return arch_map.get(wow64.upper(), wow64.lower())
+    proc_arch = os.environ.get("PROCESSOR_ARCHITECTURE")
+    if proc_arch:
+        mapped = arch_map.get(proc_arch.upper())
+        if mapped:
+            return mapped
+    return None
+
+
 def detect_target(system_name=None, machine_name=None):
     system_name = (system_name or platform.system()).lower()
-    machine_name = (machine_name or platform.machine()).lower()
+    if system_name == "windows":
+        machine_name = detect_windows_native_machine() or machine_name or platform.machine()
+    else:
+        machine_name = machine_name or platform.machine()
+    machine_name = machine_name.lower()
 
     arch_map = {
         "x86_64": "x86_64",
