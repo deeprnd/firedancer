@@ -54,10 +54,6 @@
 #define FD_HAS_HOSTED 0
 #endif
 
-#ifndef FD_HAS_WINDOWS
-#define FD_HAS_WINDOWS 0
-#endif
-
 /* FD_HAS_ATOMIC:  If the build target supports atomic operations
    between threads accessing a common memory region (include threads
    that reside in different processes on a host communicating via a
