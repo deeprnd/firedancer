@@ -108,13 +108,7 @@ pub fn build(
     const buf = try allocator.alignedAlloc(u8, topo_alloc_align, size);
     errdefer allocator.free(buf);
 
-    std.debug.print("topo_build.build: allocated buf ptr={x} len={d} [0..8]={x:08x} {x:08x}\n", .{
-        @intFromPtr(buf.ptr), buf.len,
-        buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
-    });
-
-    // Verify the buffer region is actually mapped (page 0 should be unmapped)
-    std.debug.print("topo_build.build: buf ptr != 0x0 = {s}\n", .{if (buf.ptr != null) "true" else "false"});
+    std.debug.print("topo_build.build: allocated buf ptr={x} len={d}\n", .{ @intFromPtr(buf.ptr), buf.len });
 
     var app_name_buf: [64]u8 = undefined;
     std.debug.print("topo_build.build: passing to topobNew ptr={x}\n", .{@intFromPtr(buf.ptr)});
