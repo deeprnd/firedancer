@@ -8,9 +8,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Install-ChocoPackage {
-    param([string]$Name)
-    choco install $Name -y --no-progress
+function Add-ToProcessPath {
+    param([string]$Value)
+    if (-not $Value) {
+        return
+    }
+    $current = ($env:PATH -split ';') | Where-Object { $_ }
+    if ($current -contains $Value) {
+        return
+    }
+    $env:PATH = "$Value;$env:PATH"
 }
 
 function Add-ToGitHubPath {
@@ -19,6 +26,47 @@ function Add-ToGitHubPath {
         return
     }
     Add-Content -Path $env:GITHUB_PATH -Value $Value
+}
+
+function Add-PathEntry {
+    param([string]$Value)
+    if (-not (Test-Path $Value)) {
+        return
+    }
+    Add-ToProcessPath -Value $Value
+    Add-ToGitHubPath -Value $Value
+}
+
+function Test-CommandExists {
+    param([string]$Name)
+    return [bool](Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Install-ChocoPackage {
+    param([string]$Name)
+    choco install $Name -y --no-progress
+}
+
+function Install-WinGetPackage {
+    param([string]$Id)
+    winget install --id $Id --exact --accept-package-agreements --accept-source-agreements --disable-interactivity
+}
+
+function Install-Package {
+    param(
+        [string]$ChocoName,
+        [string]$WingetId
+    )
+
+    if (Test-CommandExists -Name 'choco') {
+        Install-ChocoPackage -Name $ChocoName
+        return
+    }
+    if (Test-CommandExists -Name 'winget') {
+        Install-WinGetPackage -Id $WingetId
+        return
+    }
+    throw "setup-public-gh-runner: neither choco nor winget is available to install $ChocoName / $WingetId"
 }
 
 function Get-GitleaksAssetName {
@@ -40,21 +88,21 @@ if ($InstallKcov) {
 }
 
 if ($InstallGnuMake) {
-    Install-ChocoPackage -Name 'make'
+    Install-Package -ChocoName 'make' -WingetId 'ezwinports.make'
 }
 
-Install-ChocoPackage -Name 'strawberryperl'
+Install-Package -ChocoName 'strawberryperl' -WingetId 'StrawberryPerl.StrawberryPerl'
 
 # Install LLVM/Clang explicitly instead of assuming the runner image already
 # exposes clang on PATH. The Windows build/test recipes invoke `clang`
 # directly, so setup must provision it deterministically.
-Install-ChocoPackage -Name 'llvm'
+Install-Package -ChocoName 'llvm' -WingetId 'LLVM.LLVM'
 
 # Install MinGW-w64 cross-compiler toolchain for aarch64-pc-windows-gnu target.
 # GitHub Actions `windows-11-vs2026-arm` runners need the MinGW-w64 ARM64 SDK
 # headers/sysroot in addition to clang, so --target aarch64-pc-windows-gnu can
 # compile C sources successfully.
-Install-ChocoPackage -Name 'mingw'
+Install-Package -ChocoName 'mingw' -WingetId 'BrechtSanders.WinLibs.POSIX.UCRT'
 
 $bootstrapPaths = @(
     'C:\ProgramData\chocolatey\bin',
@@ -63,11 +111,25 @@ $bootstrapPaths = @(
     'C:\Program Files\CMake\bin',
     'C:\Program Files\LLVM\bin',
     'C:\Strawberry\perl\bin',
-    'C:\Strawberry\c\bin'
+    'C:\Strawberry\c\bin',
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links')
 )
 foreach ($pathEntry in $bootstrapPaths) {
-    if (Test-Path $pathEntry) {
-        Add-ToGitHubPath -Value $pathEntry
+    Add-PathEntry -Value $pathEntry
+}
+
+$wingetRoots = @(
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\LLVM.LLVM_*'),
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\StrawberryPerl.StrawberryPerl_*'),
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\ezwinports.make_*'),
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_*')
+)
+foreach ($pattern in $wingetRoots) {
+    foreach ($root in Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue) {
+        Add-PathEntry -Value $root.FullName
+        Add-PathEntry -Value (Join-Path $root.FullName 'bin')
+        Add-PathEntry -Value (Join-Path $root.FullName 'mingw64\bin')
+        Add-PathEntry -Value (Join-Path $root.FullName 'ucrt64\bin')
     }
 }
 
