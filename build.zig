@@ -1078,9 +1078,10 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
             }),
         });
+        const _topo_test_os = topo_run_test.root_module.resolved_target.?.result.os.tag;
         topo_run_test.root_module.addCSourceFiles(.{
             .files = &.{"src/tickoni/c_abi/shim/tile_run_test_stubs.c"},
-            .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+            .flags = shimCFlagsFor(_topo_test_os),
         });
         linkTickoniFiredancer(b, topo_run_test, fd_lib_dir);
         linkTickoniTopoRun(b, topo_run_test, fd_lib_dir);
