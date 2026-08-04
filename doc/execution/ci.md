@@ -16,6 +16,7 @@ This document describes the GitHub Actions CI workflows for Tickoni.
 - [Tests / Long](#tests--long)
 - [Tests / XLong](#tests--xlong)
 - [Optional Workflows](#optional-workflows)
+- [Zig Toolchain Policy](#zig-toolchain-policy)
 - [Centralized Firedancer Lib Machinery](#centralized-firedancer-lib-machinery)
 
 ---
@@ -76,6 +77,37 @@ Planned first-pass native Windows jobs:
 | `build-tk.yml` | `Harness Build / Windows 11 ARM` | `windows-11-vs2026-arm` | `just build-tk` |
 
 These are native Windows runner lanes only. The frozen first-pass contract explicitly excludes WSL, container, or VM fallback lanes as the official support path, and does not claim seccomp, sanitizer, replay, or full runtime parity on Windows.
+
+---
+
+## Zig Toolchain Policy
+
+Tickoni must use the same repo-owned Zig installation path in CI and on developer machines. The canonical entrypoint is:
+
+```
+contrib/install-zig-bootstrap.py
+```
+
+That script downloads the official [`zig-bootstrap`](https://codeberg.org/ziglang/zig-bootstrap) source archive from Codeberg, builds Zig for the requested host target, and installs the resulting `out/zig-<target>-<cpu>/` tree into a persistent prefix.
+
+Policy rules:
+
+1. Do not use `mlugg/setup-zig`, `winget install zig`, or other third-party Zig installers in Tickoni CI.
+2. All GitHub-hosted OS families (Windows, macOS, Linux) must call the same repo-owned installer script, differing only by the host target it infers or the explicit flags passed to it.
+3. Local developer setup must use the same script so CI and developer machines share one installation workflow.
+4. The upstream source of truth is the official Zig documentation and the official `zig-bootstrap` repository.
+
+Local developer usage examples:
+
+```bash
+python3 contrib/install-zig-bootstrap.py --bootstrap-ref master --mcpu baseline
+```
+
+```powershell
+python contrib/install-zig-bootstrap.py --bootstrap-ref master --mcpu baseline --user-path
+```
+
+CI usage is centralized in `.github/actions/setup-public-gh-runner/action.yml`, which invokes the same script for Windows and POSIX runners.
 
 ---
 
