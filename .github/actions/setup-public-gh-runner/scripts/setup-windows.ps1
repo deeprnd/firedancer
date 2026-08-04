@@ -45,11 +45,15 @@ if ($InstallGnuMake) {
 
 Install-ChocoPackage -Name 'strawberryperl'
 
+# Install LLVM/Clang explicitly instead of assuming the runner image already
+# exposes clang on PATH. The Windows build/test recipes invoke `clang`
+# directly, so setup must provision it deterministically.
+Install-ChocoPackage -Name 'llvm'
+
 # Install MinGW-w64 cross-compiler toolchain for aarch64-pc-windows-gnu target.
-# GitHub Actions `windows-11-vs2026-arm` runners ship LLVM/Clang but lack the
-# MinGW-w64 ARM64 SDK headers, so --target aarch64-pc-windows-gnu fails at C
-# compile time.  Chocolatey's `mingw` package provides the cross-compiler and
-# sysroot for arm64.
+# GitHub Actions `windows-11-vs2026-arm` runners need the MinGW-w64 ARM64 SDK
+# headers/sysroot in addition to clang, so --target aarch64-pc-windows-gnu can
+# compile C sources successfully.
 Install-ChocoPackage -Name 'mingw'
 
 $bootstrapPaths = @(
