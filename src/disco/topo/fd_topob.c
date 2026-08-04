@@ -27,7 +27,7 @@ fd_topob_new( void * mem,
     return NULL;
   }
 
-  FD_LOG_WARNING(( "fd_topob_new: memset topo=%p sizeof(fd_topo_t)=%lu", topo, sizeof(fd_topo_t) ));
+  FD_LOG_WARNING(( "fd_topob_new: memset topo=%p sizeof(fd_topo_t)=%lu", (void*)topo, sizeof(fd_topo_t) ));
   fd_memset( topo, 0, sizeof(fd_topo_t) );
   FD_LOG_WARNING(( "fd_topob_new: memset complete" ));
 
