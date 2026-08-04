@@ -164,12 +164,19 @@ def detect_vsdevcmd():
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            install_path = result.stdout.strip()
+            install_path = next(
+                (line.strip().strip('"') for line in result.stdout.splitlines() if line.strip()),
+                "",
+            )
             if install_path:
                 vsdevcmd = Path(install_path) / "Common7" / "Tools" / "VsDevCmd.bat"
                 if vsdevcmd.exists():
                     return vsdevcmd
     fallback_candidates = [
+        Path(r"C:\Program Files\Microsoft Visual Studio\18\Enterprise\Common7\Tools\VsDevCmd.bat"),
+        Path(r"C:\Program Files\Microsoft Visual Studio\18\Professional\Common7\Tools\VsDevCmd.bat"),
+        Path(r"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat"),
+        Path(r"C:\Program Files\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"),
         Path(r"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat"),
         Path(r"C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\Tools\VsDevCmd.bat"),
         Path(r"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat"),
