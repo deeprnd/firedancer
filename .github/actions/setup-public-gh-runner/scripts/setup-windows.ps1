@@ -45,6 +45,13 @@ if ($InstallGnuMake) {
 
 Install-ChocoPackage -Name 'strawberryperl'
 
+# Install MinGW-w64 cross-compiler toolchain for aarch64-pc-windows-gnu target.
+# GitHub Actions `windows-11-vs2026-arm` runners ship LLVM/Clang but lack the
+# MinGW-w64 ARM64 SDK headers, so --target aarch64-pc-windows-gnu fails at C
+# compile time.  Chocolatey's `mingw` package provides the cross-compiler and
+# sysroot for arm64.
+Install-ChocoPackage -Name 'mingw'
+
 $bootstrapPaths = @(
     'C:\ProgramData\chocolatey\bin',
     'C:\Program Files\Git\cmd',
