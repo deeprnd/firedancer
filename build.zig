@@ -728,15 +728,11 @@ pub fn build(b: *std.Build) void {
                 // linkTickoniCodec.
                 linkTickoniCodec(b, t, fd_lib_dir);
             }
-<<<<<<< HEAD
             // Split compile from run so compiler errors are visible on CI.
             // `zig build test` only compiles; `zig build run-tests` also executes.
             test_step.dependOn(&t.step);
-=======
-            test_step.dependOn(&t.step);
             const t_run = b.addRunArtifact(t);
             run_tests_step.dependOn(&t_run.step);
->>>>>>> 5a141b879 (build: split test compile and run)
         }
 
         // ---------------------------------------------------------------------------
@@ -762,10 +758,7 @@ pub fn build(b: *std.Build) void {
         });
         version_test.root_module.link_libc = true;
         test_step.dependOn(&version_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(version_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // doctor/checks.zig — standalone (no imports beyond std)
         const doctor_checks_test = b.addTest(.{
@@ -776,10 +769,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&doctor_checks_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(doctor_checks_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // doctor/output.zig imports: doctor_checks
         const doctor_output_test = b.addTest(.{
@@ -793,10 +783,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&doctor_output_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(doctor_output_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // demo/manifest.zig — standalone (no cross-module imports)
         const demo_manifest_test = b.addTest(.{
@@ -810,10 +797,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&demo_manifest_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(demo_manifest_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // demo/preflight.zig imports: demo_manifest, demo_semver, tier
         const demo_preflight_test = b.addTest(.{
@@ -830,10 +814,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&demo_preflight_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(demo_preflight_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const demo_diagnostic_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -843,10 +824,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&demo_diagnostic_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(demo_diagnostic_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const demo_conformance_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -859,10 +837,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&demo_conformance_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(demo_conformance_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const demo_comparator_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -875,10 +850,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&demo_comparator_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(demo_comparator_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const demo_runner_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -892,10 +864,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&demo_runner_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(demo_runner_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const demo_substitution_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -909,10 +878,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&demo_substitution_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(demo_substitution_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // src/tickoni/codec/thesis.zig: dedicated wrapper tests over the canonical
         // consumer-money schema hash APIs.
@@ -929,10 +895,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, thesis_codec_test, fd_lib_dir);
         test_step.dependOn(&thesis_codec_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(thesis_codec_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // thesis.zig: fresh root module so linkTickoniCodec adds C sources only to
         // this binary's root module.
@@ -949,10 +912,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, thesis_test, fd_lib_dir);
         test_step.dependOn(&thesis_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(thesis_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const catalog_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -968,10 +928,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, catalog_test, fd_lib_dir);
         test_step.dependOn(&catalog_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(catalog_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const catalog_schema_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -985,10 +942,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, catalog_schema_test, fd_lib_dir);
         test_step.dependOn(&catalog_schema_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(catalog_schema_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const basket_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1004,10 +958,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, basket_test, fd_lib_dir);
         test_step.dependOn(&basket_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(basket_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const portfolio_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1021,10 +972,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, portfolio_test, fd_lib_dir);
         test_step.dependOn(&portfolio_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(portfolio_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const fixture_portfolio_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1039,24 +987,13 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, fixture_portfolio_test, fd_lib_dir);
         test_step.dependOn(&fixture_portfolio_test.step);
-<<<<<<< HEAD
-
-        const model_messages_test = b.addTest(.{ .root_module = model_messages_mod });
-        test_step.dependOn(&model_messages_test.step);
-
-        const mock_model_test = b.addTest(.{ .root_module = mock_model_mod });
-        test_step.dependOn(&mock_model_test.step);
-=======
         run_tests_step.dependOn(&b.addRunArtifact(fixture_portfolio_test).step);
-
         const model_messages_test = b.addTest(.{ .root_module = model_messages_mod });
         test_step.dependOn(&model_messages_test.step);
         run_tests_step.dependOn(&b.addRunArtifact(model_messages_test).step);
-
         const mock_model_test = b.addTest(.{ .root_module = mock_model_mod });
         test_step.dependOn(&mock_model_test.step);
         run_tests_step.dependOn(&b.addRunArtifact(mock_model_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // link handle/type roots keep their own unit tests independent of the
         // aggregate runtime module.
@@ -1068,10 +1005,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&link_handles_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(link_handles_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const link_types_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1081,10 +1015,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&link_types_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(link_types_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // boot.zig imports c_abi for the raw fd_boot bridge call.
         const boot_test = b.addTest(.{
@@ -1098,10 +1029,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&boot_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(boot_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // cnc_counters.zig imports c_abi and calls the real tk_cnc_app_laddr
         // shim (via c_abi.cnc.appLaddr) in its round-trip test.
@@ -1117,10 +1045,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniFiredancer(b, cnc_counters_test, fd_lib_dir);
         test_step.dependOn(&cnc_counters_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(cnc_counters_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // cpu_placement.zig imports util (for the CpuSet primitive) alongside
         // its sibling topology.zig.
@@ -1135,10 +1060,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&cpu_placement_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(cpu_placement_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // launch_spec.zig embeds link.LinkHandles, which imports c_abi.
         const launch_spec_test = b.addTest(.{
@@ -1152,10 +1074,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&launch_spec_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(launch_spec_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // topology_spec.zig (v2.14.S8.T4): small tiles+channels round-trip,
         // same import needs as launch_spec.zig.
@@ -1170,10 +1089,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&topology_spec_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(topology_spec_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // topo_run.zig (v2.14.S8.T3/T4): fd_topo_run_tile adapter plus the
         // simple process-mode launcher dispatch contract. Tests assert Linux
@@ -1196,10 +1112,7 @@ pub fn build(b: *std.Build) void {
         linkTickoniTopoRun(b, topo_run_test, fd_lib_dir);
         linkTickoniTileRun(b, topo_run_test, fd_lib_dir);
         test_step.dependOn(&topo_run_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(topo_run_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // topob.zig (v2.14.S8.T12): fd_topob topology builder. Same
         // no-test-blocks-yet rationale as topo_run_test above; proves the
@@ -1215,10 +1128,7 @@ pub fn build(b: *std.Build) void {
         linkTickoniFiredancer(b, topob_test, fd_lib_dir);
         linkTickoniTopoRun(b, topob_test, fd_lib_dir);
         test_step.dependOn(&topob_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(topob_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // topo_build.zig (v2.14.S8.T12): shared topology-builder, actually
         // calls into topob.zig against a real 8-tile-shaped Topology, so
@@ -1238,10 +1148,7 @@ pub fn build(b: *std.Build) void {
         linkTickoniFiredancer(b, topo_build_test, fd_lib_dir);
         linkTickoniTopoRun(b, topo_build_test, fd_lib_dir);
         test_step.dependOn(&topo_build_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(topo_build_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // model tile: unit tests are mock/fixture-backed and must not start servers.
         const model_test_mod = b.createModule(.{
@@ -1271,10 +1178,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, model_test, fd_lib_dir);
         test_step.dependOn(&model_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(model_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const tkpoly_test_mod = b.createModule(.{
             .root_source_file = b.path("src/tickoni/tiles/policy/mod.zig"),
@@ -1303,17 +1207,10 @@ pub fn build(b: *std.Build) void {
             .root_module = adapter_test_mod,
         });
         test_step.dependOn(&adapter_test.step);
-<<<<<<< HEAD
-
-        const mock_adapter_test = b.addTest(.{ .root_module = mock_adapter_mod });
-        test_step.dependOn(&mock_adapter_test.step);
-=======
         run_tests_step.dependOn(&b.addRunArtifact(adapter_test).step);
-
         const mock_adapter_test = b.addTest(.{ .root_module = mock_adapter_mod });
         test_step.dependOn(&mock_adapter_test.step);
         run_tests_step.dependOn(&b.addRunArtifact(mock_adapter_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // trade_ticket.zig imports basket, portfolio, fixture_portfolio, and thesis.
         const trade_ticket_test = b.addTest(.{
@@ -1331,10 +1228,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, trade_ticket_test, fd_lib_dir);
         test_step.dependOn(&trade_ticket_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(trade_ticket_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // impact.zig: portfolio and cash impact model (V1.3.S1).
         const impact_test = b.addTest(.{
@@ -1350,10 +1244,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, impact_test, fd_lib_dir);
         test_step.dependOn(&impact_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(impact_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // cards.zig: thesis and money proposal card schemas (V1.3.S2).
         const cards_test = b.addTest(.{
@@ -1369,10 +1260,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, cards_test, fd_lib_dir);
         test_step.dependOn(&cards_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(cards_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // drift.zig: drift conditions, assessment, and suggestion generation (V1.3.S3).
         const drift_test = b.addTest(.{
@@ -1389,10 +1277,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, drift_test, fd_lib_dir);
         test_step.dependOn(&drift_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(drift_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const allowed_trade_fixture_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1409,10 +1294,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, allowed_trade_fixture_test, fd_lib_dir);
         test_step.dependOn(&allowed_trade_fixture_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(allowed_trade_fixture_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const denied_trade_fixture_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1427,10 +1309,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, denied_trade_fixture_test, fd_lib_dir);
         test_step.dependOn(&denied_trade_fixture_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(denied_trade_fixture_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const tool_test_mod = b.createModule(.{
             .root_source_file = b.path("src/tickoni/tiles/tool/mod.zig"),
@@ -1446,10 +1325,7 @@ pub fn build(b: *std.Build) void {
         });
         const tool_test = b.addTest(.{ .root_module = tool_test_mod });
         test_step.dependOn(&tool_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(tool_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const disp_unit_mod = b.createModule(.{
             .root_source_file = b.path("src/tickoni/tiles/disp/mod.zig"),
@@ -1478,10 +1354,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, agent_test, fd_lib_dir);
         test_step.dependOn(&agent_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(agent_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const replay_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1502,10 +1375,7 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniCodec(b, replay_test, fd_lib_dir);
         test_step.dependOn(&replay_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(replay_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // supervisor.zig imports runtime, tiles, and c_abi modules.
         const sup_mod = b.createModule(.{
@@ -1544,10 +1414,7 @@ pub fn build(b: *std.Build) void {
         // Firedancer link set as the process-mode integration tests.
         linkTickoniFiredancer(b, sup_test, fd_lib_dir);
         test_step.dependOn(&sup_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(sup_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // tile_registry.zig (v2.14.S8.T1): single source of truth for tile id
         // -> behavior, imported by supervisor.zig and tile_main.zig. Same
@@ -1566,10 +1433,7 @@ pub fn build(b: *std.Build) void {
         linkTickoniCodec(b, tile_registry_test, fd_lib_dir);
         linkTickoniFiredancer(b, tile_registry_test, fd_lib_dir);
         test_step.dependOn(&tile_registry_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(tile_registry_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // topologies.zig: fresh root module (not the shared topologies_named_mod)
         // so it gets its own dedicated test run, since named-import module
@@ -1585,10 +1449,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&topologies_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(topologies_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         // ---------------------------------------------------------------------------
         // Integration-test step — transport and boundary wiring against local mocks.
@@ -1602,10 +1463,7 @@ pub fn build(b: *std.Build) void {
         // C source additions from the unit test lane.
         linkTickoniCodec(b, investment_demo_test, fd_lib_dir);
         test_step.dependOn(&investment_demo_test.step);
-<<<<<<< HEAD
-=======
         run_tests_step.dependOn(&b.addRunArtifact(investment_demo_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
         for ([_][]const u8{
             "src/tickoni/test/integration/test_investment_allowed_trade.zig",
             "src/tickoni/test/integration/test_investment_blocked_limits.zig",
@@ -1850,35 +1708,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         test_step.dependOn(&mock_servers_test.step);
-<<<<<<< HEAD
-
-        // run-tests — all unit tests compile with `zig build test`; this step
-        // executes them.  CI uses the two-phase sequence: `zig build test`
-        // first (errors are visible), then `zig build run-tests` (exit codes).
-        const run_tests_step = b.step("run-tests", "Run all compiled Tickoni unit tests");
-        const unit_tests = .{
-            version_test, doctor_checks_test, doctor_output_test,
-            demo_manifest_test, demo_preflight_test, demo_diagnostic_test,
-            demo_conformance_test, demo_comparator_test, demo_runner_test,
-            demo_substitution_test, thesis_codec_test, thesis_test,
-            catalog_test, catalog_schema_test, basket_test, portfolio_test,
-            fixture_portfolio_test, model_messages_test, mock_model_test,
-            link_handles_test, link_types_test, boot_test, cnc_counters_test,
-            cpu_placement_test, launch_spec_test, topology_spec_test,
-            topo_run_test, topob_test, topo_build_test, model_test,
-            adapter_test, mock_adapter_test, trade_ticket_test, impact_test,
-            cards_test, drift_test, allowed_trade_fixture_test,
-            denied_trade_fixture_test, tool_test, agent_test, replay_test,
-            sup_test, tile_registry_test, topologies_test, investment_demo_test,
-            mock_servers_test,
-        };
-        inline for (unit_tests) |tt| {
-            const tt_run = b.addRunArtifact(tt);
-            run_tests_step.dependOn(&tt_run.step);
-        }
-=======
         run_tests_step.dependOn(&b.addRunArtifact(mock_servers_test).step);
->>>>>>> 5a141b879 (build: split test compile and run)
 
         const model_tile_http_test = b.addTest(.{
             .root_module = b.createModule(.{
