@@ -34,14 +34,10 @@ inputs:
     description: Install Zig
     required: false
     default: 'false'
-  zig-bootstrap-ref:
-    description: zig-bootstrap ref or tag to build from
+  zig-version:
+    description: Official Zig release version or channel key from index.json
     required: false
-    default: 'master'
-  zig-bootstrap-mcpu:
-    description: zig-bootstrap mcpu argument
-    required: false
-    default: 'baseline'
+    default: '0.16.0'
 
 runs:
   using: composite
@@ -62,17 +58,17 @@ runs:
       run: |
         .github/actions/setup-public-gh-runner/scripts/setup-windows.ps1 -AptPackages '${{ inputs.apt-packages }}' -InstallGnuMake -InstallGitleaks:('${{ inputs.gitleaks }}' -eq 'true') -GitleaksVersion '8.30.1' -InstallKcov:('${{ inputs.kcov }}' -eq 'true')
 
-    - name: Setup Zig via zig-bootstrap (Windows)
+    - name: Setup Zig via official release (Windows)
       if: inputs.zig == 'true' && runner.os == 'Windows'
       shell: pwsh
       run: |
-        python "$env:GITHUB_WORKSPACE/contrib/install-zig-bootstrap.py" --bootstrap-ref '${{ inputs.zig-bootstrap-ref }}' --mcpu '${{ inputs.zig-bootstrap-mcpu }}'
+        python "$env:GITHUB_WORKSPACE/contrib/install-zig.py" --version '${{ inputs.zig-version }}'
 
-    - name: Setup Zig via zig-bootstrap (POSIX)
+    - name: Setup Zig via official release (POSIX)
       if: inputs.zig == 'true' && runner.os != 'Windows'
       shell: bash
       run: |
-        python3 "$GITHUB_WORKSPACE/contrib/install-zig-bootstrap.py" --bootstrap-ref '${{ inputs.zig-bootstrap-ref }}' --mcpu '${{ inputs.zig-bootstrap-mcpu }}'
+        python3 "$GITHUB_WORKSPACE/contrib/install-zig.py" --version '${{ inputs.zig-version }}'
 
     - name: Setup Python
       if: inputs.python-tools != ''
