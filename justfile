@@ -292,12 +292,12 @@ test-unit-tk-windows-x86:
 	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
 
 # Windows ARM64 unit test: build FD libs for Windows ARM64, then run Zig tests.
-# Pass --target aarch64-windows-gnu because Zig 0.16.0 lacks
-# aarch64-windows-msvc support on ARM64 runners.
+# On the ARM64 Windows runner Zig compiles natively for aarch64-windows;
+# the --target override triggered a Zig 0.16.0 cross-compilation segfault.
 test-unit-tk-windows-arm:
 	just build-fd-windows-arm 2>&1 | tee build/fd-windows-arm.log
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build --target aarch64-windows-gnu -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build --target aarch64-windows-gnu -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
 
 # Windows x86_64 integration test: build FD libs for Windows x86_64, then run Zig integration tests.
 test-integration-tk-windows-x86:
@@ -305,11 +305,11 @@ test-integration-tk-windows-x86:
 	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # Windows ARM64 integration test: build FD libs for Windows ARM64, then run Zig integration tests.
-# Pass --target aarch64-windows-gnu because Zig 0.16.0 lacks
-# aarch64-windows-msvc support on ARM64 runners.
+# On the ARM64 Windows runner Zig compiles natively for aarch64-windows;
+# the --target override triggered a Zig 0.16.0 cross-compilation segfault.
 test-integration-tk-windows-arm:
 	just build-fd-windows-arm > build/fd-windows-arm.log 2>&1
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build --target aarch64-windows-gnu -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # Deterministic offline investment conformance suite — fixture-backed, no llama.cpp required.
 test-demo-tk:
