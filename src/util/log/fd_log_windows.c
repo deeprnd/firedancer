@@ -300,6 +300,26 @@ fd_log_private_main_stack_sz( void ) {
   return 1048576UL; /* 1 MB */
 }
 
+/* ── fd_log_cpu_set / fd_log_thread_set / fd_log_private_tid_set ──────── */
+
+void
+fd_log_cpu_set( char const * cpu ) {
+  (void)cpu;
+  /* No-op: Windows tile logging is handled at a higher level */
+}
+
+void
+fd_log_thread_set( char const * thread ) {
+  (void)thread;
+  /* No-op: Windows tile logging is handled at a higher level */
+}
+
+void
+fd_log_private_tid_set( ulong tid ) {
+  (void)tid;
+  /* No-op: Windows tile logging is handled at a higher level */
+}
+
 /* ── Stack discovery (from pthread) ───────────────────────────────────── */
 
 void
