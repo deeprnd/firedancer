@@ -1,6 +1,9 @@
 $(call make-lib,fd_util)
 $(call add-hdrs,fd_util_base.h fd_util.h fd_windows_compat.h fd_platform_unsupported.h fd_platform_stub_object.h fd_platform_runtime_caps.h)
 $(call add-objs,fd_hash fd_util,fd_util)
+ifdef FD_HAS_WINDOWS
+$(call add-objs,windows_crt,fd_util)
+endif
 ifdef FD_HAS_HOSTED
 ifdef FD_HAS_WINDOWS
 $(call add-objs,fd_util_hosted_windows,fd_util)
