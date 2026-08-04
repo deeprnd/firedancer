@@ -73,9 +73,11 @@ if [ "$MODE" = "test" ]; then
 else
   # Clean stale objects from any prior build with a different target/ABI
   # (e.g. ELF .o files from a Linux build persisting into a Windows COFF build).
-  # Without this, make considers them up-to-date and skips recompilation,
-  # leaving ELF objects inside the .a archives that the Windows linker rejects.
+  # Also delete stale .a archives from a prior build — make considers them
+  # up-to-date and skips recompilation, leaving ELF objects inside the .a
+  # archives that the Windows linker rejects.
   rm -rf "${OBJDIR:?}/"*
+  rm -f "${LIBDIR:?}/libfd_ballet.a" "${LIBDIR:?}/libfd_disco.a" "${LIBDIR:?}/libfd_tango.a" "${LIBDIR:?}/libfd_util.a"
   fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" "EXTRAS=${EXTRAS}" ${LDFLAGS_EXE:+LDFLAGS_EXE="${LDFLAGS_EXE}"} || fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" ${LDFLAGS_EXE:+LDFLAGS_EXE="${LDFLAGS_EXE}"}
 fi
 
