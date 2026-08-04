@@ -33,6 +33,7 @@ env FD_WINDOWS_ARCH="$fd_windows_arch" bash contrib/fd-build-lib.sh fd-tickoni-f
 # library lookup for libuuid.a. We need an actual static archive.
 libdir="build/fd-tickoni-fd/lib"
 libdir_native="build/native/gcc/lib"
+archive_tool="${AR:-llvm-ar}"
 for dir in "$libdir" "$libdir_native"; do
   if [ -d "$dir" ]; then
     echo "[+] Building libuuid.a from stub in ${dir}"
@@ -42,7 +43,7 @@ for dir in "$libdir" "$libdir_native"; do
       -DFD_HAS_HOSTED=1 \
       -DFD_USING_MSVC=1 \
       src/tickoni/c_abi/shim/libuuid_stub.c
-    ar rcs "${dir}/libuuid.a" "${dir}/libuuid_stub.obj"
+    "${archive_tool}" rcs "${dir}/libuuid.a" "${dir}/libuuid_stub.obj"
     rm -f "${dir}/libuuid_stub.obj"
   fi
 done

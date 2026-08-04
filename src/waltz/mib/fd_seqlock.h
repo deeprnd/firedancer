@@ -4,13 +4,15 @@
 #include "../../util/fd_util_base.h"
 #include <stdatomic.h>
 
+typedef _Atomic( ulong ) fd_seqlock_t;
+
 static inline void
-fd_seqlock_init( atomic_ulong * lock ) {
-  atomic_store_explicit( lock, 0UL, memory_order_release );
+fd_seqlock_init( fd_seqlock_t * lock ) {
+  atomic_store_explicit( lock, (ulong)0, memory_order_release );
 }
 
 static inline void
-fd_seqlock_write_lock( atomic_ulong * lock ) {
+fd_seqlock_write_lock( fd_seqlock_t * lock ) {
   for(;;) {
     ulong seq = atomic_load_explicit( lock, memory_order_relaxed );
     if( FD_UNLIKELY( seq & 1UL ) ) continue;
@@ -21,12 +23,12 @@ fd_seqlock_write_lock( atomic_ulong * lock ) {
 }
 
 static inline void
-fd_seqlock_write_unlock( atomic_ulong * lock ) {
-  atomic_fetch_add_explicit( lock, 1UL, memory_order_release );
+fd_seqlock_write_unlock( fd_seqlock_t * lock ) {
+  atomic_fetch_add_explicit( lock, (ulong)1, memory_order_release );
 }
 
 static inline ulong
-fd_seqlock_read_try( atomic_ulong const * lock ) {
+fd_seqlock_read_try( fd_seqlock_t const * lock ) {
   for(;;) {
     ulong seq = atomic_load_explicit( lock, memory_order_acquire );
     if( FD_LIKELY( !(seq & 1UL) ) ) return seq;
@@ -34,14 +36,14 @@ fd_seqlock_read_try( atomic_ulong const * lock ) {
 }
 
 static inline int
-fd_seqlock_read_test( atomic_ulong const * lock,
-                      ulong                seq ) {
+fd_seqlock_read_test( fd_seqlock_t const * lock,
+                      ulong               seq ) {
   atomic_thread_fence( memory_order_acquire );
   return atomic_load_explicit( lock, memory_order_acquire )==seq;
 }
 
 static inline int
-fd_seqlock_locked_hint( atomic_ulong const * lock ) {
+fd_seqlock_locked_hint( fd_seqlock_t const * lock ) {
   return atomic_load_explicit( lock, memory_order_relaxed ) & 1UL;
 }
 
