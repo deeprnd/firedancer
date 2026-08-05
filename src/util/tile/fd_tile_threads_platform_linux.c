@@ -314,8 +314,10 @@ fd_tile_private_manager( void * _args ) {
     fd_tile_private_stack0 = (ulong)stack;
     fd_tile_private_stack1 = (ulong)stack + stack_sz;
 
-    /* Prevent another fork() from smashing the stack (Linux only) */
-#if defined(__linux__)
+    /* Prevent another fork() from smashing the stack.
+       Linux and macOS both support madvise(MADV_DONTFORK).
+       Windows does not need it since fork() is not supported. */
+#if defined(__linux__) || defined(__MACH__)
     if( FD_UNLIKELY( madvise( stack, FD_TILE_PRIVATE_STACK_SZ, MADV_DONTFORK ) ) ) {
       FD_LOG_ERR(( "madvise(stack,MADV_DONTFORK) failed (%i-%s)", errno, fd_io_strerror( errno ) ));
     }
