@@ -1,7 +1,13 @@
 /// Linux-strict process topology proof: exact parent-PID validation through
 /// /proc, exact sibling stop semantics after observer crashes, and the tighter
 /// stale-heartbeat timing envelope that Linux can support.
+/// Requires Linux — /proc filesystem access is not available on other OSes.
 const std = @import("std");
+
+comptime {
+    if (@import("builtin").target.os.tag != .linux)
+        @compileError("test_process_topology_linux requires Linux (/proc access)");
+}
 const rt = @import("runtime");
 const c_abi = @import("c_abi");
 const supervisor_mod = @import("supervisor");
