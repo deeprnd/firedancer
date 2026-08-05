@@ -69,7 +69,7 @@ assert 'demo usage error' in text or 'Usage:' in text, text
 PY
 
 printf 'running JSON conformance suite\n'
-json_output="$($binary demo investment --json --manifest \"$manifest\")" || exit 1
+json_output="$($binary demo investment --json --manifest "$manifest")" || exit 1
 python3 - <<'PY' "$json_output"
 import json, sys, pathlib
 
@@ -103,7 +103,7 @@ for item in suite:
 PY
 
 printf 'running plain-text conformance suite\n'
-plain_output="$($binary demo investment --plain --manifest \"$manifest\")" || exit 1
+plain_output="$($binary demo investment --plain --manifest "$manifest")" || exit 1
 python3 - <<'PY' "$plain_output"
 import sys
 text = sys.argv[1]
