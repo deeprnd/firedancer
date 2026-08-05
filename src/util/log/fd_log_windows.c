@@ -192,7 +192,7 @@ fd_log_sleep( long dt ) {
     SwitchToThread();
     return 0L;
   }
-  long ns_dt = fd_long_min( dt, (((long)1e9)<<31)-1L );
+  long ns_dt = fd_long_min( dt, ((FD_NS_PER_S)<<31)-1L );
   dt -= ns_dt;
   long ms = (long)((ulong)ns_dt / FD_NS_PER_MS);
   if( ms < 1L ) ms = 1L;
