@@ -7,17 +7,22 @@
 
 ---
 
-## FINDING 1 — CRITICAL: OS switches in non-shim non-build code
+## FINDING 1 — CRITICAL: OS switches in non-shim non-build code ✅ DONE
 
-OS switches (`FD_HAS_WINDOWS`, `builtin.target.os.tag`) exist in non-shim, non-build files:
+OS switches (`FD_HAS_WINDOWS`, `builtin.target.os.tag`) previously existed in non-shim, non-build files. Resolved by splitting into per-platform files following the `topo_run_platform_*` pattern:
 
-- **`src/disco/topo/fd_cpu_topo.c`** — full Linux/Windows split. Linux reads `/sys/devices/system/cpu/present` and parses NUMA topology. Windows stub returns 1 CPU, 1 NUMA node. **Not a shim file — lives in `fd_topo`**
-- **`src/disco/topo/fd_topo.h`** — PATH_MAX redefine on Windows, forward-declare `sock_filter` on non-Linux
-- **`src/util/tile/fd_tile_threads.c`** — 993 lines, ~50% guarded by `FD_HAS_WINDOWS`
-- **`src/util/log/fd_log_windows.c`** — 473-line Windows-specific log implementation (new file)
-- **`src/util/fd_windows_compat.h`** — 69-line CRT compat header (new file)
+- **`src/disco/topo/fd_cpu_topo.c`** — replaced with thin dispatcher (15 lines). Platform logic moved to `fd_cpu_topo_platform_linux.c` and `fd_cpu_topo_platform_windows.c`. `fd_cpu_topo_platform.h` provides declarations.
+- **`src/disco/topo/fd_topo.h`** — PATH_MAX redefine and `sock_filter` fwd-decl moved to `fd_topo_platform.h`.
+- **`src/util/tile/fd_tile_threads.c`** — replaced with thin dispatcher (9 lines). Platform logic moved to `fd_tile_threads_platform_linux.c` (full Linux/macOS impl), `fd_tile_threads_platform_windows.c` (stub), and `fd_tile_threads_platform_macos.c` (delegates to Linux source with `__MACH__` defined).
 
-**Assessment**: The convention is "shims handle platform differences." `fd_cpu_topo.c` and `fd_topo.h` are NOT shim files — they're Firedancer core. This is a **violation of the platform-isolation convention**. These files should delegate to a `fd_cpu_topo_platform.h`-style header or a per-platform `.c` source, not contain `#if !FD_HAS_WINDOWS`/`#else` blocks.
+**Files changed by fix**:
+- Created: `fd_cpu_topo_platform.h`, `fd_cpu_topo_platform_linux.c`, `fd_cpu_topo_platform_windows.c`, `fd_topo_platform.h`, `fd_tile_threads_platform.h`, `fd_tile_threads_platform_linux.c`, `fd_tile_threads_platform_windows.c`, `fd_tile_threads_platform_macos.c`
+- Modified: `fd_cpu_topo.c`, `fd_cpu_topo.h`, `fd_topo.h`, `src/util/tile/Local.mk`
+- Unchanged (correctly already platform files): `fd_log_windows.c`, `fd_windows_compat.h`
+
+**Remaining OS switches** (acceptable — gated in shim/build files only):
+- `src/util/log/fd_log_windows.c` — entirely Windows-specific (new file)
+- `src/util/fd_windows_compat.h` — entirely Windows-specific compat header (new file)
 
 ---
 
@@ -178,7 +183,7 @@ New/modified CI files (`tests-short.yml`, `setup-windows.ps1`, `action.yml`, `fd
 
 | Category | Status |
 |---|---|
-| OS switches outside shims/build | ⚠️ 3 files violate convention |
+| OS switches outside shims/build | ✅ Resolved — all split to per-platform files |
 | Windows implementation quality | ❌ Stubs only, not functional |
 | Logging on Windows | ❌ Normal logs silently dropped |
 | Test coverage (Windows C files) | ❌ Zero tests for new Windows code |
@@ -193,32 +198,35 @@ New/modified CI files (`tests-short.yml`, `setup-windows.ps1`, `action.yml`, `fd
 
 ## FILES WITH OS SWITCHES (non-shim, non-build)
 
-```
-src/disco/topo/fd_cpu_topo.c        — #if !FD_HAS_WINDOWS / #else / #endif (lines 1, 86, 105)
-src/disco/topo/fd_topo.h            — #if FD_HAS_WINDOWS (PATH_MAX), #if !FD_HAS_LINUX (sock_filter fwd-decl)
-src/util/tile/fd_tile_threads.c     — 9 FD_HAS_WINDOWS guards + 3 __linux__ guards + 2 __GLIBC__ guards
-src/util/log/fd_log_windows.c       — #if FD_HAS_WINDOWS wrapper (lines 9, 473)
-src/util/fd_windows_compat.h        — #if FD_HAS_WINDOWS (lines 21, 67)
-src/tickoni/doctor/checks.zig       — 11 builtin.target.os.tag usages
-src/tickoni/util/tier.zig           — 2 builtin.target.os.tag usages (pre-existing)
-```
+```\
+src/tickoni/doctor/checks.zig       — 11 builtin.target.os.tag usages (expected — diagnostic tool)
+src/tickoni/util/tier.zig           — 2 builtin.target.os.tag usages (pre-existing, acceptable)
+```\
 
 ## FILES WITH OS SWITCHES (shim/build — expected)
 
-```
-src/tickoni/c_abi/shim/os.c              — FD_HAS_WINDOWS guard, #include <windows.h>
-src/tickoni/c_abi/shim/tango.c           — FD_HAS_WINDOWS guard
-src/tickoni/c_abi/shim/tile_run.c        — FD_HAS_WINDOWS guard
+```\
+src/disco/topo/fd_topo_platform.h            — PATH_MAX override, sock_filter fwd-decl
+src/disco/topo/fd_cpu_topo_platform_linux.c  — Linux-only CPU/NUMA discovery
+src/disco/topo/fd_cpu_topo_platform_windows.c — Stub Windows CPU topo
+src/util/tile/fd_tile_threads_platform_linux.c  — Linux/macOS tile threading
+src/util/tile/fd_tile_threads_platform_windows.c — Stub Windows tile threading
+src/util/log/fd_log_windows.c               — #if FD_HAS_WINDOWS wrapper (lines 9, 473)
+src/util/fd_windows_compat.h                — #if FD_HAS_WINDOWS (lines 21, 67)
+src/tickoni/c_abi/shim/os.c                 — FD_HAS_WINDOWS guard, #include <windows.h>
+src/tickoni/c_abi/shim/tango.c              — FD_HAS_WINDOWS guard
+src/tickoni/c_abi/shim/tile_run.c           — FD_HAS_WINDOWS guard
 src/tickoni/c_abi/shim/tile_run_test_stubs.c — FD_HAS_WINDOWS guard
-src/tickoni/c_abi/shim/topo_run.c        — #if FD_HAS_LINUX for seccomp block
+src/tickoni/c_abi/shim/topo_run.c           — #if FD_HAS_LINUX for seccomp block
 src/tickoni/c_abi/shim/topo_run_platform_linux.c  — FD_HAS_LINUX guard
 src/tickoni/c_abi/shim/topo_run_platform_macos.c  — FD_HAS_MACOS guard
 src/tickoni/c_abi/shim/topo_run_platform_windows.c — FD_HAS_WINDOWS guard
-src/tickoni/c_abi/shim/topob.c           — FD_HAS_WINDOWS guard
-src/tickoni/c_abi/shim/windows_crt.c     — FD_HAS_WINDOWS guard
-src/tickoni/c_abi/shim/libuuid_stub.c    — Windows-only stub
-build.zig                                — shimCFlagsFor(.windows), Windows lib linking, manifest fixups
-config/machine/windows_clang.mk          — Windows target detection
-src/util/Local.mk                        — ifdef FD_HAS_WINDOWS for windows_crt object
-src/util/log/Local.mk                    — ifdef FD_HAS_WINDOWS for fd_log_windows object
-```
+src/tickoni/c_abi/shim/topob.c              — FD_HAS_WINDOWS guard
+src/tickoni/c_abi/shim/windows_crt.c        — FD_HAS_WINDOWS guard
+src/tickoni/c_abi/shim/libuuid_stub.c       — Windows-only stub
+build.zig                                   — shimCFlagsFor(.windows), Windows lib linking, manifest fixups
+config/machine/windows_clang.mk             — Windows target detection
+src/util/Local.mk                           — ifdef FD_HAS_WINDOWS for windows_crt object
+src/util/log/Local.mk                       — ifdef FD_HAS_WINDOWS for fd_log_windows object
+src/util/tile/Local.mk                      — ifdef FD_HAS_WINDOWS for platform tile objects
+```\
