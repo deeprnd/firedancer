@@ -58,7 +58,7 @@ These aren't "incomplete implementations" — they're **explicitly non-functiona
 
 ---
 
-## FINDING 4 — HIGH: Zig OS switches in doctor module (3 files, 11 occurrences)
+## FINDING 4 — HIGH: Zig OS switches in doctor module (3 files, 11 occurrences) ✅ DONE
 
 `src/tickoni/doctor/checks.zig` uses `builtin.target.os.tag` in 11 places:
 - `detectOsVersion()` — platform-specific version detection (Linux: `/etc/os-release`, macOS: `sw_vers`, Windows: no-op)
@@ -67,7 +67,11 @@ These aren't "incomplete implementations" — they're **explicitly non-functiona
 
 `src/tickoni/util/tier.zig` uses `builtin.target.os.tag` in 2 places (existing code, pre-branch).
 
-**Assessment**: Doctor module is **expected** to be platform-aware (it's a diagnostic tool). This is acceptable, but the WSL2 and Docker checks access `/proc/` and `/sys/` paths that don't exist on Windows — the checks should detect the target platform and skip inapplicable checks at compile-time, not runtime, to avoid dead code in the Zig binary.
+**Fix**: Wrapped `detectEnvironment()` — the only function accessing `/proc/` and `/sys/` paths — in a compile-time `if (@import("builtin").target.os.tag == .linux)` gate. This eliminates all `/proc/` and `/sys/` file access from non-Linux binaries at compile time, rather than runtime `fileExists()` returns that still compile the code into Windows/macOS binaries. On Windows/macOS builds the entire body is dead code eliminated by the Zig compiler.
+
+**Files changed by fix**: `src/tickoni/doctor/checks.zig`
+
+**Assessment**: Doctor module is **expected** to be platform-aware (it's a diagnostic tool). The remaining `builtin.target.os.tag` uses in `detectOsVersion()` and `WindowsChecks` are acceptable — they branch on OS for platform-specific logic (version detection, Windows-only checks) without accessing non-existent filesystem paths. Compile-time gating resolved the dead-code concern.
 
 ---
 
