@@ -243,9 +243,9 @@ tk_topo_alignof( void ) { return alignof( fd_topo_t ); }
 
 void *
 tk_topob_new( void * mem, char const * app_name ) {
-  FD_LOG_WARNING(( "tk_topob_new: mem=%p app_name=%s", mem, app_name ));
+  FD_LOG_NOTICE(( "tk_topob_new: mem=%p app_name=%s", mem, app_name ));
   void * result = fd_topob_new( mem, app_name );
-  FD_LOG_WARNING(( "tk_topob_new: result=%p", result ));
+  FD_LOG_DEBUG(( "tk_topob_new: result=%p topo=%p", result, (void*)result ? fd_topob_topo(result) : NULL ));
   return result;
 }
 
