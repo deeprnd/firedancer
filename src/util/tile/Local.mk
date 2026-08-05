@@ -6,6 +6,8 @@ $(call make-unit-test,test_cpuset,test_cpuset,fd_util)
 $(call run-unit-test,test_cpuset)
 ifdef FD_HAS_WINDOWS
 $(call add-objs,fd_tile_threads_platform_windows,fd_util)
+$(call make-unit-test,test_tile_threads_platform_windows,test_tile_threads_platform_windows,fd_util)
+$(call run-unit-test,test_tile_threads_platform_windows)
 else
 $(call add-objs,fd_tile_threads_platform_linux fd_tile_threads_platform_macos,fd_util)
 endif
