@@ -10,6 +10,30 @@ cd "$(dirname "$0")/.."
 raw_arch="${1:-$(uname -m)}"
 cc="${2:-${TK_WINDOWS_CC:-clang}}"
 
+if ! command -v "$cc" >/dev/null 2>&1; then
+  llvm_paths=("/c/Program Files/LLVM/bin")
+  if [[ -n "${LOCALAPPDATA:-}" ]] && command -v cygpath >/dev/null 2>&1; then
+    local_appdata_unix="$(cygpath -u "$LOCALAPPDATA")"
+    for root in "$local_appdata_unix"/Microsoft/WinGet/Packages/LLVM.LLVM_*; do
+      [[ -d "$root" ]] || continue
+      llvm_paths+=("$root" "$root/bin")
+    done
+  fi
+
+  for llvm_path in "${llvm_paths[@]}"; do
+    [[ -d "$llvm_path" ]] || continue
+    PATH="$llvm_path:$PATH"
+    if command -v "$cc" >/dev/null 2>&1; then
+      break
+    fi
+  done
+fi
+
+if ! command -v "$cc" >/dev/null 2>&1; then
+  echo "Windows compiler '$cc' not found on PATH; install LLVM or set TK_WINDOWS_CC to an explicit compiler path" >&2
+  exit 127
+fi
+
 case "$raw_arch" in
   x86_64|amd64)
     fd_windows_arch="x86_64"
