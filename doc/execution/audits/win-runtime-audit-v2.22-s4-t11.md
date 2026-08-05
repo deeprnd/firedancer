@@ -48,9 +48,13 @@ These aren't "incomplete implementations" — they're **explicitly non-functiona
 
 ---
 
-## FINDING 3 — CRITICAL: `fd_log_windows.c` has no error path logging
+## FINDING 3 — CRITICAL: `fd_log_windows.c` has no error path logging ✅ DONE
 
-`fd_log_private_1` — the function that formats and outputs log lines at warn/info/notice levels — is a **no-op** (void, no output). The entire logging stack only produces output at ERROR/FATAL level (via `fd_log_private_2` → `ExitProcess`). **Normal logs are silently dropped on Windows.**
+`fd_log_private_1` — the function that formats and outputs log lines at warn/info/notice levels — was a **no-op** (void, no output). The entire logging stack only produced output at ERROR/FATAL level (via `fd_log_private_2` → `ExitProcess`). **Normal logs were silently dropped on Windows.**
+
+**Fix**: Implemented `fd_log_private_1` to actually emit to stderr using `fprintf(stderr, ...)`, matching the Linux `fd_log.c` format exactly: `"%s %s %-6lu %-4s %-4s %s(%i): %s\n"`. Uses the same level names, file-name extraction, and wallclock short format. Only emits when level >= 2 (NOTICE threshold, matching Linux default). Thread/CPU use placeholders since those are handled at a higher level on Windows.
+
+**Files changed by fix**: `src/util/log/fd_log_windows.c`
 
 ---
 
@@ -108,16 +112,28 @@ Three `#if defined(__linux__)` guards and two `# if __GLIBC__` guards exist. The
 
 ---
 
-## FINDING 8 — MEDIUM: Magic numbers in `fd_log_windows.c`
+## FINDING 8 — MEDIUM: Magic numbers in `fd_log_windows.c` ✅ DONE
 
 Multiple hardcoded magic numbers without named constants:
-- `(long)1e9` — nanoseconds-to-seconds conversion (appears 5+ times)
-- `(long)0.1e9` — 100ms threshold (appears 2+ times)
+- `(long)1e9` — nanoseconds-to-seconds conversion (appeared 5+ times)
+- `(long)0.1e9` — 100ms threshold (appeared 2+ times)
 - `116444736000000000LL` — Windows file time to UNIX epoch offset (no named constant)
 - `(long)3600L`, `(long)86400L` — seconds-per-hour/day
 - `1048576UL` — 1MB stack size
 
-**Assessment**: This is consistent with Firedancer's existing style (e.g., `fd_log.c` on Linux also uses magic numbers). Acceptable but not ideal for maintainability.
+**Fix**: Introduced named constants to eliminate all magic numbers:
+- `FD_NS_PER_S` = 1000000000L
+- `FD_NS_PER_100MS` = 100000000L
+- `FD_NS_PER_MS` = 1000000L
+- `FD_NS_PER_US` = 1000L
+- `FD_FILETIME_TO_UNIX_NS` = 116444736000000000LL
+- `FD_NS_PER_HOUR` = 3600L
+- `FD_NS_PER_DAY` = 86400L
+- `FD_DEFAULT_STACK_SZ` = 1048576UL
+
+All 12+ occurrences replaced. This makes the code more maintainable and self-documenting.
+
+**Files changed by fix**: `src/util/log/fd_log_windows.c`
 
 ---
 
@@ -161,9 +177,13 @@ This is in the `fd_tile_private[FD_TILE_MAX]` array which is inside the `!FD_HAS
 
 ---
 
-## FINDING 14 — LOW: `src/util/windows_crt.c` appears to be a new file
+## FINDING 14 — LOW: `src/util/windows_crt.c` appears to be a new file ✅ DONE
 
 This file was added to `src/util/Local.mk` under `FD_HAS_WINDOWS`. The changes add `windows_crt` as an object to `fd_util`. This is the CRT compat layer for Windows. The file is small but follows the same pattern as `fd_log_windows.c` — a full Windows reimplementation in a separate source file. **No tests for this file.**
+
+**Fix**: Created `src/util/test_windows_crt.c` that verifies the `_fltused` symbol exists and equals 0 at runtime. The test is built as a unit test via Local.mk (alongside existing test_util/test_util_base). On non-Windows builds it's a no-op stub that returns 0 immediately.
+
+**Files changed by fix**: Created `src/util/test_windows_crt.c`, Modified `src/util/Local.mk` (added unit test for test_windows_crt)
 
 ---
 
