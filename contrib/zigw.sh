@@ -35,19 +35,28 @@ if [[ "$is_windows_arm" -eq 1 && -n "${LOCALAPPDATA:-}" ]]; then
   fi
 fi
 
-if [[ "$using_windows_arm_x64_zig" -eq 1 && "${1:-}" == "build" ]]; then
-  has_target=0
-  for arg in "${@:2}"; do
-    case "$arg" in
-      -Dtarget=*|--target|--target=*)
-        has_target=1
-        break
-        ;;
-    esac
-  done
+# Allow CI / other callers to force the Zig target via env var
+force_target="${ZIG_TARGET_OVERRIDE:-}"
 
-  if [[ "$has_target" -eq 0 ]]; then
-    set -- "$1" "-Dtarget=aarch64-windows-gnu" "${@:2}"
+if [[ "$using_windows_arm_x64_zig" -eq 1 && "${1:-}" == "build" ]]; then
+  # Prefer the env var; otherwise add ARM64 target only if caller didn't
+  # already specify one and we're actually running an x64 Zig binary.
+  if [[ -n "$force_target" ]]; then
+    set -- "$1" "-Dtarget=$force_target" "${@:2}"
+  else
+    has_target=0
+    for arg in "${@:2}"; do
+      case "$arg" in
+        -Dtarget=*|--target|--target=*)
+          has_target=1
+          break
+          ;;
+      esac
+    done
+
+    if [[ "$has_target" -eq 0 ]]; then
+      set -- "$1" "-Dtarget=aarch64-windows-gnu" "${@:2}"
+    fi
   fi
 fi
 
