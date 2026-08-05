@@ -189,44 +189,48 @@ pub const OsChecks = struct {
     }
 
     fn detectEnvironment(io: Io, gpa: Allocator) enum { native, container, wsl, vm } {
-        const cwd = std.Io.Dir.cwd();
+        // Compile-time gate: /proc/ and /sys/ only exist on Linux.
+        // This eliminates dead code from Windows and macOS binaries.
+        if (@import("builtin").target.os.tag == .linux) {
+            const cwd = std.Io.Dir.cwd();
 
-        if (fileExists(cwd, io, "/proc/version")) {
-            var file = std.Io.Dir.openFile(cwd, io, "/proc/version", .{}) catch return .native;
-            defer file.close(io);
-            const data = readFileContents(file, io, gpa, 4096) catch return .native;
-            defer gpa.free(data);
-            if (std.mem.indexOf(u8, data, "microsoft") != null or
-                std.mem.indexOf(u8, data, "WSL") != null)
-            {
-                return .wsl;
+            if (fileExists(cwd, io, "/proc/version")) {
+                var file = std.Io.Dir.openFile(cwd, io, "/proc/version", .{}) catch return .native;
+                defer file.close(io);
+                const data = readFileContents(file, io, gpa, 4096) catch return .native;
+                defer gpa.free(data);
+                if (std.mem.indexOf(u8, data, "microsoft") != null or
+                    std.mem.indexOf(u8, data, "WSL") != null)
+                {
+                    return .wsl;
+                }
             }
-        }
 
-        if (fileExists(cwd, io, "/proc/1/cgroup")) {
-            var file = std.Io.Dir.openFile(cwd, io, "/proc/1/cgroup", .{}) catch return .native;
-            defer file.close(io);
-            const data = readFileContents(file, io, gpa, 4096) catch return .native;
-            defer gpa.free(data);
-            if (std.mem.indexOf(u8, data, "docker") != null or
-                std.mem.indexOf(u8, data, "kubepods") != null)
-            {
-                return .container;
+            if (fileExists(cwd, io, "/proc/1/cgroup")) {
+                var file = std.Io.Dir.openFile(cwd, io, "/proc/1/cgroup", .{}) catch return .native;
+                defer file.close(io);
+                const data = readFileContents(file, io, gpa, 4096) catch return .native;
+                defer gpa.free(data);
+                if (std.mem.indexOf(u8, data, "docker") != null or
+                    std.mem.indexOf(u8, data, "kubepods") != null)
+                {
+                    return .container;
+                }
             }
-        }
 
-        if (fileExists(cwd, io, "/sys/class/dmi/id/product_name")) {
-            var file = std.Io.Dir.openFile(cwd, io, "/sys/class/dmi/id/product_name", .{}) catch return .native;
-            defer file.close(io);
-            const data = readFileContents(file, io, gpa, 4096) catch return .native;
-            defer gpa.free(data);
-            const product = std.mem.trim(u8, data, " \n \r");
-            if (std.mem.eql(u8, product, "VMware Virtual Platform") or
-                std.mem.eql(u8, product, "VirtualBox") or
-                std.mem.indexOf(u8, product, "QEMU") != null or
-                std.mem.indexOf(u8, product, "Hyper-V") != null)
-            {
-                return .vm;
+            if (fileExists(cwd, io, "/sys/class/dmi/id/product_name")) {
+                var file = std.Io.Dir.openFile(cwd, io, "/sys/class/dmi/id/product_name", .{}) catch return .native;
+                defer file.close(io);
+                const data = readFileContents(file, io, gpa, 4096) catch return .native;
+                defer gpa.free(data);
+                const product = std.mem.trim(u8, data, " \n \r");
+                if (std.mem.eql(u8, product, "VMware Virtual Platform") or
+                    std.mem.eql(u8, product, "VirtualBox") or
+                    std.mem.indexOf(u8, product, "QEMU") != null or
+                    std.mem.indexOf(u8, product, "Hyper-V") != null)
+                {
+                    return .vm;
+                }
             }
         }
 
