@@ -37,12 +37,13 @@ Required for every story:
     Ready
 
 GitHub label guidance for story creation:
-  - Required issue-kind label: `story`.
-  - Related issue-kind labels: parent issues use `epic`; child issues use
-    `task`.
+  - Required issue-kind label: `type/story`.
+  - Related issue-kind labels: parent issues use `type/epic`; child issues use
+    `type/task`.
   - Add exactly one boundary/domain label for the story's primary ownership:
-    `agents`, `audit`, `crypto`, `investing`, `operations`, `payments`,
-    `platform`, `security`, `social`, `trust`, or `documentation`.
+    `area/agents`, `area/audit`, `area/crypto`, `area/investing`, `area/operations`,
+    `area/payments`, `area/platform`, `area/security`, `area/social`, `area/trust`,
+    or `type/documentation`.
   - If a story needs several boundary/domain labels, split it into smaller
     stories under the same epic.
   - Add `enhancement` for a new product/runtime capability when useful.
@@ -88,7 +89,7 @@ Read before filling:
 **Status:** [Backlog] upon creation
 **Epic:** #[github-epic-issue]
 **Parent roadmap item:** [VX.Y: Epic title]
-**Labels:** `story`, [exactly one of: `agents` | `audit` | `crypto` | `documentation` | `investing` | `operations` | `payments` | `platform` | `security` | `social` | `trust`], [`enhancement` if applicable]
+**Labels:** `type/story`, [exactly one of: `area/agents` | `area/audit` | `area/crypto` | `type/documentation` | `area/investing` | `area/operations` | `area/payments` | `area/platform` | `area/security` | `area/social` | `area/trust`], [`type/feature` if applicable]
 
 <!-- One sentence: the independently verifiable deliverable. -->
 
