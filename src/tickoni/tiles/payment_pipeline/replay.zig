@@ -6,6 +6,7 @@ const std = @import("std");
 const audit = @import("audit_tile");
 const audit_sink = @import("audit_sink.zig");
 const runtime = @import("runtime.zig");
+const logger = @import("logger");
 
 const PaymentPipelineState = runtime.PaymentPipelineState;
 const PaymentPipelineConfig = runtime.PaymentPipelineConfig;
@@ -13,10 +14,15 @@ const RawPayment = runtime.RawPayment;
 const PolicyDecision = runtime.PolicyDecision;
 
 pub fn runReplay(state: *PaymentPipelineState) void {
+    const log = logger.get();
+    try log.enter("tkrepl", "runReplay");
+    defer log.exit("tkrepl", "runReplay") catch {};
+
     while (!state.audit_done.load(.acquire)) {
         if (state.stop.load(.acquire) and state.crashed_tile.load(.acquire) != runtime.crash_none) {
             state.replay_checked.store(true, .release);
             state.replay_match.store(false, .release);
+            log.err("tkrepl", "runReplay", "aborting replay due to crash") catch {};
             return;
         }
         std.Thread.yield() catch {};
@@ -27,6 +33,7 @@ pub fn runReplay(state: *PaymentPipelineState) void {
     state.replay_divergences.store(divergences, .release);
     state.replay_match.store(divergences == 0, .release);
     state.replay_checked.store(true, .release);
+    log.debug("tkrepl", "runReplay", "replay check complete") catch {};
 }
 
 fn deterministicReplayDivergences(state: *PaymentPipelineState) u64 {
@@ -95,4 +102,10 @@ fn replayDuplicate(config: PaymentPipelineConfig, offset: u64, key: u64, hash: u
         if (raw.idempotency_key == key and runtime.stableEventHash(raw) == hash) return true;
     }
     return false;
+}
+
+test "sandbox failure records crash diagnostics and stops replay" {
+    var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 5, .queue_depth = 2 });
+    defer state.deinit();
+    runReplay(&state);
 }

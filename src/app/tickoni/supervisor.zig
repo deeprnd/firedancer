@@ -9,6 +9,7 @@ const c_abi = @import("c_abi");
 const util = @import("util");
 const topologies = @import("topologies");
 const tile_registry = @import("tile_registry.zig");
+const logger = @import("logger");
 
 const Topology = rt.topology.Topology;
 const TileHandle = rt.tile.TileHandle;
@@ -126,6 +127,9 @@ pub const Supervisor = struct {
     /// host) still belong to startPaymentPipelineProcess: thread mode never
     /// pins CPUs, so it has no live affinity mask to check against here.
     pub fn init(allocator: std.mem.Allocator, topo: Topology) !Supervisor {
+        const log = logger.get();
+        try log.enter("supervisor", "init");
+        defer log.exit("supervisor", "init") catch {};
         try topo.validate();
         try tile_registry.validate(topo);
         const handles = try allocator.alloc(TileHandle, topo.tiles.len);
@@ -142,6 +146,9 @@ pub const Supervisor = struct {
     /// before deinit; this assert makes a forgotten teardown loud instead of
     /// leaking child processes and shared memory.
     pub fn deinit(self: *Supervisor) void {
+        const log = logger.get();
+        try log.enter("supervisor", "deinit");
+        defer log.exit("supervisor", "deinit") catch {};
         std.debug.assert(self.process_state == null);
         self.stop();
         self.allocator.free(self.handles);
@@ -151,6 +158,9 @@ pub const Supervisor = struct {
     ///
     /// Requires topo to be exactly the paymentPipeline shape.
     pub fn startPaymentPipeline(self: *Supervisor, config: PaymentPipelineConfig) !void {
+        const log = logger.get();
+        try log.enter("supervisor", "startPaymentPipeline");
+        defer log.exit("supervisor", "startPaymentPipeline") catch {};
         std.debug.assert(self.pipeline == null);
         std.debug.assert(self.topo.tiles.len == 8);
 
@@ -177,6 +187,7 @@ pub const Supervisor = struct {
             h.thread = try std.Thread.spawn(.{}, threadTrampoline, .{ state, entry.run_fn });
             h.state = .running;
         }
+        log.debug("supervisor", "startPaymentPipeline", "started {d} tile threads", .{self.handles.len}) catch {};
     }
 
     /// Start every tile in the topology as a separate OS process connected
@@ -464,14 +475,15 @@ pub const Supervisor = struct {
         }
     }
 
-    /// Blocks until every spawned tile process exits (without requesting an
-    /// early halt) and records final state/exit_code/crashed_because.
-    /// Leaves process_state intact; pairs with the thread-mode wait().
     pub fn waitProcess(self: *Supervisor, io: std.Io, forced_termination: ?[]const bool) void {
+        const log = logger.get();
+        try log.enter("supervisor", "waitProcess");
+        defer log.exit("supervisor", "waitProcess") catch {};
         const state = self.process_state orelse return;
         for (&state.children, 0..) |*maybe_child, i| {
             var child = maybe_child.* orelse continue;
             const term = child.wait(io) catch {
+                log.err("supervisor", "waitProcess", "wait failed for child tile") catch {};
                 self.handles[i].state = .crashed;
                 self.handles[i].crashed_because = .exit_code;
                 maybe_child.* = null;
@@ -484,6 +496,9 @@ pub const Supervisor = struct {
     }
 
     pub fn refreshProcessHealth(self: *Supervisor) void {
+        const log = logger.get();
+        try log.enter("supervisor", "refreshProcessHealth");
+        defer log.exit("supervisor", "refreshProcessHealth") catch {};
         const state = self.process_state orelse return;
         const now = util.process.monotonicNanos();
         if (now <= 0) return;
@@ -556,6 +571,9 @@ pub const Supervisor = struct {
     /// are not touched by one tile's crash; this only requests a clean
     /// stop of tiles that are still running.
     pub fn stopProcess(self: *Supervisor, io: std.Io) void {
+        const log = logger.get();
+        try log.enter("supervisor", "stopProcess");
+        defer log.exit("supervisor", "stopProcess") catch {};
         const state = self.process_state orelse return;
         self.refreshProcessHealth();
         const stale_before_stop = blk: {
