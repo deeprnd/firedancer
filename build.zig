@@ -1507,57 +1507,59 @@ pub fn build(b: *std.Build) void {
         // already-spawned children exec'ing that same path.
         const process_mode_exe_install = b.addInstallArtifact(exe, .{});
 
-        // v2.14.S1 process-mode payment pipeline: spawns real supervisor-managed
-        // tile processes over Firedancer Tango shared memory. Tickoni internals
-        // run for real; the "external tool" substituted per
-        // doc/execution/testing-tickoni.md's integration-lane rule is the
-        // operator-managed host workspace path, replaced by a scratch
-        // FD_SHMEM_PATH directory under zig-cache/tmp. No huge pages or sudo.
-        const process_pipeline_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/tickoni/test/integration/test_process_pipeline.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                    .{ .name = "util", .module = util_mod },
-                    .{ .name = "supervisor", .module = supervisor_named_mod },
-                    .{ .name = "topologies", .module = topologies_named_mod },
-                },
-            }),
-        });
-        linkTickoniCodec(b, process_pipeline_test, fd_lib_dir);
-        linkTickoniFiredancer(b, process_pipeline_test, fd_lib_dir);
-        linkTickoniTopoRun(b, process_pipeline_test, fd_lib_dir);
-        const run_process_pipeline_test = addPlainTestRun(b, process_pipeline_test);
-        run_process_pipeline_test.step.dependOn(&process_mode_exe_install.step);
-        integration_step.dependOn(&run_process_pipeline_test.step);
-
-        // v2.14.S1 M5: explicit shared-core CPU placement and the
-        // CPU-unavailable fail-closed path, both through the real supervisor.
-        const process_cpu_placement_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/tickoni/test/integration/test_process_cpu_placement.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                    .{ .name = "util", .module = util_mod },
-                    .{ .name = "supervisor", .module = supervisor_named_mod },
-                    .{ .name = "topologies", .module = topologies_named_mod },
-                },
-            }),
-        });
-        linkTickoniCodec(b, process_cpu_placement_test, fd_lib_dir);
-        linkTickoniFiredancer(b, process_cpu_placement_test, fd_lib_dir);
-        linkTickoniTopoRun(b, process_cpu_placement_test, fd_lib_dir);
-        const run_process_cpu_placement_test = addPlainTestRun(b, process_cpu_placement_test);
-        run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
-        integration_step.dependOn(&run_process_cpu_placement_test.step);
-
         if (target.result.os.tag == .linux) {
+            // v2.14.S1 process-mode payment pipeline: spawns real supervisor-managed
+            // tile processes over Firedancer Tango shared memory. Tickoni internals
+            // run for real; the "external tool" substituted per
+            // doc/execution/testing-tickoni.md's integration-lane rule is the
+            // operator-managed host workspace path, replaced by a scratch
+            // FD_SHMEM_PATH directory under zig-cache/tmp. No huge pages or sudo.
+            // Retail targets intentionally exclude these tests because the product
+            // tier contract disables shared-memory topology outside linux_full.
+            const process_pipeline_test = b.addTest(.{
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/tickoni/test/integration/test_process_pipeline.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "util", .module = util_mod },
+                        .{ .name = "supervisor", .module = supervisor_named_mod },
+                        .{ .name = "topologies", .module = topologies_named_mod },
+                    },
+                }),
+            });
+            linkTickoniCodec(b, process_pipeline_test, fd_lib_dir);
+            linkTickoniFiredancer(b, process_pipeline_test, fd_lib_dir);
+            linkTickoniTopoRun(b, process_pipeline_test, fd_lib_dir);
+            const run_process_pipeline_test = addPlainTestRun(b, process_pipeline_test);
+            run_process_pipeline_test.step.dependOn(&process_mode_exe_install.step);
+            integration_step.dependOn(&run_process_pipeline_test.step);
+
+            // v2.14.S1 M5: explicit shared-core CPU placement and the
+            // CPU-unavailable fail-closed path, both through the real supervisor.
+            const process_cpu_placement_test = b.addTest(.{
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/tickoni/test/integration/test_process_cpu_placement.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "util", .module = util_mod },
+                        .{ .name = "supervisor", .module = supervisor_named_mod },
+                        .{ .name = "topologies", .module = topologies_named_mod },
+                    },
+                }),
+            });
+            linkTickoniCodec(b, process_cpu_placement_test, fd_lib_dir);
+            linkTickoniFiredancer(b, process_cpu_placement_test, fd_lib_dir);
+            linkTickoniTopoRun(b, process_cpu_placement_test, fd_lib_dir);
+            const run_process_cpu_placement_test = addPlainTestRun(b, process_cpu_placement_test);
+            run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
+            integration_step.dependOn(&run_process_cpu_placement_test.step);
+
             const process_cpu_placement_linux_test = b.addTest(.{
                 .root_module = b.createModule(.{
                     .root_source_file = b.path("src/tickoni/test/integration/test_process_cpu_placement_linux.zig"),
@@ -1577,34 +1579,31 @@ pub fn build(b: *std.Build) void {
             const run_process_cpu_placement_linux_test = addPlainTestRun(b, process_cpu_placement_linux_test);
             run_process_cpu_placement_linux_test.step.dependOn(&process_mode_exe_install.step);
             integration_step.dependOn(&run_process_cpu_placement_linux_test.step);
-        }
+            // v2.14.S1 M6: process isolation (T13: one OS process per tile,
+            // parented by the supervisor), crash isolation (T12: SIGKILL one
+            // tile, siblings unaffected), and the remaining process-mode
+            // fail-closed configuration checks.
+            const process_topology_test = b.addTest(.{
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/tickoni/test/integration/test_process_topology.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "util", .module = util_mod },
+                        .{ .name = "supervisor", .module = supervisor_named_mod },
+                        .{ .name = "topologies", .module = topologies_named_mod },
+                    },
+                }),
+            });
+            linkTickoniCodec(b, process_topology_test, fd_lib_dir);
+            linkTickoniFiredancer(b, process_topology_test, fd_lib_dir);
+            linkTickoniTopoRun(b, process_topology_test, fd_lib_dir);
+            const run_process_topology_test = addPlainTestRun(b, process_topology_test);
+            run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
+            integration_step.dependOn(&run_process_topology_test.step);
 
-        // v2.14.S1 M6: process isolation (T13: one OS process per tile,
-        // parented by the supervisor), crash isolation (T12: SIGKILL one
-        // tile, siblings unaffected), and the remaining process-mode
-        // fail-closed configuration checks.
-        const process_topology_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/tickoni/test/integration/test_process_topology.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                    .{ .name = "util", .module = util_mod },
-                    .{ .name = "supervisor", .module = supervisor_named_mod },
-                    .{ .name = "topologies", .module = topologies_named_mod },
-                },
-            }),
-        });
-        linkTickoniCodec(b, process_topology_test, fd_lib_dir);
-        linkTickoniFiredancer(b, process_topology_test, fd_lib_dir);
-        linkTickoniTopoRun(b, process_topology_test, fd_lib_dir);
-        const run_process_topology_test = addPlainTestRun(b, process_topology_test);
-        run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
-        integration_step.dependOn(&run_process_topology_test.step);
-
-        if (target.result.os.tag == .linux) {
             const process_topology_linux_test = b.addTest(.{
                 .root_module = b.createModule(.{
                     .root_source_file = b.path("src/tickoni/test/integration/test_process_topology_linux.zig"),
@@ -1625,50 +1624,49 @@ pub fn build(b: *std.Build) void {
             const run_process_topology_linux_test = addPlainTestRun(b, process_topology_linux_test);
             run_process_topology_linux_test.step.dependOn(&process_mode_exe_install.step);
             integration_step.dependOn(&run_process_topology_linux_test.step);
+            // v2.14.S1 M6: demo/replay parity — floating vs. explicit shared-core
+            // CPU placement must reach identical final pipeline metrics through the
+            // real supervisor (T14).
+            const process_demo_parity_test = b.addTest(.{
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/tickoni/test/integration/test_process_demo_parity.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "util", .module = util_mod },
+                        .{ .name = "supervisor", .module = supervisor_named_mod },
+                        .{ .name = "topologies", .module = topologies_named_mod },
+                    },
+                }),
+            });
+            linkTickoniCodec(b, process_demo_parity_test, fd_lib_dir);
+            linkTickoniFiredancer(b, process_demo_parity_test, fd_lib_dir);
+            linkTickoniTopoRun(b, process_demo_parity_test, fd_lib_dir);
+            const run_process_demo_parity_test = addPlainTestRun(b, process_demo_parity_test);
+            run_process_demo_parity_test.step.dependOn(&process_mode_exe_install.step);
+            integration_step.dependOn(&run_process_demo_parity_test.step);
+
+            // v2.14.S1 M6: runtime link fail-closed matrix (dcache bounds, missing link
+            // objects) and backpressure visibility. Single-process — no tile spawn,
+            // so no stdio-inheritance hang risk — uses the normal test-runner path.
+            const link_bounds_test = b.addTest(.{
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/tickoni/test/integration/test_link_bounds.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "util", .module = util_mod },
+                    },
+                }),
+            });
+            linkTickoniCodec(b, link_bounds_test, fd_lib_dir);
+            linkTickoniFiredancer(b, link_bounds_test, fd_lib_dir);
+            integration_step.dependOn(&b.addRunArtifact(link_bounds_test).step);
         }
-
-        // v2.14.S1 M6: demo/replay parity — floating vs. explicit shared-core
-        // CPU placement must reach identical final pipeline metrics through the
-        // real supervisor (T14).
-        const process_demo_parity_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/tickoni/test/integration/test_process_demo_parity.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                    .{ .name = "util", .module = util_mod },
-                    .{ .name = "supervisor", .module = supervisor_named_mod },
-                    .{ .name = "topologies", .module = topologies_named_mod },
-                },
-            }),
-        });
-        linkTickoniCodec(b, process_demo_parity_test, fd_lib_dir);
-        linkTickoniFiredancer(b, process_demo_parity_test, fd_lib_dir);
-        linkTickoniTopoRun(b, process_demo_parity_test, fd_lib_dir);
-        const run_process_demo_parity_test = addPlainTestRun(b, process_demo_parity_test);
-        run_process_demo_parity_test.step.dependOn(&process_mode_exe_install.step);
-        integration_step.dependOn(&run_process_demo_parity_test.step);
-
-        // v2.14.S1 M6: runtime link fail-closed matrix (dcache bounds, missing link
-        // objects) and backpressure visibility. Single-process — no tile spawn,
-        // so no stdio-inheritance hang risk — uses the normal test-runner path.
-        const link_bounds_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/tickoni/test/integration/test_link_bounds.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                    .{ .name = "util", .module = util_mod },
-                },
-            }),
-        });
-        linkTickoniCodec(b, link_bounds_test, fd_lib_dir);
-        linkTickoniFiredancer(b, link_bounds_test, fd_lib_dir);
-        integration_step.dependOn(&b.addRunArtifact(link_bounds_test).step);
 
         // Mock HTTP servers (test/mocks): self-tests of the mock
         // infrastructure itself, no tile schema imports required. Wired to
