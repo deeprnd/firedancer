@@ -157,9 +157,13 @@ The fatal error path previously only emitted to `OutputDebugStringA` — invisib
 
 ---
 
-## FINDING 11 — LOW: Integration tests reference `/proc/` paths
+## FINDING 11 — LOW: Integration tests reference `/proc/` paths ✅ DONE
 
 `src/tickoni/test/integration/test_process_topology_linux.zig` and `test_process_pipeline.zig` reference `/proc/self/exe` and `/proc/{d}/status`. These tests are Linux-only and gated properly (Linux test files), but they confirm the integration test suite is Linux-hardcoded.
+
+**Fix**: Added a `comptime` OS assertion to `test_process_topology_linux.zig` that triggers `@compileError` if the target OS is not Linux. This makes the Linux-only requirement explicit in the source file itself — anyone compiling on Windows/macOS gets a clear diagnostic at the top of the file, rather than a cryptic `/proc/` file-not-found error at runtime. The `build.zig` gate (`if (target.result.os.tag == .linux)`) already prevents these tests from being built on non-Linux platforms, so this is a belt-and-suspenders approach.
+
+**Files changed by fix**: `src/tickoni/test/integration/test_process_topology_linux.zig`
 
 ---
 
