@@ -431,7 +431,8 @@ fd_log_private_1( int          level,
 }
 
 /* FD_LOG_PRIVATE_2 is noreturn — the caller never expects a return.
-   On Windows we use ExitProcess to abort the process. */
+   On Windows we use abort() to produce a proper crash dump with CRT
+   cleanup, atexit handlers, and diagnostic information. */
 void
 fd_log_private_2( int          level,
                   long         now,
@@ -445,9 +446,9 @@ fd_log_private_2( int          level,
   (void)line;
   (void)func;
   (void)msg;
-  /* noreturn: abort the process */
+  /* noreturn: abort the process with CRT cleanup and crash dump */
   OutputDebugStringA( "fd_log_private_2: fatal\n" );
-  ExitProcess( (UINT)1 );
+  abort();
 }
 
 char const *
