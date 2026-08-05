@@ -13,7 +13,7 @@ pub const RunnerError = error{
 pub fn normalizeLineEndings(
     bytes: []const u8,
     allocator: std.mem.Allocator,
-) []u8 {
+) ![]u8 {
     var crlf_count: usize = 0;
     var i: usize = 0;
     while (i < bytes.len) : (i += 1) {
@@ -23,7 +23,7 @@ pub fn normalizeLineEndings(
         }
     }
     const normalized_len = bytes.len - crlf_count;
-    var normalized = allocator.alloc(u8, normalized_len);
+    const normalized = try allocator.alloc(u8, normalized_len);
     var src: usize = 0;
     var dst: usize = 0;
     while (src < bytes.len) {
@@ -73,7 +73,7 @@ pub fn runWithBackend(
         };
         defer allocator.free(audit_bytes);
         // Normalize line endings (\r\n -> \n) for cross-platform hash stability.
-        const normalized = normalizeLineEndings(audit_bytes, allocator);
+        const normalized = try normalizeLineEndings(audit_bytes, allocator);
         defer allocator.free(normalized);
         break :blk conformance.sha256Hex(normalized);
     };
@@ -84,7 +84,7 @@ pub fn runWithBackend(
         };
         defer allocator.free(replay_bytes);
         // Normalize line endings (\r\n -> \n) for cross-platform hash stability.
-        const normalized = normalizeLineEndings(replay_bytes, allocator);
+        const normalized = try normalizeLineEndings(replay_bytes, allocator);
         defer allocator.free(normalized);
         break :blk conformance.sha256Hex(normalized);
     };
