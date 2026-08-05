@@ -26,6 +26,8 @@ $(call make-unit-test,test_util_base,test_util_base,fd_util)
 $(call run-unit-test,test_util_base)
 $(call make-unit-test,test_windows_crt,test_windows_crt,fd_util)
 $(call run-unit-test,test_windows_crt)
+$(call make-unit-test,test_log_windows,test_log_windows,fd_util)
+$(call run-unit-test,test_log_windows)
 ifdef FD_HAS_HOSTED
 $(call make-fuzz-test,fuzz_hash,fuzz_hash,fd_util)
 endif

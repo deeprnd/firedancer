@@ -6,6 +6,8 @@ $(call make-unit-test,test_topob,test_topob,fd_disco fd_ballet fd_tango fd_waltz
 $(call run-unit-test,test_topob)
 ifdef FD_HAS_WINDOWS
 $(call add-objs,fd_cpu_topo_platform_windows,fd_disco)
+$(call make-unit-test,test_cpu_topo_platform_windows,test_cpu_topo_platform_windows,fd_disco fd_ballet fd_tango fd_waltz fd_util)
+$(call run-unit-test,test_cpu_topo_platform_windows)
 else ifdef FD_HAS_MACOS
 $(call add-objs,fd_cpu_topo_platform_macos,fd_disco)
 else
