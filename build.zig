@@ -423,7 +423,7 @@ pub fn build(b: *std.Build) void {
         addTickoniTopoRunShims(b, exe);
         addTickoniTileRunShim(b, exe);
     }
-    linkTickoniSystemLibraries(exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" });
+    linkTickoniSystemLibraries(b, exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" });
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
@@ -594,7 +594,7 @@ pub fn build(b: *std.Build) void {
             "tile_run.c",
             "ballet.c",
         };
-        const shim_flags = shimCFlagsFor(target.result.os.tag);
+        const shim_flags = shimCFlagsFor(target.result);
         const arch_name = switch (target.result.cpu.arch) {
             .x86_64 => "x86_64",
             .aarch64 => "aarch64",
@@ -1103,10 +1103,10 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
             }),
         });
-        const _topo_test_os = topo_run_test.root_module.resolved_target.?.result.os.tag;
+        const _topo_test_target = topo_run_test.root_module.resolved_target.?.result;
         topo_run_test.root_module.addCSourceFiles(.{
             .files = &.{"src/tickoni/c_abi/shim/tile_run_test_stubs.c"},
-            .flags = shimCFlagsFor(_topo_test_os),
+            .flags = shimCFlagsFor(_topo_test_target),
         });
         linkTickoniFiredancer(b, topo_run_test, fd_lib_dir);
         linkTickoniTopoRun(b, topo_run_test, fd_lib_dir);
@@ -1846,7 +1846,7 @@ pub fn build(b: *std.Build) void {
     if (target.result.os.tag == .windows) {
         cli_exe.root_module.linkLibrary(addTickoniCodecShimLibrary(b, target, optimize, "tickoni-codec-shims"));
         addWindowsFdManifestFixups(b, cli_exe, b.fmt("{s}/fd_windows_zig_codec_link.txt", .{fd_lib_dir}));
-        linkTickoniSystemLibraries(cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
+        linkTickoniSystemLibraries(b, cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
         cli_exe.root_module.linkSystemLibrary("crypt32", .{});
     } else {
         linkTickoniCodec(b, cli_exe, fd_lib_dir);
@@ -2160,24 +2160,43 @@ fn addPlainTestRun(b: *std.Build, test_compile: *std.Build.Step.Compile) *std.Bu
 /// Links the Firedancer substrate used by Tickoni runtime wrappers. Tickoni
 /// code crosses Firedancer only through src/tickoni/c_abi/shim/**, so this
 /// compiles the required Tickoni-owned shim files alongside upstream libs.
-fn shimCFlagsFor(target_os: std.Target.Os.Tag) []const []const u8 {
-    return switch (target_os) {
+fn shimCFlagsFor(target: std.Target) []const []const u8 {
+    return switch (target.os.tag) {
         .linux => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_LINUX=1" },
         .macos => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_MACOS=1" },
-        .windows => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1", "-D_CRT_SECURE_NO_WARNINGS", "-DFD_IO_STYLE=1", "-Wno-format", "-Wno-format-extra-args" },
+        .windows => switch (target.cpu.arch) {
+            .aarch64 => &.{
+                "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1",
+                "-D_CRT_SECURE_NO_WARNINGS", "-DFD_IO_STYLE=1", "-DFD_LOG_STYLE=1", "-DFD_HAS_THREADS=1",
+                "-DFD_HAS_ATOMIC=1", "-DFD_HAS_ARM64=1", "-DFD_HAS_INT128=0", "-DFD_HAS_DOUBLE=1",
+                "-DFD_HAS_ALLOCA=1", "-Wno-format", "-Wno-format-extra-args",
+            },
+            .x86_64 => &.{
+                "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1",
+                "-D_CRT_SECURE_NO_WARNINGS", "-DFD_IO_STYLE=1", "-DFD_LOG_STYLE=1", "-DFD_HAS_THREADS=1",
+                "-DFD_HAS_ATOMIC=1", "-DFD_HAS_X86=1", "-DFD_HAS_SSE=1", "-DFD_HAS_AVX=1",
+                "-DFD_HAS_AVX2=1", "-DFD_HAS_AESNI=1", "-DFD_IS_X86_64=1", "-DFD_HAS_INT128=0",
+                "-DFD_HAS_DOUBLE=1", "-DFD_HAS_ALLOCA=1", "-Wno-format", "-Wno-format-extra-args",
+            },
+            else => &.{
+                "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1",
+                "-D_CRT_SECURE_NO_WARNINGS", "-DFD_IO_STYLE=1", "-DFD_LOG_STYLE=1", "-DFD_HAS_THREADS=1",
+                "-DFD_HAS_ATOMIC=1", "-Wno-format", "-Wno-format-extra-args",
+            },
+        },
         else => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1" },
     };
 }
 
 fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniFiredancerShims(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_tango", "fd_util" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_tango", "fd_util" });
 }
 
 fn addTickoniFiredancerShims(b: *std.Build, step: *std.Build.Step.Compile) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
-    const target_os = step.root_module.resolved_target.?.result.os.tag;
+    const target_info = step.root_module.resolved_target.?.result;
     step.root_module.addCSourceFiles(.{
         .files = &.{
             "src/tickoni/c_abi/shim/tango.c",
@@ -2186,12 +2205,12 @@ fn addTickoniFiredancerShims(b: *std.Build, step: *std.Build.Step.Compile) void 
             "src/tickoni/c_abi/shim/sandbox.c",
             "src/tickoni/c_abi/shim/os.c",
         },
-        .flags = shimCFlagsFor(target_os),
+        .flags = shimCFlagsFor(target_info),
     });
 }
 
-fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const u8, libs: []const []const u8) void {
-    step.root_module.addLibraryPath(.{ .cwd_relative = fd_lib_dir });
+fn linkTickoniSystemLibraries(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8, libs: []const []const u8) void {
+    step.root_module.addLibraryPath(b.path(fd_lib_dir));
     for (libs) |lib| step.root_module.linkSystemLibrary(lib, .{});
     if (step.root_module.resolved_target.?.result.os.tag == .windows) {
         // COFF static linking is less forgiving about archive-member discovery
@@ -2218,15 +2237,15 @@ fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const
 /// src/disco/topo/Local.mk's own test_topob unit test.
 fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniTopoRunShims(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
 }
 
 fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
-    const target_os = step.root_module.resolved_target.?.result.os.tag;
+    const target_info = step.root_module.resolved_target.?.result;
 
-    const topo_run_platform_file = switch (target_os) {
+    const topo_run_platform_file = switch (target_info.os.tag) {
         .macos => "src/tickoni/c_abi/shim/topo_run_platform_macos.c",
         .windows => "src/tickoni/c_abi/shim/topo_run_platform_windows.c",
         else => "src/tickoni/c_abi/shim/topo_run_platform_linux.c",
@@ -2234,7 +2253,7 @@ fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
 
     step.root_module.addCSourceFiles(.{
         .files = &.{ "src/tickoni/c_abi/shim/topo_run.c", topo_run_platform_file, "src/tickoni/c_abi/shim/topob.c" },
-        .flags = shimCFlagsFor(target_os),
+        .flags = shimCFlagsFor(target_info),
     });
 }
 
@@ -2250,16 +2269,16 @@ fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
 /// linkTickoniFiredancer and linkTickoniTopoRun.
 fn linkTickoniTileRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniTileRunShim(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
 }
 
 fn addTickoniTileRunShim(b: *std.Build, step: *std.Build.Step.Compile) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
-    const target_os = step.root_module.resolved_target.?.result.os.tag;
+    const target_info = step.root_module.resolved_target.?.result;
     step.root_module.addCSourceFiles(.{
         .files = &.{"src/tickoni/c_abi/shim/tile_run.c"},
-        .flags = shimCFlagsFor(target_os),
+        .flags = shimCFlagsFor(target_info),
     });
 }
 
@@ -2278,12 +2297,12 @@ fn addTickoniShimLibrary(
     mod.addIncludePath(b.path("src"));
     mod.addCSourceFiles(.{
         .files = files,
-        .flags = shimCFlagsFor(target.result.os.tag),
+        .flags = shimCFlagsFor(target.result),
     });
     if (target.result.os.tag == .windows) {
         mod.addCSourceFiles(.{
             .files = &.{"src/tickoni/c_abi/shim/windows_crt.c"},
-            .flags = shimCFlagsFor(target.result.os.tag),
+            .flags = shimCFlagsFor(target.result),
         });
     }
     return b.addLibrary(.{
@@ -2349,17 +2368,17 @@ fn addWindowsFdManifestFixups(b: *std.Build, step: *std.Build.Step.Compile, mani
 /// src/tickoni/codec/audit.zig and src/tickoni/codec/thesis.zig.
 fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniCodecShim(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
 }
 
 fn addTickoniCodecShim(b: *std.Build, step: *std.Build.Step.Compile) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
-    const target_os = step.root_module.resolved_target.?.result.os.tag;
+    const target_info = step.root_module.resolved_target.?.result;
     step.root_module.addCSourceFiles(.{
         .files = &.{
             "src/tickoni/c_abi/shim/ballet.c",
         },
-        .flags = shimCFlagsFor(target_os),
+        .flags = shimCFlagsFor(target_info),
     });
 }

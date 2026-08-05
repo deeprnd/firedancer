@@ -62,7 +62,14 @@ runs:
       if: inputs.zig == 'true' && runner.os == 'Windows'
       shell: pwsh
       run: |
-        python "$env:GITHUB_WORKSPACE/contrib/install-zig.py" --version '${{ inputs.zig-version }}'
+        $zigArgs = @('--version', '${{ inputs.zig-version }}')
+        if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
+          # Native Windows ARM Zig 0.16.0 crashes during Tickoni unit builds on
+          # ARM runners; the x86_64 Windows release reliably cross-targets the
+          # same aarch64-windows-gnu test binaries.
+          $zigArgs += @('--target', 'x86_64-windows')
+        }
+        python "$env:GITHUB_WORKSPACE/contrib/install-zig.py" @zigArgs
 
     - name: Setup Zig via official release (POSIX)
       if: inputs.zig == 'true' && runner.os != 'Windows'
