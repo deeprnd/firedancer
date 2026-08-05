@@ -16,6 +16,28 @@
 #include <stdarg.h>
 #include <windows.h>
 
+/* ── Named constants for magic numbers ────────────────────────────────── */
+
+/* Nanoseconds per second (replaces `(long)1e9`) */
+#define FD_NS_PER_S       1000000000L
+/* Nanoseconds per 100ms threshold (replaces `(long)0.1e9`) */
+#define FD_NS_PER_100MS   100000000L
+/* Nanoseconds per millisecond */
+#define FD_NS_PER_MS      1000000L
+/* Nanoseconds per microsecond */
+#define FD_NS_PER_US      1000L
+/* Windows FILETIME epoch offset to UNIX epoch in 100-ns intervals
+ * File time = 100-ns intervals since 1601-01-01 UTC
+ * UNIX epoch = 1970-01-01 UTC
+ * Difference = 11644473600 seconds = 1164447360000000000 100-ns intervals */
+#define FD_FILETIME_TO_UNIX_NS 116444736000000000LL
+/* Seconds per hour (replaces `(long)3600L`) */
+#define FD_NS_PER_HOUR  3600L
+/* Seconds per day (replaces `(long)86400L`) */
+#define FD_NS_PER_DAY   86400L
+/* Default stack size 1 MB (replaces `1048576UL`) */
+#define FD_DEFAULT_STACK_SZ 1048576UL
+
 /* ── Thread-local storage helpers ─────────────────────────────────────── */
 
 /* FD_TL is already defined in fd_util_base.h — do not redefine */
@@ -65,8 +87,7 @@ fd_log_wallclock( void ) {
      * Difference = 11644473600 seconds
      * Use long long to avoid 32-bit truncation, then cast to long for return.
      * On Windows x64/ARM64, long is 64-bit so this fits. */
-    long long offset_ns = 116444736000000000LL;
-    return (long)( ui.QuadPart * 100LL - offset_ns );
+    return (long)( ui.QuadPart * 100LL - FD_FILETIME_TO_UNIX_NS );
   }
   return fd_log_private_clock_func( fd_log_private_clock_args );
 }
@@ -79,7 +100,7 @@ fd_log_wallclock_host( void const * _ ) {
   ULARGE_INTEGER ui;
   ui.LowPart  = ft.dwLowDateTime;
   ui.HighPart = ft.dwHighDateTime;
-  long long offset_ns = 116444736000000000LL;
+  long long offset_ns = FD_FILETIME_TO_UNIX_NS;
   return (long)( ui.QuadPart * 100LL - offset_ns );
 }
 
@@ -95,14 +116,14 @@ fd_log_wallclock_cstr( long   now,
                        char * buf ) {
   /* Simplified wallclock string — uses system time */
   SYSTEMTIME st;
-  long t  = now / (long)1e9;
-  long ns = now - t * (long)1e9;
-  if( ns < 0L ) { ns += (long)1e9; t--; }
+  long t  = now / FD_NS_PER_S;
+  long ns = now - t * FD_NS_PER_S;
+  if( ns < 0L ) { ns += FD_NS_PER_S; t--; }
 
   long s = t % 60L;
   long m = (t / 60L) % 60L;
-  long h = (t / 3600L) % 24L;
-  long d = (t / 86400L);
+  long h = (t / FD_NS_PER_HOUR) % 24L;
+  long d = (t / FD_NS_PER_DAY);
 
   /* Compute year/month/day from day-since-epoch */
   /* Simplified: use GetLocalTime as fallback */
@@ -151,7 +172,7 @@ fd_log_wallclock_cstr( long   now,
   memcpy( buf+17, sec_buf, 2 );
   buf[19] = '.';
   /* Milliseconds with nanosecond padding */
-  unsigned long msec = (unsigned long)( (ns / 1000000L) % 1000L );
+  unsigned long msec = (unsigned long)( (ns / FD_NS_PER_MS) % 1000L );
   buf[20] = '0' + (msec / 100);
   buf[21] = '0' + (msec / 10) % 10;
   buf[22] = '0' + msec % 10;
@@ -173,7 +194,7 @@ fd_log_sleep( long dt ) {
   }
   long ns_dt = fd_long_min( dt, (((long)1e9)<<31)-1L );
   dt -= ns_dt;
-  long ms = (long)((ulong)ns_dt / 1000000UL);
+  long ms = (long)((ulong)ns_dt / FD_NS_PER_MS);
   if( ms < 1L ) ms = 1L;
   Sleep( (DWORD)ms );
   return dt;
@@ -185,16 +206,16 @@ fd_log_wait_until( long then ) {
     long now = fd_log_wallclock();
     long rem = then - now;
     if( rem <= 0L ) break;
-    if( rem > (long)1e9 ) {
-      fd_log_sleep( rem - (long)0.1e9 );
+    if( rem > FD_NS_PER_S ) {
+      fd_log_sleep( rem - FD_NS_PER_100MS );
       continue;
     }
-    if( rem > (long)0.1e9 ) {
+    if( rem > FD_NS_PER_100MS ) {
       SwitchToThread();
       continue;
     }
     /* Very short wait: just poll wallclock */
-    if( rem > 100L ) Sleep(0);
+    if( rem > FD_NS_PER_US ) Sleep(0);
   }
   return then - fd_log_wallclock();
 }
@@ -297,7 +318,7 @@ fd_log_group_id_query( ulong group_id ) {
 ulong
 fd_log_private_main_stack_sz( void ) {
   /* Conservative estimate: 1 MB minimum stack for tile process */
-  return 1048576UL; /* 1 MB */
+  return FD_DEFAULT_STACK_SZ; /* 1 MB */
 }
 
 /* ── fd_log_cpu_set / fd_log_thread_set / fd_log_private_tid_set ──────── */
@@ -414,6 +435,18 @@ fd_log_private_0( char const * fmt,
   return buf;
 }
 
+/* Log level names — matches Linux fd_log.c level_cstr[] */
+static char const * fd_log_private_level_cstr[] = {
+  /* 0 */ "DEBUG  ",
+  /* 1 */ "INFO   ",
+  /* 2 */ "NOTICE ",
+  /* 3 */ "WARNING",
+  /* 4 */ "ERR    ",
+  /* 5 */ "CRIT   ",
+  /* 6 */ "ALERT  ",
+  /* 7 */ "EMERG  "
+};
+
 void
 fd_log_private_1( int          level,
                   long         now,
@@ -421,13 +454,46 @@ fd_log_private_1( int          level,
                   int          line,
                   char const * func,
                   char const * msg ) {
-  (void)level;
-  (void)now;
-  (void)file;
-  (void)line;
   (void)func;
-  (void)msg;
-  /* No-op: actual log output deferred to fd_log_private_1_formatted */
+
+  /* Only emit if level >= stderr threshold (matching Linux default of 2 = NOTICE) */
+  if( level < 2 ) return;
+
+  char cstr[ FD_LOG_WALLCLOCK_CSTR_BUF_SZ ];
+  fd_log_wallclock_cstr( now, cstr );
+
+  /* Short wallclock: lop off year (5) + ns resolution (12) + tz (5) = chars 5-26 */
+  char short_cstr[ 32 ];
+  memcpy( short_cstr, cstr + 5, 21 ); /* YYYY-MM-DD hh:mm:ss. */
+  short_cstr[ 21 ] = '\0';
+
+  /* Get just the file name (lop off directory path, matching Linux line 828) */
+  char const * file_name = file;
+  if( file ) {
+    char const * slash = strrchr( file, '/' );
+    if( slash ) file_name = slash + 1;
+    /* Also handle Windows backslash paths */
+    char const * backslash = strrchr( file, '\\' );
+    if( backslash && ( !slash || backslash > slash ) ) file_name = backslash + 1;
+  }
+
+  /* Get thread name and CPU name — on Windows these are handled at
+   * a higher level, so we use placeholders. The Linux version
+   * calls fd_log_thread() and fd_log_cpu() here. */
+  char const * thread_name = "[thread]";
+  char const * cpu_name    = "[cpu]";
+
+  /* Format: "%s %s %-6lu %-4s %-4s %s(%i): %s\n"
+   * Matches Linux fd_log.c line 830 format exactly. */
+  fprintf( stderr, "%s %s %-6lu %-4s %-4s %s(%i): %s\n",
+           fd_log_private_level_cstr[ fd_ulong_if( (uint)level < 8, (uint)level, 3 /* WARNING */ ) ],
+           short_cstr,
+           fd_log_group_id(),
+           cpu_name,
+           thread_name,
+           file_name ? file_name : "[unknown]",
+           line,
+           msg ? msg : "[no message]" );
 }
 
 /* FD_LOG_PRIVATE_2 is noreturn — the caller never expects a return.
