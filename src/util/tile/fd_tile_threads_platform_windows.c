@@ -15,7 +15,7 @@
 static inline void
 fd_tile_private_cpu_config( fd_tile_private_cpu_config_t * save,
                             ulong                          cpu_idx ) {
-  (void)cpu_idx; *save = 0;
+  (void)cpu_idx; fd_memset( save, 0, sizeof( *save ) );
 }
 
 static inline void
