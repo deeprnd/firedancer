@@ -175,13 +175,11 @@ The fatal error path previously only emitted to `OutputDebugStringA` — invisib
 
 ---
 
-## FINDING 13 — LOW: `fd_tile_private_manager_args_t` uses `pthread_t` on Windows
+## FINDING 13 — LOW: `fd_tile_private_manager_args_t` uses `pthread_t` on Windows ✅ DONE
 
-Line 426 of `fd_tile_threads.c`:
-```c
-pthread_t pthread;
-```
-This is in the `fd_tile_private[FD_TILE_MAX]` array which is inside the `!FD_HAS_WINDOWS` block, so it's fine. But the Windows stub path (line 898+) has no `pthread` field at all, meaning the struct layout differs between platforms. This is handled by preprocessor guards but worth noting for any future refactoring.
+The struct `fd_tile_private_manager_args_t` contains a `pthread_t pthread` field in `fd_tile_threads_platform_linux.c`. The Windows stub (`fd_tile_threads_platform_windows.c`) has no equivalent struct — it uses inline stub implementations and does not reference thread IDs or pthreads at all.
+
+**Resolution**: The per-platform file split (Finding 1) inherently resolves this. The `pthread_t` field exists only in `fd_tile_threads_platform_linux.c`. There is no shared struct definition — each platform file is fully independent. No preprocessor guards or `#ifdef` gymnastics are needed because the files never compile together.
 
 ---
 
