@@ -3,6 +3,8 @@ author: deeprnd
 date: 2026-07-02
 ---
 
+# ADR-02: Static inline and FFI
+
 **Q: A systems library exposes a hot-path function as `static inline` in its
 headers. Something outside that library, in a different compiled language,
 needs to call it through FFI. `static inline` has no linkable symbol —
