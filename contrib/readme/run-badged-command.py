@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a shell command and update the named README.md badge with the result."""
+"""Run a shell command and update the named testing-tickoni.md badge with the result."""
 
 import os
 import signal
@@ -10,7 +10,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
-LOCK_PATH = REPO_ROOT / "README.md.lock"
+LOCK_PATH = REPO_ROOT / "doc/execution/testing-tickoni.md.lock"
 LOCK_POLL_S = 0.05
 LOCK_TIMEOUT_S = 30
 
@@ -48,7 +48,7 @@ def acquire_lock() -> None:
             except (ValueError, OSError):
                 pass  # lock disappeared between checks — retry
         time.sleep(LOCK_POLL_S)
-    raise TimeoutError(f"Timed out waiting for README lock after {LOCK_TIMEOUT_S}s")
+    raise TimeoutError(f"Timed out waiting for testing doc lock after {LOCK_TIMEOUT_S}s")
 
 
 def release_lock() -> None:
