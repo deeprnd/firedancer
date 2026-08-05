@@ -432,7 +432,11 @@ fd_log_private_1( int          level,
 
 /* FD_LOG_PRIVATE_2 is noreturn — the caller never expects a return.
    On Windows we use abort() to produce a proper crash dump with CRT
-   cleanup, atexit handlers, and diagnostic information. */
+   cleanup, atexit handlers, and diagnostic information. Unlike Linux
+   where fd_log_private_1 writes to stderr before aborting, this
+   Windows path's fd_log_private_1 is a no-op, so we must emit the
+   fatal message here to stderr so it's visible in console/CI, not
+   just in DbgView/VS Output window via OutputDebugStringA. */
 void
 fd_log_private_2( int          level,
                   long         now,
@@ -440,13 +444,40 @@ fd_log_private_2( int          level,
                   int          line,
                   char const * func,
                   char const * msg ) {
-  (void)level;
-  (void)now;
-  (void)file;
-  (void)line;
-  (void)func;
-  (void)msg;
-  /* noreturn: abort the process with CRT cleanup and crash dump */
+  /* Write fatal error to stderr in the same format as Linux
+   * fd_log_private_1 (line 830): "%s %s %-6lu %-4s %-4s %s(%i): %s\n"
+   * so Windows users see the same diagnostic output in console/CI. */
+  char cstr[ FD_LOG_WALLCLOCK_CSTR_BUF_SZ ];
+  fd_log_wallclock_cstr( now, cstr );
+
+  /* Get the short wallclock (lop off year + ns like Linux line 827) */
+  char short_cstr[ 256 ];
+  memcpy( short_cstr, cstr, 31 ); /* YYYY-MM-DD hh:mm:ss. */
+  short_cstr[ 31 ] = '\0';
+
+  /* Get just the file name (lop off directory path like Linux line 829) */
+  char const * file_name = file;
+  if( file ) {
+    char const * slash = strrchr( file, '/' );
+    if( slash ) file_name = slash + 1;
+    /* Also try backslash for Windows paths */
+    char const * backslash = strrchr( file, '\\' );
+    if( backslash && ( !slash || backslash > slash ) ) file_name = backslash + 1;
+  }
+
+  char const * level_cstr = "FATAL";
+  FILE * log_fp = stderr;
+
+  fprintf( log_fp, "%s %s %-6lu %-4lu %-4lu %s(%i): %s\n",
+           level_cstr, short_cstr,
+           fd_log_group_id(),
+           fd_log_cpu_id(),
+           fd_log_thread_id(),
+           file_name ? file_name : "[unknown]",
+           line,
+           msg ? msg : "[no message]" );
+
+  /* Send to Visual Studio / DbgView for developers who have it attached. */
   OutputDebugStringA( "fd_log_private_2: fatal\n" );
   abort();
 }
