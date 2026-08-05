@@ -81,7 +81,7 @@ tests-all:
 # ── Build ──────────────────────────────────────────────────────────────────
 
 build-tk:
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}}
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir={{fd_tickoni_lib}}
 
 # tickoni_fd machine profile: builds only the 5 Firedancer libraries
 # Tickoni reuses (tango, util, ballet, disco, waltz). Excludes
@@ -255,14 +255,14 @@ test-unit-fd:
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.
 test-unit-tk:
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
 
 # Print computed hash and wire bytes for every audit fixture event, and emit audit JSONL.
 # Use the output to understand or snapshot the current encoding after intentional changes.
 gen-audit-fixtures:
-	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true test 2>&1
-	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true integration-test 2>&1
+	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true test 2>&1
+	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true integration-test 2>&1
 
 test-unit-all:
 	python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
@@ -281,35 +281,35 @@ test-integration-fd:
 
 # Tickoni integration lane: transport and boundary wiring against local mocks.
 test-integration-tk:
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # ── Windows-specific test recipes ────────────────────────────────────────────
 
 # Windows x86_64 unit test: build FD libs for Windows x86_64, then run Zig tests.
 test-unit-tk-windows-x86:
 	just build-fd-windows-x86 2>&1 | tee build/fd-windows-x86.log
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
 
 # Windows ARM64 unit test: build FD libs for Windows ARM64, then run Zig tests.
-# On the ARM64 Windows runner Zig compiles natively for aarch64-windows;
-# the --target override triggered a Zig 0.16.0 cross-compilation segfault.
+# contrib/zigw.sh prefers an x86_64 Windows Zig install on Windows ARM when
+# available because native Zig 0.16.0 is unstable on this lane.
 test-unit-tk-windows-arm:
 	just build-fd-windows-arm 2>&1 | tee build/fd-windows-arm.log
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
 
 # Windows x86_64 integration test: build FD libs for Windows x86_64, then run Zig integration tests.
 test-integration-tk-windows-x86:
 	just build-fd-windows-x86 > build/fd-windows-x86.log 2>&1
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # Windows ARM64 integration test: build FD libs for Windows ARM64, then run Zig integration tests.
-# On the ARM64 Windows runner Zig compiles natively for aarch64-windows;
-# the --target override triggered a Zig 0.16.0 cross-compilation segfault.
+# contrib/zigw.sh prefers an x86_64 Windows Zig install on Windows ARM when
+# available because native Zig 0.16.0 is unstable on this lane.
 test-integration-tk-windows-arm:
 	just build-fd-windows-arm > build/fd-windows-arm.log 2>&1
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # Deterministic offline investment conformance suite — fixture-backed, no llama.cpp required.
 test-demo-tk:
