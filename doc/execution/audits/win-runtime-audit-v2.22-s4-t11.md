@@ -12,7 +12,7 @@
 OS switches (`FD_HAS_WINDOWS`, `builtin.target.os.tag`) previously existed in non-shim, non-build files. Resolved by splitting into per-platform files following the `topo_run_platform_*` pattern:
 
 - **`src/disco/topo/fd_cpu_topo.c`** — replaced with thin dispatcher (15 lines). Platform logic moved to `fd_cpu_topo_platform_linux.c` and `fd_cpu_topo_platform_windows.c`. `fd_cpu_topo_platform.h` provides declarations.
-- **`src/disco/topo/fd_topo.h`** — PATH_MAX redefine and `sock_filter` fwd-decl moved to `fd_topo_platform.h`.
+- **`src/disco/topo/fd_topo.h`** — PATH_MAX redefine moved to `fd_topo_platform.h`. `sock_filter` type resolved by including the actual header (`<linux/filter.h>` on Linux, `<sys/bpf.h>` on macOS) so the function-pointer type matches across translation units.
 - **`src/util/tile/fd_tile_threads.c`** — replaced with thin dispatcher (9 lines). Platform logic moved to `fd_tile_threads_platform_linux.c` (full Linux/macOS impl), `fd_tile_threads_platform_windows.c` (stub), and `fd_tile_threads_platform_macos.c` (delegates to Linux source with `__MACH__` defined).
 
 **Files changed by fix**:

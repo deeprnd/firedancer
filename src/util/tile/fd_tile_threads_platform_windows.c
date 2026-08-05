@@ -10,7 +10,8 @@
 #include "fd_tile_private.h"
 #include "fd_tile_threads_platform.h"
 
-typedef int fd_tile_private_cpu_config_t;
+/* Windows stub uses the same struct type as the platform header so that
+   the definition is consistent across all platforms. */
 static inline void
 fd_tile_private_cpu_config( fd_tile_private_cpu_config_t * save,
                             ulong                          cpu_idx ) {
