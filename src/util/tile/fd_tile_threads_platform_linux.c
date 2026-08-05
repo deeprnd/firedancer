@@ -24,6 +24,13 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
+/* MADV_DONTFORK is available on macOS but may not be exposed
+ * by <sys/mman.h> depending on the SDK version / feature macros.
+ * Define it as a fallback — value 6 is the same across macOS/Linux. */
+#ifndef MADV_DONTFORK
+#define MADV_DONTFORK 6
+#endif
+
 #include "../sanitize/fd_sanitize.h"
 #include "../fd_util_base.h"
 #include "fd_tile_private.h"
