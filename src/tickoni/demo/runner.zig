@@ -9,12 +9,11 @@ pub const RunnerError = error{
 };
 
 /// Normalize line endings (\r\n -> \n) for cross-platform hash stability.
-/// Returns a new allocator-owned buffer; caller must free.
-/// Returns the original buffer (unmodified) on OOM.
+/// Always allocates and returns a new buffer; caller must free.
 pub fn normalizeLineEndings(
     bytes: []const u8,
     allocator: std.mem.Allocator,
-) ![]u8 {
+) []u8 {
     var crlf_count: usize = 0;
     var i: usize = 0;
     while (i < bytes.len) : (i += 1) {
@@ -24,8 +23,7 @@ pub fn normalizeLineEndings(
         }
     }
     const normalized_len = bytes.len - crlf_count;
-    var normalized = try allocator.alloc(u8, normalized_len);
-    errdefer allocator.free(normalized);
+    var normalized = allocator.alloc(u8, normalized_len);
     var src: usize = 0;
     var dst: usize = 0;
     while (src < bytes.len) {
@@ -70,24 +68,24 @@ pub fn runWithBackend(
     if (!backend.external_effects_disabled) return RunnerError.LiveEffectsEnabled;
 
     const audit_hash = if (backend.audit_jsonl_path.len == 0) conformance.sha256Hex("") else blk: {
-        var audit_bytes = cwd.readFileAlloc(io, backend.audit_jsonl_path, allocator, .limited(512 * 1024)) catch {
+        const audit_bytes = cwd.readFileAlloc(io, backend.audit_jsonl_path, allocator, .limited(512 * 1024)) catch {
             return RunnerError.ArtifactReadFailed;
         };
         defer allocator.free(audit_bytes);
         // Normalize line endings (\r\n -> \n) for cross-platform hash stability.
-        const normalized = normalizeLineEndings(audit_bytes, allocator) catch audit_bytes;
-        defer if (normalized != audit_bytes) allocator.free(normalized);
+        const normalized = normalizeLineEndings(audit_bytes, allocator);
+        defer allocator.free(normalized);
         break :blk conformance.sha256Hex(normalized);
     };
 
     const replay_hash = if (backend.replay_capsule_path.len == 0) conformance.sha256Hex("") else blk: {
-        var replay_bytes = cwd.readFileAlloc(io, backend.replay_capsule_path, allocator, .limited(512 * 1024)) catch {
+        const replay_bytes = cwd.readFileAlloc(io, backend.replay_capsule_path, allocator, .limited(512 * 1024)) catch {
             return RunnerError.ArtifactReadFailed;
         };
         defer allocator.free(replay_bytes);
         // Normalize line endings (\r\n -> \n) for cross-platform hash stability.
-        const normalized = normalizeLineEndings(replay_bytes, allocator) catch replay_bytes;
-        defer if (normalized != replay_bytes) allocator.free(normalized);
+        const normalized = normalizeLineEndings(replay_bytes, allocator);
+        defer allocator.free(normalized);
         break :blk conformance.sha256Hex(normalized);
     };
 
