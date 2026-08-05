@@ -105,14 +105,16 @@ This is inside the `!FD_HAS_WINDOWS` block, so it's fine. But it's a **duplicate
 
 ---
 
-## FINDING 7 — MEDIUM: `__GLIBC__` and `__linux__` guards in `fd_tile_threads.c`
+## FINDING 7 — MEDIUM: `__GLIBC__` and `__linux__` guards in `fd_tile_threads.c` ✅ DONE
 
 Three `#if defined(__linux__)` guards and two `# if __GLIBC__` guards exist. These are for Linux-specific features:
-- `prctl(PR_SET_NAME)` for thread naming
-- `madvise(MADV_DONTFORK)` for fork protection
-- `sched_setaffinity` vs `pthread_attr_setaffinity_np`
+- `prctl(PR_SET_NAME)` for thread naming — already correctly gated with `#elif defined(__MACH__)`
+- `madvise(MADV_DONTFORK)` for fork protection — fixed (see below)
+- `sched_setaffinity` vs `pthread_attr_setaffinity_np` — correctly gated
 
-**Assessment**: These are reasonable Linux-specific feature detection patterns. However, macOS (`__MACH__`) is handled inconsistently — thread naming uses `pthread_setname_np` but the `madvise(MADV_DONTFORK)` block only has Linux. macOS should use a different approach or fall back to no-op.
+**Fix**: Extended the `madvise(MADV_DONTFORK)` guard from `#if defined(__linux__)` to `#if defined(__linux__) || defined(__MACH__)`. Both Linux and macOS support `MADV_DONTFORK` (macOS since 10.9). Windows has no `fork()` so the `#else` path remains a no-op. Added a clarifying comment.
+
+**Files changed by fix**: `src/util/tile/fd_tile_threads_platform_linux.c`
 
 ---
 
