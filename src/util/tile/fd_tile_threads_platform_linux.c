@@ -455,6 +455,13 @@ fd_tile_task_t fd_tile_exec_task( fd_tile_exec_t const * exec ) { return ((fd_ti
 int            fd_tile_exec_argc( fd_tile_exec_t const * exec ) { return ((fd_tile_private_t const *)exec)->argc; }
 char **        fd_tile_exec_argv( fd_tile_exec_t const * exec ) { return ((fd_tile_private_t const *)exec)->argv; }
 
+int
+fd_tile_exec_done( fd_tile_exec_t const * exec ) {
+  fd_tile_private_t const * tile = (fd_tile_private_t const *)exec;
+  int state = FD_VOLATILE_CONST( tile->state );
+  return (int)( state != FD_TILE_PRIVATE_STATE_EXEC );
+}
+
 
 /* Boot/halt APIs ****************************************************/
 

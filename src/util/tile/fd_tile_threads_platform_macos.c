@@ -8,6 +8,8 @@
    All those differences are preprocessor-gated in the shared Linux
    source, so we simply define __MACH__ before including it. */
 
+#define _GNU_SOURCE
+#define _DARWIN_C_SOURCE
 #define __MACH__ 1
 #define FD_HAS_MACOS 1
 
