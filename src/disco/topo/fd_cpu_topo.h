@@ -3,7 +3,6 @@
 
 #include "../fd_disco_base.h"
 #include "../../util/tile/fd_tile.h"
-#include "fd_cpu_topo_platform.h"
 
 struct fd_topo_cpu {
   ulong idx;
