@@ -16,9 +16,13 @@ OS switches (`FD_HAS_WINDOWS`, `builtin.target.os.tag`) previously existed in no
 - **`src/util/tile/fd_tile_threads.c`** — replaced with thin dispatcher (9 lines). Platform logic moved to `fd_tile_threads_platform_linux.c` (full Linux/macOS impl), `fd_tile_threads_platform_windows.c` (stub), and `fd_tile_threads_platform_macos.c` (delegates to Linux source with `__MACH__` defined).
 
 **Files changed by fix**:
-- Created: `fd_cpu_topo_platform.h`, `fd_cpu_topo_platform_linux.c`, `fd_cpu_topo_platform_windows.c`, `fd_topo_platform.h`, `fd_tile_threads_platform.h`, `fd_tile_threads_platform_linux.c`, `fd_tile_threads_platform_windows.c`, `fd_tile_threads_platform_macos.c`
-- Modified: `fd_cpu_topo.c`, `fd_cpu_topo.h`, `fd_topo.h`, `src/util/tile/Local.mk`
+- Created: `fd_cpu_topo_platform.h`, `fd_cpu_topo_platform_linux.c`, `fd_cpu_topo_platform_windows.c`, `fd_cpu_topo_platform_macos.c`, `fd_topo_platform.h`, `fd_tile_threads_platform.h`, `fd_tile_threads_platform_linux.c`, `fd_tile_threads_platform_macos.c`, `fd_tile_threads_platform_windows.c`
+- Modified: `fd_cpu_topo.c`, `fd_cpu_topo.h`, `fd_topo.h`, `src/disco/topo/Local.mk`, `src/util/tile/Local.mk`
 - Unchanged (correctly already platform files): `fd_log_windows.c`, `fd_windows_compat.h`
+
+**Files changed by subsequent fix** (circular include + macOS stub):
+- Created: `fd_cpu_topo_platform_macos.c`
+- Modified: `src/disco/topo/Local.mk` (add platform objs + macOS ifdef), `src/disco/topo/fd_cpu_topo.h` (remove circular include)
 
 **Remaining OS switches** (acceptable — gated in shim/build files only):
 - `src/util/log/fd_log_windows.c` — entirely Windows-specific (new file)
