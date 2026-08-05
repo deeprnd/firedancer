@@ -61,6 +61,12 @@ runs:
     - name: Setup Zig via official release (Windows)
       if: inputs.zig == 'true' && runner.os == 'Windows'
       shell: pwsh
+      env:
+        # Force Zig to target aarch64-windows-gnu on ARM runners.
+        # zigw.sh reads ZIG_TARGET_OVERRIDE and passes it as -Dtarget.
+        # Without this, Zig defaults to x64 → "arm64 conflicts with x64" when
+        # linking ARM64 C objects compiled by the MSVC toolchain.
+        ZIG_TARGET_OVERRIDE: ${{ runner.os == 'Windows' && runner.arch == 'ARM64' && 'aarch64-windows-gnu' || '' }}
       run: |
         $zigArgs = @('--version', '${{ inputs.zig-version }}')
         if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
