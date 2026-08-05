@@ -408,7 +408,8 @@ jobs:
       - uses: ./.github/actions/build-fd-tk-libs
 
       - name: Build supervisor
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 
       - name: Export Linux conformance bundle
         run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/linux
@@ -442,7 +443,8 @@ jobs:
         run: just build-fd-macos-x86_64
 
       - name: Build supervisor
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 
       - name: Export macOS 15 x86_64 conformance bundle
         run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/macos-15-x86_64
@@ -476,7 +478,8 @@ jobs:
         run: just build-fd-macos-arm
 
       - name: Build supervisor
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 
       - name: Export macOS 15 ARM conformance bundle
         run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/macos-15-arm
@@ -510,7 +513,8 @@ jobs:
         run: just build-fd-macos-x86_64
 
       - name: Build supervisor
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 
       - name: Export macOS 26 x86_64 conformance bundle
         run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/macos-26-x86_64
@@ -544,7 +548,8 @@ jobs:
         run: just build-fd-macos-arm
 
       - name: Build supervisor
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 
       - name: Export macOS 26 ARM conformance bundle
         run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/macos-26-arm
@@ -578,7 +583,7 @@ jobs:
 
       - name: Build supervisor
         shell: bash
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 
       - name: Export Windows x86_64 conformance bundle
         shell: bash
@@ -613,7 +618,7 @@ jobs:
 
       - name: Build supervisor
         shell: bash
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 
       - name: Export Windows ARM64 conformance bundle
         shell: bash
