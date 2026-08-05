@@ -129,9 +129,11 @@ Multiple hardcoded magic numbers without named constants:
 
 ---
 
-## FINDING 10 — MEDIUM: Windows logging uses `OutputDebugStringA`
+## FINDING 10 — MEDIUM: Windows logging uses `OutputDebugStringA` ✅ DONE
 
-The only Windows diagnostic output for fatal errors goes through `OutputDebugStringA` — which only appears in Visual Studio's Output window or DbgView. This is a **debug-only channel** and will be invisible in production/CI environments. A Windows user will see `ExitProcess(1)` with no explanation of why.
+The fatal error path previously only emitted to `OutputDebugStringA` — invisible outside VS/DbgView. Fixed by adding a `fprintf(stderr, ...)` call that writes the fatal message to stderr in the same format as Linux `fd_log_private_1`. This makes the error visible in Windows console/CI output. `OutputDebugStringA` is retained as a bonus for developers who have a debugger attached.
+
+**Files changed by fix**: `src/util/log/fd_log_windows.c`
 
 ---
 
