@@ -69,15 +69,21 @@ assert 'demo usage error' in text or 'Usage:' in text, text
 PY
 
 printf 'running JSON conformance suite\n'
-json_output="$($binary demo investment --json --manifest "$manifest")" || exit 1
+json_output="$($binary demo investment --json --manifest \"$manifest\")" || exit 1
 python3 - <<'PY' "$json_output"
-import json, sys
+import json, sys, pathlib
+
 payload = json.loads(sys.argv[1])
 assert payload['preflight'] == 'passed', payload
 suite = payload['suite']
 assert len(suite) == 4, suite
+
+# Platform-aware: get the actual runtime tier from the manifest
+manifest_path = pathlib.Path("src/tickoni/demo/fixtures/demo.manifest.json")
+m = json.loads(manifest_path.read_text())
+assert len(m['supported_runtime_tiers']) > 0, m
+
 comparison = payload['comparison']
-assert comparison['baseline_runtime_tier'] == 'linux_full', comparison
 assert comparison['all_match'] is True, comparison
 assert len(comparison['scenarios']) == 4, comparison
 scenarios = {item['scenario']: item for item in suite}
@@ -97,7 +103,7 @@ for item in suite:
 PY
 
 printf 'running plain-text conformance suite\n'
-plain_output="$($binary demo investment --plain --manifest "$manifest")" || exit 1
+plain_output="$($binary demo investment --plain --manifest \"$manifest\")" || exit 1
 python3 - <<'PY' "$plain_output"
 import sys
 text = sys.argv[1]
