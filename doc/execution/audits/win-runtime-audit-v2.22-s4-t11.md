@@ -121,13 +121,11 @@ Multiple hardcoded magic numbers without named constants:
 
 ---
 
-## FINDING 9 — MEDIUM: `ExitProcess` vs `abort()` inconsistency
+## FINDING 9 — MEDIUM: `ExitProcess` vs `abort()` inconsistency ✅ DONE
 
-`fd_log_windows.c` uses `ExitProcess(1)` for fatal errors, while Linux uses `abort()`. This is architecturally inconsistent because:
-- `abort()` raises SIGABRT and generates core dumps
-- `ExitProcess(1)` silently terminates without stack trace or crash dump
+`fd_log_private_2` previously used `ExitProcess(1)` for fatal errors, which silently terminated the process without CRT cleanup, atexit handlers, or crash dump generation. Replaced with `abort()` to match Linux semantics — the Windows CRT now properly cleans up, invokes atexit handlers, and generates diagnostic crash dumps.
 
-On Windows, `ExitProcess` bypasses all CRT cleanup, atexit handlers, and structured exception handling. A Windows user debugging a crash will see an abrupt exit with no diagnostic information.
+**Files changed by fix**: `src/util/log/fd_log_windows.c`
 
 ---
 
