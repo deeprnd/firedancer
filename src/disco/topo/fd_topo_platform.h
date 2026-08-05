@@ -11,17 +11,18 @@
    one seen by callers (fd_metric_tile.c, fd_diag_tile.c, etc.).
 
    Linux:     <linux/filter.h>   (also pulled in by seccomp headers)
-   macOS/bsd: <sys/bpf.h>
+   BSD:       <sys/bpf.h>
+   macOS:     forward-decl only (no <sys/bpf.h> on Darwin)
    Windows:   forward-decl only (seccomp not available)
    Fallback:  forward-decl (type is opaque anyway — we only pass
               pointers, never dereference)
    */
 #if defined(__linux__)
 #include <linux/filter.h>
-#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 #include <sys/bpf.h>
 #else
-/* Windows or other: forward-declare only. */
+/* macOS, Windows, or other: forward-declare only. */
 struct sock_filter;
 #endif
 
