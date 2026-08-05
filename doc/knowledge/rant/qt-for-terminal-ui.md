@@ -1,5 +1,5 @@
 ---
-adr: "0001"
+adr: "03"
 title: "Choose Qt for the Tickoni desktop terminal UI"
 status: "proposed"
 date: "2026-08-05"
@@ -38,23 +38,6 @@ The terminal build will use CMake as its authoritative build system, with
 CMake presets and explicit compiler/architecture lanes. The Zig runtime and CLI
 remain under `build.zig`; Qt Creator kits are developer conveniences rather than
 the source of truth for supported builds.
-
-## Status
-
-Status: Proposed
-
-Date: 2026-08-05
-
-Owner: deeprnd
-
-Review by: After the V2.19 cross-platform prototype and before the first public
-binary release
-
-Implementation state: Not started
-
-Supersedes: none
-
-Superseded by: none
 
 ## Context and Problem Statement
 
