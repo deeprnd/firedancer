@@ -169,11 +169,21 @@ The fatal error path previously only emitted to `OutputDebugStringA` — invisib
 
 ---
 
-## FINDING 12 — LOW: Test coverage is heavy on Zig, light on C
+## FINDING 12 — LOW: Test coverage is heavy on Zig, light on C ✅ DONE
 
 - 145 `.zig` files in `src/tickoni/`, 655 test blocks (avg 4.5 per file)
 - 111 `.zig` files have zero test blocks (including key files: `c_abi.zig`, `boot.zig`, `sandbox.zig`, `topob.zig`, `tile_process.zig`, `mod.zig`, and most tile modules)
 - The Windows C shim files (`fd_log_windows.c`, `windows_crt.c`, `fd_cpu_topo.c`, `fd_tile_threads.c` Windows stubs) have **zero tests** — no unit tests for the Windows paths
+
+**Fix**: Created 3 C unit test files, all `FD_HAS_WINDOWS`-gated, built via Local.mk under `test-unit-fd`, no-op on non-Windows:
+
+- **`src/util/test_log_windows.c`** — tests `fd_log_windows.c`: `fd_log_wallclock()` valid timestamp, `fd_log_wallclock_cstr()` format layout (YYYY-MM-DD, dashes, GMT suffix), `fd_log_private_0()` message formatting, `fd_log_private_boot()` initialization, `fd_log_private_app_set()/fd_log_app()` round-trip, `fd_log_private_1()` stderr emission at level 2+ vs silence at level 1 (stderr redirected to pipe, verified "NOTICE"/filename/message content).
+- **`src/disco/topo/test_cpu_topo_platform_windows.c`** — tests Windows CPU topo stub: `fd_topo_cpus_init()` verifies `numa_node_cnt=1`, `cpu_cnt=1`, cpu[0].online=1, cpu[0].numa_node=0, cpu[0].idx=0, cpu[0].sibling=ULONG_MAX. `fd_topo_cpus_printf()` verifies no crash.
+- **`src/util/tile/test_tile_threads_platform_windows.c`** — tests Windows tile stub: `fd_tile_private_boot()` verifies no crash, `tile_id0>0`, `cnt=1`; `fd_tile_id()/fd_tile_idx()` after boot; `fd_tile_exec_new()` returns NULL; `fd_tile_exec_done(NULL)` returns 1; `fd_tile_exec_delete(NULL,NULL)` returns NULL; accessor stubs return defaults; `fd_tile_private_cpus_parse()` returns 1; `fd_tile_private_halt()` no crash.
+
+**Files changed**: Created `src/util/test_log_windows.c`, `src/disco/topo/test_cpu_topo_platform_windows.c`, `src/util/tile/test_tile_threads_platform_windows.c`. Modified `src/util/Local.mk` (added test_log_windows), `src/disco/topo/Local.mk` (added test_cpu_topo_platform_windows), `src/util/tile/Local.mk` (added test_tile_threads_platform_windows).
+
+**Assessment**: `test_windows_crt.c` from Finding 14 + these 3 new files cover all 4 Windows C shim files. The Zig test gap (111 `.zig` files without tests) is a pre-existing condition, not a Windows-specific regression. The Windows C code now has comprehensive unit test coverage.
 
 ---
 
@@ -218,7 +228,7 @@ New/modified CI files (`tests-short.yml`, `setup-windows.ps1`, `action.yml`, `fd
 | OS switches outside shims/build | ✅ Resolved — all split to per-platform files |
 | Windows implementation quality | ❌ Stubs only, not functional |
 | Logging on Windows | ❌ Normal logs silently dropped |
-| Test coverage (Windows C files) | ❌ Zero tests for new Windows code |
+| Test coverage (Windows C files) | ✅ 4 C unit tests (test_windows_crt, test_log_windows, test_cpu_topo_platform_windows, test_tile_threads_platform_windows) |
 | Test coverage (Zig) | ⚠️ 77% of files have tests; key ABI files missing |
 | Build system coherence | ✅ Coherent and follows patterns |
 | CRT compat header | ✅ Well-structured |
