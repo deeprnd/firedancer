@@ -6,8 +6,8 @@
   <img alt="Maturity" src="https://img.shields.io/badge/maturity-alpha-orange?style=flat-square" />
 
   <!-- badge:build:start -->
-<img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
-<!-- badge:build:end -->
+  <img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
+  <!-- badge:build:end -->
 
   <!-- badge:unit:start -->
   <img alt="Unit Tests" src="https://img.shields.io/badge/tests-passing-brightgreen?style=flat-square" />
