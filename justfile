@@ -241,16 +241,35 @@ test-all:
 
 # Build test binaries: libs + unit-test target.
 # Uses FD_TK_LIB_TEST_SRCS (extra: picohttpparser, blst, lz4, zstd, nanopb).
+# Linux runs the native Firedancer C unit-test binaries below (gcc-12 build +
+# run-unit-test). macOS and Windows have no native fd C unit-test lane (see
+# short-tests-macos-*/short-tests-windows-* in tests-short.yml, which only
+# build fd libs and run the Zig tk unit tests); route those hosts the same
+# way build-fd does and fall back to test-unit-tk.
 test-unit-fd:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	case "$(uname -s)" in
+	os="$(uname -s)"
+	case "$os" in
+	  Linux) ;;
+	  Darwin)
+	    arch="$(uname -m)"
+	    if [[ "$arch" =~ ^(arm64|aarch64)$ ]]; then
+	      exec bash -lc 'just build-fd-macos-arm && just test-unit-tk'
+	    else
+	      exec bash -lc 'just build-fd-macos-x86_64 && just test-unit-tk'
+	    fi
+	    ;;
 	  MINGW*|MSYS*|CYGWIN*)
 	    case "$(bash contrib/detect-windows-arch.sh)" in
 	      arm64) exec bash -lc 'just build-fd-windows-arm && just test-unit-tk-windows-arm' ;;
 	      x86_64) exec bash -lc 'just build-fd-windows-x86 && just test-unit-tk-windows-x86' ;;
 	      *) echo "unsupported Windows arch for test-unit-fd" >&2; exit 1 ;;
 	    esac
+	    ;;
+	  *)
+	    echo "unsupported host OS for test-unit-fd: $os" >&2
+	    exit 1
 	    ;;
 	esac
 	set timeout := 600
