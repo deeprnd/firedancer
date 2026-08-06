@@ -22,6 +22,7 @@ pub const audit_seed: u64 = 0xcbf29ce484222325;
 /// own id here (tknorm for malformed_drop, tkpoly for allow/deny/
 /// duplicate_drop) instead of every record being attributed to tkpoly.
 pub const tile_id_tknorm: [6]u8 = "tknorm".*;
+pub const tile_id_tkdedu: [6]u8 = "tkdedu".*;
 pub const tile_id_tkpoly: [6]u8 = "tkpoly".*;
 
 pub const AuditLog = struct {

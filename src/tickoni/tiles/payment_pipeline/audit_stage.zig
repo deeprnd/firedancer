@@ -7,6 +7,7 @@ const std = @import("std");
 const runtime = @import("runtime.zig");
 const queue = @import("queue.zig");
 const logger = @import("logger");
+const audit_sink = @import("audit_sink.zig");
 
 const PaymentPipelineState = runtime.PaymentPipelineState;
 
@@ -40,5 +41,16 @@ pub fn runAudit(state: *PaymentPipelineState) void {
 test "sandbox failure records crash diagnostics and stops audit" {
     var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 5, .queue_depth = 2 });
     defer state.deinit();
+
+    // Feed a valid event, then close the queue to force runAudit to exit
+    try state.q_poly_audit.push(.{
+        .raw = runtime.RawPayment{ .source_offset = 0, .idempotency_key = 1, .account_id = 0, .amount_cents = 100, .currency = .{ 'U', 'S', 'D' } },
+        .pipeline_hops = 1,
+        .duplicate = false,
+        .decision = .allow,
+        .decided_by = audit_sink.tile_id_tkpoly,
+        .event_hash = 0,
+    }, &state.stop);
+    state.q_poly_audit.close();
     runAudit(&state);
 }
