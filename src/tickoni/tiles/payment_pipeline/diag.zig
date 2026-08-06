@@ -27,5 +27,8 @@ pub fn runDiag(state: *PaymentPipelineState) void {
 test "sandbox failure records crash diagnostics and stops diag" {
     var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 5, .queue_depth = 2 });
     defer state.deinit();
+
+    // Signal that replay is checked so runDiag does not busy-wait forever
+    state.replay_checked.store(true, .release);
     runDiag(&state);
 }

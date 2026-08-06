@@ -107,5 +107,8 @@ fn replayDuplicate(config: PaymentPipelineConfig, offset: u64, key: u64, hash: u
 test "sandbox failure records crash diagnostics and stops replay" {
     var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 5, .queue_depth = 2 });
     defer state.deinit();
+
+    // Signal that audit is done so runReplay does not busy-wait forever
+    state.audit_done.store(true, .release);
     runReplay(&state);
 }

@@ -32,5 +32,8 @@ pub fn runMetric(state: *PaymentPipelineState) void {
 test "sandbox failure records crash diagnostics and stops metric" {
     var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 5, .queue_depth = 2 });
     defer state.deinit();
+
+    // Signal that replay is checked so runMetric does not busy-wait forever
+    state.replay_checked.store(true, .release);
     runMetric(&state);
 }
