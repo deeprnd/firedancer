@@ -91,7 +91,11 @@ def badge_unknown(alt: str, label: str) -> str:
     return build_badge(alt, label, *UNKNOWN)
 
 
-LEADING = "  "
+def _leading_of_line(doc_text: str, pos: int) -> str:
+    """Return whitespace at the start of the line containing pos."""
+    nl = doc_text.rfind("\n", 0, pos)
+    line_start = nl + 1 if nl != -1 else 0
+    return doc_text[line_start:pos]
 
 
 def replace_badge_block(doc_text: str, name: str, badge_line: str) -> str:
@@ -106,8 +110,19 @@ def replace_badge_block(doc_text: str, name: str, badge_line: str) -> str:
     if end < start:
         raise ValueError(f"Badge markers out of order for '{name}'")
 
-    block = f"{LEADING}{start_marker}\n{LEADING}{badge_line}\n{LEADING}{end_marker}"
-    return doc_text[:start] + block + doc_text[end + len(end_marker):]
+    img_pos = doc_text.find("<img", start, end)
+    if img_pos == -1:
+        raise ValueError(f"No img tag found for badge '{name}'")
+
+    # Replace the entire img line (preserve leading, swap only the img)
+    line_start = doc_text.rfind("\n", 0, img_pos)
+    line_start = line_start + 1 if line_start != -1 else 0
+    leading = doc_text[line_start:img_pos]
+    line_end = doc_text.find("\n", img_pos)
+    if line_end == -1:
+        line_end = len(doc_text)
+
+    return doc_text[:line_start] + leading + badge_line + doc_text[line_end:]
 
 
 def update_badge(name: str, exit_code: int, doc_path: Path | None = None) -> None:

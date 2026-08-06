@@ -4,15 +4,15 @@ This document summarizes the justfile-oriented test layers for the current
 Tickoni repository.
 
 <p align="center">
-      <!-- badge:build:start -->
+  <!-- badge:build:start -->
   <img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
   <!-- badge:build:end -->
 
-      <!-- badge:quality:start -->
+  <!-- badge:quality:start -->
   <img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" />
   <!-- badge:quality:end -->
 
-      <!-- badge:security:start -->
+  <!-- badge:security:start -->
   <img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
   <!-- badge:security:end -->
 </p>
@@ -20,29 +20,29 @@ Tickoni repository.
 <p align="center">
   <!-- badge:unit:start -->
   <img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-unknown-lightgrey?style=flat-square" />
-<!-- badge:unit:end -->
+  <!-- badge:unit:end -->
 
   <!-- badge:integration:start -->
   <img alt="Integration Tests" src="https://img.shields.io/badge/integration%20tests-unknown-lightgrey?style=flat-square" />
-<!-- badge:integration:end -->
+  <!-- badge:integration:end -->
 
   <!-- badge:system:start -->
   <img alt="System Tests" src="https://img.shields.io/badge/system%20tests-unknown-lightgrey?style=flat-square" />
-<!-- badge:system:end -->
+  <!-- badge:system:end -->
 
   <!-- badge:e2e:start -->
   <img alt="E2E Tests" src="https://img.shields.io/badge/e2e%20tests-unknown-lightgrey?style=flat-square" />
-<!-- badge:e2e:end -->
+  <!-- badge:e2e:end -->
 </p>
 
 <p align="center">
   <!-- badge:cov-fd:start -->
   <img alt="Engine Coverage" src="https://img.shields.io/badge/engine%20coverage-unknown-lightgrey?style=flat-square" />
-<!-- badge:cov-fd:end -->
+  <!-- badge:cov-fd:end -->
 
   <!-- badge:cov-tk:start -->
   <img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-unknown-lightgrey?style=flat-square" />
-<!-- badge:cov-tk:end -->
+  <!-- badge:cov-tk:end -->
 </p>
 
 The [Testing Firedancer](../testing.md) page is the Firedancer-style test
