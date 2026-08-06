@@ -1,9 +1,47 @@
-The below applies to all contents of this repository unless explicitly
-noted.  See NOTICE for additional information.
+LICENSING SCOPE
+
+This repository contains materials under multiple licenses.
+
+Except where explicitly stated otherwise, the Apache License,
+Version 2.0 applies to the software source code, build files,
+configuration files, tests, examples, APIs, SDKs, and technical
+documentation in this repository.
+
+The GNU General Public License, version 3 only, applies to:
+
+- all files under src/tickoni/ui/;
+- terminal-specific tests and build files located outside that
+  directory when they are expressly marked GPL-3.0-only;
+- any other files expressly identified as GPL-3.0-only.
+
+The full GPL-3.0-only license text is provided in:
+
+    LICENSES/GPL-3.0-only.txt
+
+The following materials are excluded from both Apache-2.0 and
+GPL-3.0-only:
+
+- all files under doc/strategy/lore/;
+- all files under doc/strategy/roadmap/releases/;
+- all files under assets/characters/;
+- all files under assets/lore/;
+- all files under assets/release-art/;
+- any other materials expressly identified as governed by
+  CONTENT-LICENSE.md.
+
+Those creative materials are governed by CONTENT-LICENSE.md.
+
+See LICENSING.md for the repository license map and NOTICE for
+applicable attribution information.
+
+This licensing scope statement is separate from, and does not modify,
+the Apache License, Version 2.0. The unmodified Apache license text
+follows.
 
 =======================================================================
 
    Copyright 2022 Firedancer Contributors
+   Copyright © 2026 Victor Genin (Tickoni modifications)
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
