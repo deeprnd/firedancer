@@ -361,7 +361,8 @@ v0.16
     - [Grammar](#Grammar)
     - [Zen](#Zen)
 
-## [Introduction](#toc-Introduction) [§](#Introduction)
+## Introduction {#Introduction}
+
 
 [Zig](https://ziglang.org) is a general-purpose programming language and toolchain for maintaining **robust**, **optimal**, and **reusable** software.
 
@@ -383,7 +384,8 @@ The code samples in this document are compiled and tested as part of the main te
 
 This HTML document depends on no external files, so you can use it offline.
 
-## [Zig Standard Library](#toc-Zig-Standard-Library) [§](#Zig-Standard-Library)
+## Zig Standard Library {#Zig-Standard-Library}
+
 
 The [Zig Standard Library](https://ziglang.org/documentation/0.16.0/std/) has its own documentation.
 
@@ -397,7 +399,8 @@ Shell
 zig std
 ```
 
-## [Hello World](#toc-Hello-World) [§](#Hello-World)
+## Hello World {#Hello-World}
+
 
 hello.zig
 
@@ -449,7 +452,8 @@ See also:
 - [Source Encoding](#Source-Encoding)
 - [try](#try)
 
-## [Comments](#toc-Comments) [§](#Comments)
+## Comments {#Comments}
+
 
 Zig supports 3 types of comments. Normal comments are ignored, but doc comments and top-level doc comments are used by the compiler to generate the package documentation.
 
@@ -486,7 +490,8 @@ Hello, world!
 
 There are no multiline comments in Zig (e.g. like `/* */` comments in C). This allows Zig to have the property that each line of code can be tokenized out of context.
 
-### [Doc Comments](#toc-Doc-Comments) [§](#Doc-Comments)
+### Doc Comments {#Doc-Comments}
+
 
 A doc comment is one that begins with exactly three slashes (i.e. `///` but not `////`); multiple doc comments in a row are merged together to form a multiline doc comment. The doc comment documents whatever immediately follows it.
 
@@ -550,7 +555,8 @@ $ zig build-obj unattached_doc-comment.zig
 
 Doc comments can be interleaved with normal comments, which are ignored.
 
-### [Top-Level Doc Comments](#toc-Top-Level-Doc-Comments) [§](#Top-Level-Doc-Comments)
+### Top-Level Doc Comments {#Top-Level-Doc-Comments}
+
 
 A top-level doc comment is one that begins with two slashes and an exclamation point: `//!`; it documents the current module.
 
@@ -570,11 +576,13 @@ const S = struct {
 };
 ```
 
-## [Identifiers](#toc-Identifiers) [§](#Identifiers)
+## Identifiers {#Identifiers}
+
 
 Identifiers must start with an alphabetic character or underscore and may be followed by any number of alphanumeric characters or underscores. They must not overlap with any keywords. See [Keyword Reference](#Keyword-Reference).
 
-### [String Identifier Syntax](#toc-String-Identifier-Syntax) [§](#String-Identifier-Syntax)
+### String Identifier Syntax {#String-Identifier-Syntax}
+
 
 If a name that does not fit these requirements is needed, such as for linking with external libraries, the `@""` syntax may be used.
 
@@ -595,7 +603,8 @@ const Color = enum {
 const color: Color = .@"really red";
 ```
 
-## [Values](#toc-Values) [§](#Values)
+## Values {#Values}
+
 
 values.zig
 
@@ -686,7 +695,8 @@ type: error{ExampleErrorVariant}!i32
 value: 1234
 ```
 
-### [Primitive Types](#toc-Primitive-Types) [§](#Primitive-Types)
+### Primitive Types {#Primitive-Types}
+
 
 | Type | C Equivalent | Description |
 | --- | --- | --- |
@@ -736,7 +746,8 @@ See also:
 - [Errors](#Errors)
 - [@Int](#Int)
 
-### [Primitive Values](#toc-Primitive-Values) [§](#Primitive-Values)
+### Primitive Values {#Primitive-Values}
+
 
 | Name | Description |
 | --- | --- |
@@ -749,7 +760,8 @@ See also:
 - [Optionals](#Optionals)
 - [undefined](#undefined)
 
-### [String Literals and Unicode Code Point Literals](#toc-String-Literals-and-Unicode-Code-Point-Literals) [§](#String-Literals-and-Unicode-Code-Point-Literals)
+### String Literals and Unicode Code Point Literals {#String-Literals-and-Unicode-Code-Point-Literals}
+
 
 String literals are constant single-item [Pointers](#Pointers) to null-terminated byte arrays. The type of string literals encodes both the length, and the fact that they are null-terminated, and thus they can be [coerced](#Type-Coercion) to both [Slices](#Slices) and [Null-Terminated Pointers](#Sentinel-Terminated-Pointers). Dereferencing string literals converts them to [Arrays](#Arrays).
 
@@ -807,7 +819,8 @@ See also:
 - [Arrays](#Arrays)
 - [Source Encoding](#Source-Encoding)
 
-#### [Escape Sequences](#toc-Escape-Sequences) [§](#Escape-Sequences)
+#### Escape Sequences {#Escape-Sequences}
+
 
 | Escape Sequence | Name |
 | --- | --- |
@@ -822,7 +835,8 @@ See also:
 
 Note that the maximum valid Unicode scalar value is `0x10ffff`.
 
-#### [Multiline String Literals](#toc-Multiline-String-Literals) [§](#Multiline-String-Literals)
+#### Multiline String Literals {#Multiline-String-Literals}
+
 
 Multiline string literals have no escapes and can span across multiple lines. To start a multiline string literal, use the `\\` token. Just like a comment, the string literal goes until the end of the line. The end of the line is not included in the string literal. However, if the next line begins with `\\` then a newline is appended and the string literal continues.
 
@@ -843,7 +857,8 @@ See also:
 
 - [@embedFile](#embedFile)
 
-### [Assignment](#toc-Assignment) [§](#Assignment)
+### Assignment {#Assignment}
+
 
 Use the `const` keyword to assign a value to an identifier:
 
@@ -927,7 +942,8 @@ $ zig build-exe var_must_be_initialized.zig
               ^
 ```
 
-#### [undefined](#toc-undefined) [§](#undefined)
+#### undefined {#undefined}
+
 
 Use `undefined` to leave variables uninitialized:
 
@@ -955,7 +971,8 @@ $ ./assign_undefined
 
 In [Debug](#Debug) and [ReleaseSafe](#ReleaseSafe) mode, Zig writes `0xaa` bytes to undefined memory. This is to catch bugs early, and to help detect use of undefined memory in a debugger. However, this behavior is only an implementation feature, not a language semantic, so it is not guaranteed to be observable to code.
 
-#### [Destructuring](#toc-Destructuring) [§](#Destructuring)
+#### Destructuring {#Destructuring}
+
 
 A destructuring assignment can separate elements of indexable aggregate types ([Tuples](#Tuples), [Arrays](#Arrays), [Vectors](#Vectors)):
 
@@ -1042,7 +1059,8 @@ See also:
 - [Destructuring Arrays](#Destructuring-Arrays)
 - [Destructuring Vectors](#Destructuring-Vectors)
 
-## [Zig Test](#toc-Zig-Test) [§](#Zig-Test)
+## Zig Test {#Zig-Test}
+
 
 Code written within one or more `test` declarations can be used to ensure behavior meets expectations:
 
@@ -1108,7 +1126,8 @@ The shell output shown above displays two lines after the zig test command. Thes
 - **All 2 tests passed.**
   This line indicates the total number of tests that have passed.
 
-### [Test Declarations](#toc-Test-Declarations) [§](#Test-Declarations)
+### Test Declarations {#Test-Declarations}
+
 
 Test declarations contain the [keyword](#Keyword-Reference) `test`, followed by an optional name written as a [string literal](#String-Literals-and-Unicode-Code-Point-Literals) or an [identifier](#Identifiers), followed by a [block](#Blocks) containing any valid Zig code that is allowed in a [function](#Functions).
 
@@ -1123,13 +1142,15 @@ See also:
 - [The Global Error Set](#The-Global-Error-Set)
 - [Grammar](#Grammar)
 
-#### [Doctests](#toc-Doctests) [§](#Doctests)
+#### Doctests {#Doctests}
+
 
 Test declarations named using an identifier are *doctests*. The identifier must refer to another declaration in scope. A doctest, like a [doc comment](#Doc-Comments), serves as documentation for the associated declaration, and will appear in the generated documentation for the declaration.
 
 An effective doctest should be self-contained and focused on the declaration being tested, answering questions a new user might have about its interface or intended usage, while avoiding unnecessary or confusing details. A doctest is not a substitute for a doc comment, but rather a supplement and companion providing a testable, code-driven example, verified by zig test.
 
-### [Test Failure](#toc-Test-Failure) [§](#Test-Failure)
+### Test Failure {#Test-Failure}
+
 
 The default test runner checks for an [error](#Errors) returned from a test. When a test returns an error, the test is considered a failure and its [error return trace](#Error-Return-Traces) is output to standard error. The total number of failures will be reported after all tests have run.
 
@@ -1164,7 +1185,8 @@ error: the following test command failed with exit code 1:
 /home/andy/src/zig/.zig-cache/o/8b3fa8da11c9a50847bac61c047fa567/test --seed=0xf0359694
 ```
 
-### [Skip Tests](#toc-Skip-Tests) [§](#Skip-Tests)
+### Skip Tests {#Skip-Tests}
+
 
 One way to skip tests is to filter them out by using the zig test command line parameter --test-filter [text]. This makes the test build only include tests whose name contains the supplied filter text. Note that non-named tests are run even when using the --test-filter [text] command line parameter.
 
@@ -1186,7 +1208,8 @@ $ zig test testing_skip.zig
 0 passed; 1 skipped; 0 failed.
 ```
 
-### [Report Memory Leaks](#toc-Report-Memory-Leaks) [§](#Report-Memory-Leaks)
+### Report Memory Leaks {#Report-Memory-Leaks}
+
 
 When code allocates [Memory](#Memory) using the [Zig Standard Library](#Zig-Standard-Library)'s testing allocator, `std.testing.allocator`, the default test runner will report any leaks that are found from using the testing allocator:
 
@@ -1251,7 +1274,8 @@ See also:
 - [defer](#defer)
 - [Memory](#Memory)
 
-### [Detecting Test Build](#toc-Detecting-Test-Build) [§](#Detecting-Test-Build)
+### Detecting Test Build {#Detecting-Test-Build}
+
 
 Use the [compile variable](#Compile-Variables) `@import("builtin").is_test` to detect a test build:
 
@@ -1279,11 +1303,13 @@ $ zig test testing_detect_test.zig
 All 1 tests passed.
 ```
 
-### [Test Output and Logging](#toc-Test-Output-and-Logging) [§](#Test-Output-and-Logging)
+### Test Output and Logging {#Test-Output-and-Logging}
+
 
 The default test runner and the Zig Standard Library's testing namespace output messages to standard error.
 
-### [The Testing Namespace](#toc-The-Testing-Namespace) [§](#The-Testing-Namespace)
+### The Testing Namespace {#The-Testing-Namespace}
+
 
 The Zig Standard Library's `testing` namespace contains useful functions to help you create tests. In addition to the `expect` function, this document uses a couple of more functions as exemplified here:
 
@@ -1323,11 +1349,13 @@ All 2 tests passed.
 
 The Zig Standard Library also contains functions to compare [Slices](#Slices), strings, and more. See the rest of the `std.testing` namespace in the [Zig Standard Library](#Zig-Standard-Library) for more available functions.
 
-### [Test Tool Documentation](#toc-Test-Tool-Documentation) [§](#Test-Tool-Documentation)
+### Test Tool Documentation {#Test-Tool-Documentation}
+
 
 zig test has a few command line parameters which affect the compilation. See zig test --help for a full list.
 
-## [Variables](#toc-Variables) [§](#Variables)
+## Variables {#Variables}
+
 
 A variable is a unit of [Memory](#Memory) storage.
 
@@ -1341,7 +1369,8 @@ See also:
 
 - [Exporting a C Library](#Exporting-a-C-Library)
 
-### [Container Level Variables](#toc-Container-Level-Variables) [§](#Container-Level-Variables)
+### Container Level Variables {#Container-Level-Variables}
+
 
 [Container](#Containers) level variables have static lifetime and are order-independent and lazily analyzed. The initialization value of container level variables is implicitly [comptime](#comptime). If a container level variable is `const` then its value is `comptime`-known, otherwise it is runtime-known.
 
@@ -1403,7 +1432,8 @@ $ zig test test_namespaced_container_level_variable.zig
 All 1 tests passed.
 ```
 
-### [Static Local Variables](#toc-Static-Local-Variables) [§](#Static-Local-Variables)
+### Static Local Variables {#Static-Local-Variables}
+
 
 It is also possible to have local variables with static lifetime by using containers inside functions.
 
@@ -1435,7 +1465,8 @@ $ zig test test_static_local_variable.zig
 All 1 tests passed.
 ```
 
-### [Thread Local Variables](#toc-Thread-Local-Variables) [§](#Thread-Local-Variables)
+### Thread Local Variables {#Thread-Local-Variables}
+
 
 A variable may be specified to be a thread-local variable using the `threadlocal` keyword, which makes each thread work with a separate instance of the variable:
 
@@ -1474,7 +1505,8 @@ For [Single Threaded Builds](#Single-Threaded-Builds), all thread local variable
 
 Thread local variables may not be `const`.
 
-### [Local Variables](#toc-Local-Variables) [§](#Local-Variables)
+### Local Variables {#Local-Variables}
+
 
 Local variables occur inside [Functions](#Functions), [comptime](#comptime) blocks, and [@cImport](#cImport) blocks.
 
@@ -1514,9 +1546,11 @@ $ zig test test_comptime_variables.zig
 All 1 tests passed.
 ```
 
-## [Integers](#toc-Integers) [§](#Integers)
+## Integers {#Integers}
 
-### [Integer Literals](#toc-Integer-Literals) [§](#Integer-Literals)
+
+### Integer Literals {#Integer-Literals}
+
 
 integer_literals.zig
 
@@ -1534,7 +1568,8 @@ const permissions = 0o7_5_5;
 const big_address = 0xFF80_0000_0000_0000;
 ```
 
-### [Runtime Integer Values](#toc-Runtime-Integer-Values) [§](#Runtime-Integer-Values)
+### Runtime Integer Values {#Runtime-Integer-Values}
+
 
 Integer literals have no size limitation, and if any Illegal Behavior occurs, the compiler catches it.
 
@@ -1558,7 +1593,8 @@ See also:
 
 - [Wrapping Operations](#Wrapping-Operations)
 
-## [Floats](#toc-Floats) [§](#Floats)
+## Floats {#Floats}
+
 
 Zig has the following floating point types:
 
@@ -1569,7 +1605,8 @@ Zig has the following floating point types:
 - `f128` - IEEE-754-2008 binary128
 - `c_longdouble` - matches `long double` for the target C ABI
 
-### [Float Literals](#toc-Float-Literals) [§](#Float-Literals)
+### Float Literals {#Float-Literals}
+
 
 Float literals have type `comptime_float` which is guaranteed to have the same precision and operations of the largest other floating point type, which is `f128`.
 
@@ -1604,7 +1641,8 @@ const negative_inf = -std.math.inf(f64);
 const nan = std.math.nan(f128);
 ```
 
-### [Floating Point Operations](#toc-Floating-Point-Operations) [§](#Floating-Point-Operations)
+### Floating Point Operations {#Floating-Point-Operations}
+
 
 By default floating point operations use `.strict` mode, but you can switch to `.optimized` mode on a per-block basis:
 
@@ -1652,11 +1690,13 @@ See also:
 - [@setFloatMode](#setFloatMode)
 - [Division by Zero](#Division-by-Zero)
 
-## [Operators](#toc-Operators) [§](#Operators)
+## Operators {#Operators}
+
 
 There is no operator overloading. When you see an operator in Zig, you know that it is doing something from this table, and nothing else.
 
-### [Table of Operators](#toc-Table-of-Operators) [§](#Table-of-Operators)
+### Table of Operators {#Table-of-Operators}
+
 
 | Name | Syntax | Types | Remarks | Example |
 | --- | --- | --- | --- | --- |
@@ -1809,7 +1849,8 @@ ptr.* == 1234 |
 const B = error{Two};
 (A \|\| B) == error{One, Two} |
 
-### [Precedence](#toc-Precedence) [§](#Precedence)
+### Precedence {#Precedence}
+
 
 ```
 x() x[] x.y x.* x.?
@@ -1826,7 +1867,8 @@ or
 = *= *%= *|= /= %= += +%= +|= -= -%= -|= <<= <<|= >>= &= ^= |=
 ```
 
-## [Arrays](#toc-Arrays) [§](#Arrays)
+## Arrays {#Arrays}
+
 
 test_arrays.zig
 
@@ -1959,7 +2001,8 @@ See also:
 - [for](#for)
 - [Slices](#Slices)
 
-### [Multidimensional Arrays](#toc-Multidimensional-Arrays) [§](#Multidimensional-Arrays)
+### Multidimensional Arrays {#Multidimensional-Arrays}
+
 
 Multidimensional arrays can be created by nesting arrays:
 
@@ -2005,7 +2048,8 @@ $ zig test test_multidimensional_arrays.zig
 All 1 tests passed.
 ```
 
-### [Sentinel-Terminated Arrays](#toc-Sentinel-Terminated-Arrays) [§](#Sentinel-Terminated-Arrays)
+### Sentinel-Terminated Arrays {#Sentinel-Terminated-Arrays}
+
 
 The syntax `[N:x]T` describes an array which has a sentinel element of value `x` at the index corresponding to the length `N`.
 
@@ -2047,7 +2091,8 @@ See also:
 - [Sentinel-Terminated Pointers](#Sentinel-Terminated-Pointers)
 - [Sentinel-Terminated Slices](#Sentinel-Terminated-Slices)
 
-### [Destructuring Arrays](#toc-Destructuring-Arrays) [§](#Destructuring-Arrays)
+### Destructuring Arrays {#Destructuring-Arrays}
+
 
 Arrays can be destructured:
 
@@ -2087,7 +2132,8 @@ See also:
 - [Destructuring Tuples](#Destructuring-Tuples)
 - [Destructuring Vectors](#Destructuring-Vectors)
 
-## [Vectors](#toc-Vectors) [§](#Vectors)
+## Vectors {#Vectors}
+
 
 A vector is a group of booleans, [Integers](#Integers), [Floats](#Floats), or [Pointers](#Pointers) which are operated on in parallel, using SIMD instructions if possible. Vector types are created with the builtin function [@Vector](#Vector).
 
@@ -2167,13 +2213,15 @@ See also:
 - [@select](#select)
 - [@reduce](#reduce)
 
-### [Relationship with Arrays](#toc-Relationship-with-Arrays) [§](#Relationship-with-Arrays)
+### Relationship with Arrays {#Relationship-with-Arrays}
+
 
 Vectors and [Arrays](#Arrays) each have a well-defined **bit layout** and therefore support [@bitCast](#bitCast) between each other. [Type Coercion](#Type-Coercion) implicitly peforms `@bitCast`.
 
 Arrays have well-defined byte layout, but vectors do not, making [@ptrCast](#ptrCast) between them [Illegal Behavior](#Illegal-Behavior).
 
-### [Destructuring Vectors](#toc-Destructuring-Vectors) [§](#Destructuring-Vectors)
+### Destructuring Vectors {#Destructuring-Vectors}
+
 
 Vectors can be destructured:
 
@@ -2210,7 +2258,8 @@ See also:
 - [Destructuring Tuples](#Destructuring-Tuples)
 - [Destructuring Arrays](#Destructuring-Arrays)
 
-## [Pointers](#toc-Pointers) [§](#Pointers)
+## Pointers {#Pointers}
+
 
 Zig has two kinds of pointers: single-item and many-item.
 
@@ -2500,7 +2549,8 @@ See also:
 - [@intFromPtr](#intFromPtr)
 - [C Pointers](#C-Pointers)
 
-### [volatile](#toc-volatile) [§](#volatile)
+### volatile {#volatile}
+
 
 Loads and stores are assumed to not have side effects. If a given load or store should have side effects, such as Memory Mapped Input/Output (MMIO), use `volatile`. In the following code, loads and stores with `mmio_ptr` are guaranteed to all happen and in the same order as in source code:
 
@@ -2525,7 +2575,8 @@ All 1 tests passed.
 
 Note that `volatile` is unrelated to concurrency and [Atomics](#Atomics). If you see code that is using `volatile` for something other than Memory Mapped Input/Output, it is probably a bug.
 
-### [Alignment](#toc-Alignment) [§](#Alignment)
+### Alignment {#Alignment}
+
 
 Each type has an **alignment** - a number of bytes such that, when a value of the type is loaded from or stored to memory, the memory address must be evenly divisible by this number. You can use [@alignOf](#alignOf) to find out this value for any type.
 
@@ -2660,7 +2711,8 @@ error: the following test command terminated with signal ABRT:
 /home/andy/src/zig/.zig-cache/o/7f8d19ec74bf7dbcd82b039049234c1a/test --seed=0x2210595e
 ```
 
-### [allowzero](#toc-allowzero) [§](#allowzero)
+### allowzero {#allowzero}
+
 
 This pointer attribute allows a pointer to have address zero. This is only ever needed on the freestanding OS target, where the address zero is mappable. If you want to represent null pointers, use [Optional Pointers](#Optional-Pointers) instead. [Optional Pointers](#Optional-Pointers) with `allowzero` are not the same size as pointers. In this code example, if the pointer did not have the `allowzero` attribute, this would be a [Pointer Cast Invalid Null](#Pointer-Cast-Invalid-Null) panic:
 
@@ -2686,7 +2738,8 @@ $ zig test test_allowzero.zig
 All 1 tests passed.
 ```
 
-### [Sentinel-Terminated Pointers](#toc-Sentinel-Terminated-Pointers) [§](#Sentinel-Terminated-Pointers)
+### Sentinel-Terminated Pointers {#Sentinel-Terminated-Pointers}
+
 
 The syntax `[*:x]T` describes a pointer that has a length determined by a sentinel value. This provides protection against buffer overflow and overreads.
 
@@ -2730,7 +2783,8 @@ See also:
 - [Sentinel-Terminated Slices](#Sentinel-Terminated-Slices)
 - [Sentinel-Terminated Arrays](#Sentinel-Terminated-Arrays)
 
-## [Slices](#toc-Slices) [§](#Slices)
+## Slices {#Slices}
+
 
 A slice is a pointer and a length. The difference between an array and a slice is that the array's length is part of the type and known at compile-time, whereas the slice's length is known at runtime. Both can be accessed with the `len` field.
 
@@ -2890,7 +2944,8 @@ See also:
 - [for](#for)
 - [Arrays](#Arrays)
 
-### [Sentinel-Terminated Slices](#toc-Sentinel-Terminated-Slices) [§](#Sentinel-Terminated-Slices)
+### Sentinel-Terminated Slices {#Sentinel-Terminated-Slices}
+
 
 The syntax `[:x]T` is a slice which has a runtime-known length and also guarantees a sentinel value at the element indexed by the length. The type does not guarantee that there are no sentinel elements before that. Sentinel-terminated slices allow element access to the `len` index.
 
@@ -2995,7 +3050,8 @@ See also:
 - [Sentinel-Terminated Pointers](#Sentinel-Terminated-Pointers)
 - [Sentinel-Terminated Arrays](#Sentinel-Terminated-Arrays)
 
-## [struct](#toc-struct) [§](#struct)
+## struct {#struct}
+
 
 test_structs.zig
 
@@ -3137,7 +3193,8 @@ $ zig test test_structs.zig
 All 4 tests passed.
 ```
 
-### [Default Field Values](#toc-Default-Field-Values) [§](#Default-Field-Values)
+### Default Field Values {#Default-Field-Values}
+
 
 Each struct field may have an expression indicating the default field value. Such expressions are executed at [comptime](#comptime), and allow the field to be omitted in a struct literal expression:
 
@@ -3167,7 +3224,8 @@ $ zig test struct_default_field_values.zig
 All 1 tests passed.
 ```
 
-#### [Faulty Default Field Values](#toc-Faulty-Default-Field-Values) [§](#Faulty-Default-Field-Values)
+#### Faulty Default Field Values {#Faulty-Default-Field-Values}
+
 
 Default field values are only appropriate when the data invariants of a struct cannot be violated by omitting that field from an initialization.
 
@@ -3246,7 +3304,8 @@ const Threshold = struct {
 
 If a struct value requires a runtime-known value in order to be initialized without violating data invariants, then use an initialization method that accepts those runtime values, and populates the remaining fields.
 
-### [extern struct](#toc-extern-struct) [§](#extern-struct)
+### extern struct {#extern-struct}
+
 
 An `extern struct` has in-memory layout matching the C ABI for the target.
 
@@ -3259,7 +3318,8 @@ See also:
 - [extern union](#extern-union)
 - [extern enum](#extern-enum)
 
-### [packed struct](#toc-packed-struct) [§](#packed-struct)
+### packed struct {#packed-struct}
+
 
 `packed` structs, like `enum`, are based on the concept of interpreting integers differently. All packed structs have a **backing integer**, which is implicitly determined by the total bit count of fields, or explicitly specified. Packed structs have well-defined memory layout - exactly the same ABI as their backing integer.
 
@@ -3607,7 +3667,8 @@ pub fn writeToGpio(new_states: GpioRegister) void {
 }
 ```
 
-### [Struct Naming](#toc-Struct-Naming) [§](#Struct-Naming)
+### Struct Naming {#Struct-Naming}
+
 
 Since all structs are anonymous, Zig infers the type name based on a few rules.
 
@@ -3645,7 +3706,8 @@ anonymous: struct_name.main__struct_32474
 function: struct_name.List(i32)
 ```
 
-### [Anonymous Struct Literals](#toc-Anonymous-Struct-Literals) [§](#Anonymous-Struct-Literals)
+### Anonymous Struct Literals {#Anonymous-Struct-Literals}
+
 
 Zig allows omitting the struct type of a literal. When the result is [coerced](#Type-Coercion), the struct literal will directly instantiate the [result location](#Result-Location-Semantics), with no copy:
 
@@ -3710,7 +3772,8 @@ $ zig test test_anonymous_struct.zig
 All 1 tests passed.
 ```
 
-### [Tuples](#toc-Tuples) [§](#Tuples)
+### Tuples {#Tuples}
+
 
 Anonymous structs can be created without specifying field names, and are referred to as "tuples". An empty tuple looks like `.{}` and can be seen in one of the [Hello World examples](#Hello-World).
 
@@ -3751,7 +3814,8 @@ $ zig test test_tuples.zig
 All 1 tests passed.
 ```
 
-#### [Destructuring Tuples](#toc-Destructuring-Tuples) [§](#Destructuring-Tuples)
+#### Destructuring Tuples {#Destructuring-Tuples}
+
 
 Tuples can be [destructured](#Destructuring).
 
@@ -3830,7 +3894,8 @@ See also:
 - [comptime](#comptime)
 - [@fieldParentPtr](#fieldParentPtr)
 
-## [enum](#toc-enum) [§](#enum)
+## enum {#enum}
+
 
 test_enums.zig
 
@@ -3970,7 +4035,8 @@ See also:
 - [@tagName](#tagName)
 - [@sizeOf](#sizeOf)
 
-### [extern enum](#toc-extern-enum) [§](#extern-enum)
+### extern enum {#extern-enum}
+
 
 By default, enums are not guaranteed to be compatible with the C ABI:
 
@@ -4018,7 +4084,8 @@ Shell
 $ zig build-obj enum_export.zig
 ```
 
-### [Enum Literals](#toc-Enum-Literals) [§](#Enum-Literals)
+### Enum Literals {#Enum-Literals}
+
 
 Enum literals allow specifying the name of an enum field without specifying the enum type:
 
@@ -4061,7 +4128,8 @@ $ zig test test_enum_literals.zig
 All 2 tests passed.
 ```
 
-### [Non-exhaustive enum](#toc-Non-exhaustive-enum) [§](#Non-exhaustive-enum)
+### Non-exhaustive enum {#Non-exhaustive-enum}
+
 
 A non-exhaustive enum can be created by adding a trailing `_` field. The enum must specify a tag type and cannot consume every enumeration value.
 
@@ -4106,7 +4174,8 @@ $ zig test test_switch_non-exhaustive.zig
 All 1 tests passed.
 ```
 
-## [union](#toc-union) [§](#union)
+## union {#union}
+
 
 A bare `union` defines a set of possible types that a value can be as a list of fields. Only one field can be active at a time. The in-memory representation of bare unions is not guaranteed. Bare unions cannot be used to reinterpret memory. For that, use [@ptrCast](#ptrCast), or use an [extern union](#extern-union) or a [packed union](#packed-union) which have guaranteed in-memory layout. [Accessing the non-active field](#Wrong-Union-Field-Access) is safety-checked [Illegal Behavior](#Illegal-Behavior):
 
@@ -4181,7 +4250,8 @@ In order to use [switch](#switch) with a union, it must be a [Tagged union](#Tag
 
 To initialize a union when the tag is a [comptime](#comptime)-known name, see [@unionInit](#unionInit).
 
-### [Tagged union](#toc-Tagged-union) [§](#Tagged-union)
+### Tagged union {#Tagged-union}
+
 
 Unions can be declared with an enum tag type. This turns the union into a *tagged* union, which makes it eligible to use with [switch](#switch) expressions. When switching on tagged unions, the tag value can be obtained using an additional capture. Tagged unions coerce to their tag type: [Type Coercion: Unions and Enums](#Type-Coercion-Unions-and-Enums).
 
@@ -4368,7 +4438,8 @@ $ zig test test_tagName.zig
 All 1 tests passed.
 ```
 
-### [extern union](#toc-extern-union) [§](#extern-union)
+### extern union {#extern-union}
+
 
 An `extern union` has memory layout guaranteed to be compatible with the target C ABI.
 
@@ -4376,7 +4447,8 @@ See also:
 
 - [extern struct](#extern-struct)
 
-### [packed union](#toc-packed-union) [§](#packed-union)
+### packed union {#packed-union}
+
 
 A `packed union` has well-defined in-memory layout and is eligible to be in a [packed struct](#packed-struct).
 
@@ -4409,7 +4481,8 @@ $ zig test test_packed_union_equality.zig
 All 1 tests passed.
 ```
 
-### [Anonymous Union Literals](#toc-Anonymous-Union-Literals) [§](#Anonymous-Union-Literals)
+### Anonymous Union Literals {#Anonymous-Union-Literals}
+
 
 [Anonymous Struct Literals](#Anonymous-Struct-Literals) syntax can be used to initialize unions without specifying the type:
 
@@ -4444,7 +4517,8 @@ $ zig test test_anonymous_union.zig
 All 1 tests passed.
 ```
 
-## [opaque](#toc-opaque) [§](#opaque)
+## opaque {#opaque}
+
 
 `opaque {}` declares a new type with an unknown (but non-zero) size and alignment. It can contain declarations the same as [structs](#struct), [unions](#union), and [enums](#enum).
 
@@ -4487,7 +4561,8 @@ referenced by:
     test.call foo: /home/andy/src/zig/doc/langref/test_opaque.zig:10:8
 ```
 
-## [Blocks](#toc-Blocks) [§](#Blocks)
+## Blocks {#Blocks}
+
 
 Blocks are used to limit the scope of variable declarations:
 
@@ -4547,7 +4622,8 @@ See also:
 - [Labeled while](#Labeled-while)
 - [Labeled for](#Labeled-for)
 
-### [Shadowing](#toc-Shadowing) [§](#Shadowing)
+### Shadowing {#Shadowing}
+
 
 [Identifiers](#Identifiers) are never allowed to "hide" other identifiers by using the same name:
 
@@ -4601,7 +4677,8 @@ $ zig test test_scopes.zig
 All 1 tests passed.
 ```
 
-### [Empty Blocks](#toc-Empty-Blocks) [§](#Empty-Blocks)
+### Empty Blocks {#Empty-Blocks}
+
 
 An empty block is equivalent to `void{}`:
 
@@ -4628,7 +4705,8 @@ $ zig test test_empty_block.zig
 All 1 tests passed.
 ```
 
-## [switch](#toc-switch) [§](#switch)
+## switch {#switch}
+
 
 test_switch.zig
 
@@ -4766,7 +4844,8 @@ See also:
 - [@compileError](#compileError)
 - [Compile Variables](#Compile-Variables)
 
-### [Exhaustive Switching](#toc-Exhaustive-Switching) [§](#Exhaustive-Switching)
+### Exhaustive Switching {#Exhaustive-Switching}
+
 
 When a `switch` expression does not have an `else` clause, it must exhaustively list all the possible values. Failure to do so is a compile error:
 
@@ -4803,7 +4882,8 @@ const Color = enum {
               ^~~~
 ```
 
-### [Switching with Enum Literals](#toc-Switching-with-Enum-Literals) [§](#Switching-with-Enum-Literals)
+### Switching with Enum Literals {#Switching-with-Enum-Literals}
+
 
 [Enum Literals](#Enum-Literals) can be useful to use with `switch` to avoid repetitively specifying [enum](#enum) or [union](#union) types:
 
@@ -4838,7 +4918,8 @@ $ zig test test_exhaustive_switch.zig
 All 1 tests passed.
 ```
 
-### [Switching on Errors](#toc-Switching-on-Errors) [§](#Switching-on-Errors)
+### Switching on Errors {#Switching-on-Errors}
+
 
 When switching on errors, some special cases are allowed to simplify generic programming patterns:
 
@@ -4909,7 +4990,8 @@ $ zig test test_switch_on_errors.zig
 All 2 tests passed.
 ```
 
-### [Labeled switch](#toc-Labeled-switch) [§](#Labeled-switch)
+### Labeled switch {#Labeled-switch}
+
 
 When a switch statement is labeled, it can be referenced from a `break` or `continue`. `break` will return a value from the `switch`.
 
@@ -5052,7 +5134,8 @@ If the operand to `continue` is [comptime](#comptime)-known, then it can be lowe
 
 If the operand is runtime-known, each `continue` can embed a conditional branch inline (ideally through a jump table), which allows a CPU to predict its target independently of any other prong. A loop-based lowering would force every branch through the same dispatch point, hindering branch prediction.
 
-### [Inline Switch Prongs](#toc-Inline-Switch-Prongs) [§](#Inline-Switch-Prongs)
+### Inline Switch Prongs {#Inline-Switch-Prongs}
+
 
 Switch prongs can be marked as `inline` to generate the prong's body for each possible value it could have, making the captured value [comptime](#comptime).
 
@@ -5225,7 +5308,8 @@ See also:
 - [inline for](#inline-for)
 - [Tagged union](#Tagged-union)
 
-## [while](#toc-while) [§](#while)
+## while {#while}
+
 
 A while loop is used to repeatedly execute an expression until some condition is no longer true.
 
@@ -5372,7 +5456,8 @@ $ zig test test_while_else.zig
 All 1 tests passed.
 ```
 
-### [Labeled while](#toc-Labeled-while) [§](#Labeled-while)
+### Labeled while {#Labeled-while}
+
 
 When a `while` loop is labeled, it can be referenced from a `break` or `continue` from within a nested loop:
 
@@ -5406,7 +5491,8 @@ $ zig test test_while_nested_break.zig
 All 2 tests passed.
 ```
 
-### [while with Optionals](#toc-while-with-Optionals) [§](#while-with-Optionals)
+### while with Optionals {#while-with-Optionals}
+
 
 Just like [if](#if) expressions, while loops can take an optional as the condition and capture the payload. When [null](#null) is encountered the loop exits.
 
@@ -5463,7 +5549,8 @@ $ zig test test_while_null_capture.zig
 All 1 tests passed.
 ```
 
-### [while with Error Unions](#toc-while-with-Error-Unions) [§](#while-with-Error-Unions)
+### while with Error Unions {#while-with-Error-Unions}
+
 
 Just like [if](#if) expressions, while loops can take an error union as the condition and capture the payload or the error code. When the condition results in an error code the else branch is evaluated and the loop is finished.
 
@@ -5502,7 +5589,8 @@ $ zig test test_while_error_capture.zig
 All 1 tests passed.
 ```
 
-### [inline while](#toc-inline-while) [§](#inline-while)
+### inline while {#inline-while}
+
 
 While loops can be inlined. This causes the loop to be unrolled, which allows the code to do some things which only work at compile time, such as use types as first class values.
 
@@ -5552,7 +5640,8 @@ See also:
 - [comptime](#comptime)
 - [unreachable](#unreachable)
 
-## [for](#toc-for) [§](#for)
+## for {#for}
+
 
 test_for.zig
 
@@ -5656,7 +5745,8 @@ $ zig test test_for.zig
 All 4 tests passed.
 ```
 
-### [Labeled for](#toc-Labeled-for) [§](#Labeled-for)
+### Labeled for {#Labeled-for}
+
 
 When a `for` loop is labeled, it can be referenced from a `break` or `continue` from within a nested loop:
 
@@ -5699,7 +5789,8 @@ $ zig test test_for_nested_break.zig
 All 2 tests passed.
 ```
 
-### [inline for](#toc-inline-for) [§](#inline-for)
+### inline for {#inline-for}
+
 
 For loops can be inlined. This causes the loop to be unrolled, which allows the code to do some things which only work at compile time, such as use types as first class values. The capture value and iterator value of inlined for loops are compile-time known.
 
@@ -5748,7 +5839,8 @@ See also:
 - [Arrays](#Arrays)
 - [Slices](#Slices)
 
-## [if](#toc-if) [§](#if)
+## if {#if}
+
 
 test_if.zig
 
@@ -5838,7 +5930,8 @@ $ zig test test_if.zig
 All 3 tests passed.
 ```
 
-### [if with Optionals](#toc-if-with-Optionals) [§](#if-with-Optionals)
+### if with Optionals {#if-with-Optionals}
+
 
 test_if_optionals.zig
 
@@ -5945,7 +6038,8 @@ See also:
 - [Optionals](#Optionals)
 - [Errors](#Errors)
 
-## [defer](#toc-defer) [§](#defer)
+## defer {#defer}
+
 
 Executes an expression unconditionally at scope exit.
 
@@ -6047,13 +6141,15 @@ See also:
 
 - [Errors](#Errors)
 
-## [unreachable](#toc-unreachable) [§](#unreachable)
+## unreachable {#unreachable}
+
 
 In [Debug](#Debug) and [ReleaseSafe](#ReleaseSafe) mode `unreachable` emits a call to `panic` with the message `reached unreachable code`.
 
 In [ReleaseFast](#ReleaseFast) and [ReleaseSmall](#ReleaseSmall) mode, the optimizer uses the assumption that `unreachable` code will never be hit to perform optimizations.
 
-### [Basics](#toc-Basics) [§](#Basics)
+### Basics {#Basics}
+
 
 test_unreachable.zig
 
@@ -6120,7 +6216,8 @@ error: the following test command terminated with signal ABRT:
 /home/andy/src/zig/.zig-cache/o/1209ea68e9a74969bb29b43362f9d1da/test --seed=0x3aa77c99
 ```
 
-### [At Compile-Time](#toc-At-Compile-Time) [§](#At-Compile-Time)
+### At Compile-Time {#At-Compile-Time}
+
 
 test_comptime_unreachable.zig
 
@@ -6157,7 +6254,8 @@ See also:
 - [Build Mode](#Build-Mode)
 - [comptime](#comptime)
 
-## [noreturn](#toc-noreturn) [§](#noreturn)
+## noreturn {#noreturn}
+
 
 `noreturn` is the type of:
 
@@ -6219,7 +6317,8 @@ Shell
 $ zig test test_noreturn_from_exit.zig -target x86_64-windows --test-no-exec
 ```
 
-## [Functions](#toc-Functions) [§](#Functions)
+## Functions {#Functions}
+
 
 test_functions.zig
 
@@ -6298,7 +6397,8 @@ All 1 tests passed.
 
 There is a difference between a function *body* and a function *pointer*. Function bodies are [comptime](#comptime)-only types while function [Pointers](#Pointers) may be runtime-known.
 
-### [Pass-by-value Parameters](#toc-Pass-by-value-Parameters) [§](#Pass-by-value-Parameters)
+### Pass-by-value Parameters {#Pass-by-value-Parameters}
+
 
 Primitive types such as [Integers](#Integers) and [Floats](#Floats) passed as parameters are copied, and then the copy is available in the function body. This is called "passing by value". Copying a primitive type is essentially free and typically involves nothing more than setting a register.
 
@@ -6337,7 +6437,8 @@ All 1 tests passed.
 
 For extern functions, Zig follows the C ABI for passing structs and unions by value.
 
-### [Function Parameter Type Inference](#toc-Function-Parameter-Type-Inference) [§](#Function-Parameter-Type-Inference)
+### Function Parameter Type Inference {#Function-Parameter-Type-Inference}
+
 
 Function parameters can be declared with `anytype` in place of the type. In this case the parameter types will be inferred when the function is called. Use [@TypeOf](#TypeOf) and [@typeInfo](#typeInfo) to get information about the inferred type.
 
@@ -6367,7 +6468,8 @@ $ zig test test_fn_type_inference.zig
 All 1 tests passed.
 ```
 
-### [inline fn](#toc-inline-fn) [§](#inline-fn)
+### inline fn {#inline-fn}
+
 
 Adding the `inline` keyword to a function definition makes that function become *semantically inlined* at the callsite. This is not a hint to be possibly observed by optimization passes, but has implications on the types and values involved in the function call.
 
@@ -6408,7 +6510,8 @@ It is generally better to let the compiler decide when to inline a function, exc
 
 Note that `inline` actually *restricts* what the compiler is allowed to do. This can harm binary size, compilation speed, and even runtime performance.
 
-### [Function Reflection](#toc-Function-Reflection) [§](#Function-Reflection)
+### Function Reflection {#Function-Reflection}
+
 
 test_fn_reflection.zig
 
@@ -6433,9 +6536,11 @@ $ zig test test_fn_reflection.zig
 All 1 tests passed.
 ```
 
-## [Errors](#toc-Errors) [§](#Errors)
+## Errors {#Errors}
 
-### [Error Set Type](#toc-Error-Set-Type) [§](#Error-Set-Type)
+
+### Error Set Type {#Error-Set-Type}
+
 
 An error set is like an [enum](#enum). However, each error name across the entire compilation gets assigned an unsigned integer greater than 0. You are allowed to declare the same error name more than once, and if you do, it gets assigned the same integer value.
 
@@ -6534,7 +6639,8 @@ const err = (error{FileNotFound}).FileNotFound;
 
 This becomes useful when using [Inferred Error Sets](#Inferred-Error-Sets).
 
-#### [The Global Error Set](#toc-The-Global-Error-Set) [§](#The-Global-Error-Set)
+#### The Global Error Set {#The-Global-Error-Set}
+
 
 `anyerror` refers to the global error set. This is the error set that contains all errors in the entire compilation unit, i.e. it is the union of all other error sets.
 
@@ -6542,7 +6648,8 @@ You can [coerce](#Type-Coercion) any error set to the global one, and you can ex
 
 The global error set should generally be avoided because it prevents the compiler from knowing what errors are possible at compile-time. Knowing the error set at compile-time is better for generated documentation and helpful error messages, such as forgetting a possible error value in a [switch](#switch).
 
-### [Error Union Type](#toc-Error-Union-Type) [§](#Error-Union-Type)
+### Error Union Type {#Error-Union-Type}
+
 
 An error set type and normal type can be combined with the `!` binary operator to form an error union type. You are likely to use an error union type more often than an error set type by itself.
 
@@ -6611,7 +6718,8 @@ What it looks like to use this function varies depending on what you're trying t
 - You know with complete certainty it will not return an error, so want to unconditionally unwrap it.
 - You want to take a different action for each possible error.
 
-#### [catch](#toc-catch) [§](#catch)
+#### catch {#catch}
+
 
 If you want to provide a default value, you can use the `catch` binary operator:
 
@@ -6644,7 +6752,8 @@ fn doAThing(str: []u8) void {
 }
 ```
 
-#### [try](#toc-try) [§](#try)
+#### try {#try}
+
 
 Let's say you wanted to return the error if you got one, otherwise continue with the function logic:
 
@@ -6729,7 +6838,8 @@ fn doADifferentThing(str: []u8) void {
 }
 ```
 
-#### [errdefer](#toc-errdefer) [§](#errdefer)
+#### errdefer {#errdefer}
+
 
 The other component to error handling is defer statements. In addition to an unconditional [defer](#defer), Zig has `errdefer`, which evaluates the deferred expression on block exit path if and only if the function returned with an error from the block.
 
@@ -6834,7 +6944,8 @@ $ zig test test_error_union.zig
 All 1 tests passed.
 ```
 
-#### [Merging Error Sets](#toc-Merging-Error-Sets) [§](#Merging-Error-Sets)
+#### Merging Error Sets {#Merging-Error-Sets}
+
 
 Use the `||` operator to merge two error sets together. The resulting error set contains the errors of both error sets. Doc comments from the left-hand side override doc comments from the right-hand side. In this example, the doc comments for `C.PathNotFound` is `A doc comment`.
 
@@ -6881,7 +6992,8 @@ $ zig test test_merging_error_sets.zig
 All 1 tests passed.
 ```
 
-#### [Inferred Error Sets](#toc-Inferred-Error-Sets) [§](#Inferred-Error-Sets)
+#### Inferred Error Sets {#Inferred-Error-Sets}
+
 
 Because many functions in Zig return a possible error, Zig supports inferring the error set. To infer the error set for a function, prepend the `!` operator to the function’s return type, like `!T`:
 
@@ -6929,7 +7041,8 @@ In these situations, it is recommended to use an explicit error set. You can gen
 
 These limitations may be overcome in a future version of Zig.
 
-### [Error Return Traces](#toc-Error-Return-Traces) [§](#Error-Return-Traces)
+### Error Return Traces {#Error-Return-Traces}
+
 
 Error Return Traces show all the points in the code that an error was returned to the calling function. This makes it practical to use [try](#try) everywhere and then still be able to know what happened if an error ends up bubbling all the way out of your application.
 
@@ -7096,7 +7209,8 @@ There are a few ways to activate this error return tracing feature:
 - An error makes its way to `catch unreachable` and you have not overridden the default panic handler
 - Use [errorReturnTrace](#errorReturnTrace) to access the current return trace. You can use `std.debug.dumpStackTrace` to print it. This function returns comptime-known [null](#null) when building without error return tracing support.
 
-#### [Implementation Details](#toc-Implementation-Details) [§](#Implementation-Details)
+#### Implementation Details {#Implementation-Details}
+
 
 To analyze performance cost, there are two cases:
 
@@ -7136,7 +7250,8 @@ The cost is 2 math operations plus some memory reads and writes. The memory acce
 
 As for code size cost, 1 function call before a return statement is no big deal. Even so, I have [a plan](https://github.com/ziglang/zig/issues/690) to make the call to `__zig_return_error` a tail call, which brings the code size cost down to actually zero. What is a return statement in code without error return tracing can become a jump instruction in code with error return tracing.
 
-## [Optionals](#toc-Optionals) [§](#Optionals)
+## Optionals {#Optionals}
+
 
 One area that Zig provides safety without compromising efficiency or readability is with the optional type.
 
@@ -7236,7 +7351,8 @@ Once again, the notable thing here is that inside the if block, `foo` is no long
 
 One benefit to this is that functions which take pointers as arguments can be annotated with the "nonnull" attribute - `__attribute__((nonnull))` in [GCC](https://gcc.gnu.org/onlinedocs/gcc-4.0.0/gcc/Function-Attributes.html). The optimizer can sometimes make better decisions knowing that pointer arguments cannot be null.
 
-### [Optional Type](#toc-Optional-Type) [§](#Optional-Type)
+### Optional Type {#Optional-Type}
+
 
 An optional is created by putting `?` in front of a type. You can use compile-time reflection to access the child type of an optional:
 
@@ -7265,7 +7381,8 @@ $ zig test test_optional_type.zig
 All 1 tests passed.
 ```
 
-### [null](#toc-null) [§](#null)
+### null {#null}
+
 
 Just like [undefined](#undefined), `null` has its own type, and the only way to use it is to cast it to a different type:
 
@@ -7275,7 +7392,8 @@ null.zig
 const optional_value: ?i32 = null;
 ```
 
-### [Optional Pointers](#toc-Optional-Pointers) [§](#Optional-Pointers)
+### Optional Pointers {#Optional-Pointers}
+
 
 An optional pointer is guaranteed to be the same size as a pointer. The `null` of the optional is guaranteed to be address 0.
 
@@ -7313,11 +7431,13 @@ See also:
 - [while with Optionals](#while-with-Optionals)
 - [if with Optionals](#if-with-Optionals)
 
-## [Casting](#toc-Casting) [§](#Casting)
+## Casting {#Casting}
+
 
 A **type cast** converts a value of one type to another. Zig has [Type Coercion](#Type-Coercion) for conversions that are known to be completely safe and unambiguous, and [Explicit Casts](#Explicit-Casts) for conversions that one would not want to happen on accident. There is also a third kind of type conversion called [Peer Type Resolution](#Peer-Type-Resolution) for the case when a result type must be decided given multiple operand types.
 
-### [Type Coercion](#toc-Type-Coercion) [§](#Type-Coercion)
+### Type Coercion {#Type-Coercion}
+
 
 Type coercion occurs when one type is expected, but different type is provided:
 
@@ -7358,7 +7478,8 @@ All 3 tests passed.
 
 Type coercions are only allowed when it is completely unambiguous how to get from one type to another, and the transformation is guaranteed to be safe. There is one exception, which is [C Pointers](#C-Pointers).
 
-#### [Type Coercion: Stricter Qualification](#toc-Type-Coercion-Stricter-Qualification) [§](#Type-Coercion-Stricter-Qualification)
+#### Type Coercion: Stricter Qualification {#Type-Coercion-Stricter-Qualification}
+
 
 Values which have the same representation at runtime can be cast to increase the strictness of the qualifiers, no matter how nested the qualifiers are:
 
@@ -7413,7 +7534,8 @@ $ zig test test_pointer_coerce_const_optional.zig
 All 1 tests passed.
 ```
 
-#### [Type Coercion: Integer and Float Widening](#toc-Type-Coercion-Integer-and-Float-Widening) [§](#Type-Coercion-Integer-and-Float-Widening)
+#### Type Coercion: Integer and Float Widening {#Type-Coercion-Integer-and-Float-Widening}
+
 
 [Integers](#Integers) coerce to integer types which can represent every value of the old type, and likewise [Floats](#Floats) coerce to float types which can represent every value of the old type.
 
@@ -7460,7 +7582,8 @@ $ zig test test_integer_widening.zig
 All 3 tests passed.
 ```
 
-#### [Type Coercion: Int to Float](#toc-Type-Coercion-Int-to-Float) [§](#Type-Coercion-Int-to-Float)
+#### Type Coercion: Int to Float {#Type-Coercion-Int-to-Float}
+
 
 [Integers](#Integers) coerce to [Floats](#Floats) if every possible integer value can be stored in the float without rounding (i.e. the integer's precision does not exceed the float's significand precision). Larger integer types that cannot be safely coerced must be explicitly casted with [@floatFromInt](#floatFromInt).
 
@@ -7516,7 +7639,8 @@ $ zig test test_failed_int_to_float_coercion.zig
                        ^~~
 ```
 
-#### [Type Coercion: Float to Int](#toc-Type-Coercion-Float-to-Int) [§](#Type-Coercion-Float-to-Int)
+#### Type Coercion: Float to Int {#Type-Coercion-Float-to-Int}
+
 
 A compiler error is appropriate because this ambiguous expression leaves the compiler two choices about the coercion.
 
@@ -7542,7 +7666,8 @@ $ zig test test_ambiguous_coercion.zig
                    ~~~~~^~~
 ```
 
-#### [Type Coercion: Slices, Arrays and Pointers](#toc-Type-Coercion-Slices-Arrays-and-Pointers) [§](#Type-Coercion-Slices-Arrays-and-Pointers)
+#### Type Coercion: Slices, Arrays and Pointers {#Type-Coercion-Slices-Arrays-and-Pointers}
+
 
 test_coerce_slices_arrays_and_pointers.zig
 
@@ -7645,7 +7770,8 @@ See also:
 
 - [C Pointers](#C-Pointers)
 
-#### [Type Coercion: Optionals](#toc-Type-Coercion-Optionals) [§](#Type-Coercion-Optionals)
+#### Type Coercion: Optionals {#Type-Coercion-Optionals}
+
 
 The payload type of [Optionals](#Optionals), as well as [null](#null), coerce to the optional type.
 
@@ -7697,7 +7823,8 @@ $ zig test test_coerce_optional_wrapped_error_union.zig
 All 1 tests passed.
 ```
 
-#### [Type Coercion: Error Unions](#toc-Type-Coercion-Error-Unions) [§](#Type-Coercion-Error-Unions)
+#### Type Coercion: Error Unions {#Type-Coercion-Error-Unions}
+
 
 The payload type of an [Error Union Type](#Error-Union-Type) as well as the [Error Set Type](#Error-Set-Type) coerce to the error union type:
 
@@ -7724,7 +7851,8 @@ $ zig test test_coerce_to_error_union.zig
 All 1 tests passed.
 ```
 
-#### [Type Coercion: Compile-Time Known Numbers](#toc-Type-Coercion-Compile-Time-Known-Numbers) [§](#Type-Coercion-Compile-Time-Known-Numbers)
+#### Type Coercion: Compile-Time Known Numbers {#Type-Coercion-Compile-Time-Known-Numbers}
+
 
 When a number is [comptime](#comptime)-known to be representable in the destination type, it may be coerced:
 
@@ -7749,7 +7877,8 @@ $ zig test test_coerce_large_to_small.zig
 All 1 tests passed.
 ```
 
-#### [Type Coercion: Unions and Enums](#toc-Type-Coercion-Unions-and-Enums) [§](#Type-Coercion-Unions-and-Enums)
+#### Type Coercion: Unions and Enums {#Type-Coercion-Unions-and-Enums}
+
 
 Tagged unions can be coerced to enums, and enums can be coerced to tagged unions when they are [comptime](#comptime)-known to be a field of the union that has only one possible value, such as [void](#void):
 
@@ -7818,11 +7947,13 @@ See also:
 - [union](#union)
 - [enum](#enum)
 
-#### [Type Coercion: undefined](#toc-Type-Coercion-undefined) [§](#Type-Coercion-undefined)
+#### Type Coercion: undefined {#Type-Coercion-undefined}
+
 
 [undefined](#undefined) can be coerced to any type.
 
-#### [Type Coercion: Tuples to Arrays](#toc-Type-Coercion-Tuples-to-Arrays) [§](#Type-Coercion-Tuples-to-Arrays)
+#### Type Coercion: Tuples to Arrays {#Type-Coercion-Tuples-to-Arrays}
+
 
 [Tuples](#Tuples) can be coerced to arrays, if all of the fields have the same type.
 
@@ -7848,7 +7979,8 @@ $ zig test test_coerce_tuples_arrays.zig
 All 1 tests passed.
 ```
 
-### [Explicit Casts](#toc-Explicit-Casts) [§](#Explicit-Casts)
+### Explicit Casts {#Explicit-Casts}
+
 
 Explicit casts are performed via [Builtin Functions](#Builtin-Functions). Some explicit casts are safe; some are not. Some explicit casts perform language-level assertions; some do not. Some explicit casts are no-ops at runtime; some are not.
 
@@ -7869,7 +8001,8 @@ Explicit casts are performed via [Builtin Functions](#Builtin-Functions). Some e
 - [@ptrCast](#ptrCast) - convert between pointer types
 - [@truncate](#truncate) - convert between integer types, chopping off bits
 
-### [Peer Type Resolution](#toc-Peer-Type-Resolution) [§](#Peer-Type-Resolution)
+### Peer Type Resolution {#Peer-Type-Resolution}
+
 
 Peer Type Resolution occurs in these places:
 
@@ -8032,7 +8165,8 @@ $ zig test test_peer_type_resolution.zig
 All 9 tests passed.
 ```
 
-## [Zero Bit Types](#toc-Zero-Bit-Types) [§](#Zero-Bit-Types)
+## Zero Bit Types {#Zero-Bit-Types}
+
 
 For some types, [@sizeOf](#sizeOf) is 0:
 
@@ -8068,7 +8202,8 @@ When this turns into machine code, there is no code generated in the body of `en
 
 These assembly instructions do not have any code associated with the void values - they only perform the function call prologue and epilogue.
 
-### [void](#toc-void) [§](#void)
+### void {#void}
+
 
 `void` can be useful for instantiating generic types. For example, given a `Map(Key, Value)`, one can pass `void` for the `Value` type to make it into a `Set`:
 
@@ -8159,7 +8294,8 @@ $ zig test test_void_ignored.zig
 All 2 tests passed.
 ```
 
-## [Result Location Semantics](#toc-Result-Location-Semantics) [§](#Result-Location-Semantics)
+## Result Location Semantics {#Result-Location-Semantics}
+
 
 During compilation, every Zig expression and sub-expression is assigned optional result location information. This information dictates what type the expression should have (its result type), and where the resulting value should be placed in memory (its result location). The information is optional in the sense that not every expression has this information: assignment to `_`, for instance, does not provide any information about the type of an expression, nor does it provide a concrete memory location to place it in.
 
@@ -8167,7 +8303,8 @@ As a motivating example, consider the statement `const x: u32 = 42;`. The type a
 
 This is not an implementation detail: the logic outlined above is codified into the Zig language specification, and is the primary mechanism of type inference in the language. This system is collectively referred to as "Result Location Semantics".
 
-### [Result Types](#toc-Result-Types) [§](#Result-Types)
+### Result Types {#Result-Types}
+
 
 Result types are propagated recursively through expressions where possible. For instance, if the expression `&e` has result type `*u32`, then `e` is given a result type of `u32`, allowing the language to perform this coercion before taking a reference.
 
@@ -8217,7 +8354,8 @@ This result type information is useful for the aforementioned cast builtins, as 
 | @typeInfo(x) | - | x is a type |
 | x << y | - | y is a std.math.Log2IntCeil(@TypeOf(x)) |
 
-### [Result Locations](#toc-Result-Locations) [§](#Result-Locations)
+### Result Locations {#Result-Locations}
+
 
 In addition to result type information, every expression may be optionally assigned a result location: a pointer to which the value must be directly written. This system can be used to prevent intermediate copies when initializing data structures, which can be important for types which must have a fixed memory address ("pinned" types).
 
@@ -8278,13 +8416,16 @@ The following table details how some common expressions propagate result locatio
 | @typeInfo(x) | ptr | x has no result location |
 | x << y | ptr | x and y do not have result locations |
 
-## [comptime](#toc-comptime) [§](#comptime)
+## comptime {#comptime}
+
 
 Zig places importance on the concept of whether an expression is known at compile-time. There are a few different places this concept is used, and these building blocks are used to keep the language small, readable, and powerful.
 
-### [Introducing the Compile-Time Concept](#toc-Introducing-the-Compile-Time-Concept) [§](#Introducing-the-Compile-Time-Concept)
+### Introducing the Compile-Time Concept {#Introducing-the-Compile-Time-Concept}
 
-#### [Compile-Time Parameters](#toc-Compile-Time-Parameters) [§](#Compile-Time-Parameters)
+
+#### Compile-Time Parameters {#Compile-Time-Parameters}
+
 
 Compile-time parameters is how Zig implements generics. It is compile-time duck typing.
 
@@ -8416,7 +8557,8 @@ All the code that dealt with compile-time known values is eliminated and we are 
 
 This works the same way for `switch` expressions - they are implicitly inlined when the target expression is compile-time known.
 
-#### [Compile-Time Variables](#toc-Compile-Time-Variables) [§](#Compile-Time-Variables)
+#### Compile-Time Variables {#Compile-Time-Variables}
+
 
 In Zig, the programmer can label variables as `comptime`. This guarantees to the compiler that every load and store of the variable is performed at compile-time. Any violation of this results in a compile error.
 
@@ -8516,7 +8658,8 @@ fn performFn(start_value: i32) i32 {
 
 Note that this happens even in a debug build. This is not a way to write more optimized code, but it is a way to make sure that what *should* happen at compile-time, *does* happen at compile-time. This catches more errors and allows expressiveness that in other languages requires using macros, generated code, or a preprocessor to accomplish.
 
-#### [Compile-Time Expressions](#toc-Compile-Time-Expressions) [§](#Compile-Time-Expressions)
+#### Compile-Time Expressions {#Compile-Time-Expressions}
+
 
 In Zig, it matters whether a given expression is known at compile-time or run-time. A programmer can use a `comptime` expression to guarantee that the expression will be evaluated at compile-time. If this cannot be accomplished, the compiler will emit an error. For example:
 
@@ -8728,7 +8871,8 @@ When we compile this program, Zig generates the constants with the answer pre-co
 
 Note that we did not have to do anything special with the syntax of these functions. For example, we could call the `sum` function as is with a slice of numbers whose length and values were only known at run-time.
 
-### [Generic Data Structures](#toc-Generic-Data-Structures) [§](#Generic-Data-Structures)
+### Generic Data Structures {#Generic-Data-Structures}
+
 
 Zig uses comptime capabilities to implement generic data structures without introducing any special-case syntax.
 
@@ -8777,7 +8921,8 @@ var node_b = Node{
 
 In this example, the `Node` struct refers to itself. This works because all top level declarations are order-independent. As long as the compiler can determine the size of the struct, it is free to refer to itself. In this case, `Node` refers to itself as a pointer, which has a well-defined size at compile time, so it works fine.
 
-### [Case Study: print in Zig](#toc-Case-Study-print-in-Zig) [§](#Case-Study-print-in-Zig)
+### Case Study: print in Zig {#Case-Study-print-in-Zig}
+
 
 Putting all of this together, let's see how `print` works in Zig.
 
@@ -9010,7 +9155,8 @@ See also:
 - [inline while](#inline-while)
 - [inline for](#inline-for)
 
-## [Assembly](#toc-Assembly) [§](#Assembly)
+## Assembly {#Assembly}
+
 
 For some use cases, it may be necessary to directly control the machine code generated by Zig programs, rather than relying on Zig's code generation. For these cases, one can use inline assembly. Here is an example of implementing Hello, World on x86_64 Linux using inline assembly:
 
@@ -9124,25 +9270,29 @@ For x86 and x86_64 targets, the syntax is AT&T syntax, rather than the more popu
 
 Some day Zig may have its own assembler. This would allow it to integrate more seamlessly into the language, as well as be compatible with the popular NASM syntax. This documentation section will be updated before 1.0.0 is released, with a conclusive statement about the status of AT&T vs Intel/NASM syntax.
 
-### [Output Constraints](#toc-Output-Constraints) [§](#Output-Constraints)
+### Output Constraints {#Output-Constraints}
+
 
 Output constraints are still considered to be unstable in Zig, and so [LLVM documentation](http://releases.llvm.org/10.0.0/docs/LangRef.html#inline-asm-constraint-string) and [GCC documentation](https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html) must be used to understand the semantics.
 
 Note that some breaking changes to output constraints are planned with [issue #215](https://github.com/ziglang/zig/issues/215).
 
-### [Input Constraints](#toc-Input-Constraints) [§](#Input-Constraints)
+### Input Constraints {#Input-Constraints}
+
 
 Input constraints are still considered to be unstable in Zig, and so [LLVM documentation](http://releases.llvm.org/10.0.0/docs/LangRef.html#inline-asm-constraint-string) and [GCC documentation](https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html) must be used to understand the semantics.
 
 Note that some breaking changes to input constraints are planned with [issue #215](https://github.com/ziglang/zig/issues/215).
 
-### [Clobbers](#toc-Clobbers) [§](#Clobbers)
+### Clobbers {#Clobbers}
+
 
 Clobbers are the set of registers whose values will not be preserved by the execution of the assembly code. These do not include output or input registers. The special clobber value of `"memory"` means that the assembly causes writes to arbitrary undeclared memory locations - not only the memory pointed to by a declared indirect output.
 
 Failure to declare the full set of clobbers for a given inline assembly expression is unchecked [Illegal Behavior](#Illegal-Behavior).
 
-### [Global Assembly](#toc-Global-Assembly) [§](#Global-Assembly)
+### Global Assembly {#Global-Assembly}
+
 
 When an assembly expression occurs in a [container](#Containers) level [comptime](#comptime) block, this is **global assembly**.
 
@@ -9179,7 +9329,8 @@ $ zig test test_global_assembly.zig -target x86_64-linux -fllvm
 All 1 tests passed.
 ```
 
-## [Atomics](#toc-Atomics) [§](#Atomics)
+## Atomics {#Atomics}
+
 
 TODO: @atomic rmw
 
@@ -9193,17 +9344,20 @@ See also:
 - [@cmpxchgWeak](#cmpxchgWeak)
 - [@cmpxchgStrong](#cmpxchgStrong)
 
-## [Async Functions](#toc-Async-Functions) [§](#Async-Functions)
+## Async Functions {#Async-Functions}
+
 
 Async functions regressed with the release of 0.11.0. The current plan is to reintroduce them as a lower level primitive that powers I/O implementations.
 
 Tracking issue: [Proposal: stackless coroutines as low-level primitives](https://github.com/ziglang/zig/issues/23446)
 
-## [Builtin Functions](#toc-Builtin-Functions) [§](#Builtin-Functions)
+## Builtin Functions {#Builtin-Functions}
+
 
 Builtin functions are provided by the compiler and are prefixed with `@`. The `comptime` keyword on a parameter means that the parameter must be known at compile time.
 
-### [@addrSpaceCast](#toc-addrSpaceCast) [§](#addrSpaceCast)
+### @addrSpaceCast {#addrSpaceCast}
+
 
 ```
 @addrSpaceCast(ptr: anytype) anytype
@@ -9211,7 +9365,8 @@ Builtin functions are provided by the compiler and are prefixed with `@`. The `c
 
 Converts a pointer from one address space to another. The new address space is inferred based on the result type. Depending on the current target and address spaces, this cast may be a no-op, a complex operation, or illegal. If the cast is legal, then the resulting pointer points to the same memory location as the pointer operand. It is always valid to cast a pointer between the same address spaces.
 
-### [@addWithOverflow](#toc-addWithOverflow) [§](#addWithOverflow)
+### @addWithOverflow {#addWithOverflow}
+
 
 ```
 @addWithOverflow(a: anytype, b: anytype) struct { @TypeOf(a, b), u1 }
@@ -9219,7 +9374,8 @@ Converts a pointer from one address space to another. The new address space is i
 
 Performs `a + b` and returns a tuple with the result and a possible overflow bit.
 
-### [@alignCast](#toc-alignCast) [§](#alignCast)
+### @alignCast {#alignCast}
+
 
 ```
 @alignCast(ptr: anytype) anytype
@@ -9229,7 +9385,8 @@ Performs `a + b` and returns a tuple with the result and a possible overflow bit
 
 A [pointer alignment safety check](#Incorrect-Pointer-Alignment) is added to the generated code to make sure the pointer is aligned as promised.
 
-### [@alignOf](#toc-alignOf) [§](#alignOf)
+### @alignOf {#alignOf}
+
 
 ```
 @alignOf(comptime T: type) comptime_int
@@ -9250,7 +9407,8 @@ See also:
 
 - [Alignment](#Alignment)
 
-### [@as](#toc-as) [§](#as)
+### @as {#as}
+
 
 ```
 @as(comptime T: type, expression) T
@@ -9258,7 +9416,8 @@ See also:
 
 Performs [Type Coercion](#Type-Coercion). This cast is allowed when the conversion is unambiguous and safe, and is the preferred way to convert between types, whenever possible.
 
-### [@atomicLoad](#toc-atomicLoad) [§](#atomicLoad)
+### @atomicLoad {#atomicLoad}
+
 
 ```
 @atomicLoad(comptime T: type, ptr: *const T, comptime ordering: AtomicOrder) T
@@ -9277,7 +9436,8 @@ See also:
 - [@cmpxchgWeak](#cmpxchgWeak)
 - [@cmpxchgStrong](#cmpxchgStrong)
 
-### [@atomicRmw](#toc-atomicRmw) [§](#atomicRmw)
+### @atomicRmw {#atomicRmw}
+
 
 ```
 @atomicRmw(comptime T: type, ptr: *T, comptime op: AtomicRmwOp, operand: T, comptime ordering: AtomicOrder) T
@@ -9298,7 +9458,8 @@ See also:
 - [@cmpxchgWeak](#cmpxchgWeak)
 - [@cmpxchgStrong](#cmpxchgStrong)
 
-### [@atomicStore](#toc-atomicStore) [§](#atomicStore)
+### @atomicStore {#atomicStore}
+
 
 ```
 @atomicStore(comptime T: type, ptr: *T, value: T, comptime ordering: AtomicOrder) void
@@ -9317,7 +9478,8 @@ See also:
 - [@cmpxchgWeak](#cmpxchgWeak)
 - [@cmpxchgStrong](#cmpxchgStrong)
 
-### [@bitCast](#toc-bitCast) [§](#bitCast)
+### @bitCast {#bitCast}
+
 
 ```
 @bitCast(value: anytype) anytype
@@ -9336,7 +9498,8 @@ Can be used for these things for example:
 
 Works at compile-time if `value` is known at compile time. It's a compile error to bitcast a value of undefined layout; this means that, besides the restriction from types which possess dedicated casting builtins (enums, pointers, error sets), bare structs, error unions, slices, optionals, and any other type without a well-defined memory layout, also cannot be used in this operation.
 
-### [@bitOffsetOf](#toc-bitOffsetOf) [§](#bitOffsetOf)
+### @bitOffsetOf {#bitOffsetOf}
+
 
 ```
 @bitOffsetOf(comptime T: type, comptime field_name: []const u8) comptime_int
@@ -9350,7 +9513,8 @@ See also:
 
 - [@offsetOf](#offsetOf)
 
-### [@bitSizeOf](#toc-bitSizeOf) [§](#bitSizeOf)
+### @bitSizeOf {#bitSizeOf}
+
 
 ```
 @bitSizeOf(comptime T: type) comptime_int
@@ -9365,7 +9529,8 @@ See also:
 - [@sizeOf](#sizeOf)
 - [@typeInfo](#typeInfo)
 
-### [@branchHint](#toc-branchHint) [§](#branchHint)
+### @branchHint {#branchHint}
+
 
 ```
 @branchHint(hint: BranchHint) void
@@ -9377,7 +9542,8 @@ Hints to the optimizer how likely a given branch of control flow is to be reache
 
 This function is only valid as the first statement in a control flow branch, or the first statement in a function.
 
-### [@breakpoint](#toc-breakpoint) [§](#breakpoint)
+### @breakpoint {#breakpoint}
+
 
 ```
 @breakpoint() void
@@ -9391,7 +9557,8 @@ See also:
 
 - [@trap](#trap)
 
-### [@mulAdd](#toc-mulAdd) [§](#mulAdd)
+### @mulAdd {#mulAdd}
+
 
 ```
 @mulAdd(comptime T: type, a: T, b: T, c: T) T
@@ -9401,7 +9568,8 @@ Fused multiply-add, similar to `(a * b) + c`, except only rounds once, and is th
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@byteSwap](#toc-byteSwap) [§](#byteSwap)
+### @byteSwap {#byteSwap}
+
 
 ```
 @byteSwap(operand: anytype) T
@@ -9415,7 +9583,8 @@ Swaps the byte order of the integer. This converts a big endian integer to a lit
 
 Note that for the purposes of memory layout with respect to endianness, the integer type should be related to the number of bytes reported by [@sizeOf](#sizeOf) bytes. This is demonstrated with `u24`. `@sizeOf(u24) == 4`, which means that a `u24` stored in memory takes 4 bytes, and those 4 bytes are what are swapped on a little vs big endian system. On the other hand, if `T` is specified to be `u24`, then only 3 bytes are reversed.
 
-### [@bitReverse](#toc-bitReverse) [§](#bitReverse)
+### @bitReverse {#bitReverse}
+
 
 ```
 @bitReverse(integer: anytype) T
@@ -9427,7 +9596,8 @@ Reverses the bitpattern of an integer value, including the sign bit if applicabl
 
 For example 0b10110110 (`u8 = 182`, `i8 = -74`) becomes 0b01101101 (`u8 = 109`, `i8 = 109`).
 
-### [@offsetOf](#toc-offsetOf) [§](#offsetOf)
+### @offsetOf {#offsetOf}
+
 
 ```
 @offsetOf(comptime T: type, comptime field_name: []const u8) comptime_int
@@ -9439,7 +9609,8 @@ See also:
 
 - [@bitOffsetOf](#bitOffsetOf)
 
-### [@call](#toc-call) [§](#call)
+### @call {#call}
+
 
 ```
 @call(modifier: std.builtin.CallModifier, function: anytype, args: anytype) anytype
@@ -9506,7 +9677,8 @@ pub const CallModifier = enum {
 };
 ```
 
-### [@cDefine](#toc-cDefine) [§](#cDefine)
+### @cDefine {#cDefine}
+
 
 ```
 @cDefine(comptime name: []const u8, value) void
@@ -9536,7 +9708,8 @@ See also:
 - [@cUndef](#cUndef)
 - [void](#void)
 
-### [@cImport](#toc-cImport) [§](#cImport)
+### @cImport {#cImport}
+
 
 ```
 @cImport(expression) type
@@ -9560,7 +9733,8 @@ See also:
 - [@cDefine](#cDefine)
 - [@cUndef](#cUndef)
 
-### [@cInclude](#toc-cInclude) [§](#cInclude)
+### @cInclude {#cInclude}
+
 
 ```
 @cInclude(comptime path: []const u8) void
@@ -9577,7 +9751,8 @@ See also:
 - [@cDefine](#cDefine)
 - [@cUndef](#cUndef)
 
-### [@clz](#toc-clz) [§](#clz)
+### @clz {#clz}
+
 
 ```
 @clz(operand: anytype) anytype
@@ -9598,7 +9773,8 @@ See also:
 - [@ctz](#ctz)
 - [@popCount](#popCount)
 
-### [@cmpxchgStrong](#toc-cmpxchgStrong) [§](#cmpxchgStrong)
+### @cmpxchgStrong {#cmpxchgStrong}
+
 
 ```
 @cmpxchgStrong(comptime T: type, ptr: *T, expected_value: T, new_value: T, success_order: AtomicOrder, fail_order: AtomicOrder) ?T
@@ -9635,7 +9811,8 @@ See also:
 - [@atomicRmw](#atomicRmw)
 - [@cmpxchgWeak](#cmpxchgWeak)
 
-### [@cmpxchgWeak](#toc-cmpxchgWeak) [§](#cmpxchgWeak)
+### @cmpxchgWeak {#cmpxchgWeak}
+
 
 ```
 @cmpxchgWeak(comptime T: type, ptr: *T, expected_value: T, new_value: T, success_order: AtomicOrder, fail_order: AtomicOrder) ?T
@@ -9672,7 +9849,8 @@ See also:
 - [@atomicRmw](#atomicRmw)
 - [@cmpxchgStrong](#cmpxchgStrong)
 
-### [@compileError](#toc-compileError) [§](#compileError)
+### @compileError {#compileError}
+
 
 ```
 @compileError(comptime msg: []const u8) noreturn
@@ -9682,7 +9860,8 @@ This function, when semantically analyzed, causes a compile error with the messa
 
 There are several ways that code avoids being semantically checked, such as using `if` or `switch` with compile time constants, and `comptime` functions.
 
-### [@compileLog](#toc-compileLog) [§](#compileLog)
+### @compileLog {#compileLog}
+
 
 ```
 @compileLog(...) void
@@ -9731,7 +9910,8 @@ Compile Log Output:
 @as(*const [16:0]u8, "comptime in main")
 ```
 
-### [@constCast](#toc-constCast) [§](#constCast)
+### @constCast {#constCast}
+
 
 ```
 @constCast(value: anytype) DestType
@@ -9739,7 +9919,8 @@ Compile Log Output:
 
 Remove `const` qualifier from a pointer.
 
-### [@ctz](#toc-ctz) [§](#ctz)
+### @ctz {#ctz}
+
 
 ```
 @ctz(operand: anytype) anytype
@@ -9760,7 +9941,8 @@ See also:
 - [@clz](#clz)
 - [@popCount](#popCount)
 
-### [@cUndef](#toc-cUndef) [§](#cUndef)
+### @cUndef {#cUndef}
+
 
 ```
 @cUndef(comptime name: []const u8) void
@@ -9777,7 +9959,8 @@ See also:
 - [@cDefine](#cDefine)
 - [@cInclude](#cInclude)
 
-### [@cVaArg](#toc-cVaArg) [§](#cVaArg)
+### @cVaArg {#cVaArg}
+
 
 ```
 @cVaArg(operand: *std.builtin.VaList, comptime T: type) T
@@ -9791,7 +9974,8 @@ See also:
 - [@cVaEnd](#cVaEnd)
 - [@cVaStart](#cVaStart)
 
-### [@cVaCopy](#toc-cVaCopy) [§](#cVaCopy)
+### @cVaCopy {#cVaCopy}
+
 
 ```
 @cVaCopy(src: *std.builtin.VaList) std.builtin.VaList
@@ -9805,7 +9989,8 @@ See also:
 - [@cVaEnd](#cVaEnd)
 - [@cVaStart](#cVaStart)
 
-### [@cVaEnd](#toc-cVaEnd) [§](#cVaEnd)
+### @cVaEnd {#cVaEnd}
+
 
 ```
 @cVaEnd(src: *std.builtin.VaList) void
@@ -9819,7 +10004,8 @@ See also:
 - [@cVaCopy](#cVaCopy)
 - [@cVaStart](#cVaStart)
 
-### [@cVaStart](#toc-cVaStart) [§](#cVaStart)
+### @cVaStart {#cVaStart}
+
 
 ```
 @cVaStart() std.builtin.VaList
@@ -9833,7 +10019,8 @@ See also:
 - [@cVaCopy](#cVaCopy)
 - [@cVaEnd](#cVaEnd)
 
-### [@divExact](#toc-divExact) [§](#divExact)
+### @divExact {#divExact}
+
 
 ```
 @divExact(numerator: T, denominator: T) T
@@ -9851,7 +10038,8 @@ See also:
 - [@divTrunc](#divTrunc)
 - [@divFloor](#divFloor)
 
-### [@divFloor](#toc-divFloor) [§](#divFloor)
+### @divFloor {#divFloor}
+
 
 ```
 @divFloor(numerator: T, denominator: T) T
@@ -9869,7 +10057,8 @@ See also:
 - [@divTrunc](#divTrunc)
 - [@divExact](#divExact)
 
-### [@divTrunc](#toc-divTrunc) [§](#divTrunc)
+### @divTrunc {#divTrunc}
+
 
 ```
 @divTrunc(numerator: T, denominator: T) T
@@ -9887,7 +10076,8 @@ See also:
 - [@divFloor](#divFloor)
 - [@divExact](#divExact)
 
-### [@embedFile](#toc-embedFile) [§](#embedFile)
+### @embedFile {#embedFile}
+
 
 ```
 @embedFile(comptime path: []const u8) *const [N:0]u8
@@ -9901,7 +10091,8 @@ See also:
 
 - [@import](#import)
 
-### [@enumFromInt](#toc-enumFromInt) [§](#enumFromInt)
+### @enumFromInt {#enumFromInt}
+
 
 ```
 @enumFromInt(integer: anytype) anytype
@@ -9915,7 +10106,8 @@ See also:
 
 - [@intFromEnum](#intFromEnum)
 
-### [@errorFromInt](#toc-errorFromInt) [§](#errorFromInt)
+### @errorFromInt {#errorFromInt}
+
 
 ```
 @errorFromInt(value: @Int(.unsigned, @bitSizeOf(anyerror))) anyerror
@@ -9931,7 +10123,8 @@ See also:
 
 - [@intFromError](#intFromError)
 
-### [@errorName](#toc-errorName) [§](#errorName)
+### @errorName {#errorName}
+
 
 ```
 @errorName(err: anyerror) [:0]const u8
@@ -9941,7 +10134,8 @@ This function returns the string representation of an error. The string represen
 
 If there are no calls to `@errorName` in an entire application, or all calls have a compile-time known value for `err`, then no error name table will be generated.
 
-### [@errorReturnTrace](#toc-errorReturnTrace) [§](#errorReturnTrace)
+### @errorReturnTrace {#errorReturnTrace}
+
 
 ```
 @errorReturnTrace() ?*builtin.StackTrace
@@ -9949,7 +10143,8 @@ If there are no calls to `@errorName` in an entire application, or all calls hav
 
 If the binary is built with error return tracing, and this function is invoked in a function that calls a function with an error or error union return type, returns a stack trace object. Otherwise returns [null](#null).
 
-### [@errorCast](#toc-errorCast) [§](#errorCast)
+### @errorCast {#errorCast}
+
 
 ```
 @errorCast(value: anytype) anytype
@@ -9957,7 +10152,8 @@ If the binary is built with error return tracing, and this function is invoked i
 
 Converts an error set or error union value from one error set to another error set. The return type is the inferred result type. Attempting to convert an error which is not in the destination error set results in safety-checked [Illegal Behavior](#Illegal-Behavior).
 
-### [@export](#toc-export) [§](#export)
+### @export {#export}
+
 
 ```
 @export(comptime ptr: *const anyopaque, comptime options: std.builtin.ExportOptions) void
@@ -10023,7 +10219,8 @@ See also:
 
 - [Exporting a C Library](#Exporting-a-C-Library)
 
-### [@extern](#toc-extern) [§](#extern)
+### @extern {#extern}
+
 
 ```
 @extern(T: type, comptime options: std.builtin.ExternOptions) T
@@ -10035,7 +10232,8 @@ See also:
 
 - [@export](#export)
 
-### [@field](#toc-field) [§](#field)
+### @field {#field}
+
 
 ```
 @field(lhs: anytype, comptime field_name: []const u8) (field)
@@ -10083,7 +10281,8 @@ $ zig test test_field_builtin.zig
 All 2 tests passed.
 ```
 
-### [@fieldParentPtr](#toc-fieldParentPtr) [§](#fieldParentPtr)
+### @fieldParentPtr {#fieldParentPtr}
+
 
 ```
 @fieldParentPtr(comptime field_name: []const u8, field_ptr: *T) anytype
@@ -10093,7 +10292,8 @@ Given a pointer to a struct or union field, returns a pointer to the struct or u
 
 If `field_ptr` does not point to the `field_name` field of an instance of the result type, and the result type has ill-defined layout, invokes unchecked [Illegal Behavior](#Illegal-Behavior).
 
-### [@FieldType](#toc-FieldType) [§](#FieldType)
+### @FieldType {#FieldType}
+
 
 ```
 @FieldType(comptime Type: type, comptime field_name: []const u8) type
@@ -10101,7 +10301,8 @@ If `field_ptr` does not point to the `field_name` field of an instance of the re
 
 Given a type and the name of one of its fields, returns the type of that field.
 
-### [@floatCast](#toc-floatCast) [§](#floatCast)
+### @floatCast {#floatCast}
+
 
 ```
 @floatCast(value: anytype) anytype
@@ -10109,7 +10310,8 @@ Given a type and the name of one of its fields, returns the type of that field.
 
 Convert from one float type to another. This cast is safe, but may cause the numeric value to lose precision. The return type is the inferred result type.
 
-### [@floatFromInt](#toc-floatFromInt) [§](#floatFromInt)
+### @floatFromInt {#floatFromInt}
+
 
 ```
 @floatFromInt(int: anytype) anytype
@@ -10117,7 +10319,8 @@ Convert from one float type to another. This cast is safe, but may cause the num
 
 Converts an integer to the closest floating point representation. The return type is the inferred result type. To convert the other way, use [@intFromFloat](#intFromFloat). This operation is legal for all values of all integer types.
 
-### [@frameAddress](#toc-frameAddress) [§](#frameAddress)
+### @frameAddress {#frameAddress}
+
 
 ```
 @frameAddress() usize
@@ -10129,7 +10332,8 @@ The implications of this are target-specific and not consistent across all platf
 
 This function is only valid within function scope.
 
-### [@hasDecl](#toc-hasDecl) [§](#hasDecl)
+### @hasDecl {#hasDecl}
+
 
 ```
 @hasDecl(comptime Container: type, comptime name: []const u8) bool
@@ -10176,7 +10380,8 @@ See also:
 
 - [@hasField](#hasField)
 
-### [@hasField](#toc-hasField) [§](#hasField)
+### @hasField {#hasField}
+
 
 ```
 @hasField(comptime Container: type, comptime name: []const u8) bool
@@ -10192,7 +10397,8 @@ See also:
 
 - [@hasDecl](#hasDecl)
 
-### [@import](#toc-import) [§](#import)
+### @import {#import}
+
 
 ```
 @import(comptime target: []const u8) anytype
@@ -10215,7 +10421,8 @@ See also:
 - [Compile Variables](#Compile-Variables)
 - [@embedFile](#embedFile)
 
-### [@inComptime](#toc-inComptime) [§](#inComptime)
+### @inComptime {#inComptime}
+
 
 ```
 @inComptime() bool
@@ -10229,7 +10436,8 @@ See also:
 
 - [comptime](#comptime)
 
-### [@intCast](#toc-intCast) [§](#intCast)
+### @intCast {#intCast}
+
 
 ```
 @intCast(int: anytype) anytype
@@ -10276,7 +10484,8 @@ To truncate the significant bits of a number out of range of the destination typ
 
 If `T` is `comptime_int`, then this is semantically equivalent to [Type Coercion](#Type-Coercion).
 
-### [@intFromBool](#toc-intFromBool) [§](#intFromBool)
+### @intFromBool {#intFromBool}
+
 
 ```
 @intFromBool(value: bool) u1
@@ -10284,7 +10493,8 @@ If `T` is `comptime_int`, then this is semantically equivalent to [Type Coercion
 
 Converts `true` to `@as(u1, 1)` and `false` to `@as(u1, 0)`.
 
-### [@intFromEnum](#toc-intFromEnum) [§](#intFromEnum)
+### @intFromEnum {#intFromEnum}
+
 
 ```
 @intFromEnum(enum_or_tagged_union: anytype) anytype
@@ -10298,7 +10508,8 @@ See also:
 
 - [@enumFromInt](#enumFromInt)
 
-### [@intFromError](#toc-intFromError) [§](#intFromError)
+### @intFromError {#intFromError}
+
 
 ```
 @intFromError(err: anytype) @Int(.unsigned, @bitSizeOf(anyerror))
@@ -10318,7 +10529,8 @@ See also:
 
 - [@errorFromInt](#errorFromInt)
 
-### [@intFromFloat](#toc-intFromFloat) [§](#intFromFloat)
+### @intFromFloat {#intFromFloat}
+
 
 ```
 @intFromFloat(float: anytype) anytype
@@ -10332,7 +10544,8 @@ See also:
 
 - [@floatFromInt](#floatFromInt)
 
-### [@intFromPtr](#toc-intFromPtr) [§](#intFromPtr)
+### @intFromPtr {#intFromPtr}
+
 
 ```
 @intFromPtr(value: anytype) usize
@@ -10342,7 +10555,8 @@ Converts `value` to a `usize` which is the address of the pointer. `value` can b
 
 To convert the other way, use [@ptrFromInt](#ptrFromInt)
 
-### [@max](#toc-max) [§](#max)
+### @max {#max}
+
 
 ```
 @max(...) T
@@ -10357,7 +10571,8 @@ See also:
 - [@min](#min)
 - [Vectors](#Vectors)
 
-### [@memcpy](#toc-memcpy) [§](#memcpy)
+### @memcpy {#memcpy}
+
 
 ```
 @memcpy(noalias dest, noalias source) void
@@ -10375,7 +10590,8 @@ Similar to [for](#for) loops, at least one of `source` and `dest` must provide a
 
 Finally, the two memory regions must not overlap.
 
-### [@memset](#toc-memset) [§](#memset)
+### @memset {#memset}
+
 
 ```
 @memset(dest, elem) void
@@ -10389,7 +10605,8 @@ This function sets all the elements of a memory region to `elem`.
 
 For securely zeroing out sensitive contents from memory, you should use `std.crypto.secureZero`
 
-### [@memmove](#toc-memmove) [§](#memmove)
+### @memmove {#memmove}
+
 
 ```
 @memmove(dest, source) void
@@ -10405,7 +10622,8 @@ The `source` element type must have the same in-memory representation as the `de
 
 Similar to [for](#for) loops, at least one of `source` and `dest` must provide a length, and if two lengths are provided, they must be equal.
 
-### [@min](#toc-min) [§](#min)
+### @min {#min}
+
 
 ```
 @min(...) T
@@ -10420,7 +10638,8 @@ See also:
 - [@max](#max)
 - [Vectors](#Vectors)
 
-### [@wasmMemorySize](#toc-wasmMemorySize) [§](#wasmMemorySize)
+### @wasmMemorySize {#wasmMemorySize}
+
 
 ```
 @wasmMemorySize(index: u32) usize
@@ -10434,7 +10653,8 @@ See also:
 
 - [@wasmMemoryGrow](#wasmMemoryGrow)
 
-### [@wasmMemoryGrow](#toc-wasmMemoryGrow) [§](#wasmMemoryGrow)
+### @wasmMemoryGrow {#wasmMemoryGrow}
+
 
 ```
 @wasmMemoryGrow(index: u32, delta: usize) isize
@@ -10472,7 +10692,8 @@ See also:
 
 - [@wasmMemorySize](#wasmMemorySize)
 
-### [@mod](#toc-mod) [§](#mod)
+### @mod {#mod}
+
 
 ```
 @mod(numerator: T, denominator: T) T
@@ -10489,7 +10710,8 @@ See also:
 
 - [@rem](#rem)
 
-### [@mulWithOverflow](#toc-mulWithOverflow) [§](#mulWithOverflow)
+### @mulWithOverflow {#mulWithOverflow}
+
 
 ```
 @mulWithOverflow(a: anytype, b: anytype) struct { @TypeOf(a, b), u1 }
@@ -10497,7 +10719,8 @@ See also:
 
 Performs `a * b` and returns a tuple with the result and a possible overflow bit.
 
-### [@panic](#toc-panic) [§](#panic)
+### @panic {#panic}
+
 
 ```
 @panic(message: []const u8) noreturn
@@ -10514,7 +10737,8 @@ See also:
 
 - [Panic Handler](#Panic-Handler)
 
-### [@popCount](#toc-popCount) [§](#popCount)
+### @popCount {#popCount}
+
 
 ```
 @popCount(operand: anytype) anytype
@@ -10533,7 +10757,8 @@ See also:
 - [@ctz](#ctz)
 - [@clz](#clz)
 
-### [@prefetch](#toc-prefetch) [§](#prefetch)
+### @prefetch {#prefetch}
+
 
 ```
 @prefetch(ptr: anytype, comptime options: PrefetchOptions) void
@@ -10545,7 +10770,8 @@ The `ptr` argument may be any pointer type and determines the memory address to 
 
 `PrefetchOptions` can be found with `@import("std").builtin.PrefetchOptions`.
 
-### [@ptrCast](#toc-ptrCast) [§](#ptrCast)
+### @ptrCast {#ptrCast}
+
 
 ```
 @ptrCast(value: anytype) anytype
@@ -10563,7 +10789,8 @@ Converts a pointer of one type to a pointer of another type. The return type is 
 - Increasing pointer alignment, use [@alignCast](#alignCast).
 - Casting a non-slice pointer to a slice, use slicing syntax `ptr[start..end]`.
 
-### [@ptrFromInt](#toc-ptrFromInt) [§](#ptrFromInt)
+### @ptrFromInt {#ptrFromInt}
+
 
 ```
 @ptrFromInt(address: usize) anytype
@@ -10573,7 +10800,8 @@ Converts an integer to a [pointer](#Pointers). The return type is the inferred r
 
 If the destination pointer type does not allow address zero and `address` is zero, this invokes safety-checked [Illegal Behavior](#Illegal-Behavior).
 
-### [@rem](#toc-rem) [§](#rem)
+### @rem {#rem}
+
 
 ```
 @rem(numerator: T, denominator: T) T
@@ -10590,7 +10818,8 @@ See also:
 
 - [@mod](#mod)
 
-### [@returnAddress](#toc-returnAddress) [§](#returnAddress)
+### @returnAddress {#returnAddress}
+
 
 ```
 @returnAddress() usize
@@ -10602,7 +10831,8 @@ The implications of this are target-specific and not consistent across all platf
 
 This function is only valid within function scope. If the function gets inlined into a calling function, the returned address will apply to the calling function.
 
-### [@select](#toc-select) [§](#select)
+### @select {#select}
+
 
 ```
 @select(comptime T: type, pred: @Vector(len, bool), a: @Vector(len, T), b: @Vector(len, T)) @Vector(len, T)
@@ -10614,7 +10844,8 @@ See also:
 
 - [Vectors](#Vectors)
 
-### [@setEvalBranchQuota](#toc-setEvalBranchQuota) [§](#setEvalBranchQuota)
+### @setEvalBranchQuota {#setEvalBranchQuota}
+
 
 ```
 @setEvalBranchQuota(comptime new_quota: u32) void
@@ -10673,7 +10904,8 @@ See also:
 
 - [comptime](#comptime)
 
-### [@setFloatMode](#toc-setFloatMode) [§](#setFloatMode)
+### @setFloatMode {#setFloatMode}
+
 
 ```
 @setFloatMode(comptime mode: FloatMode) void
@@ -10698,7 +10930,8 @@ See also:
 
 - [Floating Point Operations](#Floating-Point-Operations)
 
-### [@setRuntimeSafety](#toc-setRuntimeSafety) [§](#setRuntimeSafety)
+### @setRuntimeSafety {#setRuntimeSafety}
+
 
 ```
 @setRuntimeSafety(comptime safety_on: bool) void
@@ -10755,7 +10988,8 @@ error: the following test command terminated with signal ABRT:
 
 Note: it is [planned](https://github.com/ziglang/zig/issues/978) to replace `@setRuntimeSafety` with `@optimizeFor`
 
-### [@shlExact](#toc-shlExact) [§](#shlExact)
+### @shlExact {#shlExact}
+
 
 ```
 @shlExact(value: T, shift_amt: Log2T) T
@@ -10772,7 +11006,8 @@ See also:
 - [@shrExact](#shrExact)
 - [@shlWithOverflow](#shlWithOverflow)
 
-### [@shlWithOverflow](#toc-shlWithOverflow) [§](#shlWithOverflow)
+### @shlWithOverflow {#shlWithOverflow}
+
 
 ```
 @shlWithOverflow(a: anytype, shift_amt: Log2T) struct { @TypeOf(a), u1 }
@@ -10787,7 +11022,8 @@ See also:
 - [@shlExact](#shlExact)
 - [@shrExact](#shrExact)
 
-### [@shrExact](#toc-shrExact) [§](#shrExact)
+### @shrExact {#shrExact}
+
 
 ```
 @shrExact(value: T, shift_amt: Log2T) T
@@ -10802,7 +11038,8 @@ See also:
 - [@shlExact](#shlExact)
 - [@shlWithOverflow](#shlWithOverflow)
 
-### [@shuffle](#toc-shuffle) [§](#shuffle)
+### @shuffle {#shuffle}
+
 
 ```
 @shuffle(comptime E: type, a: @Vector(a_len, E), b: @Vector(b_len, E), comptime mask: @Vector(mask_len, i32)) @Vector(mask_len, E)
@@ -10855,7 +11092,8 @@ See also:
 
 - [Vectors](#Vectors)
 
-### [@sizeOf](#toc-sizeOf) [§](#sizeOf)
+### @sizeOf {#sizeOf}
+
 
 ```
 @sizeOf(comptime T: type) comptime_int
@@ -10872,7 +11110,8 @@ See also:
 - [@bitSizeOf](#bitSizeOf)
 - [@typeInfo](#typeInfo)
 
-### [@splat](#toc-splat) [§](#splat)
+### @splat {#splat}
+
 
 ```
 @splat(scalar: anytype) anytype
@@ -10915,7 +11154,8 @@ See also:
 - [Vectors](#Vectors)
 - [@shuffle](#shuffle)
 
-### [@reduce](#toc-reduce) [§](#reduce)
+### @reduce {#reduce}
+
 
 ```
 @reduce(comptime op: std.builtin.ReduceOp, value: anytype) E
@@ -10962,7 +11202,8 @@ See also:
 - [Vectors](#Vectors)
 - [@setFloatMode](#setFloatMode)
 
-### [@src](#toc-src) [§](#src)
+### @src {#src}
+
 
 ```
 @src() std.builtin.SourceLocation
@@ -10999,7 +11240,8 @@ $ zig test test_src_builtin.zig
 All 1 tests passed.
 ```
 
-### [@sqrt](#toc-sqrt) [§](#sqrt)
+### @sqrt {#sqrt}
+
 
 ```
 @sqrt(value: anytype) @TypeOf(value)
@@ -11009,7 +11251,8 @@ Performs the square root of a floating point number. Uses a dedicated hardware i
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@sin](#toc-sin) [§](#sin)
+### @sin {#sin}
+
 
 ```
 @sin(value: anytype) @TypeOf(value)
@@ -11019,7 +11262,8 @@ Sine trigonometric function on a floating point number in radians. Uses a dedica
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@cos](#toc-cos) [§](#cos)
+### @cos {#cos}
+
 
 ```
 @cos(value: anytype) @TypeOf(value)
@@ -11029,7 +11273,8 @@ Cosine trigonometric function on a floating point number in radians. Uses a dedi
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@tan](#toc-tan) [§](#tan)
+### @tan {#tan}
+
 
 ```
 @tan(value: anytype) @TypeOf(value)
@@ -11039,7 +11284,8 @@ Tangent trigonometric function on a floating point number in radians. Uses a ded
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@exp](#toc-exp) [§](#exp)
+### @exp {#exp}
+
 
 ```
 @exp(value: anytype) @TypeOf(value)
@@ -11049,7 +11295,8 @@ Base-e exponential function on a floating point number. Uses a dedicated hardwar
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@exp2](#toc-exp2) [§](#exp2)
+### @exp2 {#exp2}
+
 
 ```
 @exp2(value: anytype) @TypeOf(value)
@@ -11059,7 +11306,8 @@ Base-2 exponential function on a floating point number. Uses a dedicated hardwar
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@log](#toc-log) [§](#log)
+### @log {#log}
+
 
 ```
 @log(value: anytype) @TypeOf(value)
@@ -11069,7 +11317,8 @@ Returns the natural logarithm of a floating point number. Uses a dedicated hardw
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@log2](#toc-log2) [§](#log2)
+### @log2 {#log2}
+
 
 ```
 @log2(value: anytype) @TypeOf(value)
@@ -11079,7 +11328,8 @@ Returns the logarithm to the base 2 of a floating point number. Uses a dedicated
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@log10](#toc-log10) [§](#log10)
+### @log10 {#log10}
+
 
 ```
 @log10(value: anytype) @TypeOf(value)
@@ -11089,7 +11339,8 @@ Returns the logarithm to the base 10 of a floating point number. Uses a dedicate
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@abs](#toc-abs) [§](#abs)
+### @abs {#abs}
+
 
 ```
 @abs(value: anytype) anytype
@@ -11099,7 +11350,8 @@ Returns the absolute value of an integer or a floating point number. Uses a dedi
 
 Supports [Floats](#Floats), [Integers](#Integers) and [Vectors](#Vectors) of floats or integers.
 
-### [@floor](#toc-floor) [§](#floor)
+### @floor {#floor}
+
 
 ```
 @floor(value: anytype) @TypeOf(value)
@@ -11109,7 +11361,8 @@ Returns the largest integral value not greater than the given floating point num
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@ceil](#toc-ceil) [§](#ceil)
+### @ceil {#ceil}
+
 
 ```
 @ceil(value: anytype) @TypeOf(value)
@@ -11119,7 +11372,8 @@ Returns the smallest integral value not less than the given floating point numbe
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@trunc](#toc-trunc) [§](#trunc)
+### @trunc {#trunc}
+
 
 ```
 @trunc(value: anytype) @TypeOf(value)
@@ -11129,7 +11383,8 @@ Rounds the given floating point number to an integer, towards zero. Uses a dedic
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@round](#toc-round) [§](#round)
+### @round {#round}
+
 
 ```
 @round(value: anytype) @TypeOf(value)
@@ -11160,7 +11415,8 @@ All 1 tests passed.
 
 Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
-### [@subWithOverflow](#toc-subWithOverflow) [§](#subWithOverflow)
+### @subWithOverflow {#subWithOverflow}
+
 
 ```
 @subWithOverflow(a: anytype, b: anytype) struct { @TypeOf(a, b), u1 }
@@ -11168,7 +11424,8 @@ Supports [Floats](#Floats) and [Vectors](#Vectors) of floats.
 
 Performs `a - b` and returns a tuple with the result and a possible overflow bit.
 
-### [@tagName](#toc-tagName) [§](#tagName)
+### @tagName {#tagName}
+
 
 ```
 @tagName(value: anytype) [:0]const u8
@@ -11178,7 +11435,8 @@ Converts an enum value or union value to a string literal representing the name.
 
 If the enum is non-exhaustive and the tag value does not map to a name, it invokes safety-checked [Illegal Behavior](#Illegal-Behavior).
 
-### [@This](#toc-This) [§](#This)
+### @This {#This}
+
 
 ```
 @This() type
@@ -11221,7 +11479,8 @@ All 1 tests passed.
 
 When `@This()` is used at file scope, it returns a reference to the struct that corresponds to the current file.
 
-### [@trap](#toc-trap) [§](#trap)
+### @trap {#trap}
+
 
 ```
 @trap() noreturn
@@ -11235,7 +11494,8 @@ See also:
 
 - [@breakpoint](#breakpoint)
 
-### [@truncate](#toc-truncate) [§](#truncate)
+### @truncate {#truncate}
+
 
 ```
 @truncate(integer: anytype) anytype
@@ -11270,7 +11530,8 @@ All 1 tests passed.
 
 Use [@intCast](#intCast) to convert numbers guaranteed to fit the destination type.
 
-### [@EnumLiteral](#toc-EnumLiteral) [§](#EnumLiteral)
+### @EnumLiteral {#EnumLiteral}
+
 
 ```
 @EnumLiteral() type
@@ -11278,7 +11539,8 @@ Use [@intCast](#intCast) to convert numbers guaranteed to fit the destination ty
 
 Returns the comptime-only "enum literal" type. This is the type of uncoerced [Enum Literals](#Enum-Literals). Values of this type can coerce to any [enum](#enum) with a matching field.
 
-### [@Int](#toc-Int) [§](#Int)
+### @Int {#Int}
+
 
 ```
 @Int(comptime signedness: std.builtin.Signedness, comptime bits: u16) type
@@ -11288,7 +11550,8 @@ Returns an integer type with the given signedness and bit width.
 
 For instance, `@Int(.unsigned, 18)` returns the type `u18`.
 
-### [@Tuple](#toc-Tuple) [§](#Tuple)
+### @Tuple {#Tuple}
+
 
 ```
 @Tuple(comptime field_types: []const type) type
@@ -11296,7 +11559,8 @@ For instance, `@Int(.unsigned, 18)` returns the type `u18`.
 
 Returns a [tuple](#Tuples) type with the given field types.
 
-### [@Pointer](#toc-Pointer) [§](#Pointer)
+### @Pointer {#Pointer}
+
 
 ```
 @Pointer(
@@ -11309,7 +11573,8 @@ Returns a [tuple](#Tuples) type with the given field types.
 
 Returns a [pointer](#Pointers) type with the properties specified by the arguments.
 
-### [@Fn](#toc-Fn) [§](#Fn)
+### @Fn {#Fn}
+
 
 ```
 @Fn(
@@ -11322,7 +11587,8 @@ Returns a [pointer](#Pointers) type with the properties specified by the argumen
 
 Returns a [function](#Functions) type with the properties specified by the arguments.
 
-### [@Struct](#toc-Struct) [§](#Struct)
+### @Struct {#Struct}
+
 
 ```
 @Struct(
@@ -11336,7 +11602,8 @@ Returns a [function](#Functions) type with the properties specified by the argum
 
 Returns a [struct](#struct) type with the properties specified by the arguments.
 
-### [@Union](#toc-Union) [§](#Union)
+### @Union {#Union}
+
 
 ```
 @Union(
@@ -11351,7 +11618,8 @@ Returns a [struct](#struct) type with the properties specified by the arguments.
 
 Returns a [union](#union) type with the properties specified by the arguments.
 
-### [@Enum](#toc-Enum) [§](#Enum)
+### @Enum {#Enum}
+
 
 ```
 @Enum(
@@ -11364,7 +11632,8 @@ Returns a [union](#union) type with the properties specified by the arguments.
 
 Returns an [enum](#enum) type with the properties specified by the arguments.
 
-### [@typeInfo](#toc-typeInfo) [§](#typeInfo)
+### @typeInfo {#typeInfo}
+
 
 ```
 @typeInfo(comptime T: type) std.builtin.Type
@@ -11376,7 +11645,8 @@ Type information of [structs](#struct), [unions](#union), [enums](#enum), and [e
 
 Type information of [structs](#struct), [unions](#union), [enums](#enum), and [opaques](#opaque) has declarations, which are also guaranteed to be in the same order as appearance in the source file.
 
-### [@typeName](#toc-typeName) [§](#typeName)
+### @typeName {#typeName}
+
 
 ```
 @typeName(T: type) *const [N:0]u8
@@ -11384,7 +11654,8 @@ Type information of [structs](#struct), [unions](#union), [enums](#enum), and [o
 
 This function returns the string representation of a type, as an array. It is equivalent to a string literal of the type name. The returned type name is fully qualified with the parent namespace included as part of the type name with a series of dots.
 
-### [@TypeOf](#toc-TypeOf) [§](#TypeOf)
+### @TypeOf {#TypeOf}
+
 
 ```
 @TypeOf(...) type
@@ -11421,7 +11692,8 @@ $ zig test test_TypeOf_builtin.zig
 All 1 tests passed.
 ```
 
-### [@unionInit](#toc-unionInit) [§](#unionInit)
+### @unionInit {#unionInit}
+
 
 ```
 @unionInit(comptime Union: type, comptime active_field_name: []const u8, init_expr) Union
@@ -11431,7 +11703,8 @@ This is the same thing as [union](#union) initialization syntax, except that the
 
 `@unionInit` forwards its [result location](#Result-Location-Semantics) to `init_expr`.
 
-### [@Vector](#toc-Vector) [§](#Vector)
+### @Vector {#Vector}
+
 
 ```
 @Vector(len: comptime_int, Element: type) type
@@ -11439,7 +11712,8 @@ This is the same thing as [union](#union) initialization syntax, except that the
 
 Creates [Vectors](#Vectors).
 
-### [@volatileCast](#toc-volatileCast) [§](#volatileCast)
+### @volatileCast {#volatileCast}
+
 
 ```
 @volatileCast(value: anytype) DestType
@@ -11447,7 +11721,8 @@ Creates [Vectors](#Vectors).
 
 Remove `volatile` qualifier from a pointer.
 
-### [@workGroupId](#toc-workGroupId) [§](#workGroupId)
+### @workGroupId {#workGroupId}
+
 
 ```
 @workGroupId(comptime dimension: u32) u32
@@ -11455,7 +11730,8 @@ Remove `volatile` qualifier from a pointer.
 
 Returns the index of the work group in the current kernel invocation in dimension `dimension`.
 
-### [@workGroupSize](#toc-workGroupSize) [§](#workGroupSize)
+### @workGroupSize {#workGroupSize}
+
 
 ```
 @workGroupSize(comptime dimension: u32) u32
@@ -11463,7 +11739,8 @@ Returns the index of the work group in the current kernel invocation in dimensio
 
 Returns the number of work items that a work group has in dimension `dimension`.
 
-### [@workItemId](#toc-workItemId) [§](#workItemId)
+### @workItemId {#workItemId}
+
 
 ```
 @workItemId(comptime dimension: u32) u32
@@ -11471,7 +11748,8 @@ Returns the number of work items that a work group has in dimension `dimension`.
 
 Returns the index of the work item in the work group in dimension `dimension`. This function returns values between `0` (inclusive) and `@workGroupSize(dimension)` (exclusive).
 
-## [Build Mode](#toc-Build-Mode) [§](#Build-Mode)
+## Build Mode {#Build-Mode}
+
 
 Zig has four build modes:
 
@@ -11511,7 +11789,8 @@ This causes these options to be available:
 - **-Doptimize=ReleaseSmall**
   Size optimizations on and safety off
 
-### [Debug](#toc-Debug) [§](#Debug)
+### Debug {#Debug}
+
 
 Shell
 
@@ -11525,7 +11804,8 @@ $ zig build-exe example.zig
 - Large binary size
 - No reproducible build requirement
 
-### [ReleaseFast](#toc-ReleaseFast) [§](#ReleaseFast)
+### ReleaseFast {#ReleaseFast}
+
 
 Shell
 
@@ -11539,7 +11819,8 @@ $ zig build-exe example.zig -O ReleaseFast
 - Large binary size
 - Reproducible build
 
-### [ReleaseSafe](#toc-ReleaseSafe) [§](#ReleaseSafe)
+### ReleaseSafe {#ReleaseSafe}
+
 
 Shell
 
@@ -11553,7 +11834,8 @@ $ zig build-exe example.zig -O ReleaseSafe
 - Large binary size
 - Reproducible build
 
-### [ReleaseSmall](#toc-ReleaseSmall) [§](#ReleaseSmall)
+### ReleaseSmall {#ReleaseSmall}
+
 
 Shell
 
@@ -11573,7 +11855,8 @@ See also:
 - [Zig Build System](#Zig-Build-System)
 - [Illegal Behavior](#Illegal-Behavior)
 
-## [Single Threaded Builds](#toc-Single-Threaded-Builds) [§](#Single-Threaded-Builds)
+## Single Threaded Builds {#Single-Threaded-Builds}
+
 
 Zig has a compile option -fsingle-threaded which has the following effects:
 
@@ -11581,7 +11864,8 @@ Zig has a compile option -fsingle-threaded which has the following effects:
 - The overhead of [Async Functions](#Async-Functions) becomes equivalent to function call overhead.
 - The `@import("builtin").single_threaded` becomes `true` and therefore various userland APIs which read this variable become more efficient. For example `std.Mutex` becomes an empty data structure and all of its functions become no-ops.
 
-## [Illegal Behavior](#toc-Illegal-Behavior) [§](#Illegal-Behavior)
+## Illegal Behavior {#Illegal-Behavior}
+
 
 Many operations in Zig trigger what is known as "Illegal Behavior" (IB). If Illegal Behavior is detected at compile-time, Zig emits a compile error and refuses to continue. Otherwise, when Illegal Behavior is not caught at compile-time, it falls into one of two categories.
 
@@ -11625,7 +11909,8 @@ error: the following test command terminated with signal ABRT:
 /home/andy/src/zig/.zig-cache/o/072ba49a7ed3af767b4ac6cae5d991d5/test --seed=0x56efd66b
 ```
 
-### [Reaching Unreachable Code](#toc-Reaching-Unreachable-Code) [§](#Reaching-Unreachable-Code)
+### Reaching Unreachable Code {#Reaching-Unreachable-Code}
+
 
 At compile-time:
 
@@ -11685,7 +11970,8 @@ thread 930209 panic: reached unreachable code
 (process terminated by signal)
 ```
 
-### [Index out of Bounds](#toc-Index-out-of-Bounds) [§](#Index-out-of-Bounds)
+### Index out of Bounds {#Index-out-of-Bounds}
+
 
 At compile-time:
 
@@ -11744,7 +12030,8 @@ thread 931962 panic: index out of bounds: index 5, len 5
 (process terminated by signal)
 ```
 
-### [Cast Negative Number to Unsigned Integer](#toc-Cast-Negative-Number-to-Unsigned-Integer) [§](#Cast-Negative-Number-to-Unsigned-Integer)
+### Cast Negative Number to Unsigned Integer {#Cast-Negative-Number-to-Unsigned-Integer}
+
 
 At compile-time:
 
@@ -11802,7 +12089,8 @@ thread 933932 panic: integer does not fit in destination type
 
 To obtain the maximum value of an unsigned integer, use `std.math.maxInt`.
 
-### [Cast Truncates Data](#toc-Cast-Truncates-Data) [§](#Cast-Truncates-Data)
+### Cast Truncates Data {#Cast-Truncates-Data}
+
 
 At compile-time:
 
@@ -11860,9 +12148,11 @@ thread 930996 panic: integer does not fit in destination type
 
 To truncate bits, use [@truncate](#truncate).
 
-### [Integer Overflow](#toc-Integer-Overflow) [§](#Integer-Overflow)
+### Integer Overflow {#Integer-Overflow}
 
-#### [Default Operations](#toc-Default-Operations) [§](#Default-Operations)
+
+#### Default Operations {#Default-Operations}
+
 
 The following operators can cause integer overflow:
 
@@ -11927,7 +12217,8 @@ thread 934575 panic: integer overflow
 (process terminated by signal)
 ```
 
-#### [Standard Library Math Functions](#toc-Standard-Library-Math-Functions) [§](#Standard-Library-Math-Functions)
+#### Standard Library Math Functions {#Standard-Library-Math-Functions}
+
 
 These functions provided by the standard library return possible errors.
 
@@ -11973,7 +12264,8 @@ error: Overflow
         ^
 ```
 
-#### [Builtin Overflow Functions](#toc-Builtin-Overflow-Functions) [§](#Builtin-Overflow-Functions)
+#### Builtin Overflow Functions {#Builtin-Overflow-Functions}
+
 
 These builtins return a tuple containing whether there was an overflow (as a `u1`) and the possibly overflowed bits of the operation:
 
@@ -12008,7 +12300,8 @@ $ ./addWithOverflow_builtin
 overflowed result: 9
 ```
 
-#### [Wrapping Operations](#toc-Wrapping-Operations) [§](#Wrapping-Operations)
+#### Wrapping Operations {#Wrapping-Operations}
+
 
 These operations have guaranteed wraparound semantics.
 
@@ -12042,7 +12335,8 @@ $ zig test test_wraparound_semantics.zig
 All 1 tests passed.
 ```
 
-### [Exact Left Shift Overflow](#toc-Exact-Left-Shift-Overflow) [§](#Exact-Left-Shift-Overflow)
+### Exact Left Shift Overflow {#Exact-Left-Shift-Overflow}
+
 
 At compile-time:
 
@@ -12097,7 +12391,8 @@ thread 934568 panic: left shift overflowed bits
 (process terminated by signal)
 ```
 
-### [Exact Right Shift Overflow](#toc-Exact-Right-Shift-Overflow) [§](#Exact-Right-Shift-Overflow)
+### Exact Right Shift Overflow {#Exact-Right-Shift-Overflow}
+
 
 At compile-time:
 
@@ -12155,7 +12450,8 @@ thread 935584 panic: right shift overflowed bits
 (process terminated by signal)
 ```
 
-### [Division by Zero](#toc-Division-by-Zero) [§](#Division-by-Zero)
+### Division by Zero {#Division-by-Zero}
+
 
 At compile-time:
 
@@ -12213,7 +12509,8 @@ thread 928583 panic: division by zero
 (process terminated by signal)
 ```
 
-### [Remainder Division by Zero](#toc-Remainder-Division-by-Zero) [§](#Remainder-Division-by-Zero)
+### Remainder Division by Zero {#Remainder-Division-by-Zero}
+
 
 At compile-time:
 
@@ -12271,7 +12568,8 @@ thread 931002 panic: division by zero
 (process terminated by signal)
 ```
 
-### [Exact Division Remainder](#toc-Exact-Division-Remainder) [§](#Exact-Division-Remainder)
+### Exact Division Remainder {#Exact-Division-Remainder}
+
 
 At compile-time:
 
@@ -12329,7 +12627,8 @@ thread 930219 panic: exact division produced remainder
 (process terminated by signal)
 ```
 
-### [Attempt to Unwrap Null](#toc-Attempt-to-Unwrap-Null) [§](#Attempt-to-Unwrap-Null)
+### Attempt to Unwrap Null {#Attempt-to-Unwrap-Null}
+
 
 At compile-time:
 
@@ -12414,7 +12713,8 @@ See also:
 
 - [Optionals](#Optionals)
 
-### [Attempt to Unwrap Error](#toc-Attempt-to-Unwrap-Error) [§](#Attempt-to-Unwrap-Error)
+### Attempt to Unwrap Error {#Attempt-to-Unwrap-Error}
+
 
 At compile-time:
 
@@ -12518,7 +12818,8 @@ See also:
 
 - [Errors](#Errors)
 
-### [Invalid Error Code](#toc-Invalid-Error-Code) [§](#Invalid-Error-Code)
+### Invalid Error Code {#Invalid-Error-Code}
+
 
 At compile-time:
 
@@ -12573,7 +12874,8 @@ thread 926286 panic: invalid error code
 (process terminated by signal)
 ```
 
-### [Invalid Enum Cast](#toc-Invalid-Enum-Cast) [§](#Invalid-Enum-Cast)
+### Invalid Enum Cast {#Invalid-Enum-Cast}
+
 
 At compile-time:
 
@@ -12643,7 +12945,8 @@ thread 926295 panic: invalid enum value
 (process terminated by signal)
 ```
 
-### [Invalid Error Set Cast](#toc-Invalid-Error-Set-Cast) [§](#Invalid-Error-Set-Cast)
+### Invalid Error Set Cast {#Invalid-Error-Set-Cast}
+
 
 At compile-time:
 
@@ -12717,7 +13020,8 @@ thread 927253 panic: invalid error code
 (process terminated by signal)
 ```
 
-### [Incorrect Pointer Alignment](#toc-Incorrect-Pointer-Alignment) [§](#Incorrect-Pointer-Alignment)
+### Incorrect Pointer Alignment {#Incorrect-Pointer-Alignment}
+
 
 At compile-time:
 
@@ -12779,7 +13083,8 @@ thread 927819 panic: incorrect alignment
 (process terminated by signal)
 ```
 
-### [Wrong Union Field Access](#toc-Wrong-Union-Field-Access) [§](#Wrong-Union-Field-Access)
+### Wrong Union Field Access {#Wrong-Union-Field-Access}
+
 
 At compile-time:
 
@@ -12923,7 +13228,8 @@ See also:
 - [union](#union)
 - [extern union](#extern-union)
 
-### [Out of Bounds Float to Integer Cast](#toc-Out-of-Bounds-Float-to-Integer-Cast) [§](#Out-of-Bounds-Float-to-Integer-Cast)
+### Out of Bounds Float to Integer Cast {#Out-of-Bounds-Float-to-Integer-Cast}
+
 
 This happens when casting a float to an integer where the float has a value outside the integer type's range.
 
@@ -12979,7 +13285,8 @@ thread 935571 panic: integer part of floating point value out of bounds
 (process terminated by signal)
 ```
 
-### [Pointer Cast Invalid Null](#toc-Pointer-Cast-Invalid-Null) [§](#Pointer-Cast-Invalid-Null)
+### Pointer Cast Invalid Null {#Pointer-Cast-Invalid-Null}
+
 
 This happens when casting a pointer with the address 0 to a pointer which may not have the address 0. For example, [C Pointers](#C-Pointers), [Optional Pointers](#Optional-Pointers), and [allowzero](#allowzero) pointers allow address zero, but normal [Pointers](#Pointers) do not.
 
@@ -13035,7 +13342,8 @@ thread 931960 panic: cast causes pointer to be null
 (process terminated by signal)
 ```
 
-## [Memory](#toc-Memory) [§](#Memory)
+## Memory {#Memory}
+
 
 The Zig language performs no memory management on behalf of the programmer. This is why Zig has no runtime, and why Zig code works seamlessly in so many environments, including real-time software, operating system kernels, embedded devices, and low latency servers. As a consequence, Zig programmers must always be able to answer the question:
 
@@ -13078,7 +13386,8 @@ In the above example, 100 bytes of stack memory are used to initialize a `FixedB
 
 Zig has a general purpose allocator available to be imported with `std.heap.DebugAllocator`. However, it is still recommended to follow the [Choosing an Allocator](#Choosing-an-Allocator) guide.
 
-### [Choosing an Allocator](#toc-Choosing-an-Allocator) [§](#Choosing-an-Allocator)
+### Choosing an Allocator {#Choosing-an-Allocator}
+
 
 What allocator to use depends on a number of factors. Here is a flow chart to help you decide:
 
@@ -13115,7 +13424,8 @@ What allocator to use depends on a number of factors. Here is a flow chart to he
 9. If you are compiling in ReleaseFast mode, `std.heap.smp_allocator` is a solid choice for a general purpose allocator.
 10. You can also consider implementing an allocator.
 
-### [Where are the bytes?](#toc-Where-are-the-bytes) [§](#Where-are-the-bytes)
+### Where are the bytes? {#Where-are-the-bytes}
+
 
 String literals such as `"hello"` are in the global constant data section. This is why it is an error to pass a string literal to a mutable slice, like this:
 
@@ -13176,7 +13486,8 @@ The location of memory allocated with `allocator.alloc` or `allocator.create` is
 
 TODO: thread local variables
 
-### [Heap Allocation Failure](#toc-Heap-Allocation-Failure) [§](#Heap-Allocation-Failure)
+### Heap Allocation Failure {#Heap-Allocation-Failure}
+
 
 Many programming languages choose to handle the possibility of heap allocation failure by unconditionally crashing. By convention, Zig programmers do not consider this to be a satisfactory solution. Instead, `error.OutOfMemory` represents heap allocation failure, and Zig libraries return this error code whenever heap allocation failure prevented an operation from completing successfully.
 
@@ -13191,7 +13502,8 @@ Some have argued that because some operating systems such as Linux have memory o
 - When writing a library, one of the main goals is code reuse. By making code handle allocation failure correctly, a library becomes eligible to be reused in more contexts.
 - Although some software has grown to depend on overcommit being enabled, its existence is the source of countless user experience disasters. When a system with overcommit enabled, such as Linux on default settings, comes close to memory exhaustion, the system locks up and becomes unusable. At this point, the OOM Killer selects an application to kill based on heuristics. This non-deterministic decision often results in an important process being killed, and often fails to return the system back to working order.
 
-### [Recursion](#toc-Recursion) [§](#Recursion)
+### Recursion {#Recursion}
+
 
 Recursion is a fundamental tool in modeling software. However it has an often-overlooked problem: unbounded memory allocation.
 
@@ -13199,7 +13511,8 @@ Recursion is an area of active experimentation in Zig and so the documentation h
 
 The short summary is that currently recursion works normally as you would expect. Although Zig code is not yet protected from stack overflow, it is planned that a future version of Zig will provide such protection, with some degree of cooperation from Zig code required.
 
-### [Lifetime and Ownership](#toc-Lifetime-and-Ownership) [§](#Lifetime-and-Ownership)
+### Lifetime and Ownership {#Lifetime-and-Ownership}
+
 
 It is the Zig programmer's responsibility to ensure that a [pointer](#Pointers) is not accessed when the memory pointed to is no longer available. Note that a [slice](#Slices) is a form of pointer, in that it references other memory.
 
@@ -13211,7 +13524,8 @@ Sometimes the lifetime of a pointer may be more complicated. For example, the `s
 
 The API documentation for functions and data structures should take great care to explain the ownership and lifetime semantics of pointers. Ownership determines whose responsibility it is to free the memory referenced by the pointer, and lifetime determines the point at which the memory becomes inaccessible (lest [Illegal Behavior](#Illegal-Behavior) occur).
 
-## [Compile Variables](#toc-Compile-Variables) [§](#Compile-Variables)
+## Compile Variables {#Compile-Variables}
+
 
 Compile variables are accessible by importing the `"builtin"` package, which the compiler makes available to every Zig source file. It contains compile-time constants such as the current target, endianness, and release mode.
 
@@ -13378,7 +13692,8 @@ See also:
 
 - [Build Mode](#Build-Mode)
 
-## [Compilation Model](#toc-Compilation-Model) [§](#Compilation-Model)
+## Compilation Model {#Compilation-Model}
+
 
 A Zig compilation is separated into *modules*. Each module is a collection of Zig source files, one of which is the module's *root source file*. Each module can *depend* on any number of other modules, forming a directed graph (dependency loops between modules are allowed). If module A depends on module B, then any Zig source file in module A can import the *root source file* of module B using `@import` with the module's name. In essence, a module acts as an alias to import a Zig source file (which might exist in a completely separate part of the filesystem).
 
@@ -13386,7 +13701,8 @@ A simple Zig program compiled with `zig build-exe` has two key modules: the one 
 
 The "root module" (the one provided by you in the `zig build-exe` example) has a special property. Like the standard library, it is implicitly made available to all modules (including itself), this time under the name "root". So, `@import("root")` will always be equivalent to `@import` of your "main" source file (often, but not necessarily, named `main.zig`).
 
-### [Source File Structs](#toc-Source-File-Structs) [§](#Source-File-Structs)
+### Source File Structs {#Source-File-Structs}
+
 
 Every Zig source file is implicitly a `struct` declaration; you can imagine that the file's contents are literally surrounded by `struct {... }`. This means that as well as declarations, the top level of a file is permitted to contain fields:
 
@@ -13413,7 +13729,8 @@ pub fn init(val: u32) TopLevelFields {
 
 Such files can be instantiated just like any other `struct` type. A file's "root struct type" can be referred to within that file using [@This](#This).
 
-### [File and Declaration Discovery](#toc-File-and-Declaration-Discovery) [§](#File-and-Declaration-Discovery)
+### File and Declaration Discovery {#File-and-Declaration-Discovery}
+
 
 Zig places importance on the concept of whether any piece of code is *semantically analyzed*; in essence, whether the compiler "looks at" it. What code is analyzed is based on what files and declarations are "discovered" from a certain point. This process of "discovery" is based on a simple set of recursive rules:
 
@@ -13458,11 +13775,13 @@ test {
 const builtin = @import("builtin");
 ```
 
-### [Special Root Declarations](#toc-Special-Root-Declarations) [§](#Special-Root-Declarations)
+### Special Root Declarations {#Special-Root-Declarations}
+
 
 Because the root module's root source file is always accessible using `@import("root")`, is is sometimes used by libraries — including the Zig Standard Library — as a place for the program to expose some "global" information to that library. The Zig Standard Library will look for several declarations in this file.
 
-#### [Entry Point](#toc-Entry-Point) [§](#Entry-Point)
+#### Entry Point {#Entry-Point}
+
 
 When building an executable, the most important thing to be looked up in this file is the program's *entry point*. Most commonly, this is a function named `main`, which `std.start` will call just after performing important initialization work.
 
@@ -13523,7 +13842,8 @@ Hello! argv[0] is './libc_export_entry_point'
 
 `std.start` may also use other entry point declarations in certain situations, such as `wWinMain` or `EfiMain`. Refer to the `lib/std/start.zig` logic for details of these declarations.
 
-#### [Standard Library Options](#toc-Standard-Library-Options) [§](#Standard-Library-Options)
+#### Standard Library Options {#Standard-Library-Options}
+
 
 The standard library also looks for a declaration in the root module's root source file named `std_options`. If present, this declaration is expected to be a struct of type `std.Options`, and allows the program to customize some standard library functionality, such as the `std.log` implementation.
 
@@ -13555,7 +13875,8 @@ fn myLogFn(
 const std = @import("std");
 ```
 
-#### [Panic Handler](#toc-Panic-Handler) [§](#Panic-Handler)
+#### Panic Handler {#Panic-Handler}
+
 
 The Zig Standard Library looks for a declaration named `panic` in the root module's root source file. If present, it is expected to be a namespace (container type) with declarations providing different panic handlers.
 
@@ -13592,7 +13913,8 @@ $ ./panic_handler
 Panic! integer overflow
 ```
 
-## [Zig Build System](#toc-Zig-Build-System) [§](#Zig-Build-System)
+## Zig Build System {#Zig-Build-System}
+
 
 The Zig Build System provides a cross-platform, dependency-free way to declare the logic required to build a project. With this system, the logic to build a project is written in a build.zig file, using the Zig Build System API to declare and configure build artifacts and other tasks.
 
@@ -13614,13 +13936,15 @@ To use the build system, run zig build --help to see a command-line usage help m
 
 For the time being, the build system documentation is hosted externally: [Build System Documentation](https://ziglang.org/learn/build-system/)
 
-## [C](#toc-C) [§](#C)
+## C {#C}
+
 
 Although Zig is independent of C, and, unlike most other languages, does not depend on libc, Zig acknowledges the importance of interacting with existing C code.
 
 There are a few ways that Zig facilitates C interop.
 
-### [C Type Primitives](#toc-C-Type-Primitives) [§](#C-Type-Primitives)
+### C Type Primitives {#C-Type-Primitives}
+
 
 These have guaranteed C ABI compatibility and can be used like any other type.
 
@@ -13641,7 +13965,8 @@ See also:
 
 - [Primitive Types](#Primitive-Types)
 
-### [Import from C Header File](#toc-Import-from-C-Header-File) [§](#Import-from-C-Header-File)
+### Import from C Header File {#Import-from-C-Header-File}
+
 
 The `@cImport` builtin function can be used to directly import symbols from `.h` files:
 
@@ -13695,18 +14020,21 @@ See also:
 - [@cUndef](#cUndef)
 - [@import](#import)
 
-### [C Translation CLI](#toc-C-Translation-CLI) [§](#C-Translation-CLI)
+### C Translation CLI {#C-Translation-CLI}
+
 
 Zig's C translation capability is available as a CLI tool via zig translate-c. It requires a single filename as an argument. It may also take a set of optional flags that are forwarded to clang. It writes the translated file to stdout.
 
-#### [Command line flags](#toc-Command-line-flags) [§](#Command-line-flags)
+#### Command line flags {#Command-line-flags}
+
 
 - -I: Specify a search directory for include files. May be used multiple times. Equivalent to [clang's -I flag](https://releases.llvm.org/12.0.0/tools/clang/docs/ClangCommandLineReference.html#cmdoption-clang-i-dir). The current directory is *not* included by default; use -I. to include it.
 - -D: Define a preprocessor macro. Equivalent to [clang's -D flag](https://releases.llvm.org/12.0.0/tools/clang/docs/ClangCommandLineReference.html#cmdoption-clang-d-macro).
 - -cflags [flags] --: Pass arbitrary additional [command line flags](https://releases.llvm.org/12.0.0/tools/clang/docs/ClangCommandLineReference.html) to clang. Note: the list of flags must end with --
 - -target: The [target triple](#Targets) for the translated Zig code. If no target is specified, the current host target will be used.
 
-#### [Using -target and -cflags](#toc-Using--target-and--cflags) [§](#Using--target-and--cflags)
+#### Using -target and -cflags {#Using--target-and--cflags}
+
 
 **Important!** When translating C code with zig translate-c, you **must** use the same -target triple that you will use when compiling the translated code. In addition, you **must** ensure that the -cflags used, if any, match the cflags used by code on the target system. Using the incorrect -target or -cflags could result in clang or Zig parse failures, or subtle ABI incompatibilities when linking with C code.
 
@@ -13743,7 +14071,8 @@ pub const enum_FOO = u8;
 pub extern fn do_something(foo: enum_FOO) c_int;
 ```
 
-#### [@cImport vs translate-c](#toc-cImport-vs-translate-c) [§](#cImport-vs-translate-c)
+#### @cImport vs translate-c {#cImport-vs-translate-c}
+
 
 `@cImport` and zig translate-c use the same underlying C translation functionality, so on a technical level they are equivalent. In practice, `@cImport` is useful as a way to quickly and easily access numeric constants, typedefs, and record types without needing any extra setup. If you need to pass [cflags](#Using--target-and--cflags) to clang, or if you would like to edit the translated code, it is recommended to use zig translate-c and save the results to a file. Common reasons for editing the generated code include: changing `anytype` parameters in function-like macros to more specific types; changing `[*c]T` pointers to `[*]T` or `*T` pointers for improved type safety; and [enabling or disabling runtime safety](#setRuntimeSafety) within specific functions.
 
@@ -13758,7 +14087,8 @@ See also:
 - [@cImport](#cImport)
 - [@setRuntimeSafety](#setRuntimeSafety)
 
-### [C Translation Caching](#toc-C-Translation-Caching) [§](#C-Translation-Caching)
+### C Translation Caching {#C-Translation-Caching}
+
 
 The C translation feature (whether used via zig translate-c or `@cImport`) integrates with the Zig caching system. Subsequent runs with the same source file, target, and cflags will use the cache instead of repeatedly translating the same code.
 
@@ -13797,7 +14127,8 @@ See also:
 - [@cInclude](#cInclude)
 - [@cImport](#cImport)
 
-### [Translation failures](#toc-Translation-failures) [§](#Translation-failures)
+### Translation failures {#Translation-failures}
+
 
 Some C constructs cannot be translated to Zig - for example, *goto*, structs with bitfields, and token-pasting macros. Zig employs *demotion* to allow translation to continue in the face of non-translatable entities.
 
@@ -13811,7 +14142,8 @@ See also:
 - [extern](#extern)
 - [@compileError](#compileError)
 
-### [C Macros](#toc-C-Macros) [§](#C-Macros)
+### C Macros {#C-Macros}
+
 
 C Translation makes a best-effort attempt to translate function-like macros into equivalent Zig functions. Since C macros operate at the level of lexical tokens, not all C macros can be translated to Zig. Macros that cannot be translated will be demoted to `@compileError`. Note that C code which *uses* macros will be translated without any additional issues (since Zig operates on the pre-processed source with macros expanded). It is merely the macros themselves which may not be translatable to Zig.
 
@@ -13853,7 +14185,8 @@ See also:
 
 - [@compileError](#compileError)
 
-### [C Pointers](#toc-C-Pointers) [§](#C-Pointers)
+### C Pointers {#C-Pointers}
+
 
 This type is to be avoided whenever possible. The only valid reason for using a C pointer is in auto-generated code from translating C code.
 
@@ -13878,7 +14211,8 @@ When a C pointer is pointing to an array of structs, the syntax reverts to this:
 
 `ptr_to_struct_array[index].struct_member`
 
-### [C Variadic Functions](#toc-C-Variadic-Functions) [§](#C-Variadic-Functions)
+### C Variadic Functions {#C-Variadic-Functions}
+
 
 Zig supports extern variadic functions.
 
@@ -13953,7 +14287,8 @@ $ zig test test_defining_variadic_function.zig
 All 1 tests passed.
 ```
 
-### [Exporting a C Library](#toc-Exporting-a-C-Library) [§](#Exporting-a-C-Library)
+### Exporting a C Library {#Exporting-a-C-Library}
+
 
 One of the primary use cases for Zig is exporting a library with the C ABI for other programming languages to call into. The `export` keyword in front of functions, variables, and types causes them to be part of the library API:
 
@@ -14040,7 +14375,8 @@ See also:
 
 - [export](#export)
 
-### [Mixing Object Files](#toc-Mixing-Object-Files) [§](#Mixing-Object-Files)
+### Mixing Object Files {#Mixing-Object-Files}
+
 
 You can mix Zig object files with any other object files that respect the C ABI. Example:
 
@@ -14123,11 +14459,13 @@ See also:
 - [Targets](#Targets)
 - [Zig Build System](#Zig-Build-System)
 
-## [WebAssembly](#toc-WebAssembly) [§](#WebAssembly)
+## WebAssembly {#WebAssembly}
+
 
 Zig supports building for WebAssembly out of the box.
 
-### [Freestanding](#toc-Freestanding) [§](#Freestanding)
+### Freestanding {#Freestanding}
+
 
 For host environments like the web browser and nodejs, build as an executable using the freestanding OS target. Here's an example of running Zig code compiled to WebAssembly with nodejs.
 
@@ -14170,7 +14508,8 @@ $ node test.js
 The result is 3
 ```
 
-### [WASI](#toc-WASI) [§](#WASI)
+### WASI {#WASI}
+
 
 Zig standard library has first-class support for WebAssembly System Interface.
 
@@ -14232,7 +14571,8 @@ $ wasmtime --dir=. wasi_preopens.wasm
 3: .
 ```
 
-## [Targets](#toc-Targets) [§](#Targets)
+## Targets {#Targets}
+
 
 **Target** refers to the computer that will be used to run an executable. It is composed of the CPU architecture, the set of enabled CPU features, operating system, minimum and maximum operating system version, ABI, and ABI version.
 
@@ -14244,11 +14584,13 @@ The Zig Standard Library (`@import("std")`) has cross-platform abstractions, mak
 
 Each platform requires its own implementations to make Zig's cross-platform abstractions work. These implementations are at various degrees of completion. Each tagged release of the compiler comes with release notes that provide the full support table for each target.
 
-## [Style Guide](#toc-Style-Guide) [§](#Style-Guide)
+## Style Guide {#Style-Guide}
+
 
 These coding conventions are not enforced by the compiler, but they are shipped in this documentation along with the compiler in order to provide a point of reference, should anyone wish to point to an authority on agreed upon Zig coding style.
 
-### [Avoid Redundancy in Names](#toc-Avoid-Redundancy-in-Names) [§](#Avoid-Redundancy-in-Names)
+### Avoid Redundancy in Names {#Avoid-Redundancy-in-Names}
+
 
 Avoid these words in type names:
 
@@ -14263,7 +14605,8 @@ Everything is a value, all types are data, everything is context, all logic mana
 
 Temptation to use "utilities", "miscellaneous", or somebody's initials is a failure to categorize, or more commonly, overcategorization. Such declarations can live at the root of a module that needs them with no namespace needed.
 
-### [Avoid Redundant Names in Fully-Qualified Namespaces](#toc-Avoid-Redundant-Names-in-Fully-Qualified-Namespaces) [§](#Avoid-Redundant-Names-in-Fully-Qualified-Namespaces)
+### Avoid Redundant Names in Fully-Qualified Namespaces {#Avoid-Redundant-Names-in-Fully-Qualified-Namespaces}
+
 
 Every declaration is assigned a **fully qualified namespace** by the compiler, creating a tree structure. Choose names based on the fully-qualified namespace, and avoid redundant name segments.
 
@@ -14297,7 +14640,8 @@ In this example, "json" is repeated in the fully-qualified namespace. The soluti
 
 This example is an exception to the rule specified in [Avoid Redundancy in Names](#Avoid-Redundancy-in-Names). The meaning of the type has been reduced to its core: it is a json value. The name cannot be any more specific without being incorrect.
 
-### [Refrain from Underscore Prefixes](#toc-Refrain-from-Underscore-Prefixes) [§](#Refrain-from-Underscore-Prefixes)
+### Refrain from Underscore Prefixes {#Refrain-from-Underscore-Prefixes}
+
 
 In some programming languages, it is common to prefix identifiers with underscores `_like_this` to avoid keyword collisions, name collisions, or indicate additional metadata associated with usage of the identifier, such as: privacy, existence of complex data invariants, exclusion from semantic versioning, or context-specific type reflection meaning.
 
@@ -14309,14 +14653,16 @@ Regarding name collisions, an underscore is insufficient to explain the differen
 
 Finally, keyword collisions are better avoided via [String Identifier Syntax](#String-Identifier-Syntax).
 
-### [Whitespace](#toc-Whitespace) [§](#Whitespace)
+### Whitespace {#Whitespace}
+
 
 - 4 space indentation
 - Open braces on same line, unless you need to wrap.
 - If a list of things is longer than 2, put each item on its own line and exercise the ability to put an extra comma at the end.
 - Line length: aim for 100; use common sense.
 
-### [Names](#toc-Names) [§](#Names)
+### Names {#Names}
+
 
 Roughly speaking: `camelCaseFunctionName`, `TitleCaseTypeName`, `snake_case_variable_name`. More precisely:
 
@@ -14332,7 +14678,8 @@ File names fall into two categories: types and namespaces. If the file (implicit
 
 These are general rules of thumb; if it makes sense to do something different, do what makes sense. For example, if there is an established convention such as `ENOENT`, follow the established convention.
 
-### [Examples](#toc-Examples) [§](#Examples)
+### Examples {#Examples}
+
 
 style_example.zig
 
@@ -14383,14 +14730,16 @@ fn readU32Be() u32 {}
 
 See the [Zig Standard Library](#Zig-Standard-Library) for more examples.
 
-### [Doc Comment Guidance](#toc-Doc-Comment-Guidance) [§](#Doc-Comment-Guidance)
+### Doc Comment Guidance {#Doc-Comment-Guidance}
+
 
 - Omit any information that is redundant based on the name of the thing being documented.
 - Duplicating information onto multiple similar functions is encouraged because it helps IDEs and other tools provide better help text.
 - Use the word **assume** to indicate invariants that cause *unchecked* [Illegal Behavior](#Illegal-Behavior) when violated.
 - Use the word **assert** to indicate invariants that cause *safety-checked* [Illegal Behavior](#Illegal-Behavior) when violated.
 
-## [Source Encoding](#toc-Source-Encoding) [§](#Source-Encoding)
+## Source Encoding {#Source-Encoding}
+
 
 Zig source code is encoded in UTF-8. An invalid UTF-8 byte sequence results in a compile error.
 
@@ -14411,7 +14760,8 @@ Note that running zig fmt on a source file will implement all recommendations me
 
 Note that a tool reading Zig source code can make assumptions if the source code is assumed to be correct Zig code. For example, when identifying the ends of lines, a tool can use a naive search such as `/\n/`, or an [advanced](https://msdn.microsoft.com/en-us/library/dd409797.aspx) search such as `/\r\n?|[\n\u0085\u2028\u2029]/`, and in either case line endings will be correctly identified. For another example, when identifying the whitespace before the first token on a line, a tool can either use a naive search such as `/[ \t]/`, or an [advanced](https://tc39.es/ecma262/#sec-characterclassescape) search such as `/\s/`, and in either case whitespace will be correctly identified.
 
-## [Keyword Reference](#toc-Keyword-Reference) [§](#Keyword-Reference)
+## Keyword Reference {#Keyword-Reference}
+
 
 | Keyword | Description |
 | --- | --- |
@@ -14582,15 +14932,18 @@ Note that a tool reading Zig source code can make assumptions if the source code
 
  See also while |
 
-## [Appendix](#toc-Appendix) [§](#Appendix)
+## Appendix {#Appendix}
 
-### [Containers](#toc-Containers) [§](#Containers)
+
+### Containers {#Containers}
+
 
 A *container* in Zig is any syntactical construct that acts as a namespace to hold [variable](#Container-Level-Variables) and [function](#Functions) declarations. Containers are also type definitions which can be instantiated. [Structs](#struct), [enums](#enum), [unions](#union), [opaques](#opaque), and even Zig source files themselves are containers.
 
 Although containers (except Zig source files) use curly braces to surround their definition, they should not be confused with [blocks](#Blocks) or functions. Containers do not contain statements.
 
-### [Grammar](#toc-Grammar) [§](#Grammar)
+### Grammar {#Grammar}
+
 
 grammar.peg
 
@@ -14830,7 +15183,7 @@ ForArgumentsList <- ForItem (COMMA ForItem)* COMMA?
 
 ForItem <- Expr (DOT2 Expr?)?
 
-# Operators
+# Operators {#Operators}
 AssignOp
     <- ASTERISKEQUAL
      / ASTERISKPIPEEQUAL
@@ -14947,7 +15300,7 @@ ContainerDeclType
      / KEYWORD_enum (LPAREN Expr RPAREN)?
      / KEYWORD_union (LPAREN (KEYWORD_enum (LPAREN Expr RPAREN)? / !KEYWORD_enum Expr) RPAREN)?
 
-# Alignment
+# Alignment {#Alignment}
 ByteAlign <- KEYWORD_align LPAREN Expr RPAREN
 
 BitAlign <- KEYWORD_align LPAREN Expr (COLON Expr COLON Expr)? RPAREN
@@ -15187,7 +15540,8 @@ keyword <- KEYWORD_addrspace / KEYWORD_align / KEYWORD_allowzero / KEYWORD_and
          / KEYWORD_var / KEYWORD_volatile / KEYWORD_while
 ```
 
-### [Zen](#toc-Zen) [§](#Zen)
+### Zen {#Zen}
+
 
 - Communicate intent precisely.
 - Edge cases matter.

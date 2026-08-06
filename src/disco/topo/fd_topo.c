@@ -5,9 +5,11 @@
 #include "../../util/wksp/fd_wksp_private.h"
 #include "../../util/shmem/fd_shmem_private.h"
 
+#include "../../util/fd_windows_compat.h"
+
 #include <stdio.h>
 #include <errno.h>
-#include <unistd.h>
+#include <limits.h>
 #include <sys/stat.h>
 
 void *
@@ -415,7 +417,7 @@ fd_topo_print_log( int         write_stdout,
   if( FD_UNLIKELY( topo->agave_affinity_cnt>0UL ) ) {
     char agave_affinity[4096];
     ulong offset = 0UL;
-    for ( ulong i = 0UL; i < topo->agave_affinity_cnt; i++ ) {
+    for( ulong i = 0UL; i < topo->agave_affinity_cnt; i++ ) {
       ulong sz;
       if( FD_LIKELY( i != 0UL )) FD_TEST( fd_cstr_printf_check( agave_affinity+offset, 4096-offset, &sz, ", %lu", topo->agave_affinity_cpu_idx[ i ] ) );
       else                       FD_TEST( fd_cstr_printf_check( agave_affinity+offset, 4096-offset, &sz, "%lu", topo->agave_affinity_cpu_idx[ i ] ) );

@@ -23,7 +23,10 @@
    (fd_topo_t, fd_topo_tile_t, fd_topo_obj_t, fd_topo_obj_callbacks_t)
    exist in Tickoni. */
 
+#if FD_HAS_LINUX
 #define _GNU_SOURCE
+#endif
+
 #include "../../../util/fd_util.h"
 #include "../../../util/pod/fd_pod_format.h"
 #include "../../../disco/topo/fd_topob.h"
@@ -240,7 +243,10 @@ tk_topo_alignof( void ) { return alignof( fd_topo_t ); }
 
 void *
 tk_topob_new( void * mem, char const * app_name ) {
-  return fd_topob_new( mem, app_name );
+  FD_LOG_NOTICE(( "tk_topob_new: mem=%p app_name=%s", mem, app_name ));
+  void * result = fd_topob_new( mem, app_name );
+  FD_LOG_DEBUG(( "tk_topob_new: result=%p", result ));
+  return result;
 }
 
 ulong

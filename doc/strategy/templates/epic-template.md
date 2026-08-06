@@ -31,8 +31,9 @@ Example:
 GitHub label guidance for epic creation:
   - Required issue-kind label: `epic`.
   - Add all relevant boundary/domain labels covered by the child stories, such
-    as `agents`, `audit`, `crypto`, `investing`, `operations`, `payments`,
-    `platform`, `security`, `social`, `trust`, or `documentation`.
+    as `area/agents`, `area/audit`, `area/crypto`, `area/investing`, `area/operations`,
+    `area/payments`, `area/platform`, `area/security`, `area/social`, `area/trust`,
+    `type/documentation`, or `type/feature`.
   - Epics may carry several boundary/domain labels because they comprise
     several stories across domains.
   - Do not add resolution or triage labels during normal epic creation, such as
@@ -65,7 +66,7 @@ Read before filling:
 
 **Status:** [Backlog] upon creation
 **Milestone:** [M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 | M11]
-**Labels:** `epic`, [`agents` | `audit` | `crypto` | `documentation` | `enhancement` | `investing` | `operations` | `payments` | `platform` | `security` | `social` | `trust`]
+**Labels:** `type/epic`, [`area/agents` | `area/audit` | `area/crypto` | `type/documentation` | `type/feature` | `area/investing` | `area/operations` | `area/payments` | `area/platform` | `area/security` | `area/social` | `area/trust`]
 
 <!-- One paragraph: what complete feature this epic delivers and why now. -->
 

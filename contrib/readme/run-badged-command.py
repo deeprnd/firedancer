@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a shell command and update the named testing-tickoni.md badge with the result."""
+"""Run a shell command and update badges with the result."""
 
 import os
 import signal
@@ -19,8 +19,19 @@ import importlib.util as _ilu
 _spec = _ilu.spec_from_file_location("refresh_badges", SCRIPT_DIR / "refresh-badges.py")
 _mod = _ilu.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
-update_readme_badge = _mod.update_readme_badge
-update_readme_badge_unknown = _mod.update_readme_badge_unknown
+update_badge = _mod.update_badge
+update_badge_unknown = _mod.update_badge_unknown
+README_PATH = _mod.README_PATH
+
+README_BADGES = frozenset({"build", "unit", "security", "cov-tk"})
+
+
+def _update_readme(name: str, exit_code: int) -> None:
+    update_badge(name, exit_code, README_PATH)
+
+
+def _update_readme_unknown(name: str) -> None:
+    update_badge_unknown(name, README_PATH)
 
 
 def is_process_alive(pid: int) -> bool:
@@ -46,7 +57,7 @@ def acquire_lock() -> None:
                     LOCK_PATH.unlink(missing_ok=True)
                     continue
             except (ValueError, OSError):
-                pass  # lock disappeared between checks — retry
+                pass
         time.sleep(LOCK_POLL_S)
     raise TimeoutError(f"Timed out waiting for testing doc lock after {LOCK_TIMEOUT_S}s")
 
@@ -66,7 +77,8 @@ def update_badge_with_lock(update_fn, badge_name: str, *args) -> int:
     status = 0
     acquire_lock()
     try:
-        print(f"[badge] update '{badge_name}' via {update_fn.__name__}{args}", file=sys.stderr)
+        fname = getattr(update_fn, "__name__", str(update_fn))
+        print(f"[badge] update '{badge_name}' via {fname}{args}", file=sys.stderr)
         update_fn(badge_name, *args)
         print(f"[badge] update '{badge_name}' ok", file=sys.stderr)
     except Exception as e:
@@ -91,12 +103,18 @@ def main() -> None:
         signal.signal(signum, signal.SIG_DFL)
         os.kill(os.getpid(), signum)
 
-    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sig, _cleanup)
+    for sig_name in ("SIGINT", "SIGTERM", "SIGHUP"):
+        sig = getattr(signal, sig_name, None)
+        if sig is not None:
+            signal.signal(sig, _cleanup)
 
-    badge_status = update_badge_with_lock(update_readme_badge_unknown, badge_name)
+    badge_status = update_badge_with_lock(update_badge_unknown, badge_name)
     command_status = run_command(command_argv)
-    badge_status |= update_badge_with_lock(update_readme_badge, badge_name, command_status)
+    badge_status |= update_badge_with_lock(update_badge, badge_name, command_status)
+
+    if badge_name in README_BADGES:
+        badge_status |= update_badge_with_lock(_update_readme_unknown, badge_name)
+        badge_status |= update_badge_with_lock(_update_readme, badge_name, command_status)
 
     sys.exit(command_status if command_status != 0 else badge_status)
 

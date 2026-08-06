@@ -1,6 +1,9 @@
 $(call make-lib,fd_util)
 $(call add-hdrs,fd_util_base.h fd_util.h fd_windows_compat.h fd_platform_unsupported.h fd_platform_stub_object.h fd_platform_runtime_caps.h)
 $(call add-objs,fd_hash fd_util,fd_util)
+ifdef FD_HAS_WINDOWS
+$(call add-objs,windows_crt,fd_util)
+endif
 ifdef FD_HAS_HOSTED
 ifdef FD_HAS_WINDOWS
 $(call add-objs,fd_util_hosted_windows,fd_util)
@@ -21,6 +24,10 @@ ifndef FD_HAS_UBSAN
 # don't bother building it if FD_HAS_UBSAN is defined.
 $(call make-unit-test,test_util_base,test_util_base,fd_util)
 $(call run-unit-test,test_util_base)
+$(call make-unit-test,test_windows_crt,test_windows_crt,fd_util)
+$(call run-unit-test,test_windows_crt)
+$(call make-unit-test,test_log_windows,test_log_windows,fd_util)
+$(call run-unit-test,test_log_windows)
 ifdef FD_HAS_HOSTED
 $(call make-fuzz-test,fuzz_hash,fuzz_hash,fd_util)
 endif

@@ -1,4 +1,6 @@
-#define _GNU_SOURCE
+/* Windows platform-specific tile launcher operations.
+   This file is only compiled on Windows. */
+
 #include "topo_run_platform.h"
 
 #include "../../../disco/events/fd_event_report.h"

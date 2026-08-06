@@ -34,6 +34,10 @@ inputs:
     description: Install Zig
     required: false
     default: 'false'
+  zig-version:
+    description: Official Zig release version or channel key from index.json
+    required: false
+    default: '0.16.0'
 
 runs:
   using: composite
@@ -54,11 +58,35 @@ runs:
       run: |
         .github/actions/setup-public-gh-runner/scripts/setup-windows.ps1 -AptPackages '${{ inputs.apt-packages }}' -InstallGnuMake -InstallGitleaks:('${{ inputs.gitleaks }}' -eq 'true') -GitleaksVersion '8.30.1' -InstallKcov:('${{ inputs.kcov }}' -eq 'true')
 
-    - name: Setup Zig
-      if: inputs.zig == 'true'
-      uses: mlugg/setup-zig@v2
-      with:
-        version: 0.16.0
+    - name: Setup Zig via official release (Windows)
+      if: inputs.zig == 'true' && runner.os == 'Windows'
+      shell: pwsh
+      env:
+        # Force Zig to target aarch64-windows-gnu on ARM runners.
+        # zigw.sh reads ZIG_TARGET_OVERRIDE and passes it as -Dtarget.
+        # Without this, Zig defaults to x64 → "arm64 conflicts with x64" when
+        # linking ARM64 C objects compiled by the MSVC toolchain.
+        ZIG_TARGET_OVERRIDE: ${{ runner.os == 'Windows' && runner.arch == 'ARM64' && 'aarch64-windows-gnu' || '' }}
+      run: |
+        $zigArgs = @('--version', '${{ inputs.zig-version }}')
+        if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
+          # Native Windows ARM Zig 0.16.0 crashes during Tickoni unit builds on
+          # ARM runners; the x86_64 Windows release reliably cross-targets the
+          # same aarch64-windows-gnu test binaries.
+          $zigArgs += @('--target', 'x86_64-windows')
+        }
+        python "$env:GITHUB_WORKSPACE/contrib/install-zig.py" @zigArgs
+        if ($env:ZIG_TARGET_OVERRIDE) {
+          # Persist for later bash build/test steps; step-local env does not
+          # survive across GitHub Actions steps.
+          "ZIG_TARGET_OVERRIDE=$env:ZIG_TARGET_OVERRIDE" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        }
+
+    - name: Setup Zig via official release (POSIX)
+      if: inputs.zig == 'true' && runner.os != 'Windows'
+      shell: bash
+      run: |
+        python3 "$GITHUB_WORKSPACE/contrib/install-zig.py" --version '${{ inputs.zig-version }}'
 
     - name: Setup Python
       if: inputs.python-tools != ''

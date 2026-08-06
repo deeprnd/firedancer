@@ -5,6 +5,7 @@
    wire format.  It can be used to deserialize Protobuf. */
 
 #include "fd_pb_wire.h"
+#include "../../util/fd_util_base.h"
 
 struct fd_pb_inbuf {
   uchar const * cur;
@@ -46,7 +47,7 @@ struct fd_pb_tlv {
     ulong varint;
     ulong i64;
     ulong len;
-    uint  i32;
+    uint i32;
   };
 };
 

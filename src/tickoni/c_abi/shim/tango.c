@@ -96,9 +96,10 @@ ulong
 tk_fctl_cr_query( fd_fctl_t const * fctl,
                   ulong             tx_seq,
                   ulong *           rx_idx_slow ) {
-  ulong rx_idx_local = ULONG_MAX;
-  ulong cr = fd_fctl_cr_query( fctl, tx_seq, &rx_idx_local );
-  if( rx_idx_slow ) rx_idx_slow[0] = rx_idx_local;
+  ulong  rx_idx_local = 0UL;
+  ulong * rx_idx_out  = rx_idx_slow ? rx_idx_slow : &rx_idx_local;
+  ulong   cr          = fd_fctl_cr_query( fctl, tx_seq, rx_idx_out );
+  if( rx_idx_slow && rx_idx_slow[0]==ULONG_MAX ) rx_idx_slow[0] = ((ulong)-1);
   return cr;
 }
 

@@ -164,6 +164,62 @@ jobs:
       - name: Run deterministic demo CLI conformance suite
         run: just test-demo-tk
 
+  # ── Windows: Clang (x86_64) ────────────────────────────────────────────────
+  short-tests-windows-x86_64:
+    name: Harness Unit Tests / Windows x86_64
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+          fd-deps: 'false'
+          compiler: clang
+          compiler-version: system
+
+      - name: Build FD libs
+        run: just build-fd-windows-x86
+
+      - name: Run test suite
+        run: just test-unit-tk-windows-x86
+
+      - name: Run deterministic demo CLI conformance suite
+        run: just test-demo-tk
+
+  # ── Windows: Clang (ARM64) ─────────────────────────────────────────────────
+  short-tests-windows-arm:
+    name: Harness Unit Tests / Windows ARM64
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: windows-11-vs2026-arm
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+          fd-deps: 'false'
+          compiler: clang
+          compiler-version: system
+
+      - name: Build FD libs
+        run: just build-fd-windows-arm
+
+      - name: Run test suite
+        run: just test-unit-tk-windows-arm
+
+      - name: Run deterministic demo CLI conformance suite
+        run: just test-demo-tk
+
   # ── macOS: Clang (x86_64, macOS 15) ────────────────────────────────────────
   integration-tests-macos-15-x86_64:
     name: Integration Tests / macOS 15 (x86_64)
@@ -264,6 +320,56 @@ jobs:
       - name: Run integration tests
         run: just test-integration-tk
 
+  # ── Windows: Clang (x86_64) ────────────────────────────────────────────────
+  integration-tests-windows-x86_64:
+    name: Integration Tests / Windows x86_64
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+          fd-deps: 'false'
+          compiler: clang
+          compiler-version: system
+
+      - name: Build FD libs
+        run: just build-fd-windows-x86
+
+      - name: Run integration tests
+        run: just test-integration-tk-windows-x86
+
+  # ── Windows: Clang (ARM64) ─────────────────────────────────────────────────
+  integration-tests-windows-arm:
+    name: Integration Tests / Windows ARM64
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: windows-11-vs2026-arm
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+          fd-deps: 'false'
+          compiler: clang
+          compiler-version: system
+
+      - name: Build FD libs
+        run: just build-fd-windows-arm
+
+      - name: Run integration tests
+        run: just test-integration-tk-windows-arm
+
   integration-tests-tk:
     name: Harness Integration Tests
     needs: detect-changes
@@ -302,7 +408,8 @@ jobs:
       - uses: ./.github/actions/build-fd-tk-libs
 
       - name: Build supervisor
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 
       - name: Export Linux conformance bundle
         run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/linux
@@ -313,8 +420,44 @@ jobs:
           name: demo-conformance-linux
           path: build/demo-conformance/linux
 
-  demo-conformance-macos-retail:
-    name: Demo Conformance Retail / macOS 15 (ARM)
+  # ── Demo Conformance: macOS 15 x86_64 ───────────────────────────────────────
+  demo-conformance-macos-15-x86_64:
+    name: Demo Conformance / macOS 15 (x86_64)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-x86_64
+
+      - name: Build supervisor
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+
+      - name: Export macOS 15 x86_64 conformance bundle
+        run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/macos-15-x86_64
+
+      - name: Upload macOS 15 x86_64 conformance bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-conformance-macos-15-x86_64
+          path: build/demo-conformance/macos-15-x86_64
+
+  # ── Demo Conformance: macOS 15 ARM ──────────────────────────────────────────
+  demo-conformance-macos-15-arm:
+    name: Demo Conformance / macOS 15 (ARM)
     needs: detect-changes
     if: needs.detect-changes.outputs.run == 'true'
     runs-on: macos-15
@@ -335,23 +478,177 @@ jobs:
         run: just build-fd-macos-arm
 
       - name: Build supervisor
-        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
 
-      - name: Export macOS retail conformance bundle
-        run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/macos-retail
+      - name: Export macOS 15 ARM conformance bundle
+        run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/macos-15-arm
 
-      - name: Upload macOS retail conformance bundle
+      - name: Upload macOS 15 ARM conformance bundle
         uses: actions/upload-artifact@v4
         with:
-          name: demo-conformance-macos-retail
-          path: build/demo-conformance/macos-retail
+          name: demo-conformance-macos-15-arm
+          path: build/demo-conformance/macos-15-arm
 
+  # ── Demo Conformance: macOS 26 x86_64 ───────────────────────────────────────
+  demo-conformance-macos-26-x86_64:
+    name: Demo Conformance / macOS 26 (x86_64)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-26-intel
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-x86_64
+
+      - name: Build supervisor
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+
+      - name: Export macOS 26 x86_64 conformance bundle
+        run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/macos-26-x86_64
+
+      - name: Upload macOS 26 x86_64 conformance bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-conformance-macos-26-x86_64
+          path: build/demo-conformance/macos-26-x86_64
+
+  # ── Demo Conformance: macOS 26 ARM ──────────────────────────────────────────
+  demo-conformance-macos-26-arm:
+    name: Demo Conformance / macOS 26 (ARM)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup public GitHub runner
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+
+      - name: Install GNU make (macOS)
+        run: brew install make
+
+      - name: Build FD libs
+        run: just build-fd-macos-arm
+
+      - name: Build supervisor
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+
+      - name: Export macOS 26 ARM conformance bundle
+        run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/macos-26-arm
+
+      - name: Upload macOS 26 ARM conformance bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-conformance-macos-26-arm
+          path: build/demo-conformance/macos-26-arm
+
+  # ── Demo Conformance: Windows x86_64 ────────────────────────────────────────
+  demo-conformance-windows-x86:
+    name: Demo Conformance / Windows x86_64
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup deps + Zig
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+          fd-deps: 'false'
+          compiler: clang
+          compiler-version: system
+
+      - name: Build FD libs
+        run: just build-fd-windows-x86
+
+      - name: Build supervisor
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+
+      - name: Export Windows x86_64 conformance bundle
+        shell: bash
+        run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/windows-x86
+
+      - name: Upload Windows x86_64 conformance bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-conformance-windows-x86
+          path: build/demo-conformance/windows-x86
+
+  # ── Demo Conformance: Windows ARM64 ─────────────────────────────────────────
+  demo-conformance-windows-arm:
+    name: Demo Conformance / Windows ARM64
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
+    runs-on: windows-11-vs2026-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup deps + Zig
+        uses: ./.github/actions/setup-public-gh-runner
+        with:
+          zig: 'true'
+          fd-deps: 'false'
+          compiler: clang
+          compiler-version: system
+
+      - name: Build FD libs
+        run: just build-fd-windows-arm
+
+      - name: Build supervisor
+        shell: bash
+        run: ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir=build/fd-tickoni-fd/lib --summary all
+
+      - name: Export Windows ARM64 conformance bundle
+        shell: bash
+        run: python3 contrib/test/export_demo_conformance_bundle.py . build/demo-conformance/windows-arm
+
+      - name: Upload Windows ARM64 conformance bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-conformance-windows-arm
+          path: build/demo-conformance/windows-arm
+
+  # ── Demo Conformance: Compare ───────────────────────────────────────────────
   demo-conformance-compare:
-    name: Demo Conformance Compare / Linux vs macOS retail
+    name: Demo Conformance Compare / All Platforms
     needs:
       - demo-conformance-linux
-      - demo-conformance-macos-retail
-    if: needs.demo-conformance-linux.result == 'success' && needs.demo-conformance-macos-retail.result == 'success'
+      - demo-conformance-macos-15-x86_64
+      - demo-conformance-macos-15-arm
+      - demo-conformance-macos-26-x86_64
+      - demo-conformance-macos-26-arm
+      - demo-conformance-windows-x86
+      - demo-conformance-windows-arm
+    if: >-
+      needs.demo-conformance-linux.result == 'success' &&
+      needs.demo-conformance-macos-15-x86_64.result == 'success' &&
+      needs.demo-conformance-macos-15-arm.result == 'success' &&
+      needs.demo-conformance-macos-26-x86_64.result == 'success' &&
+      needs.demo-conformance-macos-26-arm.result == 'success' &&
+      needs.demo-conformance-windows-x86.result == 'success' &&
+      needs.demo-conformance-windows-arm.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -364,14 +661,52 @@ jobs:
           name: demo-conformance-linux
           path: build/demo-conformance/linux
 
-      - name: Download macOS retail conformance bundle
+      - name: Download macOS 15 x86_64 conformance bundle
         uses: actions/download-artifact@v4
         with:
-          name: demo-conformance-macos-retail
-          path: build/demo-conformance/macos-retail
+          name: demo-conformance-macos-15-x86_64
+          path: build/demo-conformance/macos-15-x86_64
 
-      - name: Compare deterministic conformance fields
-        run: python3 contrib/test/compare_demo_conformance.py build/demo-conformance/linux/conformance.json build/demo-conformance/macos-retail/conformance.json
+      - name: Download macOS 15 ARM conformance bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-conformance-macos-15-arm
+          path: build/demo-conformance/macos-15-arm
+
+      - name: Download macOS 26 x86_64 conformance bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-conformance-macos-26-x86_64
+          path: build/demo-conformance/macos-26-x86_64
+
+      - name: Download macOS 26 ARM conformance bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-conformance-macos-26-arm
+          path: build/demo-conformance/macos-26-arm
+
+      - name: Download Windows x86_64 conformance bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-conformance-windows-x86
+          path: build/demo-conformance/windows-x86
+
+      - name: Download Windows ARM64 conformance bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-conformance-windows-arm
+          path: build/demo-conformance/windows-arm
+
+      - name: Compare all platform conformance bundles
+        run: |
+          python3 contrib/test/compare_demo_conformance.py \
+            build/demo-conformance/linux/conformance.json \
+            build/demo-conformance/macos-15-x86_64/conformance.json \
+            build/demo-conformance/macos-15-arm/conformance.json \
+            build/demo-conformance/macos-26-x86_64/conformance.json \
+            build/demo-conformance/macos-26-arm/conformance.json \
+            build/demo-conformance/windows-x86/conformance.json \
+            build/demo-conformance/windows-arm/conformance.json
 
   cov-tk:
     name: Harness Tests Coverage

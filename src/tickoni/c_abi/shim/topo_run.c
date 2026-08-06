@@ -5,7 +5,10 @@
    via topo_run_platform.h. The orchestration below stays identical across
    Linux and macOS; only the leaf operations vary. */
 
+#if FD_HAS_LINUX
 #define _GNU_SOURCE
+#endif
+
 #include "../../../util/fd_util.h"
 #include "../../../disco/events/fd_event_report.h"
 #include "../../../disco/metrics/fd_metrics.h"
@@ -53,9 +56,13 @@ tk_topo_run_tile( void * topo,
   fd_topo_tile_t *     tile_c     = (fd_topo_tile_t *)tile;
   fd_topo_run_tile_t * tile_run_c = (fd_topo_run_tile_t *)tile_run;
 
+  FD_LOG_DEBUG(( "tk_topo_run_tile: tile=%s:%lu sandbox=%d", tile_c->name, tile_c->kind_id, sandbox ));
+
   ulong pid = 0UL;
   ulong tid = 0UL;
   tk_topo_platform_pre_boot( tile_c, &pid, &tid );
+
+  FD_LOG_DEBUG(( "tk_topo_run_tile: pre_boot pid=%lu tid=%lu", pid, tid ));
 
   tk_topo_platform_join_tile_workspaces( topo_c, tile_c, core_dump_level );
 
@@ -132,5 +139,6 @@ tk_topo_run_tile( void * topo,
   if( FD_UNLIKELY( !tile_c->allow_shutdown ) )
     FD_LOG_ERR(( "tile %s:%lu run loop returned", tile_c->name, tile_c->kind_id ));
 
+  FD_LOG_DEBUG(( "tk_topo_run_tile: tile=%s:%lu completed", tile_c->name, tile_c->kind_id ));
   FD_MGAUGE_SET( TILE, STATUS, 2UL );
 }

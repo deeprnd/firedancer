@@ -100,7 +100,7 @@ pub fn writePlain(writer: anytype, artifact: Artifact) !void {
 }
 
 test "sha256Hex is stable" {
-    const actual = sha256Hex("tickoni-demo");
+    const actual = sha256Hex("tickoni-demo"[0..]);
     try std.testing.expectEqualStrings("bb0c8815440097944b9002383728aee8a17e1d558d21e172f01b4b50d3b69af7", actual[0..]);
 }
 
@@ -113,13 +113,13 @@ test "conformance JSON contains required schema fields" {
         .isolation_tier = "full",
         .fixture_set_id = "investment_sample",
         .scenario = "allowed",
-        .normalized_event_hash = sha256Hex("normalized-events"),
+        .normalized_event_hash = sha256Hex("normalized-events"[0..]),
         .policy_outcome = "allow",
-        .proposal_hash = sha256Hex("proposal"),
+        .proposal_hash = sha256Hex("proposal"[0..]),
         .audit_jsonl_path = "audit.jsonl",
-        .audit_jsonl_sha256 = sha256Hex("audit"),
+        .audit_jsonl_sha256 = sha256Hex("audit"[0..]),
         .replay_capsule_path = "replay.json",
-        .replay_capsule_sha256 = sha256Hex("replay"),
+        .replay_capsule_sha256 = sha256Hex("replay"[0..]),
         .replay_result = .{ .replay_match = true, .divergence_count = 0 },
         .external_effects_disabled = true,
     };

@@ -12,7 +12,11 @@
    supervisor exe and the process-mode integration tests, but not for
    topo_run.c/topob.c's own standalone adapter unit tests, which is why
    this stays out of topo_run.c itself. */
+
+#if FD_HAS_LINUX
 #define _GNU_SOURCE
+#endif
+
 #include "../../../util/fd_util.h"
 #include "../../../disco/topo/fd_topo.h"
 

@@ -59,7 +59,7 @@ struct fd_netdev_tbl_private;
 typedef struct fd_netdev_tbl_private fd_netdev_tbl_t;
 
 struct fd_netdev_tbl_hdr {
-  atomic_ulong seqlock;
+  fd_seqlock_t seqlock;
   ushort dev_max;
   ushort bond_max;
   ushort dev_cnt;

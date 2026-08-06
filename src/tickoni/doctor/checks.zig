@@ -189,44 +189,48 @@ pub const OsChecks = struct {
     }
 
     fn detectEnvironment(io: Io, gpa: Allocator) enum { native, container, wsl, vm } {
-        const cwd = std.Io.Dir.cwd();
+        // Compile-time gate: /proc/ and /sys/ only exist on Linux.
+        // This eliminates dead code from Windows and macOS binaries.
+        if (@import("builtin").target.os.tag == .linux) {
+            const cwd = std.Io.Dir.cwd();
 
-        if (fileExists(cwd, io, "/proc/version")) {
-            var file = std.Io.Dir.openFile(cwd, io, "/proc/version", .{}) catch return .native;
-            defer file.close(io);
-            const data = readFileContents(file, io, gpa, 4096) catch return .native;
-            defer gpa.free(data);
-            if (std.mem.indexOf(u8, data, "microsoft") != null or
-                std.mem.indexOf(u8, data, "WSL") != null)
-            {
-                return .wsl;
+            if (fileExists(cwd, io, "/proc/version")) {
+                var file = std.Io.Dir.openFile(cwd, io, "/proc/version", .{}) catch return .native;
+                defer file.close(io);
+                const data = readFileContents(file, io, gpa, 4096) catch return .native;
+                defer gpa.free(data);
+                if (std.mem.indexOf(u8, data, "microsoft") != null or
+                    std.mem.indexOf(u8, data, "WSL") != null)
+                {
+                    return .wsl;
+                }
             }
-        }
 
-        if (fileExists(cwd, io, "/proc/1/cgroup")) {
-            var file = std.Io.Dir.openFile(cwd, io, "/proc/1/cgroup", .{}) catch return .native;
-            defer file.close(io);
-            const data = readFileContents(file, io, gpa, 4096) catch return .native;
-            defer gpa.free(data);
-            if (std.mem.indexOf(u8, data, "docker") != null or
-                std.mem.indexOf(u8, data, "kubepods") != null)
-            {
-                return .container;
+            if (fileExists(cwd, io, "/proc/1/cgroup")) {
+                var file = std.Io.Dir.openFile(cwd, io, "/proc/1/cgroup", .{}) catch return .native;
+                defer file.close(io);
+                const data = readFileContents(file, io, gpa, 4096) catch return .native;
+                defer gpa.free(data);
+                if (std.mem.indexOf(u8, data, "docker") != null or
+                    std.mem.indexOf(u8, data, "kubepods") != null)
+                {
+                    return .container;
+                }
             }
-        }
 
-        if (fileExists(cwd, io, "/sys/class/dmi/id/product_name")) {
-            var file = std.Io.Dir.openFile(cwd, io, "/sys/class/dmi/id/product_name", .{}) catch return .native;
-            defer file.close(io);
-            const data = readFileContents(file, io, gpa, 4096) catch return .native;
-            defer gpa.free(data);
-            const product = std.mem.trim(u8, data, " \n \r");
-            if (std.mem.eql(u8, product, "VMware Virtual Platform") or
-                std.mem.eql(u8, product, "VirtualBox") or
-                std.mem.indexOf(u8, product, "QEMU") != null or
-                std.mem.indexOf(u8, product, "Hyper-V") != null)
-            {
-                return .vm;
+            if (fileExists(cwd, io, "/sys/class/dmi/id/product_name")) {
+                var file = std.Io.Dir.openFile(cwd, io, "/sys/class/dmi/id/product_name", .{}) catch return .native;
+                defer file.close(io);
+                const data = readFileContents(file, io, gpa, 4096) catch return .native;
+                defer gpa.free(data);
+                const product = std.mem.trim(u8, data, " \n \r");
+                if (std.mem.eql(u8, product, "VMware Virtual Platform") or
+                    std.mem.eql(u8, product, "VirtualBox") or
+                    std.mem.indexOf(u8, product, "QEMU") != null or
+                    std.mem.indexOf(u8, product, "Hyper-V") != null)
+                {
+                    return .vm;
+                }
             }
         }
 
@@ -334,12 +338,16 @@ pub const WindowsChecks = struct {
         const os_tag = builtin.target.os.tag;
 
         // On Windows builds, always check WSL as optional
-        // On Linux, check /proc/version for microsoft indicator
         if (os_tag == .windows) {
             return Result.initOwnedMessage("wsl2", .warn, "Windows native — WSL2 check N/A");
         }
 
-        // On Linux, check if we're in WSL
+        // WSL2 check is not applicable on macOS
+        if (os_tag == .macos) {
+            return Result.initOwnedMessage("wsl2", .warn, "macOS — WSL2 check N/A");
+        }
+
+        // On Linux, check /proc/version for microsoft indicator
         const cwd = std.Io.Dir.cwd();
         if (fileExists(cwd, io, "/proc/version")) {
             var file = std.Io.Dir.openFile(cwd, io, "/proc/version", .{}) catch {
@@ -532,8 +540,13 @@ test "runAll fills results array" {
     try std.testing.expectEqual(.pass, results[9].status);
     try std.testing.expectEqualStrings("source_build", results[10].name);
     try std.testing.expectEqual(.warn, results[10].status);
+    // wsl2 — returns .pass on Linux (native), .warn on macOS/Windows
     try std.testing.expectEqualStrings("wsl2", results[11].name);
-    try std.testing.expectEqual(.pass, results[11].status);
+    const wsl2_status = switch (builtin.target.os.tag) {
+        .linux => .pass,
+        else => .warn,
+    };
+    try std.testing.expectEqual(wsl2_status, results[11].status);
     try std.testing.expectEqualStrings("docker", results[12].name);
     try std.testing.expectEqualStrings("cpu_features", results[13].name);
     try std.testing.expectEqual(.pass, results[13].status);
