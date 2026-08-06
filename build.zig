@@ -605,7 +605,7 @@ const arch_name = switch (target.result.cpu.arch) {
 const os_name = switch (target.result.os.tag) {
     .linux => "linux",
     .windows => "windows",
-    .macos => "darwin",
+    .macos => "macos",
     else => b.fmt("{s}", .{@tagName(target.result.os.tag)}),
 };
 const abi_name = switch (target.result.abi) {

@@ -7,7 +7,10 @@ set -uo pipefail
 echo "Finding test binaries..."
 
 # Find all test binaries in the zig cache
-mapfile -t binaries < <(find .zig-cache/o -name test -type f 2>/dev/null | sort)
+declare -a binaries=()
+while IFS= read -r bin; do
+    binaries+=("$bin")
+done < <(find .zig-cache/o -name test -type f 2>/dev/null | sort)
 
 if [[ ${#binaries[@]} -eq 0 ]]; then
     echo "ERROR: No test binaries found in .zig-cache/o/" >&2
