@@ -4,17 +4,17 @@ This document summarizes the justfile-oriented test layers for the current
 Tickoni repository.
 
 <p align="center">
-  <!-- badge:build:start -->
-  <img alt="Build" src="https://img.shields.io/badge/build-unknown-lightgrey?style=flat-square" />
-<!-- badge:build:end -->
+      <!-- badge:build:start -->
+  <img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
+  <!-- badge:build:end -->
 
-  <!-- badge:quality:start -->
-  <img alt="Quality" src="https://img.shields.io/badge/quality-unknown-lightgrey?style=flat-square" />
-<!-- badge:quality:end -->
+      <!-- badge:quality:start -->
+  <img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" />
+  <!-- badge:quality:end -->
 
-  <!-- badge:security:start -->
-  <img alt="Security" src="https://img.shields.io/badge/security-unknown-lightgrey?style=flat-square" />
-<!-- badge:security:end -->
+      <!-- badge:security:start -->
+  <img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
+  <!-- badge:security:end -->
 </p>
 
 <p align="center">
