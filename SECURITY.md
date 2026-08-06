@@ -1,30 +1,43 @@
 # Security
 
-The following document describes various aspects of the Firedancer security program.
+This document describes the current security status and vulnerability-reporting process for Tickoni.
+
+Tickoni’s systems foundation originates in Firedancer, Jump Crypto’s high-performance Solana systems codebase.
+
+Firedancer contributes low-level C infrastructure for high-throughput networking, preallocated memory workspaces, concurrent processing, and restrictive process isolation. Tickoni repurposes that foundation for autonomous capital allocation.
+
+Firedancer’s security programs and audit reports cover the Firedancer project. They do not automatically cover Tickoni’s investment, agent, portfolio-management, or execution components.
 
 ## Table of Contents
 
-- [Bug Bounty Program](#Bug-Bounty-Program)
-- [Third Party Security Audits](#Third-Party-Security-Audits)
-- [Audit Contest](#Audit-Contest)
+* [Reporting a Vulnerability](#reporting-a-vulnerability)
+* [Security Status](#security-status)
+* [Firedancer Security Resources](#firedancer-security-resources)
 
-# Bug Bounty Program
+## Reporting a Vulnerability
 
-Security-relevant bugs in Firedancer v0.1 should be submitted to our [Immunefi bug bounty program](https://immunefi.com/bug-bounty/Frankendancer/).
-Under the terms and conditions of the program, you may be eligible for a reward.
+Security vulnerabilities affecting Tickoni should be reported through the repository’s private security-reporting channel.
 
-Code outside the scope of the bug bounty program is still in development.
-It has yet to go through more rigorous security testing and auditing.
-If you find a bug outside the bug bounty program's scope, submit it as a [GitHub issue](https://github.com/firedancer-io/firedancer/issues).
+Please do not open a public GitHub issue for a vulnerability until it has been reviewed and addressed.
 
-## Third Party Security Audits
+Non-security bugs may be submitted through the Tickoni GitHub issue tracker.
 
-The Firedancer project engages third-party firms to conduct independent security audits of Firedancer.
+## Security Status
 
-As these third-party audits are completed and issues are sufficiently addressed, we make those audit reports public.
+Tickoni is experimental software and remains under active development.
 
-- [Firedancer v0.1 Audit Reports](https://github.com/firedancer-io/audits)
+Tickoni-specific components have not yet undergone independent third-party security audits or a public bug-bounty program.
 
-## Audit Contest
+Use paper capital, conservative limits, restricted credentials, and staged approvals before enabling live execution.
 
-Leading up to the mainnet launch of Firedancer v0.1, an [audit contest on Immunefi](https://github.com/immunefi-team/Bounty_Boosts/tree/main/Firedancer%20v0.1) was held from 10 July 2024 to 21 August 2024.
+## Firedancer Security Resources
+
+The systems infrastructure inherited from Firedancer has been developed alongside Firedancer’s broader security program.
+
+Relevant Firedancer resources include:
+
+* [Firedancer Immunefi bug bounty program](https://immunefi.com/bug-bounty/Frankendancer/)
+* [Firedancer v0.1 audit reports](https://github.com/firedancer-io/audits)
+* [Firedancer v0.1 audit contest](https://github.com/immunefi-team/Bounty_Boosts/tree/main/Firedancer%20v0.1)
+
+These resources provide useful security context for the Firedancer-derived systems foundation. They should not be interpreted as an audit, endorsement, or bug bounty covering Tickoni as a whole.
