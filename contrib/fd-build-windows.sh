@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-raw_arch="${1:-$(uname -m)}"
+raw_arch="${1:-$(bash contrib/detect-windows-arch.sh)}"
 cc="${2:-${TK_WINDOWS_CC:-clang}}"
 
 if ! command -v "$cc" >/dev/null 2>&1; then

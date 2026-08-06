@@ -126,7 +126,11 @@ int64_t tk_monotonic_nanos( void ) {
   LARGE_INTEGER freq;
   if( FD_UNLIKELY( !QueryPerformanceFrequency( &freq ) ) ) return 0;
   if( FD_UNLIKELY( !QueryPerformanceCounter( &counter ) ) ) return 0;
-  return (int64_t)((counter.QuadPart * 1000000000LL) / freq.QuadPart);
+  {
+    int64_t whole_secs = (int64_t)(counter.QuadPart / freq.QuadPart);
+    int64_t rem_ticks  = (int64_t)(counter.QuadPart % freq.QuadPart);
+    return whole_secs * 1000000000LL + (rem_ticks * 1000000000LL) / (int64_t)freq.QuadPart;
+  }
 }
 
 void tk_sleep_nanos( uint64_t ns ) {

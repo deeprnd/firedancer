@@ -11,7 +11,7 @@ include config/extra/with-optimization.mk
 include config/extra/with-hosted.mk
 
 UNAME?=$(shell uname)
-FD_WINDOWS_ARCH?=$(shell uname -m)
+FD_WINDOWS_ARCH?=$(shell if [ -n "$$MSYSTEM_CARCH" ]; then printf '%s' "$$MSYSTEM_CARCH"; elif [ -n "$$PROCESSOR_ARCHITEW6432" ]; then printf '%s' "$$PROCESSOR_ARCHITEW6432"; elif [ -n "$$PROCESSOR_ARCHITECTURE" ]; then printf '%s' "$$PROCESSOR_ARCHITECTURE"; else uname -m; fi)
 
 # _CRT_SECURE_NO_WARNINGS is required by the Windows CRT to suppress
 # deprecated-unsafe-function warnings (e.g. strcpy → strcpy_s).
