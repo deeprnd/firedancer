@@ -1,10 +1,10 @@
-# Tickoni UI Proposal: Bloomberg-Style Money Control Terminal
+# Tickoni UI Proposal: terminal-Style Money Control Terminal
 
 ## Context
 
 The reference image has the visual language of a dense financial terminal: dark background, ticker strip, status badges, large metric cards, execution pipeline, graph/network canvas, heatmaps, distribution charts, scatter plots, and live operational micro-panels.
 
-That visual direction is useful for Tickoni, but the product should not become a trading-alpha cockpit. Tickoni should borrow the density, seriousness, and real-time feel of Bloomberg-like financial systems while centering the product around:
+That visual direction is useful for Tickoni, but the product should not become a trading-alpha cockpit. Tickoni should borrow the density, seriousness, and real-time feel of Terminal-like financial systems while centering the product around:
 
 ```text
 intent → policy → proposal → approval → paper/sandbox action → audit/replay
@@ -13,13 +13,13 @@ intent → policy → proposal → approval → paper/sandbox action → audit/r
 The strongest UI direction is:
 
 ```text
-Bloomberg terminal for safe financial actions.
+visual terminal for safe financial actions.
 ```
 
 Not:
 
 ```text
-Bloomberg terminal for AI trading performance.
+visual terminal for AI trading performance.
 ```
 
 ---
@@ -166,7 +166,7 @@ Tickoni
 
 ---
 
-## Bloomberg-Style Visual System
+## Terminal-Style Visual System
 
 ```text
 Background
