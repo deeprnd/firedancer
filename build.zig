@@ -384,6 +384,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
             .{ .name = "util", .module = util_mod },
+            .{ .name = "logger", .module = logger_mod },
         },
     });
 
@@ -430,6 +431,13 @@ pub fn build(b: *std.Build) void {
     if (b.args) |argv| run_exe.addArgs(argv);
     const run_step = b.step("run", "Run tickoni-supervisor");
     run_step.dependOn(&run_exe.step);
+
+    // ---------------------------------------------------------------------------
+    // Check step — compile-check Zig + C without full link dependencies.
+    // This is what CI's lint-check-tk runs to validate syntax before the
+    // full build. Only verifies that all source files parse and type-check.
+    // ---------------------------------------------------------------------------
+    const check_step = b.step("check", "Check Zig + C compilation without full link dependencies");
 
     // ---------------------------------------------------------------------------
     // Test / integration / system / coverage steps — gated behind -Dtest=true
@@ -571,6 +579,60 @@ pub fn build(b: *std.Build) void {
             .{ .name = "trade_ticket", .module = trade_ticket_mod },
         },
     });
+// Diagnostic C compile-check: compiles each shim file individually and
+// prints errors to stdout (not stderr) so CI can surface them. Zig's
+// C compiler writes to stderr via --listen=- which CI captures as
+// opaque; this step forces compilation output into stdout.
+const shim_c_files = &.{
+    "tango.c",
+    "util.c",
+    "wksp.c",
+    "sandbox.c",
+    "os.c",
+    "topo_run.c",
+    "topob.c",
+    "tile_run.c",
+    "ballet.c",
+};
+const shim_flags = shimCFlagsFor(target.result);
+const arch_name = switch (target.result.cpu.arch) {
+    .x86_64 => "x86_64",
+    .aarch64 => "aarch64",
+    .x86 => "x86",
+    .arm => "arm",
+    else => b.fmt("{s}", .{@tagName(target.result.cpu.arch)}),
+};
+const os_name = switch (target.result.os.tag) {
+    .linux => "linux",
+    .windows => "windows",
+    .macos => "darwin",
+    else => b.fmt("{s}", .{@tagName(target.result.os.tag)}),
+};
+const abi_name = switch (target.result.abi) {
+    .gnu => "gnu",
+    .gnuabi64 => "gnu",
+    .musl => "musl",
+    .msvc => "msvc",
+    else => "",
+};
+const triple = if (abi_name.len > 0)
+    b.fmt("{s}-{s}-{s}", .{ arch_name, os_name, abi_name })
+else
+    b.fmt("{s}-{s}", .{ arch_name, os_name });
+const c_compile_check_step = b.step("check-c-compile", "Compile-check all C shim files and print errors to stdout");
+inline for (shim_c_files) |shim_file| {
+    const c_check = b.addSystemCommand(&.{
+        "sh", "-c",
+        b.fmt("zig cc -target {s} -c -I src -std=c17 -UBMI2 -ULZCNT -DFD_HAS_HOSTED=1 {s} {s} 2>&1 || true", .{
+            triple,
+            shim_flags[0],
+            b.fmt("src/tickoni/c_abi/shim/{s}", .{shim_file}),
+        }),
+    });
+    c_compile_check_step.dependOn(&c_check.step);
+}
+    check_step.dependOn(c_compile_check_step);
+
     if (build_tests) {
         const investment_demo_test = b.addTest(.{ .root_module = investment_demo_mod });
 
@@ -579,59 +641,6 @@ pub fn build(b: *std.Build) void {
         // Pure logic and fixture/mock-backed proofs belong here; no running servers.
         // Run with: zig build -Dtest=true test
         // ---------------------------------------------------------------------------
-        // Diagnostic C compile-check: compiles each shim file individually and
-        // prints errors to stdout (not stderr) so CI can surface them. Zig's
-        // C compiler writes to stderr via --listen=- which CI captures as
-        // opaque; this step forces compilation output into stdout.
-        const shim_c_files = &.{
-            "tango.c",
-            "util.c",
-            "wksp.c",
-            "sandbox.c",
-            "os.c",
-            "topo_run.c",
-            "topob.c",
-            "tile_run.c",
-            "ballet.c",
-        };
-        const shim_flags = shimCFlagsFor(target.result);
-        const arch_name = switch (target.result.cpu.arch) {
-            .x86_64 => "x86_64",
-            .aarch64 => "aarch64",
-            .x86 => "x86",
-            .arm => "arm",
-            else => b.fmt("{s}", .{@tagName(target.result.cpu.arch)}),
-        };
-        const os_name = switch (target.result.os.tag) {
-            .linux => "linux",
-            .windows => "windows",
-            .macos => "darwin",
-            else => b.fmt("{s}", .{@tagName(target.result.os.tag)}),
-        };
-        const abi_name = switch (target.result.abi) {
-            .gnu => "gnu",
-            .gnuabi64 => "gnu",
-            .musl => "musl",
-            .msvc => "msvc",
-            else => "",
-        };
-        const triple = if (abi_name.len > 0)
-            b.fmt("{s}-{s}-{s}", .{ arch_name, os_name, abi_name })
-        else
-            b.fmt("{s}-{s}", .{ arch_name, os_name });
-        const c_compile_check_step = b.step("check-c-compile", "Compile-check all C shim files and print errors to stdout");
-        inline for (shim_c_files) |shim_file| {
-            const c_check = b.addSystemCommand(&.{
-                "sh", "-c",
-                b.fmt("zig cc -target {s} -c -I src -std=c17 -UBMI2 -ULZCNT -DFD_HAS_HOSTED=1 {s} {s} 2>&1 || true", .{
-                    triple,
-                    shim_flags[0],
-                    b.fmt("src/tickoni/c_abi/shim/{s}", .{shim_file}),
-                }),
-            });
-            c_compile_check_step.dependOn(&c_check.step);
-        }
-
         const test_step = b.step("test", "Compile offline Tickoni unit test binaries");
         const run_tests_step = b.step("run-tests", "Run offline Tickoni unit tests");
         test_step.dependOn(c_compile_check_step);

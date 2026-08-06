@@ -8,7 +8,7 @@ const PaymentPipelineState = runtime.PaymentPipelineState;
 
 pub fn runMetric(state: *PaymentPipelineState) void {
     const log = logger.get();
-    try log.enter("tkmetr", "runMetric");
+    log.enter("tkmetr", "runMetric") catch {};
     defer log.exit("tkmetr", "runMetric") catch {};
 
     var backpressure_waits: u64 = 0;

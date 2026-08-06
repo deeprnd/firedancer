@@ -9,7 +9,7 @@ const PaymentPipelineState = runtime.PaymentPipelineState;
 
 pub fn runDedupe(state: *PaymentPipelineState) void {
     const log = logger.get();
-    try log.enter("tkdedu", "runDedupe");
+    log.enter("tkdedu", "runDedupe") catch {};
     defer log.exit("tkdedu", "runDedupe") catch {};
 
     defer state.q_dedu_poly.close();

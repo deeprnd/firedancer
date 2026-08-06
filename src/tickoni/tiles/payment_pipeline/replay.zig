@@ -15,7 +15,7 @@ const PolicyDecision = runtime.PolicyDecision;
 
 pub fn runReplay(state: *PaymentPipelineState) void {
     const log = logger.get();
-    try log.enter("tkrepl", "runReplay");
+    log.enter("tkrepl", "runReplay") catch {};
     defer log.exit("tkrepl", "runReplay") catch {};
 
     while (!state.audit_done.load(.acquire)) {

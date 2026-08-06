@@ -12,7 +12,7 @@ const PaymentPipelineState = runtime.PaymentPipelineState;
 
 pub fn runAudit(state: *PaymentPipelineState) void {
     const log = logger.get();
-    try log.enter("tkaudt", "runAudit");
+    log.enter("tkaudt", "runAudit") catch {};
     defer log.exit("tkaudt", "runAudit") catch {};
 
     var offset: u64 = 0;

@@ -10,7 +10,7 @@ const PaymentPipelineState = runtime.PaymentPipelineState;
 
 pub fn runNormalize(state: *PaymentPipelineState) void {
     const log = logger.get();
-    try log.enter("tknorm", "runNormalize");
+    log.enter("tknorm", "runNormalize") catch {};
     defer log.exit("tknorm", "runNormalize") catch {};
 
     defer state.q_norm_dedu.close();

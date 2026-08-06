@@ -147,7 +147,7 @@ pub const Supervisor = struct {
     /// leaking child processes and shared memory.
     pub fn deinit(self: *Supervisor) void {
         const log = logger.get();
-        try log.enter("supervisor", "deinit");
+        log.enter("supervisor", "deinit") catch {};
         defer log.exit("supervisor", "deinit") catch {};
         std.debug.assert(self.process_state == null);
         self.stop();
@@ -187,7 +187,9 @@ pub const Supervisor = struct {
             h.thread = try std.Thread.spawn(.{}, threadTrampoline, .{ state, entry.run_fn });
             h.state = .running;
         }
-        log.debug("supervisor", "startPaymentPipeline", "started {d} tile threads", .{self.handles.len}) catch {};
+        var thread_count_buf: [16]u8 = undefined;
+        const thread_count = std.fmt.bufPrint(&thread_count_buf, "{d}", .{self.handles.len}) catch "";
+        log.debug("supervisor", "startPaymentPipeline", thread_count) catch {};
     }
 
     /// Start every tile in the topology as a separate OS process connected
@@ -477,7 +479,7 @@ pub const Supervisor = struct {
 
     pub fn waitProcess(self: *Supervisor, io: std.Io, forced_termination: ?[]const bool) void {
         const log = logger.get();
-        try log.enter("supervisor", "waitProcess");
+        log.enter("supervisor", "waitProcess") catch {};
         defer log.exit("supervisor", "waitProcess") catch {};
         const state = self.process_state orelse return;
         for (&state.children, 0..) |*maybe_child, i| {
@@ -497,7 +499,7 @@ pub const Supervisor = struct {
 
     pub fn refreshProcessHealth(self: *Supervisor) void {
         const log = logger.get();
-        try log.enter("supervisor", "refreshProcessHealth");
+        log.enter("supervisor", "refreshProcessHealth") catch {};
         defer log.exit("supervisor", "refreshProcessHealth") catch {};
         const state = self.process_state orelse return;
         const now = util.process.monotonicNanos();
@@ -572,7 +574,7 @@ pub const Supervisor = struct {
     /// stop of tiles that are still running.
     pub fn stopProcess(self: *Supervisor, io: std.Io) void {
         const log = logger.get();
-        try log.enter("supervisor", "stopProcess");
+        log.enter("supervisor", "stopProcess") catch {};
         defer log.exit("supervisor", "stopProcess") catch {};
         const state = self.process_state orelse return;
         self.refreshProcessHealth();
