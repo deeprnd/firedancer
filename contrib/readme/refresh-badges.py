@@ -103,16 +103,24 @@ def replace_badge_block(doc_text: str, name: str, badge_line: str) -> str:
     if end < start:
         raise ValueError(f"Badge markers out of order for '{name}'")
 
-    # Extract leading whitespace from the badge line (between markers)
+    # Extract leading whitespace from both the badge line and the end-marker line
     newline = "\r\n" if "\r\n" in doc_text else "\n"
     after_start = start + len(start_marker) + len(newline)
     next_line_end = doc_text.find(newline, after_start)
     if next_line_end == -1:
         next_line_end = len(doc_text)
-    next_line = doc_text[after_start : next_line_end]
-    leading = next_line[: len(next_line) - len(next_line.lstrip())] if next_line.lstrip() else ""
+    badge_line_text = doc_text[after_start : next_line_end]
+    leading = badge_line_text[: len(badge_line_text) - len(badge_line_text.lstrip())] if badge_line_text.lstrip() else ""
 
-    block = f"{start_marker}{newline}{leading}{badge_line}{newline}{end_marker}"
+    # End marker line indentation (e.g. `  <!-- badge:build:end -->`)
+    end_line_start = end + len(newline)
+    end_line_end = doc_text.find(newline, end_line_start)
+    if end_line_end == -1:
+        end_line_end = len(doc_text)
+    end_line_text = doc_text[end_line_start : end_line_end]
+    end_leading = end_line_text[: len(end_line_text) - len(end_line_text.lstrip())] if end_line_text.lstrip() else ""
+
+    block = f"{start_marker}{newline}{leading}{badge_line}{newline}{end_leading}{end_marker}"
     return doc_text[:start] + block + doc_text[end + len(end_marker):]
 
 
