@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Update doc/execution/testing-tickoni.md badge image tags between marker comments."""
+"""Update badge image tags between marker comments in a markdown document."""
 
 import json
 import sys
@@ -93,38 +93,27 @@ def badge_unknown(alt: str, label: str) -> str:
 
 def replace_badge_block(doc_text: str, name: str, badge_line: str) -> str:
     start_marker = f"<!-- badge:{name}:start -->"
-    end_marker   = f"<!-- badge:{name}:end -->"
+    end_marker = f"<!-- badge:{name}:end -->"
 
     start = doc_text.find(start_marker)
-    end   = doc_text.find(end_marker)
+    end = doc_text.find(end_marker)
 
     if start == -1 or end == -1:
         raise ValueError(f"Badge markers missing for '{name}'")
     if end < start:
         raise ValueError(f"Badge markers out of order for '{name}'")
 
-    # Extract leading whitespace from both the badge line and the end-marker line
-    newline = "\r\n" if "\r\n" in doc_text else "\n"
-    after_start = start + len(start_marker) + len(newline)
-    next_line_end = doc_text.find(newline, after_start)
-    if next_line_end == -1:
-        next_line_end = len(doc_text)
-    badge_line_text = doc_text[after_start : next_line_end]
-    leading = badge_line_text[: len(badge_line_text) - len(badge_line_text.lstrip())] if badge_line_text.lstrip() else ""
+    # Preserve existing indentation by reading the leading whitespace
+    after_start = start + len(start_marker) + 1
+    nl = doc_text.find("\n", after_start)
+    existing = doc_text[after_start:nl] if nl != -1 else doc_text[after_start:]
+    leading = existing[: len(existing) - len(existing.lstrip())] if existing.strip() else ""
 
-    # End marker line indentation (e.g. `  <!-- badge:build:end -->`)
-    end_line_start = end + len(newline)
-    end_line_end = doc_text.find(newline, end_line_start)
-    if end_line_end == -1:
-        end_line_end = len(doc_text)
-    end_line_text = doc_text[end_line_start : end_line_end]
-    end_leading = end_line_text[: len(end_line_text) - len(end_line_text.lstrip())] if end_line_text.lstrip() else ""
-
-    block = f"{start_marker}{newline}{leading}{badge_line}{newline}{end_leading}{end_marker}"
+    block = f"{start_marker}\n{leading}{badge_line}\n{end_marker}"
     return doc_text[:start] + block + doc_text[end + len(end_marker):]
 
 
-def update_readme_badge(name: str, exit_code: int, doc_path: Path | None = None) -> None:
+def update_badge(name: str, exit_code: int, doc_path: Path | None = None) -> None:
     if name not in BADGE_SPECS:
         raise ValueError(f'Unknown badge "{name}". Expected one of: {", ".join(BADGE_SPECS)}')
 
@@ -139,7 +128,7 @@ def update_readme_badge(name: str, exit_code: int, doc_path: Path | None = None)
     doc_path.write_text(updated, encoding="utf-8")
 
 
-def update_readme_badge_unknown(name: str, doc_path: Path | None = None) -> None:
+def update_badge_unknown(name: str, doc_path: Path | None = None) -> None:
     if name not in BADGE_SPECS:
         raise ValueError(f'Unknown badge "{name}". Expected one of: {", ".join(BADGE_SPECS)}')
 
@@ -151,11 +140,14 @@ def update_readme_badge_unknown(name: str, doc_path: Path | None = None) -> None
     doc_path.write_text(updated, encoding="utf-8")
 
 
-def reset_all_readme_badges(doc_path: Path | None = None) -> None:
+def reset_all_badges(doc_path: Path | None = None) -> None:
     doc_path = doc_path or TESTING_DOC_PATH
     doc_text = doc_path.read_text(encoding="utf-8")
     for name, (alt, label, _badge_type, _cov_path) in BADGE_SPECS.items():
-        doc_text = replace_badge_block(doc_text, name, badge_unknown(alt, label))
+        start_marker = f"<!-- badge:{name}:start -->"
+        end_marker = f"<!-- badge:{name}:end -->"
+        if start_marker in doc_text and end_marker in doc_text:
+            doc_text = replace_badge_block(doc_text, name, badge_unknown(alt, label))
     doc_path.write_text(doc_text, encoding="utf-8")
 
 
@@ -171,13 +163,13 @@ if __name__ == "__main__":
 
     try:
         if args[0] == "reset-all":
-            reset_all_readme_badges()
+            reset_all_badges()
         else:
             if len(args) < 2:
                 raise ValueError("Missing badge state argument")
             name = args[0]
             if args[1] == "unknown":
-                update_readme_badge_unknown(name)
+                update_badge_unknown(name)
             else:
                 try:
                     exit_code = int(args[1])
@@ -185,7 +177,7 @@ if __name__ == "__main__":
                         raise ValueError()
                 except ValueError:
                     raise ValueError(f"Invalid exit code: {args[1]}")
-                update_readme_badge(name, exit_code)
+                update_badge(name, exit_code)
     except Exception as e:
         print(str(e), file=sys.stderr)
         sys.exit(1)

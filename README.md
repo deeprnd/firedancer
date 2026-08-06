@@ -6,20 +6,20 @@
   <img alt="Maturity" src="https://img.shields.io/badge/maturity-alpha-orange?style=flat-square" />
 
   <!-- badge:build:start -->
-  <img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
-  <!-- badge:build:end -->
+  <img alt="Build" src="https://img.shields.io/badge/build-unknown-lightgrey?style=flat-square" />
+<!-- badge:build:end -->
 
   <!-- badge:unit:start -->
-  <img alt="Unit Tests" src="https://img.shields.io/badge/tests-passing-brightgreen?style=flat-square" />
-  <!-- badge:unit:end -->
+  <img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-unknown-lightgrey?style=flat-square" />
+<!-- badge:unit:end -->
 
   <!-- badge:security:start -->
-  <img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
-  <!-- badge:security:end -->
-  
+  <img alt="Security" src="https://img.shields.io/badge/security-unknown-lightgrey?style=flat-square" />
+<!-- badge:security:end -->
+
   <!-- badge:cov-tk:start -->
-  <img alt="AI Harness Coverage" src="https://img.shields.io/badge/test%20coverage-80.0%25-yellowgreen?style=flat-square" />
-  <!-- badge:cov-tk:end -->
+  <img alt="AI Harness Coverage" src="https://img.shields.io/badge/harness%20coverage-unknown-lightgrey?style=flat-square" />
+<!-- badge:cov-tk:end -->
     
   <img alt="Platforms" src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square" />
 
