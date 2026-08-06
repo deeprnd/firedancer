@@ -8,6 +8,8 @@
   <img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
 
   <img alt="Tests" src="https://img.shields.io/badge/tests-passing-brightgreen?style=flat-square" />
+
+  <img alt="Tests" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
   
   <img alt="Test Coverage" src="https://img.shields.io/badge/test%20coverage-80.0%25-yellowgreen?style=flat-square" />
     

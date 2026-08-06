@@ -41,11 +41,11 @@ pub fn runIngest(state: *PaymentPipelineState) void {
 }
 
 test "sandbox failure records crash diagnostics and stops ingest" {
-    var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 10, .queue_depth = 2, .sandbox_fail_at = 2 }) catch {};
-    defer state.deinit() catch {};
-    runIngest(&state) catch {};
-    const diag = state.snapshotDiag() catch {};
-    try std.testing.expectEqual(tile_tkings, diag.crashed_tile) catch {};
-    try std.testing.expectEqual(@as(u64, 1), diag.sandbox_failures) catch {};
-    try std.testing.expect(state.stop.load(.seq_cst)) catch {};
+    var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 10, .queue_depth = 2, .sandbox_fail_at = 2 });
+    defer state.deinit();
+    runIngest(&state);
+    const diag = state.snapshotDiag();
+    try std.testing.expectEqual(tile_tkings, diag.crashed_tile);
+    try std.testing.expectEqual(@as(u64, 1), diag.sandbox_failures);
+    try std.testing.expect(state.stop.load(.seq_cst));
 }

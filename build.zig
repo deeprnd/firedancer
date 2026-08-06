@@ -692,6 +692,7 @@ inline for (shim_c_files) |shim_file| {
                         .{ .name = "audit_tile", .module = audit_tile_mod },
                         .{ .name = "runtime", .module = runtime_mod },
                         .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "logger", .module = logger_mod },
                     },
                 })
             else if (std.mem.eql(u8, path, "src/tickoni/runtime/sandbox.zig"))
@@ -716,10 +717,15 @@ inline for (shim_c_files) |shim_file| {
                 });
                 t.root_module.link_libc = true;
             }
-            if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig") or
-                std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline/mod.zig"))
+            if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig"))
             {
                 linkTickoniCodec(b, t, fd_lib_dir);
+            }
+            if (std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline/mod.zig"))
+            {
+                linkTickoniCodec(b, t, fd_lib_dir);
+                // Logger module imports util -> c_abi.os which needs shim/os.c
+                linkTickoniFiredancer(b, t, fd_lib_dir);
             }
             if (std.mem.eql(u8, path, "src/tickoni/c_abi/queue.zig") or
                 std.mem.eql(u8, path, "src/tickoni/c_abi/dcache.zig") or
@@ -1397,6 +1403,7 @@ inline for (shim_c_files) |shim_file| {
                 .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "util", .module = util_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
+                .{ .name = "logger", .module = logger_mod },
             },
         });
         // Named module (vs. sup_mod's anonymous instance above) so
@@ -1412,6 +1419,7 @@ inline for (shim_c_files) |shim_file| {
                 .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "util", .module = util_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
+                .{ .name = "logger", .module = logger_mod },
             },
         });
         const sup_test = b.addTest(.{ .root_module = sup_mod });
@@ -2121,6 +2129,7 @@ inline for (shim_c_files) |shim_file| {
                 .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "util", .module = util_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
+                .{ .name = "logger", .module = logger_mod },
             },
         }),
     });
