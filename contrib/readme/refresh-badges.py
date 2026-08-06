@@ -91,6 +91,9 @@ def badge_unknown(alt: str, label: str) -> str:
     return build_badge(alt, label, *UNKNOWN)
 
 
+LEADING = "  "
+
+
 def replace_badge_block(doc_text: str, name: str, badge_line: str) -> str:
     start_marker = f"<!-- badge:{name}:start -->"
     end_marker = f"<!-- badge:{name}:end -->"
@@ -103,13 +106,7 @@ def replace_badge_block(doc_text: str, name: str, badge_line: str) -> str:
     if end < start:
         raise ValueError(f"Badge markers out of order for '{name}'")
 
-    # Preserve existing indentation by reading the leading whitespace
-    after_start = start + len(start_marker) + 1
-    nl = doc_text.find("\n", after_start)
-    existing = doc_text[after_start:nl] if nl != -1 else doc_text[after_start:]
-    leading = existing[: len(existing) - len(existing.lstrip())] if existing.strip() else ""
-
-    block = f"{start_marker}\n{leading}{badge_line}\n{end_marker}"
+    block = f"{LEADING}{start_marker}\n{LEADING}{badge_line}\n{LEADING}{end_marker}"
     return doc_text[:start] + block + doc_text[end + len(end_marker):]
 
 
