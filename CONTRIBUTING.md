@@ -1,469 +1,313 @@
-## Firedancer Code Style Guide
+# Contributing to Tickoni
 
-Below is an incomplete list of code style rules.
+Tickoni is a financial event runtime first and an AI harness second. The
+repository combines Tickoni-owned Zig product and runtime code, a retained
+Firedancer-derived C substrate, and a separately licensed Qt desktop terminal.
 
-This document is not authoritative.  The code style is defined by the
-code in `src/tango`.
+The runtime, CLI, APIs, SDKs, and retained C substrate are generally licensed
+under Apache-2.0. The official Qt desktop terminal is licensed under
+GPL-3.0-only. Tickoni creative content is governed separately by
+CONTENT-LICENSE.md.
 
-Most contributors do not use a code formatting tool.
+This file is the repository entry point.  Detailed rules live in:
 
-### 1. General
+- the [Tickoni contributor guide](doc/execution/contribution/tickoni.md) for
+  Tickoni-owned Zig, schemas, codecs, tiles, supervisors, connectors, audit,
+  replay, and product behavior;
+- the [Firedancer contributor guide](doc/execution/contribution/firedancer.md)
+  for retained C substrate, topology, Tango, workspaces, sandboxing, C style,
+  portability, fuzzing, and C-specific testing.
+- the [Qt terminal architecture decision](doc/knowledge/adr/qt-for-terminal-ui.md)
+  for the GPL-3.0-only desktop terminal, Qt/QML/C++ boundaries, CMake,
+  packaging, and Qt-specific licensing requirements;
+- [LICENSING.md](LICENSING.md) for the repository-wide license map;
+- [CONTENT-LICENSE.md](CONTENT-LICENSE.md) for Tickoni lore, characters,
+  narratives, illustrations, and release artwork.
 
-#### 1.1. Text Word Wrap
+A change that spans both runtimes must satisfy both guides.
 
-Aspire to word wrap text (comments, not code) at 72 columns for
-readability. After accounting for the indent, this is right around the
-level the publishing industry has used for hundreds of years for making
-print easily readable with minimal eye strain and also makes default
-behaviors of various common development environments like emacs.
+## Choose The Contribution Path
 
-#### 1.2. Organization
+### Tickoni-owned code
 
-See [organization.txt](./doc/organization.txt).
+Use the Tickoni guide for `src/app/tickoni`, `src/tickoni/**`, Tickoni tests and
+fixtures, Tickoni documentation, and `justfile` recipes.
 
-Please avoid cluttering the repository root.
+| Change | Destination |
+| --- | --- |
+| Supervisor, lifecycle, topology, channels, metrics, replay hooks, sandbox configuration | `src/tickoni/runtime/` |
+| Narrow Zig declarations and wrappers around retained C substrate | `src/tickoni/c_abi/` |
+| Canonical cross-tile financial, policy, audit, case, and capability contracts | `src/tickoni/schema/` |
+| Binary, JSONL, protobuf, and hash codecs for canonical contracts | `src/tickoni/codec/` |
+| Tile-owned state, messages, validation, backends, and orchestration | `src/tickoni/tiles/<tile>/` |
+| Signed adapter manifests and external integration code | `src/tickoni/connectors/` |
+| Deterministic demo orchestration | `src/tickoni/test/demo/` |
+| Test-only mocks and servers | `src/tickoni/test/mocks/` |
+| Financial fixtures and scenarios | `src/tickoni/test/fixtures/` |
+| Qt desktop terminal, QML, C++ UI models, terminal transport, terminal CMake, UI tests | `src/tickoni/ui/` |
 
-#### 1.3. File Extensions
+### Qt desktop terminal
 
-| Extension | File Type                                        |
-|-----------|--------------------------------------------------|
-| `.c`      | Standalone C translation unit                    |
-| `.h`      | Reusable C include file, no symbol defs (header) |
-| `.c`      | Include-once C file, with symbol defs            |
-| `.s`      | Assembly files                                   |
-| (none)    | Shell scripts                                    |
+Use the Qt terminal ADR and terminal-specific contributor documentation for:
 
-#### 1.4. Include Guards
+- `src/tickoni/ui/**`;
+- terminal-specific C++ and QML source;
+- terminal-specific CMake files;
+- terminal tests, resources, packaging, and deployment files;
+- files otherwise expressly marked `GPL-3.0-only`.
 
-Header files that are intended to be included by other compile units
-should use an ifndef include guard.
+The official Qt desktop terminal is licensed under GPL-3.0-only.
 
-Given file: `src/path/to/file/fd_file_name.h`:
+Keep the GPL terminal separate from the Apache-2.0 runtime, CLI, APIs, schemas,
+and non-UI SDKs. Shared protocol definitions and generated clients should live
+in their Apache-2.0 component rather than being implemented only inside the
+terminal.
 
-```c
-/* good */
+Do not copy GPL-covered terminal implementation code into an Apache-2.0
+component. Apache-2.0 code may be used by the GPL terminal when its original
+copyright, license, attribution, and modification notices are preserved.
 
-#ifndef HEADER_fd_src_path_to_file_fd_file_name_h
-#define HEADER_fd_src_path_to_file_fd_file_name_h
+### Firedancer-derived C substrate
 
-...
+Use the Firedancer guide for retained low-level C code, including `src/tango`,
+`src/util`, `src/waltz`, `src/disco`, `src/discof`, `src/flamenco`, `src/funk`,
+and `src/app/firedancer`.
 
-#endif /* HEADER_fd_path_to_file_fd_file_name_h */
+Tickoni product requirements do not by themselves justify modifying this
+substrate.  Prefer a Tickoni-owned module or a narrow boundary under
+`src/tickoni/c_abi`.  A substrate change should be genuinely generic and must
+follow the Firedancer ownership, memory, isolation, performance, C style, and
+testing rules.
 
-/* WRONG! */
+### Cross-boundary changes
 
-#pragma once
+A Zig-to-C dependency crosses a Tickoni-owned boundary:
+
+1. Add or use a narrow `tk_*` C shim under `src/tickoni/c_abi/shim/**`.
+2. Add a typed wrapper under `src/tickoni/c_abi/*.zig` when Zig needs it.
+3. Pass primitive configuration, pointers, footprints, handles, and status.
+4. Keep Tickoni product structs and financial semantics out of the C substrate.
+5. Preserve the C object's ownership and lifecycle, including
+   `align`, `footprint`, `new`, `join`, `leave`, and `delete` where applicable.
+
+Do not call retained `fd_*` APIs directly from Tickoni product code, invent
+linkage stubs to hide an unhealthy boundary, or place business-adjacent C code
+in the ABI directory merely because Zig calls it through `extern`.
+
+### Creative Content Contributions
+
+Do not submit fictional lore, character designs, character biographies,
+narrative material, dialogue, illustrations, comic or manga material, or
+release artwork through ordinary pull requests.
+
+Creative-content contributions require a separate written agreement confirming:
+
+- the contributor's authorship or authority to submit the material;
+- ownership of the relevant rights;
+- any third-party or generated-material inputs;
+- the rights granted to Victor Genin, publishing under the name DeepRND;
+- whether the material may be modified, commercially licensed, sublicensed,
+  registered, or enforced by the Licensor.
+
+Opening a pull request containing creative content does not by itself establish
+that the contribution has been accepted or that the required rights have been
+granted.
+
+## Contribution Licensing
+
+Tickoni is a mixed-license repository. The license applicable to a contribution
+is determined by the component, directory, and file being modified.
+
+By submitting a contribution, you agree to license that contribution under the
+license applicable to its destination:
+
+- contributions to the runtime, CLI, retained C substrate, APIs, schemas,
+  non-UI SDKs, and other files designated Apache-2.0 are submitted under the
+  Apache License, Version 2.0;
+- contributions to `src/tickoni/ui/**` and other files designated
+  GPL-3.0-only are submitted under the GNU General Public License,
+  version 3 only;
+- creative-content contributions are not accepted under either software
+  license and require a separate written agreement.
+
+Existing third-party code remains under its existing license. A contribution
+must not remove or alter applicable copyright, license, attribution, NOTICE,
+SPDX, or modification notices.
+
+Contributors must have the legal right to submit their contributions. Do not
+submit code, documentation, artwork, generated material, or other content that
+cannot lawfully be distributed under the applicable component license.
+
+Changes that move or copy material across Apache-2.0, GPL-3.0-only, and creative
+content boundaries require an explicit licensing review.
+
+## Architectural Rules
+
+The implementation order is:
+
+```text
+runtime first
+cases second
+agents third
+privileged actions last
 ```
 
-### 2. Vertical Alignment
-
-Popular code formatting tools would produce code like this.
-This sort of code is discouraged in Firedancer.
-
-```c
-#define FD_FOO_SUCCESS (0)
-#define FD_FOO_ERR_PROTO (1)
-#define FD_FOO_ERR_IO (20)
-
-void
-foo( void ) {
-  char const * _init = fd_env_strip_cmdline_cstr( &argc, &argv, "--init", NULL, NULL );
-  uint seed = fd_env_strip_cmdline_uint( &argc, &argv, "--seed", NULL, (uint)fd_tickcount() );
-  int lazy = fd_env_strip_cmdline_int( &argc, &argv, "--lazy", NULL, 7 );
-}
-```
-
-Instead, use vertical alignment for better readability:
-
-```c
-#define FD_FOO_SUCCESS    (0)
-#define FD_FOO_ERR_PROTO  (1)
-#define FD_FOO_ERR_IO    (20)
-
-void
-foo( void ) {
-  char const * _init = fd_env_strip_cmdline_cstr( &argc, &argv, "--init", NULL, NULL                 );
-  uint         seed  = fd_env_strip_cmdline_uint( &argc, &argv, "--seed", NULL, (uint)fd_tickcount() );
-  int          lazy  = fd_env_strip_cmdline_int ( &argc, &argv, "--lazy", NULL, 7                    );
-}
-```
-
-### 3. Spacing Rules
-
-#### 3.1. Function Calls
-
-No spaces for function calls with zero arguments:
-
-```c
-abort();   /* good */
-
-abort( );  /* WRONG! */
-abort ();  /* WRONG! */
-```
-
-For function calls with arguments, spaces inside brackets.
-No space before brackets.
-
-```c
-printf( "Hello %s\n", "World" );  /* good */
-
-printf ( "Hello" );  /* WRONG! */
-printf("Hello");     /* WRONG! */
-```
-
-Exception: Usually, no spaces with `sizeof`:
-
-```c
-memcpy( dst, src, sizeof(fd_rng_t) );  /* good */
-
-memcpy( dst, src, sizeof( fd_rng_t ) );  /* WRONG! */
-```
-
-Exception: No spaces between double bracket macros:
-
-```c
-FD_LOG_NOTICE(( "pass" ));  /* good */
-
-FD_LOG_NOTICE( ( "pass" ) );  /* WRONG! */
-```
-
-#### 3.2. Control Flow
-
-Annotate uncommon error paths with `FD_UNLIKELY`.
-
-For single-line if statements, no braces required:
-
-```c
-if( FD_UNLIKELY( do_crash ) ) abort();
-```
-
-Spaces in brackets.  No spaces before brackets.
-
-```c
-if( c==1 ) c = 2;  /* good */
-
-if (c==1) c = 2;    /* WRONG! */
-if ( c==1 ) c = 2;  /* WRONG! */
-if( c==1) c = 2;    /* VERY WRONG! */
-```
-
-If a branch goes on a separate line, braces are mandatory:
-
-```c
-/* good */
-if( FD_UNLIKELY( status!=3 ) ) {
-  FD_LOG_CRIT(( "Critical error, aborting" ));
-}
-
-/* WRONG! */
-if( FD_UNLIKELY( status!=3 ) )
-  FD_LOG_CRIT(( "Critical error, aborting" ));
-```
-
-#### 3.3. Function Prototypes
-
-- Modifiers and return types on separate lines
-- One function argument per line
-- Vertically align function argument types and names
-
-```c
-/* good */
-static inline uint
-fd_rng_seq_set( fd_rng_t * rng,
-                uint       seq );
-
-/* WRONG! */
-static inline uint fd_rng_seq_set( fd_rng_t * rng, uint seq );
-```
-
-### 4. Type System
-
-#### 4.1. Integers
-
-Use `fd_util_base.h` types instead of `stdint.h` integer types.
-
-FAQ: Why not `stdint.h`? For more information, see
-- [`fd_util_base.h`](./src/util/fd_util_base.h)
-- [Kevin's rant](./doc/knowledge/rant/integer-types.md)
-
-**Mapping**
-
-| stdint      | fd_util_base |
-|-------------|--------------|
-| `int8_t`    | `schar`      |
-| `uint8_t`   | `uchar`      |
-| `int16_t`   | `short`      |
-| `uint16_t`  | `ushort`     |
-| `int32_t`   | `int`        |
-| `uint32_t`  | `uint`       |
-| `int64_t`   | `long`       |
-| `ptrdiff_t` | `long`       |
-| `uint64_t`  | `ulong`      |
-| `size_t`    | `ulong`      |
-
-#### 4.2. Bools
-
-Do not use `bool` (stdbool).  Instead use `int`.
-
-The value `1` is "true" and the value `0` is "false".
-
-```
-int is_working = 1;
-if( is_working ) { ... }
-```
-
-### 5. Function Documentation
-
-- Documentation for a function is typically before the function
-  prototype in a comment block to help with potential automated
-  documentation extraction ala Doxygen.
-- Such comments should try to mention the name of the function they are
-  toward the beginning of the comment to eliminate ambiguity. E.g. no
-  confusion from devs from environments where comments chase the
-  prototype.
-- Function declarations belonging to a public API must be documented
-- Implementations of these functions must not repeat the comment.
-- Functions that are not public (e.g. static function in an
-  implementation source code file) are nice to document like this, but
-  this is more aspirational.  (Depends on code maturity, complexity, etc.)
-
-```c
-/* fd_rng_seq_set sets the sequence to be used by rng and returns
-   the replaced value.  fd_rng_idx_set sets the next slot that will be
-   consumed next by rng and returns the replaced value. */
-
-static inline uint
-fd_rng_seq_set( fd_rng_t * rng,
-                uint       seq );
-```
-
-Rant about our documentation style: https://github.com/firedancer-io/firedancer/pull/302#issuecomment-1530810227
-
-### 6. Macros
-
-Note: These are recommendations.  Depending on macro scope, these rules
-might not make sense.
-
-Enclose arguments in braces:
-
-```c
-#define wwl_abs(x) _mm512_abs_epi64( (x) )  /* good */
-
-#define wwl_abs(x) _mm512_abs_epi64( x )  /* WRONG! */
-```
-
-Enclose macro bodies in do/while(0) scopes:
-
-```c
-/* good */
-#define FD_R43X6_SQR2_INL( za,xa, zb,xb ) \
-  do {                                    \
-    (za) = fd_r43x6_sqr( (xa) );          \
-    (zb) = fd_r43x6_sqr( (xb) );          \
-  } while(0)
-
-/* WRONG! */
-#define FD_R43X6_SQR2_INL( za,xa, zb,xb ) \
-  (za) = fd_r43x6_sqr( (xa) );            \
-  (zb) = fd_r43x6_sqr( (xb) );
-```
-
-Only evaluate macro arguments once:
-
-```c
-/* good */
-#define TRAP(x)               \
-  do {                        \
-    int _cnt = (x);           \
-    if( _cnt<0 ) return _cnt; \
-    cnt += _cnt;              \
-  } while(0)
-
-/* WRONG! */
-#define TRAP(x)             \
-  do {                      \
-    if( (x)<0 ) return (x); \
-    cnt += (x);             \
-  } while(0)
-
-/* Note: A user might do this */
-TRAP( ++y );
-```
-
-### 7. Portability
-
-#### 7.1. Build capabilities
-
-Generally, Firedancer aspires to compile fine under any LP64
-environment.  If any component has more assumptions (e.g. needs a POSIX
-like target), it should check for these capabilities via the
-`FD_HAS_{...}` switches.
-
-Example Makefile:
-
-```makefile
-ifdef FD_HAS_HOSTED
-$(call add-objs,fd_numa,fd_util)
-endif
-```
-
-Example C code:
-
-```c
-#if FD_HAS_HOSTED
-
-...
-
-#endif /* FD_HAS_HOSTED */
-```
-
-Example
-
-#### 7.2. Language features
-
-Try to stick to ISO C17.  GNU C extensions are permitted as long as they
-are well supported by Clang and CBMC many years back.
-
-#### 7.3. Compiler compatibility
-
-As of 2024-Jul, Firedancer builds on GNU/Linux sysroots with GCC 8.5 or
-newer.  Clang and CBMC are also supported build environments.
-
-The "Frankendancer" build target (fdctl) only targets x86_64 with a
-Haswell like minimum feature set (AVX2, FMA).
-
-Experimental support exists for the following targets:
-- musl Linux, macOS, FreeBSD, Solana (SVM) C programs
-- arm64, ppc64le, sBPFv1, sBPFv2
-
-#### 7.4. seccomp
-
-Firedancer uses a strict sandbox architecture on Linux platforms using
-seccomp.  During initialization, a seccomp profile is installed to each
-tile containing rules for allowed syscalls.
-
-Be mindful of what syscalls glibc could use under the hood when using
-standard library APIs.  Note that the syscalls used can differ between
-different glibc versions.
-
-If a syscall is triggered unexpectedly, seccomp will crash Firedancer.
-
-#### 7.5. File I/O
-
-Prefer `fd_io` over `stdio.h` for streaming file I/O.
-
-Make sure to handle `EINTR` correctly.
-
-### 8. Code Coverage
-
-To generate an HTML coverage report for a single test:
-
-```bash
-make -j CC=clang EXTRAS=llvm-cov BUILDDIR=clang-cov
-./contrib/test/single_test_cov.sh build/clang-cov/unit-test/test_xxx
-```
-
-This creates a `report/` directory with an HTML report.  View it with:
-
-```bash
-python3 -m http.server 12000 -b 127.0.0.1 -d report
-```
-
-### 9. Security
-
-#### 9.1. Fuzzing
-
-Most code should be covered by fuzz tests.
-
-Try to:
-- Use graceful error handling instead of aborting/crashing/exiting even
-  when that is the only reasonable behavior from an app pov.
-- Provide test APIs for mocking state.  (e.g. encryption keys when
-  fuzzing a network protocol)
-
-We run a large set of [test vectors](https://github.com/firedancer-io/
-test-vectors) in our CI that tests conformance between Firedancer and
-Agave's block, transaction, instruction, and VM execution down to the
-same error code. The test vector inputs are sourced from:
-- Vectors generated by past fuzzing campaigns
-- Hand-written / manually generated unit tests
-- Fixed mismatches, added as regression tests
-
-To add a new test vector to run in CI:
-1. Make a pull request into the test-vectors repository with your
-new fixtures. See [solana-conformance](https://github.com/firedancer-io/solana-conformance) for more information on generating fixtures.
-2. Once the pull request is merged, make a pull request into Firedancer,
-updating `contrib/test/test-vectors-fixtures/test-vectors-commit-sha.txt`
-with the latest test vectors Github commit SHA containing your change
-(e.g. `2066cfd358a8fd163255c58b3e9a28b9de65df11`).
-
-#### 9.2. Complex Function Exit
-
-Sometimes complex control flow is unavoidable.
-
-A typical error is failure to release resources on variables that go
-out of scope.
-
-```c
-...
-if( fail1 ) {
-  cleanup();
-  return;
-}
-... 800 lines later ...
-if( fail2 ) {
-  return;  /* we forgot to call cleanup() !!! */
-}
-...
-cleanup();
-return;
-```
-
-Instead, you could use a `do/while` scope like so:
-
-```c
-...
-do {
-  if( fail1 ) break;
-  ...
-  if( fail2 ) break;
-  ...
-} while(0);
-
-cleanup();
-return;
-```
-
-In egregious cases, you may use the `cleanup` attribute to execute an
-inline function when a variable goes out of scope.
-
-```c
-static inline void
-release_lock( int * lock ) {
-  ...
-}
-
-void
-my_func( void ) {
-  ...
-  int my_lock __attribute__((cleanup(release_lock))) = acquire_lock();
-  ...
-  if( fail1 ) return;  /* calls release_lock when returning */
-  ...
-  /* calls release_lock when going out of scope */
-}
-```
-
-To improve readability, wrap the cleanup attribute in macros like so:
-See `FD_SCRATCH_SCOPE_BEGIN` in `src/util/scratch/fd_scratch.h`.
-
-```c
-int my_lock;
-FD_MY_LOCK_BEGIN(my_lock) {
-  if( fail1 ) return;  /* releases lock */
-  if( fail2 ) break;   /* releases lock */
-  ...
-  /* releases lock */
-}
-FD_MY_LOCK_END;
-```
+The deterministic financial event path must not require a model.  Events should
+remain ingestible, normalizable, deduplicated, policy-checkable, auditable, and
+replayable without agent or model execution.
+
+For every non-trivial runtime change, make these facts explicit:
+
+1. Which tile or module owns the state?
+2. Which workspace or bounded allocation holds it?
+3. Which process may access it, and in what mode?
+4. Who writes each shared field?
+5. What happens on malformed input, backpressure, overrun, restart, and
+   shutdown?
+6. Which metrics, diagnostics, audit records, or logs expose unhealthy
+   behavior?
+
+Preserve these defaults:
+
+- explicit topology over runtime discovery;
+- fixed capacity over unbounded growth;
+- one writer for hot mutable state;
+- bounded channels over generic event buses;
+- process isolation over in-process trust;
+- fail-closed validation for configuration and authority;
+- audit and deterministic replay for material behavior;
+- no hidden allocation, threads, registries, permissions, or external calls.
+
+Agents are not the security boundary.  Model access belongs behind `tkmodl`,
+tool access behind `tktool`, external integrations behind signed `tkadpt`
+instances, and money-adjacent mutation behind `tkexec`.  Replay must not invoke
+production mutation.
+
+Before implementing a new tile, link, or meaningful runtime behavior, define
+its runtime ID, owned state, links, queue depth, MTU, reliability, access modes,
+fixed memory, process placement, restart behavior, overrun behavior, shutdown
+behavior, metrics, diagnostics, audit, and replay impact.
+
+Resolve ownership or source-tree ambiguity before coding.  Do not let a helper
+quietly become an execution owner, storage authority, service locator, or
+privileged boundary.
+
+## Development Workflow
+
+1. Read the relevant detailed contributor guide.
+2. Identify the owning module, tile, process, and storage boundary.
+3. Make the smallest coherent change that preserves those boundaries.
+4. Add or update tests for the behavior being claimed.
+5. Update architecture, schema, telemetry, testing, or operator documentation
+   when the effective contract changes.
+6. Run the narrowest relevant checks first, then broaden based on risk.
+7. In the handoff or pull request, list the checks run and identify any
+   relevant checks not run.
+
+All Tickoni developer tooling belongs in the root `justfile` or in
+Tickoni-specific scripts called by it.  Do not add Tickoni development targets
+to retained Firedancer makefiles.  Use the existing recipe naming convention:
+`tk` for Tickoni, `fd` for Firedancer-derived C, and `all` for composed checks.
+Do not implement fake success paths when a check is unavailable.
+
+## Testing
+
+Treat the root `justfile` and the repository testing guide as the source of
+truth for available test layers and commands.
+
+Run the narrowest relevant command first:
+
+- `just test-unit-tk` for Tickoni Zig supervisor, topology, queue, sandbox,
+  C ABI wrapper, schema, codec, or tile behavior;
+- `just test-unit-fd` for retained C substrate, Tango, Disco, Discof, Waltz,
+  utilities, and C integration behavior;
+- `just test-unit-all` for changes crossing the Zig/C boundary;
+- `just test-e2e-fd` for topology, workspace setup, process startup, or the
+  Firedancer development path;
+- `just test-all` or `just tests-all` for broad local validation before a
+  risky handoff.
+
+Match the test layer to the risk:
+
+- unit tests isolate a function, module, tile helper, wrapper, or supervisor;
+- integration tests keep Tickoni internals real and substitute only the
+  external boundary;
+- end-to-end and system tests use the real local runtime path and avoid
+  internal mocks.
+
+Runtime and boundary changes should test successful behavior and important
+fail-closed cases.  Depending on the change, cover malformed input, duplicate
+handling, bounded queues, backpressure, overrun, workspace join modes, missing
+shared-memory objects, sandbox failure, tile crash, audit chaining, replay
+divergence, policy allow and deny outcomes, and configuration validation.
+
+Do not silently fall back from a real integration backend to a mock.  If a real
+service is unavailable, use the repository's explicit skip behavior.
+
+## Compatibility And Documentation
+
+Treat schemas, audit formats, replay inputs, topology, C ABI layouts,
+configuration, metrics, diagnostics, and external routes as compatibility
+surfaces.
+
+When changing one of them:
+
+- update the owning documentation in the same change;
+- preserve explicit versions and bounded representations;
+- add layout or constant checks at C ABI boundaries;
+- report effective runtime behavior, not only configured intent;
+- keep metric names and labels stable and low-cardinality;
+- place high-cardinality identifiers in logs, audit records, evidence, or
+  bounded trace attributes rather than metric labels;
+- regenerate derived outputs using the applicable contributor guide.
+
+Use consumer-money language in product-facing documentation, APIs, and demos.
+Keep tile IDs, capability envelopes, audit records, replay capsules, adapter
+manifests, and signed action envelopes as internal implementation terminology.
+
+## Pull Request Checklist
+
+Before requesting review, verify that the contribution:
+
+- belongs in its chosen module or substrate path;
+- gives every mutable object one clear owner;
+- makes capacities, payload bounds, and allocation explicit;
+- keeps process, sandbox, filesystem, network, model, tool, adapter, storage,
+  and execution permissions narrow;
+- defines malformed-input, overrun, restart, and shutdown behavior;
+- makes material decisions, denials, and external results auditable;
+- supports replay comparison without external mutation;
+- exposes relevant lag, drops, backpressure, crashes, and divergence through
+  metrics or diagnostics;
+- includes tests matching the actual risk;
+- documents which checks were and were not run.
+- is submitted under the license applicable to every modified file;
+- preserves existing copyright, SPDX, license, attribution, NOTICE, and
+  modification notices;
+- does not copy GPL-covered terminal code into an Apache-2.0 component;
+- does not embed separately licensed lore or character assets into the GPL
+  terminal without an explicit licensing review;
+- identifies every new third-party dependency and its license;
+- updates `LICENSING.md`, `NOTICE`, third-party notices, or the SBOM when the
+  distributed dependency or licensing boundary changes.
+
+Also verify that the change does not:
+
+- add Tickoni product semantics to retained Firedancer paths;
+- introduce a hidden mutable global registry or service locator;
+- add an unbounded queue or steady-state allocation without a bounded design;
+- let multiple tiles mutate state without a documented ownership protocol;
+- bypass `tkmodl`, `tktool`, `tkadpt`, `tkexec`, storage, audit, or replay
+  boundaries;
+- suppress formatter, lint, sanitizer, seccomp, test, or static-analysis
+  findings instead of fixing the underlying issue;
+- claim durability before the owning durable store or append-only audit path
+  has accepted the data.
+- silently move code or assets across Apache-2.0, GPL-3.0-only, or
+  creative-content boundaries;
+- introduce a dependency whose license is incompatible with the destination
+  component;
+- remove an upstream copyright, license, attribution, or modification notice.
+
+If a relevant check cannot be run, state that directly and explain the missing
+environment, dependency, or scope.

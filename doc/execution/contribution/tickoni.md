@@ -1,10 +1,14 @@
 # Tickoni Zig Runtime Philosophy And Style Guide
 
-This document extends [`firedancer.md`](firedancer.md) for the Zig-native
-Tickoni runtime. It is not a replacement for the Firedancer philosophy. It is
-the rulebook for carrying that philosophy into Tickoni without mixing product
-logic into upstream-hot validator code or hiding isolation boundaries behind
-comfortable abstractions.
+This document is the detailed engineering guide for the Zig-native Tickoni
+runtime. Repository-wide contribution workflow, test-command selection, and
+pull-request expectations are defined in
+[`CONTRIBUTING.md`](../../../CONTRIBUTING.md). The retained C substrate has its
+own self-contained [`firedancer.md`](firedancer.md) contributor guide.
+
+This guide carries Firedancer's explicit ownership, bounded-memory, and
+isolation philosophy into Tickoni without mixing product logic into retained
+validator code or hiding runtime boundaries behind comfortable abstractions.
 
 Read "Tickoni" here as:
 
@@ -26,6 +30,38 @@ Do not use this guide as permission to edit `src/app/firedancer`,
 `src/disco`, `src/discof`, `src/tango`, or `src/util` for Tickoni convenience.
 Those paths remain upstream substrate unless a change is genuinely generic and
 reviewed as such.
+
+This guide also adopts the parts of TigerStyle that fit Tickoni: safety before
+performance, performance before developer convenience; bounded control flow;
+startup allocation; dense executable invariants; deliberate naming; and design
+work before implementation. These rules are adapted to Tickoni's financial,
+auditable, replayable, process-isolated runtime rather than copied as
+TigerBeetle-specific policy.
+
+## Design Priorities
+
+Tickoni optimizes for:
+
+1. safety,
+2. performance,
+3. developer experience.
+
+The order matters. A convenient API is not an improvement if it weakens
+ownership, replay, audit, bounds, or isolation. A faster path is not acceptable
+if it makes financial behavior non-deterministic or unauditable. Within those
+constraints, the code should remain direct, readable, and economical.
+
+Simplicity is not the first implementation that happens to work. It is the
+result of revision: finding one design that satisfies ownership, capacity,
+failure behavior, observability, and performance together. Spend design effort
+before code because topology, schema, allocation, and authority mistakes become
+far more expensive after data and money depend on them.
+
+Tickoni does not knowingly defer correctness debt in shipped paths. A phase may
+lack features, but the behavior that exists must satisfy its stated bounds,
+audit, replay, isolation, and failure contracts. Do not merge a temporary
+unbounded queue, silent fallback, incomplete audit path, or sandbox bypass on
+the assumption that it will be fixed later.
 
 ## Source-Tree Guide
 
@@ -480,6 +516,39 @@ metrics: produced, consumed, lag, backpressure_ns, malformed, dropped
 If the topology cannot be written plainly, the implementation is probably
 mixing responsibilities.
 
+## Design And Performance Sketches
+
+Performance is an architectural property, not a cleanup phase. Before
+implementing a non-trivial tile, queue, codec, storage path, or external
+boundary, write a back-of-the-envelope sketch for:
+
+- network bandwidth and latency;
+- disk bandwidth and latency;
+- memory footprint, bandwidth, cache behavior, and allocation lifetime;
+- CPU work per event, branch shape, batching, and worst-case loop count;
+- steady-state rate and credible burst rate;
+- queue depth, time-to-saturation, and recovery behavior;
+- copies, encodings, hashes, syscalls, and context switches per event.
+
+Be roughly right before measuring precisely. Profiling can find local costs, but
+it cannot repair a topology that serializes the wrong stage, allocates on every
+event, or performs one syscall per fragment.
+
+Separate control-plane work from data-plane work. Validation, configuration,
+policy updates, lifecycle transitions, and diagnostics may be rich and
+assertion-heavy. The steady-state event path should be fixed-capacity,
+predictable, and batch work where batching preserves latency and correctness.
+
+Do not let external systems dictate Tickoni's internal control flow one callback
+at a time. Ingest external events into bounded ownership-controlled state, then
+process them at the runtime's own pace. This preserves batching, work bounds,
+audit ordering, and backpressure behavior.
+
+Extract important hot loops into small stand-alone functions with primitive or
+narrow arguments. Avoid making the compiler and reviewer rediscover which large
+context fields are loop invariants. Keep hot-loop ownership, bounds, and
+publication mechanics visible.
+
 ## Firedancer Configuration And The AI Harness
 
 Changes to Firedancer configuration, layout, topology, sandboxing, or
@@ -589,33 +658,164 @@ what the supervisor actually built.
 
 ## Zig Style For Runtime Code
 
-Use idiomatic Zig where it improves explicitness. Do not build a high-level
-framework that hides the same details Firedancer makes visible.
+Use Zig to make ownership, bounds, and lifetimes more explicit. Do not use the
+language to build a framework that hides the details Firedancer and Tickoni need
+reviewers to see.
 
 Prefer:
 
-- plain structs with explicit fields
-- small error sets on boundary APIs
-- comptime constants for fixed capacities and layout constraints
-- explicit allocator ownership
-- slices that make lifetimes obvious
-- `extern struct` only for C ABI layout
-- tests for layout, limits, and topology validation
+- plain structs with explicit fields;
+- small error sets on boundary APIs;
+- comptime constants for capacities, layout, and schema constraints;
+- explicitly owned allocators and buffers;
+- slices whose lifetime and maximum length are obvious;
+- `extern struct` only for C ABI layout;
+- tagged unions for closed implementation choices;
+- compile-time and runtime tests for layout, limits, and topology invariants.
 
 Avoid:
 
-- global mutable registries
-- dynamic plugin discovery in the runtime path
-- unbounded `ArrayList` growth in hot paths
-- hidden allocation inside parse, hash, or enqueue helpers
-- background threads spawned from utility functions
-- generic "event bus" abstractions
-- catch-all `anyopaque` handles outside narrow C ABI edges
-- convenience APIs that let a tile access state it does not own
+- global mutable registries;
+- dynamic plugin discovery in the runtime path;
+- unbounded `ArrayList` growth in steady state;
+- hidden allocation inside parse, hash, enqueue, or dispatch helpers;
+- background threads spawned from utility functions;
+- generic event-bus abstractions;
+- catch-all `anyopaque` handles outside narrow C ABI edges;
+- convenience APIs that let a tile access state it does not own.
 
-Zig safety features are welcome, but they are not a substitute for topology
-discipline. A bounds check does not define ownership. An allocator does not
-define capacity. A type does not define process isolation.
+Zig safety features are useful, but they do not replace architecture. A bounds
+check does not define ownership. An allocator does not define capacity. A type
+does not define process isolation. An error union does not define recovery.
+
+### Control Flow And Bounds
+
+Use simple, explicit control flow.
+
+- Do not use recursion in runtime, schema, codec, queue, replay, or tile code.
+  Rare build-time or offline tooling exceptions require an explicit depth bound
+  and a reason iteration is worse.
+- Every loop must have a fixed or externally validated upper bound. Permanent
+  event loops are the exception: document and assert that they are intentionally
+  non-terminating, and bound the work performed per iteration.
+- Every queue, buffer, retry count, batch, timer set, capability list, schema
+  field, and replay window must have an explicit maximum.
+- Split compound conditions when they hide independent invariants or cases.
+  Prefer nested branches that make positive and negative space visible.
+- State invariants positively. Prefer `index < count` over reasoning through a
+  negated `index >= count` unless the negative form is the actual domain rule.
+- Use braces unless the complete branch, including its meaning, fits safely on
+  one line.
+- Do not suspend or spawn hidden work from helpers. A function should run to
+  completion unless its asynchronous boundary is explicit in its name, type,
+  owner, and lifecycle.
+
+External input is data, not control authority. Decode, validate, classify, and
+enqueue it into a bounded path. Do not let network callbacks, model callbacks,
+database callbacks, or UI handlers mutate unrelated runtime state directly.
+
+### Function Shape And Scope
+
+Non-generated functions should fit on one screen. Treat 70 lines as the review
+limit. A longer function requires a clear reason why splitting it would make
+ownership or control flow harder to understand.
+
+When splitting a function:
+
+- keep branching and lifecycle control in the parent;
+- move non-branching calculations and bounded loops into helpers;
+- push `if` decisions upward and `for` mechanics downward;
+- centralize mutation in the owner and keep leaf helpers pure where practical;
+- keep function signatures narrow and return types simple.
+
+Prefer the least expressive return type that fully represents the contract:
+`void` before `bool`, a required value before an optional value, and an
+infallible result before an error union. Do not force uncertainty or branching
+onto every caller when the callee can resolve it locally and safely.
+
+Declare variables at the smallest useful scope. Compute and validate a value
+close to where it is consumed. Do not keep aliases or duplicate cached forms of
+state unless the synchronization protocol explicitly requires them.
+
+Pass values larger than 16 bytes as `*const` when the callee must not copy them.
+Construct large or address-sensitive structs in place with an output pointer.
+If one field requires in-place initialization, prefer initializing the
+containing object in place as well.
+
+Callbacks go last in parameter lists. When a callback or helper exists for one
+calling function, prefix it with that function's name when doing so clarifies
+the call path.
+
+### Naming
+
+Names should expose the domain model.
+
+- Use `snake_case` for functions, variables, fields, and file names.
+- Use Zig's type naming conventions for structs, enums, unions, and other types.
+- Do not abbreviate ordinary names. Stable tile IDs such as `tkdedu`, protocol
+  terms, mathematical indices, and established financial acronyms are allowed.
+- Capitalize acronyms consistently in type names.
+- Put units and qualifiers last, ordered from more significant to less
+  significant: `latency_ms_max`, `queue_depth_max`, `replay_bytes_used`.
+- Treat `index`, `count`, `size`, `offset`, `capacity`, and `length` as distinct
+  concepts even when they share an integer representation.
+- Prefer nouns for state and components, and verbs for operations.
+- Avoid context-dependent reuse of one word for different runtime concepts.
+- Choose related names that align visually when this improves comparison, but
+  do not shorten names merely to force alignment.
+
+Use an options struct when positional arguments can be confused, especially
+when a function accepts two values of the same scalar type. Nullable arguments
+must be named at the call site when the meaning of `null` would otherwise be
+ambiguous. Unique dependencies such as an allocator or runtime IO handle may be
+passed positionally from general to specific.
+
+### File Order And Comments
+
+Files are read top to bottom. Put the public or controlling surface near the
+top. In executable entrypoint files, put `main` before secondary helpers. For a
+struct, prefer this order:
+
+1. fields,
+2. nested types and constants,
+3. initialization,
+4. public methods,
+5. private helpers.
+
+Keep complex nested types at top level when nesting makes the parent difficult
+to scan.
+
+Comments explain why an invariant, layout, permission, or algorithm exists and
+how a non-obvious test proves it. They do not restate the next line. Write
+comments as normal sentences with capitalization and punctuation. A complex
+test should begin with a short description of its goal and method.
+
+Use assertions rather than comments when a surprising property is executable
+and must remain true.
+
+### Call-Site Explicitness
+
+Pass safety-relevant options explicitly rather than relying on library defaults.
+Defaults may change and call sites are part of the review surface.
+
+Use operations that show rounding intent, such as exact, floor, or ceiling
+division helpers. Do not use ordinary division where a count, offset, fee,
+price, lot size, or capacity can round ambiguously.
+
+Do not introduce implicit fallback. If a real backend, durable store, audit
+append, or policy decision is unavailable, return or classify the error. A mock
+or degraded mode must be selected explicitly before the call.
+
+### Formatting
+
+- Run `zig fmt`.
+- Use four spaces of indentation as produced by the formatter.
+- Keep Zig source lines at or below 100 columns.
+- Add a trailing comma and let `zig fmt` wrap signatures, calls, literals, and
+  initializers.
+- Use braces for multi-line branches and loops.
+- Treat warnings, sanitizer findings, lint findings, and static-analysis
+  findings as defects unless an exception is explicitly justified and approved.
 
 ### No-Nos
 
@@ -684,19 +884,19 @@ define capacity. A type does not define process isolation.
 - Do not suppress compiler, sanitizer, lint, or static-analysis findings unless
   explicitly approved.
 
-### Error Handling
+### Boundary Error Translation
 
-- Let errors bubble up through lower layers.
-- Catch errors only at the highest level that can add meaningful context or
-  convert them into the correct boundary behavior.
-- When catching, log with useful identifiers such as tile id, link name,
-  source offset, case id, capability id, policy version, request id, adapter id,
-  or replay capsule id, then rethrow unless the boundary intentionally
-  terminates or translates the error.
-- Do not swallow errors, downgrade policy denials into warnings, or continue
-  with partial topology, partial audit state, or unknown replay state.
-- Malformed input should become explicit rejection, metric, and audit behavior;
-  internal invariant failures should remain loud.
+The repository-wide assertion and error rules are defined in
+[Error Handling And Assertions](#error-handling-and-assertions). At a tile,
+storage, model, adapter, HTTP, or C ABI boundary:
+
+- add stable context such as tile id, link name, source offset, case id,
+  capability id, policy version, request id, adapter id, or replay capsule id;
+- translate only into the boundary's documented error or outcome type;
+- preserve the original cause when the caller can still act on it;
+- emit the metric, audit record, or operator diagnostic owned by that boundary;
+- never continue with partial topology, partial audit state, or unknown replay
+  state.
 
 ### Dependency Injection
 
@@ -822,25 +1022,74 @@ The swap is a single struct literal at construction. Nothing else changes.
 
 ## Memory And Allocation
 
-Runtime allocations must be bounded by topology or startup configuration.
+The deterministic production runtime allocates and formats its working memory
+during topology construction or startup. It does not allocate, free, or grow
+memory in the steady-state event path.
+
+This means:
+
+- tile contexts, queue metadata, payload arenas, replay windows, audit staging,
+  and bounded caches have startup-computed capacities;
+- footprint calculations validate overflow, alignment, and configured maxima;
+- startup fails if required memory cannot be allocated or mapped;
+- a slow consumer does not cause a queue or transcript buffer to grow;
+- no event path hides allocation inside parsing, hashing, logging, or dispatch.
+
+External boundaries such as HTTP, model providers, adapters, and administrative
+commands may need call-scoped allocation. Those allocations must have explicit
+byte limits, ownership, and cleanup, and must not become the correctness queue
+for the deterministic runtime.
+
+Prefer explicitly sized integers for schema fields, wire values, persistent
+identifiers, capacities, timestamps, money quantities, and C ABI contracts.
+Use `usize` only for local address-space operations such as slice indexing and
+allocation APIs. Convert between sized values and `usize` with checked bounds;
+do not persist or hash architecture-sized values.
+
+Construct large structs in place when copying would increase stack use or break
+pointer stability:
+
+```zig
+fn init(target: *LargeState, config: Config) !void {
+    target.* = .{
+        // Initialize the final object in its final location.
+    };
+}
+```
+
+Keep resource acquisition and the matching `defer` visually adjacent. Minimize
+the time and scope in which a resource, mutable pointer, or temporary buffer is
+live.
+
+Do not duplicate mutable state or retain aliases merely for convenience. If a
+cached value is required for performance, document who refreshes it, when it can
+be stale, and which invariant reconnects it to the source of truth.
+
+Initialize complete output buffers before hashing, persisting, encrypting, or
+sending them. Zero padding and unused bytes where canonical encoding or
+confidentiality requires it. Treat partially initialized buffers as a
+correctness, replay, and information-disclosure risk.
 
 Good:
 
-- allocate tile handles once during supervisor initialization
-- compute queue footprints from depth and MTU
-- allocate replay buffers from a configured cap
-- reject a config that exceeds fixed limits
+- allocate tile handles once during supervisor initialization;
+- compute queue footprints from depth and MTU;
+- allocate replay buffers from a configured cap;
+- reject a config that exceeds fixed limits;
+- write directly into final, bounded storage.
 
 Bad:
 
-- allocate per event in the steady-state path
-- grow queues because a consumer fell behind
-- store whole model transcripts in hot runtime memory
-- hide payload copies inside generic helpers
+- allocate per event in the steady-state path;
+- free and reallocate a runtime object after initialization;
+- grow queues because a consumer fell behind;
+- store whole model transcripts in hot runtime memory;
+- return large state by value when an in-place result is clearer;
+- hide payload copies inside generic helpers.
 
 The Phase 0 synthetic pipeline may use ordinary in-process state to prove
-lifecycle, but production paths should move toward explicit queue objects,
-workspace-backed state, and process isolation.
+lifecycle, but any exception to production allocation rules must remain
+test-only, explicitly bounded, and easy to remove.
 
 ## Concurrency
 
@@ -867,32 +1116,89 @@ protocol fields. An atomic does not make an ownership model correct by itself.
 
 ## Error Handling And Assertions
 
-Use assertions for internal invariants that indicate programmer error. Use
-explicit errors for operator-facing validation and malformed input.
+Assertions handle programmer errors and broken internal invariants. Explicit
+errors handle expected operating conditions such as malformed input,
+configuration mistakes, unavailable services, backpressure, and policy denial.
+
+Assert contracts aggressively:
+
+- function preconditions and postconditions;
+- relationships among arguments and return values;
+- index, count, size, alignment, and capacity invariants;
+- state-machine transitions;
+- ownership and lifecycle assumptions;
+- compile-time constant relationships, type sizes, and field layout;
+- conditions immediately before writing durable or shared state and again after
+  reading it back.
+
+Pair important assertions across independent paths. For example, validate a
+canonical audit record before encoding it and validate it again after decoding.
+Assert both the positive space that is allowed and the negative space that must
+remain impossible.
+
+Split compound assertions:
+
+```zig
+std.debug.assert(index < count);
+std.debug.assert(count <= capacity);
+```
+
+Do not compress them into one condition when separate failures provide better
+diagnostics. A single-line implication is acceptable when it states the
+contract directly:
+
+```zig
+if (state == .running) std.debug.assert(process_id != 0);
+```
+
+High assertion density is expected in runtime code, but do not optimize for a
+mechanical assertion count. Each assertion must defend a real contract and be
+understandable to a reviewer.
+
+Use compile-time assertions to check schema sizes, C ABI layouts, queue
+relationships, alignment, enum values, and other design facts before the
+program runs.
+
+All errors must be handled. Catch an error only at the highest layer that can
+add boundary context, classify it, translate it, retry it within a fixed bound,
+or terminate the owning process. Preserve the original cause unless the
+boundary intentionally converts it into a stable public result.
 
 Good:
 
-- assert that a synthetic test supervisor is using the expected payment pipeline shape
-- return `error.ChannelDepthNotPowerOfTwo` from topology validation
-- reject malformed financial events with a counted policy/audit record
-- fail startup when configured capacity cannot be allocated
+- assert that a synthetic test supervisor uses the expected pipeline shape;
+- return `error.ChannelDepthNotPowerOfTwo` from topology validation;
+- reject malformed financial events with a metric and audit record;
+- fail startup when configured capacity cannot be allocated;
+- crash the owning tile on impossible internal corruption.
 
 Bad:
 
-- assert on user-provided event data in a long-running tile
-- silently drop malformed events without metrics
-- catch an error and continue with partial topology
-- convert all failures to `error.Unknown`
+- assert on untrusted user or network data in a long-running tile;
+- silently drop malformed events;
+- catch an error and continue with partial topology or audit state;
+- convert all failures to `error.Unknown`;
+- retry without a fixed attempt, time, and queue bound;
+- downgrade policy denial or replay divergence into a generic warning.
 
-Every failure mode in the event path should answer whether it is:
+Tests must cover valid values, invalid values, and transitions across the
+valid/invalid boundary. Error-handling paths are production paths and require
+direct tests.
 
-- configuration error
-- malformed input
-- backpressure
-- overrun
-- sandbox/process crash
-- replay divergence
-- policy denial
+Every failure mode in the event path must be classified as one of:
+
+- configuration error;
+- malformed input;
+- backpressure;
+- overrun;
+- sandbox or process crash;
+- external dependency failure;
+- audit failure;
+- replay divergence;
+- policy denial.
+
+Unknown ownership, unknown audit state, or unknown replay state is not a
+recoverable degraded mode.
 
 ## C ABI Rules
 
@@ -1177,71 +1483,54 @@ telemetry environment variables, or scrape endpoints, update
 `doc/telemetry.md`, `doc/observability.md`, or the relevant runtime README in
 the same change.
 
-## Build And Tooling
+## Dependencies And Tooling Discipline
 
-All Tickoni developer tooling belongs in `justfile` or Tickoni-specific scripts
-called by `justfile`. Do not add Tickoni development targets to upstream
-Firedancer makefiles.
+Tickoni is dependency-minimal, not dependency-blind. The retained Firedancer
+substrate, Zig standard library, and explicitly selected financial or analytical
+systems are part of the architecture. New third-party dependencies are not a
+default convenience.
 
-Use existing recipe naming conventions:
+Before adding one, document:
 
-```text
-category-scope-verb-component
-```
+- the capability missing from Zig, Firedancer, or an existing approved module;
+- supply-chain and maintenance risk;
+- runtime memory, syscall, threading, and allocation behavior;
+- determinism and replay implications;
+- sandbox and network authority;
+- binary size, build reproducibility, and cross-platform cost;
+- how the dependency is tested, updated, and removed.
 
-where component is `tk` for Tickoni Zig code, `fd` for Firedancer C code, and
-`all` for composition.
+Prefer existing `src/util`, `src/ballet`, `src/tango`, and Tickoni-owned modules
+before adding another library. Do not reimplement a suitable retained primitive
+merely to avoid the C ABI, and do not add a dependency merely to avoid writing a
+small explicit module.
 
-Examples:
+Keep the development toolbox small. The root `justfile` is the command surface.
+Prefer Zig for non-trivial repository tooling and generators. Shell scripts
+should be thin orchestration wrappers, not long-lived implementations with
+hidden platform assumptions.
 
-- `build-tk`
-- `test-unit-tk`
-- `quality-format-check-tk`
-- `security-sanitize-check-tk`
+## Tickoni-Specific Tooling And Tests
 
-If a tool does not apply to Tickoni yet, the `-tk` recipe may be a no-op in the
-justfile. Do not put skip stubs or fake success logic in implementation scripts.
+Repository-wide tooling ownership, recipe naming, command selection, test
+layers, and handoff requirements are defined in
+[`CONTRIBUTING.md`](../../../CONTRIBUTING.md). The current test matrix and
+command semantics are documented in
+[`doc/testing-tickoni.md`](../../testing-tickoni.md) and the root `justfile`.
 
-## Testing
+Keep the following Tickoni-specific constraints:
 
-The testing guide for this repository is
-[`doc/testing-tickoni.md`](../testing-tickoni.md). Treat that document and the
-root `justfile` as the source of truth for current test layers and commands.
-
-Run the narrowest relevant test first, then broaden based on risk:
-
-- Tickoni Zig supervisor, topology, queue, sandbox, C ABI wrapper, or Phase 0
-  tile behavior: `just test-unit-tk`.
-- Firedancer-derived C substrate, Tango, Disco, Discof, Waltz HTTP, utility, or
-  C build integration behavior: `just test-unit-fd`.
-- Cross-boundary Tickoni/Firedancer changes: `just test-unit-all`.
-- Runtime topology, workspace setup, local process startup, or Firedancer dev
-  path behavior: `just test-e2e-fd`.
-- Broad local validation before risky handoff: `just test-all` or
-  `just tests-all`.
-
-Use test layers deliberately:
-
-- Unit tests should isolate the direct function, module, tile helper, queue
-  wrapper, or supervisor behavior under test.
-- Integration tests should keep Tickoni internals real and substitute only the
-  outside tool or harness boundary.
-- E2E/system tests should run the real local runtime toolchain and avoid
-  internal mocks.
-
-When changing runtime behavior, add or update tests for the behavior being
-claimed. Important paths include malformed input rejection, bounded queue
-behavior, duplicate/idempotent skips, policy allow/deny decisions, audit hash
-chaining, replay comparison, sandbox/crash diagnostics, metrics, and
-configuration validation.
-
-Do not remove, rename, or repurpose placeholder recipes such as
-`just test-integration-tk` or `just test-e2e-tk` unless the user explicitly
-asks for that migration. They keep the command shape stable while Tickoni grows
-real integration and e2e layers.
-
-If you do not run a relevant check, say that explicitly in the handoff and
-explain why.
+- do not remove, rename, or repurpose placeholder recipes such as
+  `just test-integration-tk` or `just test-e2e-tk` unless the change explicitly
+  owns that migration; these recipes keep the command surface stable while
+  Tickoni grows real integration and end-to-end layers;
+- do not put skip stubs or fake-success logic in implementation scripts;
+- runtime behavior changes need tests for the claimed contract, including the
+  relevant malformed-input, bounded-queue, duplicate/idempotent, policy,
+  audit-chain, replay, sandbox/crash, metrics, or configuration behavior;
+- integration tests must not silently fall back from a real backend to a mock;
+  use the repository's explicit skip behavior when the external service is
+  unavailable.
 
 ## Phase Discipline
 
@@ -1294,26 +1583,43 @@ tile.
 
 Before merging Tickoni runtime work, check:
 
-1. Does this preserve the product/runtime/substrate boundary?
-2. Does each mutable object have one owner?
-3. Are channel depths and payload bounds explicit?
-4. Is allocation bounded outside the hot path?
-5. Are process, sandbox, and network permissions explicit?
-6. If this mirrors or wraps a Firedancer config/topology/C ABI change, did the
-   Zig config, topology snapshot, supervisor allocation, wrapper tests, and
-   diagnostics move with it?
-7. Are malformed input, overrun, restart, and shutdown behavior defined?
-8. Are metrics sufficient to diagnose lag, drops, and crashes?
-9. Are material events, denials, and external results auditable?
-10. Can replay reproduce or compare the behavior without external mutation?
-11. Did the change avoid adding Tickoni product logic to upstream Firedancer
+1. Does the design prioritize safety, then performance, then convenience?
+2. Does this preserve the product/runtime/substrate boundary?
+3. Does each mutable object have one owner?
+4. Are every queue, loop, retry, payload, batch, and buffer explicitly bounded?
+5. Is allocation completed outside the deterministic steady-state path?
+6. Are process, sandbox, network, storage, model, and tool permissions explicit?
+7. Does the topology state tile identity, links, reliability, restart,
+   overrun, shutdown, and diagnostics?
+8. Does the change include a network/disk/memory/CPU performance sketch when
+   the path is non-trivial?
+9. Are control-plane and data-plane work separated and batched appropriately?
+10. Are important preconditions, postconditions, state transitions, layouts,
+    positive space, and negative space asserted?
+11. Are malformed input, backpressure, external failure, crash, audit failure,
+    replay divergence, and policy denial handled distinctly?
+12. Are large values initialized in place where copying or pointer movement is
+    risky?
+13. Are indexes, counts, sizes, offsets, units, and rounding intent explicit?
+14. Are functions and source lines within the style limits, with simple control
+    flow and minimal live scope?
+15. Are metrics sufficient to diagnose lag, drops, saturation, and crashes?
+16. Are material events, denials, and external results auditable?
+17. Can replay reproduce or compare the behavior without external mutation?
+18. If this mirrors or wraps a Firedancer config, topology, or C ABI change,
+    did Zig config, topology, allocation, wrapper tests, and diagnostics move
+    with it?
+19. Did the change avoid adding Tickoni product logic to retained Firedancer
     paths?
-12. Does new utility code check `src/util` and `src/ballet` first? If a
-    Firedancer function covers the need, is it called as a C extern rather than
-    reimplemented in Zig?
+20. Did new utility code check `src/util`, `src/ballet`, `src/tango`, and
+    existing Tickoni modules before adding code or a dependency?
+21. Do tests cover valid, invalid, boundary-transition, error, restart, and
+    teardown behavior?
+22. Are comments and design notes clear about why the implementation is safe
+    and how its critical tests prove that claim?
 
-If the answer to any of these is "not yet", finish the design before adding
-more code.
+If the answer to any item is "not yet", finish the design before adding more
+code.
 
 ## Product Language
 
