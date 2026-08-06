@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Update README.md badge image tags between marker comments."""
+"""Update doc/execution/testing-tickoni.md badge image tags between marker comments."""
 
 import json
 import sys
@@ -7,7 +7,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
-README_PATH = REPO_ROOT / "README.md"
+TESTING_DOC_PATH = REPO_ROOT / "doc/execution/testing-tickoni.md"
 
 SHIELDS_BASE_URL = "https://img.shields.io/badge"
 SHIELDS_STYLE = "flat-square"
@@ -25,8 +25,8 @@ BADGE_SPECS = {
     "security":    ("Security",          "security",          "boolean",  None),
     "system":      ("System Tests",      "system tests",      "boolean",  None),
     "e2e":         ("E2E Tests",         "e2e tests",         "boolean",  None),
-    "cov-fd":      ("HFT Engine Coverage",        "engine coverage",      "coverage", REPO_ROOT / "build/coverage/fd/coverage-summary.json"),
-    "cov-tk":      ("AI Harness Coverage",        "harness coverage",     "coverage", REPO_ROOT / "build/coverage/tk/coverage-summary.json"),
+    "cov-fd":      ("Engine Coverage",   "engine coverage",      "coverage", REPO_ROOT / "build/coverage/fd/coverage-summary.json"),
+    "cov-tk":      ("AI Harness Coverage",    "harness coverage",     "coverage", REPO_ROOT / "build/coverage/tk/coverage-summary.json"),
 }
 
 
@@ -90,53 +90,53 @@ def badge_unknown(alt: str, label: str) -> str:
     return build_badge(alt, label, *UNKNOWN)
 
 
-def replace_badge_block(readme: str, name: str, badge_line: str) -> str:
+def replace_badge_block(doc_text: str, name: str, badge_line: str) -> str:
     start_marker = f"<!-- badge:{name}:start -->"
     end_marker   = f"<!-- badge:{name}:end -->"
 
-    start = readme.find(start_marker)
-    end   = readme.find(end_marker)
+    start = doc_text.find(start_marker)
+    end   = doc_text.find(end_marker)
 
     if start == -1 or end == -1:
         raise ValueError(f"Badge markers missing for '{name}'")
     if end < start:
         raise ValueError(f"Badge markers out of order for '{name}'")
 
-    newline = "\r\n" if "\r\n" in readme else "\n"
+    newline = "\r\n" if "\r\n" in doc_text else "\n"
     block = f"{start_marker}{newline}{badge_line}{newline}{end_marker}"
-    return readme[:start] + block + readme[end + len(end_marker):]
+    return doc_text[:start] + block + doc_text[end + len(end_marker):]
 
 
 def update_readme_badge(name: str, exit_code: int) -> None:
     if name not in BADGE_SPECS:
         raise ValueError(f'Unknown badge "{name}". Expected one of: {", ".join(BADGE_SPECS)}')
 
-    readme = README_PATH.read_text(encoding="utf-8")
+    doc_text = TESTING_DOC_PATH.read_text(encoding="utf-8")
     alt, label, badge_type, cov_path = BADGE_SPECS[name]
     if badge_type == "coverage":
         badge_line = badge_for_coverage(alt, label, exit_code, cov_path)
     else:
         badge_line = badge_for_exit_code(alt, label, exit_code)
-    updated = replace_badge_block(readme, name, badge_line)
-    README_PATH.write_text(updated, encoding="utf-8")
+    updated = replace_badge_block(doc_text, name, badge_line)
+    TESTING_DOC_PATH.write_text(updated, encoding="utf-8")
 
 
 def update_readme_badge_unknown(name: str) -> None:
     if name not in BADGE_SPECS:
         raise ValueError(f'Unknown badge "{name}". Expected one of: {", ".join(BADGE_SPECS)}')
 
-    readme = README_PATH.read_text(encoding="utf-8")
+    doc_text = TESTING_DOC_PATH.read_text(encoding="utf-8")
     alt, label, _badge_type, _cov_path = BADGE_SPECS[name]
     badge_line = badge_unknown(alt, label)
-    updated = replace_badge_block(readme, name, badge_line)
-    README_PATH.write_text(updated, encoding="utf-8")
+    updated = replace_badge_block(doc_text, name, badge_line)
+    TESTING_DOC_PATH.write_text(updated, encoding="utf-8")
 
 
 def reset_all_readme_badges() -> None:
-    readme = README_PATH.read_text(encoding="utf-8")
+    doc_text = TESTING_DOC_PATH.read_text(encoding="utf-8")
     for name, (alt, label, _badge_type, _cov_path) in BADGE_SPECS.items():
-        readme = replace_badge_block(readme, name, badge_unknown(alt, label))
-    README_PATH.write_text(readme, encoding="utf-8")
+        doc_text = replace_badge_block(doc_text, name, badge_unknown(alt, label))
+    TESTING_DOC_PATH.write_text(doc_text, encoding="utf-8")
 
 
 if __name__ == "__main__":

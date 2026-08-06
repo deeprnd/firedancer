@@ -3,6 +3,8 @@ author: deeprnd
 date: 2026-07-03
 ---
 
+# ADR-01: Firedancer orchestration reuse
+
 **Q: Tickoni needs process-mode tile orchestration, shared-memory link
 joining, sandbox setup, lifecycle checks, and metrics/heartbeat discipline.
 Firedancer already has much of that machinery. Should Tickoni build a
