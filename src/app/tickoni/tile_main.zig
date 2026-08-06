@@ -21,11 +21,6 @@ pub fn run(io: std.Io, allocator: std.mem.Allocator, spec_path: []const u8) u8 {
     defer log.exit("tile_main", "run") catch {};
 
     log.debug("tile_main", "run", "loading spec from file") catch {};
-    const spec = rt.launch_spec.LaunchSpec.load(io, allocator, spec_path) catch |err| {
-        log.err("tile_main", "run", "failed to load spec") catch {};
-        return 1;
-    };
-    defer spec.deinit(allocator);
 
     log.debug("tile_main", "run", "spec loaded") catch {};
     return rt.tile_process.run(io, allocator, spec_path, runPipelineStage);
