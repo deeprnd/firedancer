@@ -246,8 +246,11 @@ test-unit-fd:
 	set -euo pipefail
 	case "$(uname -s)" in
 	  MINGW*|MSYS*|CYGWIN*)
-	    echo "Skipping test-unit-fd on Windows: FD unit-test lane is Linux-only." >&2
-	    exit 0
+	    case "$(bash contrib/detect-windows-arch.sh)" in
+	      arm64) exec bash -lc 'just build-fd-windows-arm && just test-unit-tk-windows-arm' ;;
+	      x86_64) exec bash -lc 'just build-fd-windows-x86 && just test-unit-tk-windows-x86' ;;
+	      *) echo "unsupported Windows arch for test-unit-fd" >&2; exit 1 ;;
+	    esac
 	    ;;
 	esac
 	set timeout := 600
