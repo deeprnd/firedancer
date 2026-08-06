@@ -1923,6 +1923,7 @@ inline for (shim_c_files) |shim_file| {
                         .{ .name = "audit_tile", .module = audit_tile_mod },
                         .{ .name = "runtime", .module = runtime_mod },
                         .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "logger", .module = logger_mod },
                     },
                 })
             else if (std.mem.eql(u8, entry[1], "src/tickoni/runtime/cnc_counters.zig"))
