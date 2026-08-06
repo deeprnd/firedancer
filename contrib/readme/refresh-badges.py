@@ -103,8 +103,16 @@ def replace_badge_block(doc_text: str, name: str, badge_line: str) -> str:
     if end < start:
         raise ValueError(f"Badge markers out of order for '{name}'")
 
+    # Extract leading whitespace from the badge line (between markers)
     newline = "\r\n" if "\r\n" in doc_text else "\n"
-    block = f"{start_marker}{newline}{badge_line}{newline}{end_marker}"
+    after_start = start + len(start_marker) + len(newline)
+    next_line_end = doc_text.find(newline, after_start)
+    if next_line_end == -1:
+        next_line_end = len(doc_text)
+    next_line = doc_text[after_start : next_line_end]
+    leading = next_line[: len(next_line) - len(next_line.lstrip())] if next_line.lstrip() else ""
+
+    block = f"{start_marker}{newline}{leading}{badge_line}{newline}{end_marker}"
     return doc_text[:start] + block + doc_text[end + len(end_marker):]
 
 
