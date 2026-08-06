@@ -91,8 +91,10 @@ def main() -> None:
         signal.signal(signum, signal.SIG_DFL)
         os.kill(os.getpid(), signum)
 
-    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
-        signal.signal(sig, _cleanup)
+    for sig_name in ("SIGINT", "SIGTERM", "SIGHUP"):
+        sig = getattr(signal, sig_name, None)
+        if sig is not None:
+            signal.signal(sig, _cleanup)
 
     badge_status = update_badge_with_lock(update_readme_badge_unknown, badge_name)
     command_status = run_command(command_argv)
