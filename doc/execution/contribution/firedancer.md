@@ -1,9 +1,16 @@
-# Firedancer Philosophy And Style Guide
+# Firedancer Contributor Guide
 
-This document is a contributor guide for the Firedancer-derived C
-runtime in this repository.  It complements `CONTRIBUTING.md`, which
-defines syntax-level style, and focuses on the design philosophy that
-explains why the code looks the way it does.
+This document is the self-contained contributor guide for the
+Firedancer-derived C runtime retained in this repository.  It covers the
+architectural philosophy, source organization, C dialect, formatting,
+memory model, topology, isolation, communication, testing, security,
+and review expectations for that code.
+
+Repository-wide contribution workflow is documented in
+[`CONTRIBUTING.md`](../../../CONTRIBUTING.md).  Contributors changing
+Tickoni-owned Zig or product code should also follow
+[`tickoni.md`](tickoni.md).  A change that spans both runtimes must
+satisfy both guides.
 
 Unless a task explicitly says otherwise, read "Firedancer" here as the
 full C runtime path: `src/app/firedancer`, common Firedancer tiles in
@@ -11,6 +18,12 @@ full C runtime path: `src/app/firedancer`, common Firedancer tiles in
 runtime in `src/tango`, `src/util`, `src/waltz`, `src/flamenco`, and
 `src/funk`.  Avoid Frankendancer-specific paths such as `fdctl`,
 `fddev`, and `discoh` unless the code is genuinely shared.
+
+This guide is authoritative for contribution expectations in this
+repository, but it cannot replace local judgment.  The surrounding
+module is the final authority for established conventions, and
+`src/tango` is the canonical style reference for low-level runtime code.
+Most contributors do not use an automatic C formatting tool.
 
 ## Core Philosophy
 
@@ -407,27 +420,205 @@ Start with these files when orienting a change:
 - `src/disco/metrics/fd_metrics.h` and `src/disco/metrics/metrics.xml`:
   metrics layout and definitions.
 
-## C Dialect And Local Style
+## C Dialect, Source Layout, And Local Style
 
-`CONTRIBUTING.md` remains the syntax guide.  The short version:
+Firedancer uses a deliberate C17 dialect.  Do not apply a formatter's
+default output mechanically.  The code is vertically aligned, explicit
+about control flow, and optimized for readers who need to see ownership,
+layout, and hot-path cost.
 
-Use the repo's C17 style, not a formatter's default style:
+### Text And Repository Organization
+
+Aspire to wrap prose and comments at 72 columns after indentation.  Do
+not wrap code merely to meet that limit when alignment or readability
+would become worse.
+
+Follow [`doc/organization.txt`](../../organization.txt) for repository
+organization and avoid cluttering the repository root.  Put new files
+beside the module that owns them rather than creating broad utility or
+miscellaneous directories.
+
+Use these file conventions:
+
+| Extension | File type |
+| --- | --- |
+| `.c` | Standalone C translation unit or include-once C implementation with symbol definitions |
+| `.h` | Reusable C include file; normally declarations and inline helpers, not external symbol definitions |
+| `.s` | Assembly source |
+| none | Shell script |
+
+The surrounding directory and build rules determine whether a `.c` file
+is compiled independently or included as a template or implementation
+fragment.
+
+### Include Guards
+
+Headers intended for inclusion by other translation units use an
+`#ifndef` include guard.  Do not use `#pragma once`.
+
+For `src/path/to/file/fd_file_name.h`:
+
+```c
+#ifndef HEADER_fd_src_path_to_file_fd_file_name_h
+#define HEADER_fd_src_path_to_file_fd_file_name_h
+
+...
+
+#endif /* HEADER_fd_src_path_to_file_fd_file_name_h */
+```
+
+The guard should encode the repository-relative path so unrelated
+headers cannot collide.
+
+### Vertical Alignment
+
+Vertically align related declarations, constants, macro bodies, and
+function arguments when that makes structure easier to scan.
+
+```c
+/* avoid */
+#define FD_FOO_SUCCESS (0)
+#define FD_FOO_ERR_PROTO (1)
+#define FD_FOO_ERR_IO (20)
+
+void
+foo( void ) {
+  char const * _init = fd_env_strip_cmdline_cstr( &argc, &argv, "--init", NULL, NULL );
+  uint seed = fd_env_strip_cmdline_uint( &argc, &argv, "--seed", NULL, (uint)fd_tickcount() );
+  int lazy = fd_env_strip_cmdline_int( &argc, &argv, "--lazy", NULL, 7 );
+}
+```
 
 ```c
 /* good */
-if( FD_UNLIKELY( !ctx ) ) FD_LOG_ERR(( "NULL ctx" ));
+#define FD_FOO_SUCCESS    (0)
+#define FD_FOO_ERR_PROTO  (1)
+#define FD_FOO_ERR_IO    (20)
 
-fd_memcpy( dst, src, sz );
-
-/* avoid */
-if (unlikely(!ctx)) {
-    FD_LOG_ERR(("NULL ctx"));
+void
+foo( void ) {
+  char const * _init = fd_env_strip_cmdline_cstr( &argc, &argv, "--init", NULL, NULL                 );
+  uint         seed  = fd_env_strip_cmdline_uint( &argc, &argv, "--seed", NULL, (uint)fd_tickcount() );
+  int          lazy  = fd_env_strip_cmdline_int ( &argc, &argv, "--lazy", NULL, 7                    );
 }
-memcpy(dst, src, sz);
 ```
 
-Use Firedancer primitive names from `fd_util_base.h`: `uchar`,
-`ushort`, `uint`, `ulong`, `long`, and friends:
+Alignment is a readability tool, not a reason to create extreme line
+lengths or unrelated columns.
+
+### Function Calls And Expressions
+
+Calls with no arguments have no interior space:
+
+```c
+abort();   /* good */
+
+abort( );  /* avoid */
+abort ();  /* avoid */
+```
+
+Calls with arguments have a space inside the parentheses and no space
+between the function name and opening parenthesis:
+
+```c
+printf( "Hello %s\n", "World" );  /* good */
+
+printf ( "Hello" );  /* avoid */
+printf("Hello");      /* avoid */
+```
+
+Usually omit interior spaces for `sizeof`:
+
+```c
+fd_memcpy( dst, src, sizeof(fd_rng_t) );      /* good */
+fd_memcpy( dst, src, sizeof( fd_rng_t ) );    /* avoid */
+```
+
+Do not insert spaces between the two parenthesis pairs used by logging
+and similar macros:
+
+```c
+FD_LOG_NOTICE(( "pass" ));      /* good */
+FD_LOG_NOTICE( ( "pass" ) );    /* avoid */
+```
+
+Use the repo's spacing around comparisons and operators:
+
+```c
+if( c==1 ) c = 2;  /* good */
+
+if (c==1) c = 2;   /* avoid */
+if ( c==1 ) c = 2; /* avoid */
+if( c==1) c = 2;   /* avoid */
+```
+
+### Control Flow And Braces
+
+Annotate uncommon paths with `FD_UNLIKELY` when their rarity is part of
+the steady-state performance model.
+
+A single statement may remain on the same line without braces:
+
+```c
+if( FD_UNLIKELY( do_crash ) ) abort();
+```
+
+If the branch body starts on a new line, use braces:
+
+```c
+/* good */
+if( FD_UNLIKELY( status!=3 ) ) {
+  FD_LOG_CRIT(( "Critical error, aborting" ));
+}
+
+/* avoid */
+if( FD_UNLIKELY( status!=3 ) )
+  FD_LOG_CRIT(( "Critical error, aborting" ));
+```
+
+Do not flatten multi-step error handling into terse expressions when
+that hides cleanup, ownership transfer, or operator-facing failure
+behavior.
+
+### Function Prototypes
+
+Put modifiers and return types on their own line.  Put one argument on
+each line and vertically align argument types and names.
+
+```c
+/* good */
+static inline ulong
+foo_publish( foo_t *       foo,
+             ulong         seq,
+             uchar const * payload,
+             ulong         payload_sz );
+
+/* avoid */
+static inline ulong foo_publish(foo_t *foo, ulong seq, const uint8_t *payload, size_t payload_sz);
+```
+
+Apply the same shape to function definitions unless nearby code has a
+specific established exception.
+
+### Integer And Boolean Types
+
+Use Firedancer primitive names from `fd_util_base.h` rather than
+`stdint.h` types.  See
+[`fd_util_base.h`](../../../src/util/fd_util_base.h) and the
+[integer-types note](../../knowledge/rant/integer-types.md).
+
+| Standard type | Firedancer type |
+| --- | --- |
+| `int8_t` | `schar` |
+| `uint8_t` | `uchar` |
+| `int16_t` | `short` |
+| `uint16_t` | `ushort` |
+| `int32_t` | `int` |
+| `uint32_t` | `uint` |
+| `int64_t` | `long` |
+| `ptrdiff_t` | `long` |
+| `uint64_t` | `ulong` |
+| `size_t` | `ulong` |
 
 ```c
 /* good */
@@ -443,17 +634,98 @@ uint64_t        seq;
 int64_t         now;
 ```
 
-Do not use `bool`; use `int` with `0` and `1`:
+Do not use `bool` or `<stdbool.h>` for normal Firedancer code.  Use
+`int`, with `0` for false and `1` for true.
 
 ```c
-/* good */
 int enabled = 1;
 if( enabled ) do_work();
-
-/* avoid */
-bool enabled = true;
-if( enabled ) do_work();
 ```
+
+### Function Documentation And Comments
+
+Document every public API declaration.  Put the documentation comment
+before the declaration, mention the function name near the beginning,
+and do not duplicate that comment at the implementation.  Static helper
+documentation is encouraged when the helper is mature or non-obvious.
+
+```c
+/* fd_rng_seq_set sets the sequence used by rng and returns the
+   replaced value. */
+
+static inline uint
+fd_rng_seq_set( fd_rng_t * rng,
+                uint       seq );
+```
+
+Comments should explain invariants, ownership, memory layout, security
+behavior, or why a non-obvious mechanism is necessary.  Do not merely
+restate the next line.
+
+```c
+/* Only the producer writes seq.  Readers use odd/even values to detect
+   a torn read while the producer is updating value. */
+FD_VOLATILE( state->seq ) = seq + 1UL;
+
+/* Payload bytes follow the metadata header and are addressed by compact
+   dcache chunks, not local pointers. */
+uchar * payload = fd_chunk_to_laddr( base, chunk );
+
+/* avoid: restates the code */
+/* Increment seq by one. */
+seq++;
+```
+
+The historical rationale is recorded in the
+[Firedancer PR #302 discussion](https://github.com/firedancer-io/firedancer/pull/302#issuecomment-1530810227).
+
+### Macro Safety
+
+Macro rules are recommendations whose exact application depends on
+scope, but the default is to make evaluation and statement behavior
+safe.
+
+Parenthesize macro arguments in the expansion:
+
+```c
+#define wwl_abs(x) _mm512_abs_epi64( (x) )  /* good */
+#define wwl_abs(x) _mm512_abs_epi64( x )    /* avoid */
+```
+
+Use `do { ... } while(0)` for multi-statement macro bodies:
+
+```c
+#define FD_R43X6_SQR2_INL( za,xa, zb,xb ) \
+  do {                                    \
+    (za) = fd_r43x6_sqr( (xa) );          \
+    (zb) = fd_r43x6_sqr( (xb) );          \
+  } while(0)
+```
+
+Evaluate each macro argument once unless the macro contract explicitly
+states otherwise:
+
+```c
+#define TRAP(x)               \
+  do {                        \
+    int _cnt = (x);           \
+    if( _cnt<0 ) return _cnt; \
+    cnt += _cnt;              \
+  } while(0)
+```
+
+This matters because callers may pass expressions with side effects:
+
+```c
+TRAP( ++y );
+```
+
+Prefer existing macros and generated templates over local reinventions.
+Keep macro arguments side-effect safe and undefine or isolate template
+configuration symbols when multiple templates are included in one
+translation unit.
+
+### Firedancer Attributes, Assertions, And Branch Hints
 
 Prefer `FD_STATIC_ASSERT`, `FD_TEST`, `FD_LIKELY`, `FD_UNLIKELY`,
 `FD_FN_CONST`, and `FD_FN_PURE` where the local code does:
@@ -477,48 +749,41 @@ if( FD_UNLIKELY( depth & (depth-1UL) ) )
 FD_TEST( ctx->out_cnt<=FD_TOPO_MAX_TILE_OUT_LINKS );
 ```
 
-What these macros mean:
+These macros mean:
 
 - `FD_STATIC_ASSERT( cond, token )` is a compile-time invariant.  Use it
   for layout, alignment, constant bounds, and template assumptions that
-  must be true before the object file exists.  The second argument is a
+  must hold before the object file exists.  The second argument is a
   token-like error name, not a string.
-- `FD_TEST( cond )` is a test/startup assertion.  It is appropriate in
-  tests, self-checks, and initialization paths where failing fast is the
-  right behavior.  Do not use it as normal operator-facing input
-  validation in a long-running tile; log a clear error or return an
-  explicit status there.
-- `FD_LIKELY( cond )` and `FD_UNLIKELY( cond )` evaluate `cond` and give
-  the compiler a branch-probability hint.  They should describe the
-  steady-state hot path, not the author's hopes.  Mark rare corruptions,
-  null setup errors, overrun recovery, and cold boundary cases
-  `FD_UNLIKELY`; mark the dominant success path `FD_LIKELY` only when
-  the local code already uses that style.
+- `FD_TEST( cond )` is a test or startup assertion.  It is appropriate
+  in tests, self-checks, and initialization paths where failing fast is
+  correct.  Do not use it as ordinary operator-facing input validation
+  in a long-running tile; log a clear error or return an explicit status.
+- `FD_LIKELY( cond )` and `FD_UNLIKELY( cond )` give the compiler a
+  branch-probability hint.  They should describe the actual steady-state
+  path, not the author's hopes.
 - `FD_FN_CONST` marks a function whose result depends only on explicit
   arguments, not memory.  Alignment, footprint, bit-manipulation, and
   simple numeric conversion helpers are typical candidates.
-- `FD_FN_PURE` marks a function with no side effects whose result may
-  depend on pointed-to memory.  Query helpers such as `foo_depth( foo )`
-  are typical candidates.
+- `FD_FN_PURE` marks a side-effect-free function whose result may depend
+  on pointed-to memory.  Query helpers such as `foo_depth( foo )` are
+  typical candidates.
 
-`FD_LIKELY(c)` is `__builtin_expect( !!(c), 1L )`.
+`FD_LIKELY(c)` is `__builtin_expect( !!(c), 1L )` and
 `FD_UNLIKELY(c)` is `__builtin_expect( !!(c), 0L )`.  The `!!` coerces
 the expression to logical `0` or `1`; the builtin tells the optimizer
-which result should be common.  It does not make the branch true or
-false, it does not add a runtime check, and it does not synchronize
-memory.
+which result should be common.  It does not change the result, add a
+runtime check, or synchronize memory.
 
 The compiler may use the hint to:
 
-- arrange the hot path as fall-through code,
-- move unlikely blocks away from the tight instruction-cache path,
-- choose branch layout and prediction metadata,
-- decide whether a small branch is worth if-conversion or should remain
-  a branch.
+- arrange the hot path as fall-through code;
+- move unlikely blocks away from the tight instruction-cache path;
+- choose branch layout and prediction metadata;
+- decide whether a small branch should be converted or remain a branch.
 
 This matters in loops that run at packet, fragment, or scheduler rate.
-The normal path should be straight-line and nearby; the error path can
-be farther away.  Typical uses are:
+Typical uses are:
 
 ```c
 /* Startup or boundary validation: invalid config is cold. */
@@ -539,87 +804,110 @@ if( FD_UNLIKELY( msg_cnt<0 ) ) {
 }
 ```
 
-Misusing branch hints usually does not make the program logically wrong,
-but it can make the machine do the wrong work first.  A bad hint can:
-
-- put the real hot path behind a taken branch,
-- increase instruction-cache pressure by interleaving cold code with hot
-  code,
-- make branch prediction and layout worse under load,
-- hide a missing model of the actual steady state,
-- reduce readability because future readers infer the marked path is
-  rare or common.
-
-Do not wrap every `if` in `FD_LIKELY` or `FD_UNLIKELY`.  Use them when
-the probability is part of the performance contract or the local code
-already marks the same kind of branch.  If the branch frequency depends
-on live configuration, peer behavior, or normal load, prefer no hint
-unless measurement or nearby code makes the dominant case obvious.
+A bad hint can put the real hot path behind a taken branch, increase
+instruction-cache pressure, make prediction worse under load, or mislead
+future readers.  Do not wrap every `if`.  If frequency depends on live
+configuration, peer behavior, or ordinary load, prefer no hint unless
+measurement or nearby code makes the dominant case obvious.
 
 `FD_FN_CONST` and `FD_FN_PURE` are contracts with the optimizer and the
 reader.  In this tree they expand to nothing by default because compiler
 interpretations of these attributes have caused surprises, especially
 around functions that write through output pointers.  Keep using them
 where nearby APIs use them: they document intent and can be enabled by
-stricter build modes to find functions that violate their claimed
-contract.
+stricter build modes to find contract violations.
 
 Do not annotate a function `FD_FN_CONST` or `FD_FN_PURE` if it:
 
-- writes through a pointer,
-- reads volatile or atomic state,
-- depends on time, randomness, logging state, errno, thread-local state,
-  file descriptors, sockets, or device state,
+- writes through a pointer;
+- reads volatile or atomic state;
+- depends on time, randomness, logging state, `errno`, thread-local
+  state, file descriptors, sockets, or device state;
 - mutates scratch, metrics, queues, maps, pools, or hidden globals.
 
-Related macros and attributes show up for the same reason:
+Related macros and attributes appear for the same reasons:
 
 - `FD_RESTRICT` documents non-aliasing pointer arguments on hot helpers.
 - `FD_FN_UNUSED` is for static header helpers that may not be used in
   every translation unit.
-- `FD_VOLATILE` and `FD_VOLATILE_CONST` force volatile access, but they
-  are not a synchronization protocol by themselves.
+- `FD_VOLATILE` and `FD_VOLATILE_CONST` force volatile access, but are
+  not a synchronization protocol by themselves.
 - `FD_COMPILER_MFENCE` prevents compiler reordering across a point, but
-  it is not a hardware memory fence.
+  is not a hardware memory fence.
 - `FD_PROTOTYPES_BEGIN` and `FD_PROTOTYPES_END` keep headers usable from
   C++ when they expose C symbols.
 
-Keep function prototypes in the local style: return type on its own
-line, one argument per line, vertically aligned types and names:
-
-```c
-/* good */
-static inline ulong
-foo_publish( foo_t *       foo,
-             ulong         seq,
-             uchar const * payload,
-             ulong         payload_sz );
-
-/* avoid */
-static inline ulong foo_publish(foo_t *foo, ulong seq, const uint8_t *payload, size_t payload_sz);
-```
-
-Keep comments useful for invariants, ownership, memory layout, and
-security behavior.  Avoid restating the next line of code:
-
-```c
-/* good: explains a real invariant */
-/* Only the producer writes seq.  Readers use odd/even values to detect
-   a torn read while the producer is updating value. */
-FD_VOLATILE( state->seq ) = seq + 1UL;
-
-/* good: explains memory layout */
-/* Payload bytes follow the metadata header and are addressed by compact
-   dcache chunks, not local pointers. */
-uchar * payload = fd_chunk_to_laddr( base, chunk );
-
-/* avoid: restates the code */
-/* Increment seq by one. */
-seq++;
-```
-
 Use the surrounding module as the authority.  `src/tango` is the
 canonical style reference for low-level runtime code.
+
+## Portability, Build Capabilities, And File I/O
+
+Firedancer utilities aspire to compile in LP64 environments, but the
+full production runtime has narrower assumptions.  Keep those layers
+separate instead of weakening production code or accidentally imposing
+validator-only requirements on portable utility code.
+
+### Capability Guards
+
+If a component requires a hosted, POSIX-like, SIMD, architecture, or
+other build capability, guard it with the existing `FD_HAS_{...}`
+switches in both build rules and C code.
+
+```makefile
+ifdef FD_HAS_HOSTED
+$(call add-objs,fd_numa,fd_util)
+endif
+```
+
+```c
+#if FD_HAS_HOSTED
+
+...
+
+#endif /* FD_HAS_HOSTED */
+```
+
+Do not infer capabilities from operating-system names in local code when
+the build already exposes a capability switch.
+
+### Language And Compiler Expectations
+
+Use ISO C17 by default.  GNU C extensions are permitted where they are
+well supported by the compilers and analysis environments used by the
+project, including Clang and CBMC.
+
+The inherited guide records GNU/Linux support with GCC 8.5 or newer,
+with Clang and CBMC as supported build environments.  Utility and
+experimental components have also targeted musl Linux, macOS, FreeBSD,
+Solana C programs, arm64, ppc64le, sBPFv1, and sBPFv2.
+
+Those broader targets do not imply that the full production Firedancer
+runtime is portable.  The production path described in this guide is an
+x86-64 Linux system and some Tango synchronization designs assume x86
+TSO.  Frankendancer-specific targets also have their own minimum feature
+sets, such as Haswell-class AVX2 and FMA.  Use capability guards for
+portable components and preserve explicit architecture assumptions in
+runtime code that depends on them.
+
+### Seccomp And Library Calls
+
+On Linux, production tiles run under strict seccomp policies.  Standard
+library calls can issue different syscalls across libc versions, so a
+seemingly harmless new call may crash a sandboxed tile if the syscall is
+not allowed.
+
+Before adding a library call to post-sandbox code, determine which
+syscalls it may issue, whether the operation belongs in
+`privileged_init`, and whether the tile's generated policy and allowed
+file-descriptor list need to change.  The detailed sandbox model appears
+later in this guide.
+
+### File I/O
+
+Prefer `fd_io` over `stdio.h` for streaming file I/O.  Handle partial
+reads and writes and retry or classify `EINTR` correctly.  Do not hide
+blocking file I/O or new file-descriptor ownership inside a hot-path
+helper.
 
 ## Memory
 
@@ -2051,6 +2339,132 @@ the documented ownership, alignment, and architecture assumptions.
 Do not imitate this pattern in new shared state unless you can write
 down the publication protocol and overrun detection.
 
+## Testing, Coverage, Fuzzing, And Cleanup
+
+Testing should match the risk of the changed C code.  Local arithmetic
+or parsing logic may need a focused unit test.  Changes to topology,
+shared memory, IPC, sandboxing, or process lifecycle need integration or
+system evidence as well.
+
+### Code Coverage
+
+To generate an HTML coverage report for one test:
+
+```bash
+make -j CC=clang EXTRAS=llvm-cov BUILDDIR=clang-cov
+./contrib/test/single_test_cov.sh build/clang-cov/unit-test/test_xxx
+```
+
+This creates a `report/` directory.  Serve it locally with:
+
+```bash
+python3 -m http.server 12000 -b 127.0.0.1 -d report
+```
+
+Coverage is evidence, not the test objective.  Add assertions for
+ownership, bounds, invalid inputs, sequence behavior, and failure modes
+rather than merely executing lines.
+
+### Fuzzing And Conformance Inputs
+
+Most suitable parser, codec, protocol, and attacker-controlled-input
+code should have fuzz coverage.  Prefer graceful rejection over aborting
+on malformed external data, even when the enclosing application would
+ultimately terminate.  Expose narrow test APIs when state such as keys
+or randomness must be controlled by a harness.
+
+The inherited Firedancer CI also uses conformance vectors comparing
+Firedancer and Agave behavior for block, transaction, instruction, and
+VM execution.  Those inputs come from past fuzzing campaigns,
+hand-written fixtures, and fixed mismatches preserved as regression
+tests.
+
+Where validator conformance remains in scope, adding a vector follows
+the inherited workflow:
+
+1. Submit the fixture to the upstream
+   [test-vectors](https://github.com/firedancer-io/test-vectors)
+   repository using the relevant
+   [solana-conformance](https://github.com/firedancer-io/solana-conformance)
+   tooling.
+2. After that change merges, update
+   `contrib/test/test-vectors-fixtures/test-vectors-commit-sha.txt` to
+   the commit containing the fixture.
+
+Tickoni-only product tests should not add Solana conformance fixtures
+merely because the retained C substrate originated in Firedancer.
+
+### Complex Function Exit And Cleanup
+
+Complex control flow can leak resources when several returns must repeat
+the same cleanup:
+
+```c
+if( fail1 ) {
+  cleanup();
+  return;
+}
+
+...
+
+if( fail2 ) {
+  return;  /* cleanup was forgotten */
+}
+
+cleanup();
+return;
+```
+
+Prefer a single cleanup path when it makes ownership obvious:
+
+```c
+do {
+  if( fail1 ) break;
+  ...
+  if( fail2 ) break;
+  ...
+} while(0);
+
+cleanup();
+return;
+```
+
+For exceptional cases, the compiler cleanup attribute may execute an
+inline function when a variable leaves scope:
+
+```c
+static inline void
+release_lock( int * lock ) {
+  ...
+}
+
+void
+my_func( void ) {
+  int my_lock __attribute__((cleanup(release_lock))) = acquire_lock();
+  ...
+  if( fail1 ) return;
+}
+```
+
+Wrap such attributes in a named macro when that improves readability and
+keeps the extension localized.  `FD_SCRATCH_SCOPE_BEGIN` in
+`src/util/scratch/fd_scratch.h` is the inherited model:
+
+```c
+int my_lock;
+FD_MY_LOCK_BEGIN(my_lock) {
+  if( fail1 ) return;
+  if( fail2 ) break;
+  ...
+}
+FD_MY_LOCK_END;
+```
+
+Do not use cleanup machinery to obscure lifetime or silently release
+resources that the caller reasonably expects to own.  The preferred
+shape is still explicit acquisition, one documented owner, and a visible
+release path.
+
 ## Contribution Checklist
 
 Before changing a tile or shared primitive, answer:
@@ -2071,8 +2485,14 @@ Before changing a tile or shared primitive, answer:
 - Are metrics updated without adding cache-line traffic to hot paths?
 - Are logs reserved for operator-relevant or impossible states?
 - If generated code inputs changed, did you run the regeneration target?
+- Does new or modified public API have declaration-level documentation?
+- Are include guards, spacing, alignment, and macro evaluation consistent
+  with the surrounding module?
+- Are capability guards and platform assumptions explicit?
+- Does streaming I/O use the appropriate `fd_io` path and handle `EINTR`?
 - Does the test match the risk: unit for local logic, integration/system
   for topology, IPC, or sandbox behavior?
+- Would coverage or fuzzing expose malformed-input and cleanup failures?
 
 ## Practical Rules Of Thumb
 
