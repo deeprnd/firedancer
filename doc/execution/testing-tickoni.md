@@ -17,7 +17,7 @@ Tickoni repository.
     </td>
     <td>
       <!-- badge:security:start -->
-<img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
+<img alt="Security" src="https://img.shields.io/badge/security-unknown-lightgrey?style=flat-square" />
 <!-- badge:security:end -->
     </td>
   </tr>

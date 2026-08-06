@@ -8,6 +8,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 TESTING_DOC_PATH = REPO_ROOT / "doc/execution/testing-tickoni.md"
+README_PATH = REPO_ROOT / "README.md"
 
 SHIELDS_BASE_URL = "https://img.shields.io/badge"
 SHIELDS_STYLE = "flat-square"
@@ -107,36 +108,39 @@ def replace_badge_block(doc_text: str, name: str, badge_line: str) -> str:
     return doc_text[:start] + block + doc_text[end + len(end_marker):]
 
 
-def update_readme_badge(name: str, exit_code: int) -> None:
+def update_readme_badge(name: str, exit_code: int, doc_path: Path | None = None) -> None:
     if name not in BADGE_SPECS:
         raise ValueError(f'Unknown badge "{name}". Expected one of: {", ".join(BADGE_SPECS)}')
 
-    doc_text = TESTING_DOC_PATH.read_text(encoding="utf-8")
+    doc_path = doc_path or TESTING_DOC_PATH
+    doc_text = doc_path.read_text(encoding="utf-8")
     alt, label, badge_type, cov_path = BADGE_SPECS[name]
     if badge_type == "coverage":
         badge_line = badge_for_coverage(alt, label, exit_code, cov_path)
     else:
         badge_line = badge_for_exit_code(alt, label, exit_code)
     updated = replace_badge_block(doc_text, name, badge_line)
-    TESTING_DOC_PATH.write_text(updated, encoding="utf-8")
+    doc_path.write_text(updated, encoding="utf-8")
 
 
-def update_readme_badge_unknown(name: str) -> None:
+def update_readme_badge_unknown(name: str, doc_path: Path | None = None) -> None:
     if name not in BADGE_SPECS:
         raise ValueError(f'Unknown badge "{name}". Expected one of: {", ".join(BADGE_SPECS)}')
 
-    doc_text = TESTING_DOC_PATH.read_text(encoding="utf-8")
+    doc_path = doc_path or TESTING_DOC_PATH
+    doc_text = doc_path.read_text(encoding="utf-8")
     alt, label, _badge_type, _cov_path = BADGE_SPECS[name]
     badge_line = badge_unknown(alt, label)
     updated = replace_badge_block(doc_text, name, badge_line)
-    TESTING_DOC_PATH.write_text(updated, encoding="utf-8")
+    doc_path.write_text(updated, encoding="utf-8")
 
 
-def reset_all_readme_badges() -> None:
-    doc_text = TESTING_DOC_PATH.read_text(encoding="utf-8")
+def reset_all_readme_badges(doc_path: Path | None = None) -> None:
+    doc_path = doc_path or TESTING_DOC_PATH
+    doc_text = doc_path.read_text(encoding="utf-8")
     for name, (alt, label, _badge_type, _cov_path) in BADGE_SPECS.items():
         doc_text = replace_badge_block(doc_text, name, badge_unknown(alt, label))
-    TESTING_DOC_PATH.write_text(doc_text, encoding="utf-8")
+    doc_path.write_text(doc_text, encoding="utf-8")
 
 
 if __name__ == "__main__":
