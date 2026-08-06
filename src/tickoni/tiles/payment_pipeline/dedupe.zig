@@ -32,5 +32,12 @@ pub fn runDedupe(state: *PaymentPipelineState) void {
 test "sandbox failure records crash diagnostics and stops dedupe" {
     var state = try PaymentPipelineState.init(std.testing.allocator, .{ .event_count = 5, .queue_depth = 2 });
     defer state.deinit();
+
+    // Feed a valid event, then close the queue to force runDedupe to exit
+    try state.q_norm_dedu.push(.{
+        .raw = runtime.RawPayment{ .source_offset = 0, .idempotency_key = 1, .account_id = 0, .amount_cents = 100, .currency = .{ 'U', 'S', 'D' } },
+        .pipeline_hops = 1,
+    }, &state.stop);
+    state.q_norm_dedu.close();
     runDedupe(&state);
 }
