@@ -1924,6 +1924,8 @@ inline for (shim_c_files) |shim_file| {
             std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline/mod.zig"))
         {
             linkTickoniCodec(b, t, fd_lib_dir);
+            // Logger imports util -> c_abi.os which needs shim/os.c
+            linkTickoniFiredancer(b, t, fd_lib_dir);
         }
         if (std.mem.eql(u8, entry[1], "src/tickoni/c_abi/queue.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/dcache.zig") or
