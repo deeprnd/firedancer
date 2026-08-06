@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run a shell command and update the named testing-tickoni.md badge with the result."""
 
+import functools
 import os
 import signal
 import subprocess
@@ -21,6 +22,13 @@ _mod = _ilu.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 update_readme_badge = _mod.update_readme_badge
 update_readme_badge_unknown = _mod.update_readme_badge_unknown
+README_PATH = _mod.README_PATH
+
+README_BADGES = frozenset({"build", "unit", "security", "cov-tk"})
+
+# Partial functions that target README.md instead of testing-tickoni.md
+_update_readme_badge_readme = functools.partial(update_readme_badge, doc_path=README_PATH)
+_update_readme_badge_unknown_readme = functools.partial(update_readme_badge_unknown, doc_path=README_PATH)
 
 
 def is_process_alive(pid: int) -> bool:
@@ -66,7 +74,8 @@ def update_badge_with_lock(update_fn, badge_name: str, *args) -> int:
     status = 0
     acquire_lock()
     try:
-        print(f"[badge] update '{badge_name}' via {update_fn.__name__}{args}", file=sys.stderr)
+        fname = getattr(update_fn, "__name__", str(update_fn))
+        print(f"[badge] update '{badge_name}' via {fname}{args}", file=sys.stderr)
         update_fn(badge_name, *args)
         print(f"[badge] update '{badge_name}' ok", file=sys.stderr)
     except Exception as e:
@@ -99,6 +108,10 @@ def main() -> None:
     badge_status = update_badge_with_lock(update_readme_badge_unknown, badge_name)
     command_status = run_command(command_argv)
     badge_status |= update_badge_with_lock(update_readme_badge, badge_name, command_status)
+
+    if badge_name in README_BADGES:
+        badge_status |= update_badge_with_lock(_update_readme_badge_unknown_readme, badge_name)
+        badge_status |= update_badge_with_lock(_update_readme_badge_readme, badge_name, command_status)
 
     sys.exit(command_status if command_status != 0 else badge_status)
 

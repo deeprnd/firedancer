@@ -5,13 +5,21 @@
 <p align="center">
   <img alt="Maturity" src="https://img.shields.io/badge/maturity-alpha-orange?style=flat-square" />
 
-  <img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
+  <!-- badge:build:start -->
+<img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
+<!-- badge:build:end -->
 
-  <img alt="Tests" src="https://img.shields.io/badge/tests-passing-brightgreen?style=flat-square" />
+  <!-- badge:unit:start -->
+  <img alt="Unit Tests" src="https://img.shields.io/badge/tests-passing-brightgreen?style=flat-square" />
+  <!-- badge:unit:end -->
 
-  <img alt="Tests" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
+  <!-- badge:security:start -->
+  <img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
+  <!-- badge:security:end -->
   
-  <img alt="Test Coverage" src="https://img.shields.io/badge/test%20coverage-80.0%25-yellowgreen?style=flat-square" />
+  <!-- badge:cov-tk:start -->
+  <img alt="AI Harness Coverage" src="https://img.shields.io/badge/test%20coverage-80.0%25-yellowgreen?style=flat-square" />
+  <!-- badge:cov-tk:end -->
     
   <img alt="Platforms" src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square" />
 
@@ -21,8 +29,7 @@
 <img
   src="assets/banner.png"
   alt="A blue oni studying investment charts beside an abacus and coins"
-  width="100%"
-/>
+  width="100%"/>
 
 Markets run continuously. Human attention does not.
 
