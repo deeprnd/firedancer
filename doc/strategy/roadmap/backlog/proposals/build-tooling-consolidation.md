@@ -332,3 +332,12 @@ a separate decision from this consolidation.
 Each phase should land as its own reviewable change, not one large rewrite — this is a build-system
 change under `CLAUDE.md`'s "Ask Before You Change," and the existing `test-unit-fd` macOS fix
 earlier in this session is a good example of the size of change that should ship per step.
+
+---
+
+## 7. Follow-up (Post-Implementation)
+
+Once all phases above have landed, `doc/execution/build.md` and `doc/execution/testing-tickoni.md`
+still need to be updated to reflect the final recipe names, `setup-*` flow, and `just`-prerequisite
+note described in Section 4 — do not consider this proposal fully closed until both docs are
+brought in sync with the shipped `justfile`.
