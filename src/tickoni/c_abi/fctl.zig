@@ -39,7 +39,7 @@ extern fn tk_fctl_leave(fctl: *Fctl) ?*anyopaque;
 extern fn tk_fctl_delete(shfctl: *anyopaque) ?*anyopaque;
 extern fn tk_fctl_cfg_rx_add(fctl: *Fctl, cr_max: usize, seq_laddr: ?[*]const u64, slow_laddr: [*]u64) ?*Fctl;
 extern fn tk_fctl_cfg_done(fctl: *Fctl, cr_burst: usize, cr_max: usize, cr_resume: usize, cr_refill: usize) ?*Fctl;
-extern fn tk_fctl_cr_query(fctl: *const Fctl, tx_seq: u64, rx_idx_slow: ?*usize) usize;
+extern fn tk_fctl_cr_query(fctl: *const Fctl, tx_seq: u64, rx_idx_slow: ?*u64) usize;
 extern fn tk_fctl_rx_cr_return(rx_seq_laddr: [*]u64, rx_seq: u64) void;
 extern fn tk_fctl_rx_cnt(fctl: *const Fctl) usize;
 extern fn tk_fctl_cr_burst(fctl: *const Fctl) usize;
@@ -73,7 +73,16 @@ pub fn cfgDone(fctl: *Fctl, cr_burst: usize, cr_max: usize, cr_resume: usize, cr
 }
 
 pub fn crQuery(fctl: *const Fctl, tx_seq: u64, rx_idx_slow: ?*usize) usize {
-    return tk_fctl_cr_query(fctl, tx_seq, rx_idx_slow);
+    var slow_idx_raw: u64 = 0;
+    const out_ptr: ?*u64 = if (rx_idx_slow != null) &slow_idx_raw else null;
+    const credits = tk_fctl_cr_query(fctl, tx_seq, out_ptr);
+    if (rx_idx_slow) |slow_idx| {
+        slow_idx.* = if (slow_idx_raw == std.math.maxInt(u64))
+            std.math.maxInt(usize)
+        else
+            @intCast(slow_idx_raw);
+    }
+    return credits;
 }
 
 pub fn rxCrReturn(rx_seq_laddr: [*]volatile u64, rx_seq: u64) void {

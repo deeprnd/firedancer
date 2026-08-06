@@ -71,7 +71,14 @@ if [ "$MODE" = "test" ]; then
   rm -f "${LIBDIR:?}/libfd_lz4.a" "${LIBDIR}/libfd_blst.a" "${LIBDIR}/libfd_zstd.a" "${LIBDIR}/libfd_ballet.a" "${LIBDIR}/libfd_waltz.a" "${LIBDIR}/libfd_disco.a" "${LIBDIR}/libfd_tango.a" "${LIBDIR}/libfd_util.a"
   fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" EXTRAS="lz4 blst zstd" BUILD_TARGET="unit-test" ${LDFLAGS_EXE:+LDFLAGS_EXE="${LDFLAGS_EXE}"}
 else
-  [ -n "${EXTRAS}" ] && fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" "EXTRAS=${EXTRAS}" ${LDFLAGS_EXE:+LDFLAGS_EXE="${LDFLAGS_EXE}"} || fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" ${LDFLAGS_EXE:+LDFLAGS_EXE="${LDFLAGS_EXE}"}
+  # Clean stale objects from any prior build with a different target/ABI
+  # (e.g. ELF .o files from a Linux build persisting into a Windows COFF build).
+  # Also delete stale .a archives from a prior build — make considers them
+  # up-to-date and skips recompilation, leaving ELF objects inside the .a
+  # archives that the Windows linker rejects.
+  rm -rf "${OBJDIR:?}/"*
+  rm -f "${LIBDIR:?}/libfd_ballet.a" "${LIBDIR:?}/libfd_disco.a" "${LIBDIR:?}/libfd_tango.a" "${LIBDIR:?}/libfd_util.a"
+  fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" "EXTRAS=${EXTRAS}" ${LDFLAGS_EXE:+LDFLAGS_EXE="${LDFLAGS_EXE}"} || fd_build_fd BUILDDIR="${BUILDDIR}" CC="${CC}" "TARGETS=${TARGETS[*]}" "SRCS=${SRCS[*]}" ${LDFLAGS_EXE:+LDFLAGS_EXE="${LDFLAGS_EXE}"}
 fi
 
 # Post-build: cov mode runs unit-test with coverage after libs.

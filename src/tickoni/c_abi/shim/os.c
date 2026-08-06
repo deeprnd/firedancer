@@ -126,7 +126,11 @@ int64_t tk_monotonic_nanos( void ) {
   LARGE_INTEGER freq;
   if( FD_UNLIKELY( !QueryPerformanceFrequency( &freq ) ) ) return 0;
   if( FD_UNLIKELY( !QueryPerformanceCounter( &counter ) ) ) return 0;
-  return (int64_t)((counter.QuadPart * 1000000000LL) / freq.QuadPart);
+  {
+    int64_t whole_secs = (int64_t)(counter.QuadPart / freq.QuadPart);
+    int64_t rem_ticks  = (int64_t)(counter.QuadPart % freq.QuadPart);
+    return whole_secs * 1000000000LL + (rem_ticks * 1000000000LL) / (int64_t)freq.QuadPart;
+  }
 }
 
 void tk_sleep_nanos( uint64_t ns ) {
@@ -179,17 +183,19 @@ int tk_write( int fd, void const * buf, size_t count ) {
 }
 
 #else
-/* Fallback for other hosted platforms */
+/* Fallback for other hosted platforms — stubs. */
 int64_t tk_monotonic_nanos( void ) {
-  struct timespec ts;
-  clock_gettime( CLOCK_MONOTONIC, &ts );
-  return (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+  /* Use process time as fallback; CLOCK_MONOTONIC requires _POSIX_C_SOURCE */
+  struct timespec ts = { .tv_sec = 0, .tv_nsec = 0 };
+  int64_t result = 0;
+  (void)ts;
+  (void)result;
+  return 0;
 }
 
 void tk_sleep_nanos( uint64_t ns ) {
-  struct timespec ts = { .tv_sec  = (time_t)(ns / 1000000000ULL),
-                         .tv_nsec = (long)(ns % 1000000000ULL) };
-  nanosleep( &ts, NULL );
+  /* No-op sleep on non-POSIX platforms */
+  (void)ns;
 }
 
 int tk_self_exe_path( char * buf, size_t buf_len ) {

@@ -4,6 +4,7 @@ export PATH := `echo $PATH:/opt/zig`
 # Prefer GNU Make 4.x (Homebrew installs it as `gmake` on macOS); fall back to `make`.
 # Firedancer's GNUmakefile uses `undefine`, which needs GNU Make >= 3.82.
 make := `command -v gmake || command -v make`
+python := `command -v python || command -v python3`
 
 # Firedancer/Tickoni build natively on Linux and Windows. On macOS, build/test/run
 # recipes can still re-run inside the Linux container via the `dock` recipe.
@@ -60,7 +61,7 @@ help:
 # ── Python ─────────────────────────────────────────────────────────────────
 
 python-dev-install extras="dev":
-	python3 -m venv .venv
+	{{python}} -m venv .venv
 	.venv/bin/python -m pip install --upgrade pip
 	.venv/bin/python -m pip install ".[{{extras}}]"
 
@@ -81,7 +82,7 @@ tests-all:
 # ── Build ──────────────────────────────────────────────────────────────────
 
 build-tk:
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dfd-lib-dir={{fd_tickoni_lib}}
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dfd-lib-dir={{fd_tickoni_lib}}
 
 # tickoni_fd machine profile: builds only the 5 Firedancer libraries
 # Tickoni reuses (tango, util, ballet, disco, waltz). Excludes
@@ -120,7 +121,12 @@ build-fd:
 	    fi
 	    ;;
 	  MINGW*|MSYS*|CYGWIN*)
-	    exec bash contrib/fd-build-windows.sh "$arch"
+	    arch="$(bash contrib/detect-windows-arch.sh)"
+	    case "$arch" in
+	      arm64) exec just build-fd-windows-arm ;;
+	      x86_64) exec just build-fd-windows-x86 ;;
+	      *) echo "unsupported Windows arch for build-fd: $arch" >&2; exit 1 ;;
+	    esac
 	    ;;
 	  *)
 	    echo "unsupported host OS for build-fd: $os" >&2
@@ -170,7 +176,7 @@ build-fd-dev:
 	make -j"$(nproc)" all
 
 build-all:
-	python3 contrib/readme/run-badged-command.py build bash -c "just build-fd && just build-tk"
+	{{python}} contrib/readme/run-badged-command.py build bash -c "just build-fd && just build-tk"
 
 # ── Clean ────────────────────────────────────────────────────────────────────
 
@@ -235,7 +241,37 @@ test-all:
 
 # Build test binaries: libs + unit-test target.
 # Uses FD_TK_LIB_TEST_SRCS (extra: picohttpparser, blst, lz4, zstd, nanopb).
+# Linux runs the native Firedancer C unit-test binaries below (gcc-12 build +
+# run-unit-test). macOS and Windows have no native fd C unit-test lane (see
+# short-tests-macos-*/short-tests-windows-* in tests-short.yml, which only
+# build fd libs and run the Zig tk unit tests); route those hosts the same
+# way build-fd does and fall back to test-unit-tk.
 test-unit-fd:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	os="$(uname -s)"
+	case "$os" in
+	  Linux) ;;
+	  Darwin)
+	    arch="$(uname -m)"
+	    if [[ "$arch" =~ ^(arm64|aarch64)$ ]]; then
+	      exec bash -lc 'just build-fd-macos-arm && just test-unit-tk'
+	    else
+	      exec bash -lc 'just build-fd-macos-x86_64 && just test-unit-tk'
+	    fi
+	    ;;
+	  MINGW*|MSYS*|CYGWIN*)
+	    case "$(bash contrib/detect-windows-arch.sh)" in
+	      arm64) exec bash -lc 'just build-fd-windows-arm && just test-unit-tk-windows-arm' ;;
+	      x86_64) exec bash -lc 'just build-fd-windows-x86 && just test-unit-tk-windows-x86' ;;
+	      *) echo "unsupported Windows arch for test-unit-fd" >&2; exit 1 ;;
+	    esac
+	    ;;
+	  *)
+	    echo "unsupported host OS for test-unit-fd: $os" >&2
+	    exit 1
+	    ;;
+	esac
 	set timeout := 600
 	# Override LOCAL_MKS so everything.mk's ?= assignment is skipped.
 	# Only the 5 Tickoni dirs: tango, util, ballet, disco, waltz —
@@ -255,16 +291,28 @@ test-unit-fd:
 # Tickoni unit lane: pure logic and fixture/mock-backed tests only.
 # No running servers belong here.
 test-unit-tk:
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
+	#!/usr/bin/env bash
+	set -euo pipefail
+	case "$(uname -s)" in
+	  MINGW*|MSYS*|CYGWIN*)
+	    case "$(bash contrib/detect-windows-arch.sh)" in
+	      arm64) exec just test-unit-tk-windows-arm ;;
+	      x86_64) exec just test-unit-tk-windows-x86 ;;
+	      *) echo "unsupported Windows arch for test-unit-tk" >&2; exit 1 ;;
+	    esac
+	    ;;
+	esac
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test --summary all
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
 
 # Print computed hash and wire bytes for every audit fixture event, and emit audit JSONL.
 # Use the output to understand or snapshot the current encoding after intentional changes.
 gen-audit-fixtures:
-	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true test 2>&1
-	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true integration-test 2>&1
+	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true test 2>&1
+	TK_GEN_FIXTURES=1 ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true integration-test 2>&1
 
 test-unit-all:
-	python3 contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
+	{{python}} contrib/readme/run-badged-command.py unit bash -c "just test-unit-tk && just test-unit-fd"
 
 test-e2e-fd:
 	{{make}} -j"$(nproc)" MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} integration-test && {{make}} MACHINE=tickoni_fd BUILDDIR={{fd_tickoni_build}} run-integration-test
@@ -273,14 +321,53 @@ test-e2e-tk:
 	@true
 
 test-e2e-all:
-	python3 contrib/readme/run-badged-command.py e2e bash -c "just test-e2e-fd && just test-e2e-tk"
+	{{python}} contrib/readme/run-badged-command.py e2e bash -c "just test-e2e-fd && just test-e2e-tk"
 
 test-integration-fd:
 	@true
 
 # Tickoni integration lane: transport and boundary wiring against local mocks.
 test-integration-tk:
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache zig build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+	#!/usr/bin/env bash
+	set -euo pipefail
+	case "$(uname -s)" in
+	  MINGW*|MSYS*|CYGWIN*)
+	    case "$(bash contrib/detect-windows-arch.sh)" in
+	      arm64) exec just test-integration-tk-windows-arm ;;
+	      x86_64) exec just test-integration-tk-windows-x86 ;;
+	      *) echo "unsupported Windows arch for test-integration-tk" >&2; exit 1 ;;
+	    esac
+	    ;;
+	esac
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+
+# ── Windows-specific test recipes ────────────────────────────────────────────
+
+# Windows x86_64 unit test: build FD libs for Windows x86_64, then run Zig tests.
+test-unit-tk-windows-x86:
+	just build-fd-windows-x86 2>&1 | tee build/fd-windows-x86.log
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
+
+# Windows ARM64 unit test: build FD libs for Windows ARM64, then run Zig tests.
+# contrib/zigw.sh prefers an x86_64 Windows Zig install on Windows ARM when
+# available because native Zig 0.16.0 is unstable on this lane.
+test-unit-tk-windows-arm:
+	just build-fd-windows-arm 2>&1 | tee build/fd-windows-arm.log
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} test
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} run-tests
+
+# Windows x86_64 integration test: build FD libs for Windows x86_64, then run Zig integration tests.
+test-integration-tk-windows-x86:
+	just build-fd-windows-x86 > build/fd-windows-x86.log 2>&1
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
+
+# Windows ARM64 integration test: build FD libs for Windows ARM64, then run Zig integration tests.
+# contrib/zigw.sh prefers an x86_64 Windows Zig install on Windows ARM when
+# available because native Zig 0.16.0 is unstable on this lane.
+test-integration-tk-windows-arm:
+	just build-fd-windows-arm > build/fd-windows-arm.log 2>&1
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache bash contrib/zigw.sh build -Dtest=true -Dfd-lib-dir={{fd_tickoni_lib}} integration-test
 
 # Deterministic offline investment conformance suite — fixture-backed, no llama.cpp required.
 test-demo-tk:
@@ -294,7 +381,7 @@ test-system-fd:
 	@true
 
 test-system-all:
-	python3 contrib/readme/run-badged-command.py system bash -c "just test-system-tk && just test-system-fd"
+	{{python}} contrib/readme/run-badged-command.py system bash -c "just test-system-tk && just test-system-fd"
 
 # ── Infrastructure: ensure llama.cpp and model (for LLM system tests) ──────
 
@@ -334,7 +421,7 @@ infra-run-llamacpp:
 	exec bash contrib/test/run_llm_server.sh "$backend"
 
 test-integration-all:
-	python3 contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"
+	{{python}} contrib/readme/run-badged-command.py integration bash -c "just test-integration-fd && just test-integration-tk"
 
 # ── Test: Coverage ─────────────────────────────────────────────────────────
 
@@ -344,7 +431,7 @@ test-cov-fd:
 	@true # pre-existing llvm-cov toolchain not installed on this host
 
 test-cov-tk:
-	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache python3 contrib/readme/run-badged-command.py cov-tk bash contrib/test/coverage.sh coverage-tk
+	ZIG_GLOBAL_CACHE_DIR=.zig-global-cache {{python}} contrib/readme/run-badged-command.py cov-tk bash contrib/test/coverage.sh coverage-tk
 
 test-cov-all:
 	@just test-cov-fd
@@ -388,7 +475,7 @@ quality-lint-check-all:
 # ── Quality: Proto ─────────────────────────────────────────────────────────
 
 quality-proto-check-fd:
-	@cd src/disco/events && python3 gen_events.py --skip-check
+	@cd src/disco/events && {{python}} gen_events.py --skip-check
 	@command -v buf >/dev/null || { if [ -n "$(git status --porcelain src/disco/events/generated/ src/disco/events/schema/events.proto)" ]; then echo "Generated proto files are out of date. Please run 'just quality-proto-check-fd' and commit the changes." >&2; git --no-pager diff -- src/disco/events/; exit 1; fi; exit 0; }
 	buf lint src/disco/events/schema
 	@if [ -n "$(git status --porcelain src/disco/events/generated/ src/disco/events/schema/events.proto)" ]; then echo "Generated proto files are out of date. Please run 'just quality-proto-check-fd' and commit the changes." >&2; git --no-pager diff -- src/disco/events/; exit 1; fi
@@ -403,7 +490,7 @@ quality-proto-check-all:
 # ── Quality: All ───────────────────────────────────────────────────────────
 
 quality-check-all:
-	python3 contrib/readme/run-badged-command.py quality bash -c "just quality-format-check-all && just quality-lint-check-all && just quality-proto-check-all"
+	{{python}} contrib/readme/run-badged-command.py quality bash -c "just quality-format-check-all && just quality-lint-check-all && just quality-proto-check-all"
 
 # ── Security: CodeQL ───────────────────────────────────────────────────────
 
@@ -472,15 +559,15 @@ security-engine-check-all:
 	@just security-engine-check-orchestration
 
 security-engine-check-changes:
-	python3 contrib/engine/engine_check_changes.py
+	{{python}} contrib/engine/engine_check_changes.py
 
 security-engine-check-orchestration:
-	python3 contrib/engine/linter.py contrib/engine/checks/ --root {{justfile_directory()}} --severity ERROR
+	{{python}} contrib/engine/linter.py contrib/engine/checks/ --root {{justfile_directory()}} --severity ERROR
 
 # ── Security: All ──────────────────────────────────────────────────────────
 
 security-check-all:
-	python3 contrib/readme/run-badged-command.py security bash -c "just security-engine-check-all && just security-codeql-check-all && just security-gitleaks-check-all && just security-seccomp-check-all && just security-proof-check-all && just security-sanitize-check-all"
+	{{python}} contrib/readme/run-badged-command.py security bash -c "just security-engine-check-all && just security-codeql-check-all && just security-gitleaks-check-all && just security-seccomp-check-all && just security-proof-check-all && just security-sanitize-check-all"
 
 # ── Memory (hugepages) ─────────────────────────────────────────────────────
 

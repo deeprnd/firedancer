@@ -207,7 +207,7 @@ This should not move forward if:
 | Decision | Options | Owner / next step |
 | -------- | ------- | ----------------- |
 | First Mac support path | Native portable Tickoni mode, Linux container through Docker/Colima, lightweight VM, or hybrid | Product/architecture decision before M2 topology hardening |
-| First Windows support path | WSL2, Docker Desktop Linux container, Hyper-V VM, native portable Tickoni mode, or hybrid | Product/architecture decision before packaging work |
+| First Windows support path | **RESOLVED: Native portable Tickoni on Windows.** Chosen in S4.T5 — no WSL2, Docker Desktop, or VM. CI runs directly on Windows 2025 and Windows 11 ARM64 runners. | Done — S4.T5 |
 | Support tier language | Full Linux runtime vs portable proof runtime vs unsupported host | Define in docs and CLI preflight before accepting implementation work |
 | Installer channel | Official shell/PowerShell scripts, package manager, signed binary releases, container image, or combined approach | Product/security decision before public demo distribution |
 | Version source of truth | `build.zig.zon`, generated release manifest, git tag, signed metadata file, or release registry | Build/release decision before adding `tickoni --version` |

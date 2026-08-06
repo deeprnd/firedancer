@@ -103,10 +103,15 @@ pub fn build(
     std.debug.assert(c_abi.topob.topoAlignof() <= topo_alloc_align.toByteUnits());
 
     const size = c_abi.topob.topoSizeof();
+    std.debug.print("topo_build.build: size={d} align={d}\n", .{ size, topo_alloc_align.toByteUnits() });
+
     const buf = try allocator.alignedAlloc(u8, topo_alloc_align, size);
     errdefer allocator.free(buf);
 
+    std.debug.print("topo_build.build: allocated buf ptr={x} len={d}\n", .{ @intFromPtr(buf.ptr), buf.len });
+
     var app_name_buf: [64]u8 = undefined;
+    std.debug.print("topo_build.build: passing to topobNew ptr={x}\n", .{@intFromPtr(buf.ptr)});
     const topo = c_abi.topob.topobNew(buf.ptr, toZ(&app_name_buf, app_name)) orelse return error.TopobNewFailed;
 
     var wksp_name_buf: [64]u8 = undefined;

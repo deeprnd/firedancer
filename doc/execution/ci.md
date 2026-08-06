@@ -16,6 +16,7 @@ This document describes the GitHub Actions CI workflows for Tickoni.
 - [Tests / Long](#tests--long)
 - [Tests / XLong](#tests--xlong)
 - [Optional Workflows](#optional-workflows)
+- [Zig Toolchain Policy](#zig-toolchain-policy)
 - [Centralized Firedancer Lib Machinery](#centralized-firedancer-lib-machinery)
 
 ---
@@ -76,6 +77,39 @@ Planned first-pass native Windows jobs:
 | `build-tk.yml` | `Harness Build / Windows 11 ARM` | `windows-11-vs2026-arm` | `just build-tk` |
 
 These are native Windows runner lanes only. The frozen first-pass contract explicitly excludes WSL, container, or VM fallback lanes as the official support path, and does not claim seccomp, sanitizer, replay, or full runtime parity on Windows.
+
+---
+
+## Zig Toolchain Policy
+
+Tickoni now uses two repo-owned Zig entrypoints depending on context:
+
+```
+contrib/install-zig.py
+contrib/install-zig-bootstrap.py
+```
+
+CI uses `contrib/install-zig.py`, which downloads an official prebuilt Zig release archive for the host platform and installs it into a persistent prefix. Local developer machines may still use `contrib/install-zig-bootstrap.py` when source-built parity experiments are needed, but that path is intentionally excluded from GitHub Actions because `zig-bootstrap` takes too long on hosted runners.
+
+Policy rules:
+
+1. Do not use `mlugg/setup-zig`, `winget install zig`, or other third-party Zig installers in Tickoni CI.
+2. All GitHub-hosted OS families (Windows, macOS, Linux) must call the same repo-owned CI installer script: `contrib/install-zig.py`.
+3. `contrib/install-zig-bootstrap.py` remains available for local developer workflows and bootstrap experiments, not CI.
+4. The upstream sources of truth are the official Zig documentation, the official Zig download index, and the official `zig-bootstrap` repository.
+5. Windows ARM must use the official GNU Zig release archive, not a Winget-managed Zig package.
+
+Local developer bootstrap examples:
+
+```bash
+python3 contrib/install-zig-bootstrap.py --bootstrap-ref master --mcpu baseline
+```
+
+```powershell
+python contrib/install-zig-bootstrap.py --bootstrap-ref master --mcpu baseline --user-path
+```
+
+CI usage is centralized in `.github/actions/setup-public-gh-runner/action.yml`, which invokes `contrib/install-zig.py` for Windows and POSIX runners.
 
 ---
 

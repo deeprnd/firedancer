@@ -13,6 +13,8 @@
 fd_topo_t *
 fd_topob_new( void * mem,
               char const * app_name ) {
+  FD_LOG_WARNING(( "fd_topob_new: mem=%p app_name=%s", mem, app_name ));
+
   fd_topo_t * topo = (fd_topo_t *)mem;
 
   if( FD_UNLIKELY( !topo ) ) {
@@ -25,7 +27,9 @@ fd_topob_new( void * mem,
     return NULL;
   }
 
+  FD_LOG_WARNING(( "fd_topob_new: memset topo=%p sizeof(fd_topo_t)=%lu", (void*)topo, sizeof(fd_topo_t) ));
   fd_memset( topo, 0, sizeof(fd_topo_t) );
+  FD_LOG_WARNING(( "fd_topob_new: memset complete" ));
 
   FD_TEST( fd_pod_new( topo->props, sizeof(topo->props) ) );
 

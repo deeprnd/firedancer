@@ -12,7 +12,6 @@
 /// The existing GNUmakefile (C/Firedancer build) is unchanged.
 const std = @import("std");
 
-
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -385,6 +384,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "runtime", .module = runtime_mod },
             .{ .name = "c_abi", .module = c_abi_mod },
             .{ .name = "util", .module = util_mod },
+            .{ .name = "logger", .module = logger_mod },
         },
     });
 
@@ -424,13 +424,20 @@ pub fn build(b: *std.Build) void {
         addTickoniTopoRunShims(b, exe);
         addTickoniTileRunShim(b, exe);
     }
-    linkTickoniSystemLibraries(exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" });
+    linkTickoniSystemLibraries(b, exe, fd_lib_dir, &.{ "fd_disco", "fd_waltz", "fd_tango", "fd_ballet", "fd_util" });
     b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
     if (b.args) |argv| run_exe.addArgs(argv);
     const run_step = b.step("run", "Run tickoni-supervisor");
     run_step.dependOn(&run_exe.step);
+
+    // ---------------------------------------------------------------------------
+    // Check step — compile-check Zig + C without full link dependencies.
+    // This is what CI's lint-check-tk runs to validate syntax before the
+    // full build. Only verifies that all source files parse and type-check.
+    // ---------------------------------------------------------------------------
+    const check_step = b.step("check", "Check Zig + C compilation without full link dependencies");
 
     // ---------------------------------------------------------------------------
     // Test / integration / system / coverage steps — gated behind -Dtest=true
@@ -572,6 +579,60 @@ pub fn build(b: *std.Build) void {
             .{ .name = "trade_ticket", .module = trade_ticket_mod },
         },
     });
+// Diagnostic C compile-check: compiles each shim file individually and
+// prints errors to stdout (not stderr) so CI can surface them. Zig's
+// C compiler writes to stderr via --listen=- which CI captures as
+// opaque; this step forces compilation output into stdout.
+const shim_c_files = &.{
+    "tango.c",
+    "util.c",
+    "wksp.c",
+    "sandbox.c",
+    "os.c",
+    "topo_run.c",
+    "topob.c",
+    "tile_run.c",
+    "ballet.c",
+};
+const shim_flags = shimCFlagsFor(target.result);
+const arch_name = switch (target.result.cpu.arch) {
+    .x86_64 => "x86_64",
+    .aarch64 => "aarch64",
+    .x86 => "x86",
+    .arm => "arm",
+    else => b.fmt("{s}", .{@tagName(target.result.cpu.arch)}),
+};
+const os_name = switch (target.result.os.tag) {
+    .linux => "linux",
+    .windows => "windows",
+    .macos => "macos",
+    else => b.fmt("{s}", .{@tagName(target.result.os.tag)}),
+};
+const abi_name = switch (target.result.abi) {
+    .gnu => "gnu",
+    .gnuabi64 => "gnu",
+    .musl => "musl",
+    .msvc => "msvc",
+    else => "",
+};
+const triple = if (abi_name.len > 0)
+    b.fmt("{s}-{s}-{s}", .{ arch_name, os_name, abi_name })
+else
+    b.fmt("{s}-{s}", .{ arch_name, os_name });
+const c_compile_check_step = b.step("check-c-compile", "Compile-check all C shim files and print errors to stdout");
+inline for (shim_c_files) |shim_file| {
+    const c_check = b.addSystemCommand(&.{
+        "sh", "-c",
+        b.fmt("zig cc -target {s} -c -I src -std=c17 -UBMI2 -ULZCNT -DFD_HAS_HOSTED=1 {s} {s} 2>&1 || true", .{
+            triple,
+            shim_flags[0],
+            b.fmt("src/tickoni/c_abi/shim/{s}", .{shim_file}),
+        }),
+    });
+    c_compile_check_step.dependOn(&c_check.step);
+}
+    check_step.dependOn(c_compile_check_step);
+
     if (build_tests) {
         const investment_demo_test = b.addTest(.{ .root_module = investment_demo_mod });
 
@@ -580,7 +641,18 @@ pub fn build(b: *std.Build) void {
         // Pure logic and fixture/mock-backed proofs belong here; no running servers.
         // Run with: zig build -Dtest=true test
         // ---------------------------------------------------------------------------
-        const test_step = b.step("test", "Run offline Tickoni unit tests");
+        const test_step = b.step("test", "Compile offline Tickoni unit test binaries");
+        const run_tests_step = b.step("run-tests", "Run offline Tickoni unit tests");
+        test_step.dependOn(c_compile_check_step);
+        run_tests_step.dependOn(c_compile_check_step);
+
+        // Run all compiled test binaries sequentially via a bash script.
+        // This avoids Zig's --listen=- parallel coordination which panics
+        // with EndOfStream when 48+ test binaries communicate over the same pipe.
+        const run_tests_cmd = std.Build.Step.Run.create(b, "run-tests");
+        run_tests_cmd.addArgs(&.{"bash", "contrib/run-test-series.sh"});
+        run_tests_cmd.step.dependOn(test_step);
+        run_tests_step.dependOn(&run_tests_cmd.step);
 
         // Files with no cross-module imports: standalone test binaries.
         for ([_][]const u8{
@@ -628,6 +700,7 @@ pub fn build(b: *std.Build) void {
                         .{ .name = "audit_tile", .module = audit_tile_mod },
                         .{ .name = "runtime", .module = runtime_mod },
                         .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "logger", .module = logger_mod },
                     },
                 })
             else if (std.mem.eql(u8, path, "src/tickoni/runtime/sandbox.zig"))
@@ -652,10 +725,15 @@ pub fn build(b: *std.Build) void {
                 });
                 t.root_module.link_libc = true;
             }
-            if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig") or
-                std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline/mod.zig"))
+            if (std.mem.eql(u8, path, "src/tickoni/tiles/audit/mod.zig"))
             {
                 linkTickoniCodec(b, t, fd_lib_dir);
+            }
+            if (std.mem.eql(u8, path, "src/tickoni/tiles/payment_pipeline/mod.zig"))
+            {
+                linkTickoniCodec(b, t, fd_lib_dir);
+                // Logger module imports util -> c_abi.os which needs shim/os.c
+                linkTickoniFiredancer(b, t, fd_lib_dir);
             }
             if (std.mem.eql(u8, path, "src/tickoni/c_abi/queue.zig") or
                 std.mem.eql(u8, path, "src/tickoni/c_abi/dcache.zig") or
@@ -673,8 +751,10 @@ pub fn build(b: *std.Build) void {
                 // linkTickoniCodec.
                 linkTickoniCodec(b, t, fd_lib_dir);
             }
-            const t_run = b.addRunArtifact(t);
-            test_step.dependOn(&t_run.step);
+            // Compile from run so compiler errors are visible on CI.
+            // `zig build test` only compiles; `zig build run-tests` also executes.
+            test_step.dependOn(&t.step);
+            run_tests_cmd.addArtifactArg(t);
         }
 
         // ---------------------------------------------------------------------------
@@ -699,7 +779,8 @@ pub fn build(b: *std.Build) void {
             .files = &.{"src/tickoni/util/compiler_version.c"},
         });
         version_test.root_module.link_libc = true;
-        test_step.dependOn(&b.addRunArtifact(version_test).step);
+        test_step.dependOn(&version_test.step);
+        run_tests_cmd.addArtifactArg(version_test);
 
         // doctor/checks.zig — standalone (no imports beyond std)
         const doctor_checks_test = b.addTest(.{
@@ -709,7 +790,8 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(doctor_checks_test).step);
+        test_step.dependOn(&doctor_checks_test.step);
+        run_tests_cmd.addArtifactArg(doctor_checks_test);
 
         // doctor/output.zig imports: doctor_checks
         const doctor_output_test = b.addTest(.{
@@ -722,7 +804,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(doctor_output_test).step);
+        test_step.dependOn(&doctor_output_test.step);
+        run_tests_cmd.addArtifactArg(doctor_output_test);
 
         // demo/manifest.zig — standalone (no cross-module imports)
         const demo_manifest_test = b.addTest(.{
@@ -735,7 +818,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(demo_manifest_test).step);
+        test_step.dependOn(&demo_manifest_test.step);
+        run_tests_cmd.addArtifactArg(demo_manifest_test);
 
         // demo/preflight.zig imports: demo_manifest, demo_semver, tier
         const demo_preflight_test = b.addTest(.{
@@ -751,7 +835,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(demo_preflight_test).step);
+        test_step.dependOn(&demo_preflight_test.step);
+        run_tests_cmd.addArtifactArg(demo_preflight_test);
 
         const demo_diagnostic_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -760,7 +845,8 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(demo_diagnostic_test).step);
+        test_step.dependOn(&demo_diagnostic_test.step);
+        run_tests_cmd.addArtifactArg(demo_diagnostic_test);
 
         const demo_conformance_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -772,7 +858,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(demo_conformance_test).step);
+        test_step.dependOn(&demo_conformance_test.step);
+        run_tests_cmd.addArtifactArg(demo_conformance_test);
 
         const demo_comparator_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -784,7 +871,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(demo_comparator_test).step);
+        test_step.dependOn(&demo_comparator_test.step);
+        run_tests_cmd.addArtifactArg(demo_comparator_test);
 
         const demo_runner_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -797,7 +885,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(demo_runner_test).step);
+        test_step.dependOn(&demo_runner_test.step);
+        run_tests_cmd.addArtifactArg(demo_runner_test);
 
         const demo_substitution_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -810,7 +899,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(demo_substitution_test).step);
+        test_step.dependOn(&demo_substitution_test.step);
+        run_tests_cmd.addArtifactArg(demo_substitution_test);
 
         // src/tickoni/codec/thesis.zig: dedicated wrapper tests over the canonical
         // consumer-money schema hash APIs.
@@ -826,7 +916,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, thesis_codec_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(thesis_codec_test).step);
+        test_step.dependOn(&thesis_codec_test.step);
+        run_tests_cmd.addArtifactArg(thesis_codec_test);
 
         // thesis.zig: fresh root module so linkTickoniCodec adds C sources only to
         // this binary's root module.
@@ -842,7 +933,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, thesis_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(thesis_test).step);
+        test_step.dependOn(&thesis_test.step);
+        run_tests_cmd.addArtifactArg(thesis_test);
 
         const catalog_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -857,7 +949,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, catalog_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(catalog_test).step);
+        test_step.dependOn(&catalog_test.step);
+        run_tests_cmd.addArtifactArg(catalog_test);
 
         const catalog_schema_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -870,7 +963,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, catalog_schema_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(catalog_schema_test).step);
+        test_step.dependOn(&catalog_schema_test.step);
+        run_tests_cmd.addArtifactArg(catalog_schema_test);
 
         const basket_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -885,7 +979,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, basket_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(basket_test).step);
+        test_step.dependOn(&basket_test.step);
+        run_tests_cmd.addArtifactArg(basket_test);
 
         const portfolio_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -898,7 +993,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, portfolio_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(portfolio_test).step);
+        test_step.dependOn(&portfolio_test.step);
+        run_tests_cmd.addArtifactArg(portfolio_test);
 
         const fixture_portfolio_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -912,13 +1008,14 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, fixture_portfolio_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(fixture_portfolio_test).step);
-
+        test_step.dependOn(&fixture_portfolio_test.step);
+        run_tests_cmd.addArtifactArg(fixture_portfolio_test);
         const model_messages_test = b.addTest(.{ .root_module = model_messages_mod });
-        test_step.dependOn(&b.addRunArtifact(model_messages_test).step);
-
+        test_step.dependOn(&model_messages_test.step);
+        run_tests_cmd.addArtifactArg(model_messages_test);
         const mock_model_test = b.addTest(.{ .root_module = mock_model_mod });
-        test_step.dependOn(&b.addRunArtifact(mock_model_test).step);
+        test_step.dependOn(&mock_model_test.step);
+        run_tests_cmd.addArtifactArg(mock_model_test);
 
         // link handle/type roots keep their own unit tests independent of the
         // aggregate runtime module.
@@ -929,7 +1026,8 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(link_handles_test).step);
+        test_step.dependOn(&link_handles_test.step);
+        run_tests_cmd.addArtifactArg(link_handles_test);
 
         const link_types_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -938,7 +1036,8 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(link_types_test).step);
+        test_step.dependOn(&link_types_test.step);
+        run_tests_cmd.addArtifactArg(link_types_test);
 
         // boot.zig imports c_abi for the raw fd_boot bridge call.
         const boot_test = b.addTest(.{
@@ -951,7 +1050,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(boot_test).step);
+        test_step.dependOn(&boot_test.step);
+        run_tests_cmd.addArtifactArg(boot_test);
 
         // cnc_counters.zig imports c_abi and calls the real tk_cnc_app_laddr
         // shim (via c_abi.cnc.appLaddr) in its round-trip test.
@@ -966,7 +1066,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniFiredancer(b, cnc_counters_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(cnc_counters_test).step);
+        test_step.dependOn(&cnc_counters_test.step);
+        run_tests_cmd.addArtifactArg(cnc_counters_test);
 
         // cpu_placement.zig imports util (for the CpuSet primitive) alongside
         // its sibling topology.zig.
@@ -980,7 +1081,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(cpu_placement_test).step);
+        test_step.dependOn(&cpu_placement_test.step);
+        run_tests_cmd.addArtifactArg(cpu_placement_test);
 
         // launch_spec.zig embeds link.LinkHandles, which imports c_abi.
         const launch_spec_test = b.addTest(.{
@@ -993,7 +1095,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(launch_spec_test).step);
+        test_step.dependOn(&launch_spec_test.step);
+        run_tests_cmd.addArtifactArg(launch_spec_test);
 
         // topology_spec.zig (v2.14.S8.T4): small tiles+channels round-trip,
         // same import needs as launch_spec.zig.
@@ -1007,7 +1110,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(topology_spec_test).step);
+        test_step.dependOn(&topology_spec_test.step);
+        run_tests_cmd.addArtifactArg(topology_spec_test);
 
         // topo_run.zig (v2.14.S8.T3/T4): fd_topo_run_tile adapter plus the
         // simple process-mode launcher dispatch contract. Tests assert Linux
@@ -1021,14 +1125,16 @@ pub fn build(b: *std.Build) void {
                 .optimize = optimize,
             }),
         });
+        const _topo_test_target = topo_run_test.root_module.resolved_target.?.result;
         topo_run_test.root_module.addCSourceFiles(.{
             .files = &.{"src/tickoni/c_abi/shim/tile_run_test_stubs.c"},
-            .flags = &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__" },
+            .flags = shimCFlagsFor(_topo_test_target),
         });
         linkTickoniFiredancer(b, topo_run_test, fd_lib_dir);
         linkTickoniTopoRun(b, topo_run_test, fd_lib_dir);
         linkTickoniTileRun(b, topo_run_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(topo_run_test).step);
+        test_step.dependOn(&topo_run_test.step);
+        run_tests_cmd.addArtifactArg(topo_run_test);
 
         // topob.zig (v2.14.S8.T12): fd_topob topology builder. Same
         // no-test-blocks-yet rationale as topo_run_test above; proves the
@@ -1043,7 +1149,8 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniFiredancer(b, topob_test, fd_lib_dir);
         linkTickoniTopoRun(b, topob_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(topob_test).step);
+        test_step.dependOn(&topob_test.step);
+        run_tests_cmd.addArtifactArg(topob_test);
 
         // topo_build.zig (v2.14.S8.T12): shared topology-builder, actually
         // calls into topob.zig against a real 8-tile-shaped Topology, so
@@ -1062,7 +1169,8 @@ pub fn build(b: *std.Build) void {
         });
         linkTickoniFiredancer(b, topo_build_test, fd_lib_dir);
         linkTickoniTopoRun(b, topo_build_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(topo_build_test).step);
+        test_step.dependOn(&topo_build_test.step);
+        run_tests_cmd.addArtifactArg(topo_build_test);
 
         // model tile: unit tests are mock/fixture-backed and must not start servers.
         const model_test_mod = b.createModule(.{
@@ -1091,7 +1199,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, model_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(model_test).step);
+        test_step.dependOn(&model_test.step);
+        run_tests_cmd.addArtifactArg(model_test);
 
         const tkpoly_test_mod = b.createModule(.{
             .root_source_file = b.path("src/tickoni/tiles/policy/mod.zig"),
@@ -1119,10 +1228,11 @@ pub fn build(b: *std.Build) void {
         const adapter_test = b.addTest(.{
             .root_module = adapter_test_mod,
         });
-        test_step.dependOn(&b.addRunArtifact(adapter_test).step);
-
+        test_step.dependOn(&adapter_test.step);
+        run_tests_cmd.addArtifactArg(adapter_test);
         const mock_adapter_test = b.addTest(.{ .root_module = mock_adapter_mod });
-        test_step.dependOn(&b.addRunArtifact(mock_adapter_test).step);
+        test_step.dependOn(&mock_adapter_test.step);
+        run_tests_cmd.addArtifactArg(mock_adapter_test);
 
         // trade_ticket.zig imports basket, portfolio, fixture_portfolio, and thesis.
         const trade_ticket_test = b.addTest(.{
@@ -1139,7 +1249,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, trade_ticket_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(trade_ticket_test).step);
+        test_step.dependOn(&trade_ticket_test.step);
+        run_tests_cmd.addArtifactArg(trade_ticket_test);
 
         // impact.zig: portfolio and cash impact model (V1.3.S1).
         const impact_test = b.addTest(.{
@@ -1154,7 +1265,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, impact_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(impact_test).step);
+        test_step.dependOn(&impact_test.step);
+        run_tests_cmd.addArtifactArg(impact_test);
 
         // cards.zig: thesis and money proposal card schemas (V1.3.S2).
         const cards_test = b.addTest(.{
@@ -1169,7 +1281,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, cards_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(cards_test).step);
+        test_step.dependOn(&cards_test.step);
+        run_tests_cmd.addArtifactArg(cards_test);
 
         // drift.zig: drift conditions, assessment, and suggestion generation (V1.3.S3).
         const drift_test = b.addTest(.{
@@ -1185,7 +1298,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, drift_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(drift_test).step);
+        test_step.dependOn(&drift_test.step);
+        run_tests_cmd.addArtifactArg(drift_test);
 
         const allowed_trade_fixture_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1201,7 +1315,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, allowed_trade_fixture_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(allowed_trade_fixture_test).step);
+        test_step.dependOn(&allowed_trade_fixture_test.step);
+        run_tests_cmd.addArtifactArg(allowed_trade_fixture_test);
 
         const denied_trade_fixture_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1215,7 +1330,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, denied_trade_fixture_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(denied_trade_fixture_test).step);
+        test_step.dependOn(&denied_trade_fixture_test.step);
+        run_tests_cmd.addArtifactArg(denied_trade_fixture_test);
 
         const tool_test_mod = b.createModule(.{
             .root_source_file = b.path("src/tickoni/tiles/tool/mod.zig"),
@@ -1230,7 +1346,8 @@ pub fn build(b: *std.Build) void {
             },
         });
         const tool_test = b.addTest(.{ .root_module = tool_test_mod });
-        test_step.dependOn(&b.addRunArtifact(tool_test).step);
+        test_step.dependOn(&tool_test.step);
+        run_tests_cmd.addArtifactArg(tool_test);
 
         const disp_unit_mod = b.createModule(.{
             .root_source_file = b.path("src/tickoni/tiles/disp/mod.zig"),
@@ -1258,7 +1375,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, agent_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(agent_test).step);
+        test_step.dependOn(&agent_test.step);
+        run_tests_cmd.addArtifactArg(agent_test);
 
         const replay_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1278,7 +1396,8 @@ pub fn build(b: *std.Build) void {
             }),
         });
         linkTickoniCodec(b, replay_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(replay_test).step);
+        test_step.dependOn(&replay_test.step);
+        run_tests_cmd.addArtifactArg(replay_test);
 
         // supervisor.zig imports runtime, tiles, and c_abi modules.
         const sup_mod = b.createModule(.{
@@ -1291,6 +1410,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "util", .module = util_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
+                .{ .name = "logger", .module = logger_mod },
             },
         });
         // Named module (vs. sup_mod's anonymous instance above) so
@@ -1306,6 +1426,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "util", .module = util_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
+                .{ .name = "logger", .module = logger_mod },
             },
         });
         const sup_test = b.addTest(.{ .root_module = sup_mod });
@@ -1316,7 +1437,8 @@ pub fn build(b: *std.Build) void {
         // data even for tests that only exercise thread mode — needs the same
         // Firedancer link set as the process-mode integration tests.
         linkTickoniFiredancer(b, sup_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(sup_test).step);
+        test_step.dependOn(&sup_test.step);
+        run_tests_cmd.addArtifactArg(sup_test);
 
         // tile_registry.zig (v2.14.S8.T1): single source of truth for tile id
         // -> behavior, imported by supervisor.zig and tile_main.zig. Same
@@ -1334,7 +1456,8 @@ pub fn build(b: *std.Build) void {
         const tile_registry_test = b.addTest(.{ .root_module = tile_registry_mod });
         linkTickoniCodec(b, tile_registry_test, fd_lib_dir);
         linkTickoniFiredancer(b, tile_registry_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(tile_registry_test).step);
+        test_step.dependOn(&tile_registry_test.step);
+        run_tests_cmd.addArtifactArg(tile_registry_test);
 
         // topologies.zig: fresh root module (not the shared topologies_named_mod)
         // so it gets its own dedicated test run, since named-import module
@@ -1349,7 +1472,8 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(topologies_test).step);
+        test_step.dependOn(&topologies_test.step);
+        run_tests_cmd.addArtifactArg(topologies_test);
 
         // ---------------------------------------------------------------------------
         // Integration-test step — transport and boundary wiring against local mocks.
@@ -1362,7 +1486,7 @@ pub fn build(b: *std.Build) void {
         // Integration tile modules are fresh instances so they don't inherit any
         // C source additions from the unit test lane.
         linkTickoniCodec(b, investment_demo_test, fd_lib_dir);
-        test_step.dependOn(&b.addRunArtifact(investment_demo_test).step);
+        test_step.dependOn(&investment_demo_test.step);
         for ([_][]const u8{
             "src/tickoni/test/integration/test_investment_allowed_trade.zig",
             "src/tickoni/test/integration/test_investment_blocked_limits.zig",
@@ -1406,57 +1530,59 @@ pub fn build(b: *std.Build) void {
         // already-spawned children exec'ing that same path.
         const process_mode_exe_install = b.addInstallArtifact(exe, .{});
 
-        // v2.14.S1 process-mode payment pipeline: spawns real supervisor-managed
-        // tile processes over Firedancer Tango shared memory. Tickoni internals
-        // run for real; the "external tool" substituted per
-        // doc/execution/testing-tickoni.md's integration-lane rule is the
-        // operator-managed host workspace path, replaced by a scratch
-        // FD_SHMEM_PATH directory under zig-cache/tmp. No huge pages or sudo.
-        const process_pipeline_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/tickoni/test/integration/test_process_pipeline.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                    .{ .name = "util", .module = util_mod },
-                    .{ .name = "supervisor", .module = supervisor_named_mod },
-                    .{ .name = "topologies", .module = topologies_named_mod },
-                },
-            }),
-        });
-        linkTickoniCodec(b, process_pipeline_test, fd_lib_dir);
-        linkTickoniFiredancer(b, process_pipeline_test, fd_lib_dir);
-        linkTickoniTopoRun(b, process_pipeline_test, fd_lib_dir);
-        const run_process_pipeline_test = addPlainTestRun(b, process_pipeline_test);
-        run_process_pipeline_test.step.dependOn(&process_mode_exe_install.step);
-        integration_step.dependOn(&run_process_pipeline_test.step);
-
-        // v2.14.S1 M5: explicit shared-core CPU placement and the
-        // CPU-unavailable fail-closed path, both through the real supervisor.
-        const process_cpu_placement_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/tickoni/test/integration/test_process_cpu_placement.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                    .{ .name = "util", .module = util_mod },
-                    .{ .name = "supervisor", .module = supervisor_named_mod },
-                    .{ .name = "topologies", .module = topologies_named_mod },
-                },
-            }),
-        });
-        linkTickoniCodec(b, process_cpu_placement_test, fd_lib_dir);
-        linkTickoniFiredancer(b, process_cpu_placement_test, fd_lib_dir);
-        linkTickoniTopoRun(b, process_cpu_placement_test, fd_lib_dir);
-        const run_process_cpu_placement_test = addPlainTestRun(b, process_cpu_placement_test);
-        run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
-        integration_step.dependOn(&run_process_cpu_placement_test.step);
-
         if (target.result.os.tag == .linux) {
+            // v2.14.S1 process-mode payment pipeline: spawns real supervisor-managed
+            // tile processes over Firedancer Tango shared memory. Tickoni internals
+            // run for real; the "external tool" substituted per
+            // doc/execution/testing-tickoni.md's integration-lane rule is the
+            // operator-managed host workspace path, replaced by a scratch
+            // FD_SHMEM_PATH directory under zig-cache/tmp. No huge pages or sudo.
+            // Retail targets intentionally exclude these tests because the product
+            // tier contract disables shared-memory topology outside linux_full.
+            const process_pipeline_test = b.addTest(.{
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/tickoni/test/integration/test_process_pipeline.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "util", .module = util_mod },
+                        .{ .name = "supervisor", .module = supervisor_named_mod },
+                        .{ .name = "topologies", .module = topologies_named_mod },
+                    },
+                }),
+            });
+            linkTickoniCodec(b, process_pipeline_test, fd_lib_dir);
+            linkTickoniFiredancer(b, process_pipeline_test, fd_lib_dir);
+            linkTickoniTopoRun(b, process_pipeline_test, fd_lib_dir);
+            const run_process_pipeline_test = addPlainTestRun(b, process_pipeline_test);
+            run_process_pipeline_test.step.dependOn(&process_mode_exe_install.step);
+            integration_step.dependOn(&run_process_pipeline_test.step);
+
+            // v2.14.S1 M5: explicit shared-core CPU placement and the
+            // CPU-unavailable fail-closed path, both through the real supervisor.
+            const process_cpu_placement_test = b.addTest(.{
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/tickoni/test/integration/test_process_cpu_placement.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "util", .module = util_mod },
+                        .{ .name = "supervisor", .module = supervisor_named_mod },
+                        .{ .name = "topologies", .module = topologies_named_mod },
+                    },
+                }),
+            });
+            linkTickoniCodec(b, process_cpu_placement_test, fd_lib_dir);
+            linkTickoniFiredancer(b, process_cpu_placement_test, fd_lib_dir);
+            linkTickoniTopoRun(b, process_cpu_placement_test, fd_lib_dir);
+            const run_process_cpu_placement_test = addPlainTestRun(b, process_cpu_placement_test);
+            run_process_cpu_placement_test.step.dependOn(&process_mode_exe_install.step);
+            integration_step.dependOn(&run_process_cpu_placement_test.step);
+
             const process_cpu_placement_linux_test = b.addTest(.{
                 .root_module = b.createModule(.{
                     .root_source_file = b.path("src/tickoni/test/integration/test_process_cpu_placement_linux.zig"),
@@ -1476,34 +1602,31 @@ pub fn build(b: *std.Build) void {
             const run_process_cpu_placement_linux_test = addPlainTestRun(b, process_cpu_placement_linux_test);
             run_process_cpu_placement_linux_test.step.dependOn(&process_mode_exe_install.step);
             integration_step.dependOn(&run_process_cpu_placement_linux_test.step);
-        }
+            // v2.14.S1 M6: process isolation (T13: one OS process per tile,
+            // parented by the supervisor), crash isolation (T12: SIGKILL one
+            // tile, siblings unaffected), and the remaining process-mode
+            // fail-closed configuration checks.
+            const process_topology_test = b.addTest(.{
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/tickoni/test/integration/test_process_topology.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "util", .module = util_mod },
+                        .{ .name = "supervisor", .module = supervisor_named_mod },
+                        .{ .name = "topologies", .module = topologies_named_mod },
+                    },
+                }),
+            });
+            linkTickoniCodec(b, process_topology_test, fd_lib_dir);
+            linkTickoniFiredancer(b, process_topology_test, fd_lib_dir);
+            linkTickoniTopoRun(b, process_topology_test, fd_lib_dir);
+            const run_process_topology_test = addPlainTestRun(b, process_topology_test);
+            run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
+            integration_step.dependOn(&run_process_topology_test.step);
 
-        // v2.14.S1 M6: process isolation (T13: one OS process per tile,
-        // parented by the supervisor), crash isolation (T12: SIGKILL one
-        // tile, siblings unaffected), and the remaining process-mode
-        // fail-closed configuration checks.
-        const process_topology_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/tickoni/test/integration/test_process_topology.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                    .{ .name = "util", .module = util_mod },
-                    .{ .name = "supervisor", .module = supervisor_named_mod },
-                    .{ .name = "topologies", .module = topologies_named_mod },
-                },
-            }),
-        });
-        linkTickoniCodec(b, process_topology_test, fd_lib_dir);
-        linkTickoniFiredancer(b, process_topology_test, fd_lib_dir);
-        linkTickoniTopoRun(b, process_topology_test, fd_lib_dir);
-        const run_process_topology_test = addPlainTestRun(b, process_topology_test);
-        run_process_topology_test.step.dependOn(&process_mode_exe_install.step);
-        integration_step.dependOn(&run_process_topology_test.step);
-
-        if (target.result.os.tag == .linux) {
             const process_topology_linux_test = b.addTest(.{
                 .root_module = b.createModule(.{
                     .root_source_file = b.path("src/tickoni/test/integration/test_process_topology_linux.zig"),
@@ -1524,50 +1647,49 @@ pub fn build(b: *std.Build) void {
             const run_process_topology_linux_test = addPlainTestRun(b, process_topology_linux_test);
             run_process_topology_linux_test.step.dependOn(&process_mode_exe_install.step);
             integration_step.dependOn(&run_process_topology_linux_test.step);
+            // v2.14.S1 M6: demo/replay parity — floating vs. explicit shared-core
+            // CPU placement must reach identical final pipeline metrics through the
+            // real supervisor (T14).
+            const process_demo_parity_test = b.addTest(.{
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/tickoni/test/integration/test_process_demo_parity.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "util", .module = util_mod },
+                        .{ .name = "supervisor", .module = supervisor_named_mod },
+                        .{ .name = "topologies", .module = topologies_named_mod },
+                    },
+                }),
+            });
+            linkTickoniCodec(b, process_demo_parity_test, fd_lib_dir);
+            linkTickoniFiredancer(b, process_demo_parity_test, fd_lib_dir);
+            linkTickoniTopoRun(b, process_demo_parity_test, fd_lib_dir);
+            const run_process_demo_parity_test = addPlainTestRun(b, process_demo_parity_test);
+            run_process_demo_parity_test.step.dependOn(&process_mode_exe_install.step);
+            integration_step.dependOn(&run_process_demo_parity_test.step);
+
+            // v2.14.S1 M6: runtime link fail-closed matrix (dcache bounds, missing link
+            // objects) and backpressure visibility. Single-process — no tile spawn,
+            // so no stdio-inheritance hang risk — uses the normal test-runner path.
+            const link_bounds_test = b.addTest(.{
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path("src/tickoni/test/integration/test_link_bounds.zig"),
+                    .target = target,
+                    .optimize = optimize,
+                    .imports = &.{
+                        .{ .name = "runtime", .module = runtime_mod },
+                        .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "util", .module = util_mod },
+                    },
+                }),
+            });
+            linkTickoniCodec(b, link_bounds_test, fd_lib_dir);
+            linkTickoniFiredancer(b, link_bounds_test, fd_lib_dir);
+            integration_step.dependOn(&b.addRunArtifact(link_bounds_test).step);
         }
-
-        // v2.14.S1 M6: demo/replay parity — floating vs. explicit shared-core
-        // CPU placement must reach identical final pipeline metrics through the
-        // real supervisor (T14).
-        const process_demo_parity_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/tickoni/test/integration/test_process_demo_parity.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                    .{ .name = "util", .module = util_mod },
-                    .{ .name = "supervisor", .module = supervisor_named_mod },
-                    .{ .name = "topologies", .module = topologies_named_mod },
-                },
-            }),
-        });
-        linkTickoniCodec(b, process_demo_parity_test, fd_lib_dir);
-        linkTickoniFiredancer(b, process_demo_parity_test, fd_lib_dir);
-        linkTickoniTopoRun(b, process_demo_parity_test, fd_lib_dir);
-        const run_process_demo_parity_test = addPlainTestRun(b, process_demo_parity_test);
-        run_process_demo_parity_test.step.dependOn(&process_mode_exe_install.step);
-        integration_step.dependOn(&run_process_demo_parity_test.step);
-
-        // v2.14.S1 M6: runtime link fail-closed matrix (dcache bounds, missing link
-        // objects) and backpressure visibility. Single-process — no tile spawn,
-        // so no stdio-inheritance hang risk — uses the normal test-runner path.
-        const link_bounds_test = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/tickoni/test/integration/test_link_bounds.zig"),
-                .target = target,
-                .optimize = optimize,
-                .imports = &.{
-                    .{ .name = "runtime", .module = runtime_mod },
-                    .{ .name = "c_abi", .module = c_abi_mod },
-                    .{ .name = "util", .module = util_mod },
-                },
-            }),
-        });
-        linkTickoniCodec(b, link_bounds_test, fd_lib_dir);
-        linkTickoniFiredancer(b, link_bounds_test, fd_lib_dir);
-        integration_step.dependOn(&b.addRunArtifact(link_bounds_test).step);
 
         // Mock HTTP servers (test/mocks): self-tests of the mock
         // infrastructure itself, no tile schema imports required. Wired to
@@ -1606,7 +1728,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        test_step.dependOn(&b.addRunArtifact(mock_servers_test).step);
+        test_step.dependOn(&mock_servers_test.step);
 
         const model_tile_http_test = b.addTest(.{
             .root_module = b.createModule(.{
@@ -1744,7 +1866,7 @@ pub fn build(b: *std.Build) void {
     if (target.result.os.tag == .windows) {
         cli_exe.root_module.linkLibrary(addTickoniCodecShimLibrary(b, target, optimize, "tickoni-codec-shims"));
         addWindowsFdManifestFixups(b, cli_exe, b.fmt("{s}/fd_windows_zig_codec_link.txt", .{fd_lib_dir}));
-        linkTickoniSystemLibraries(cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
+        linkTickoniSystemLibraries(b, cli_exe, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
         cli_exe.root_module.linkSystemLibrary("crypt32", .{});
     } else {
         linkTickoniCodec(b, cli_exe, fd_lib_dir);
@@ -1806,6 +1928,7 @@ pub fn build(b: *std.Build) void {
                         .{ .name = "audit_tile", .module = audit_tile_mod },
                         .{ .name = "runtime", .module = runtime_mod },
                         .{ .name = "c_abi", .module = c_abi_mod },
+                        .{ .name = "logger", .module = logger_mod },
                     },
                 })
             else if (std.mem.eql(u8, entry[1], "src/tickoni/runtime/cnc_counters.zig"))
@@ -1846,6 +1969,8 @@ pub fn build(b: *std.Build) void {
             std.mem.eql(u8, entry[1], "src/tickoni/tiles/payment_pipeline/mod.zig"))
         {
             linkTickoniCodec(b, t, fd_lib_dir);
+            // Logger imports util -> c_abi.os which needs shim/os.c
+            linkTickoniFiredancer(b, t, fd_lib_dir);
         }
         if (std.mem.eql(u8, entry[1], "src/tickoni/c_abi/queue.zig") or
             std.mem.eql(u8, entry[1], "src/tickoni/c_abi/dcache.zig") or
@@ -2012,6 +2137,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "c_abi", .module = c_abi_mod },
                 .{ .name = "util", .module = util_mod },
                 .{ .name = "topologies", .module = topologies_named_mod },
+                .{ .name = "logger", .module = logger_mod },
             },
         }),
     });
@@ -2058,24 +2184,43 @@ fn addPlainTestRun(b: *std.Build, test_compile: *std.Build.Step.Compile) *std.Bu
 /// Links the Firedancer substrate used by Tickoni runtime wrappers. Tickoni
 /// code crosses Firedancer only through src/tickoni/c_abi/shim/**, so this
 /// compiles the required Tickoni-owned shim files alongside upstream libs.
-fn shimCFlagsFor(target_os: std.Target.Os.Tag) []const []const u8 {
-    return switch (target_os) {
+fn shimCFlagsFor(target: std.Target) []const []const u8 {
+    return switch (target.os.tag) {
         .linux => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_LINUX=1" },
         .macos => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_MACOS=1" },
-        .windows => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1", "-D_CRT_SECURE_NO_WARNINGS", "-DFD_IO_STYLE=1", "-Wno-format", "-Wno-format-extra-args" },
+        .windows => switch (target.cpu.arch) {
+            .aarch64 => &.{
+                "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1",
+                "-D_CRT_SECURE_NO_WARNINGS", "-DFD_IO_STYLE=1", "-DFD_LOG_STYLE=1", "-DFD_HAS_THREADS=1",
+                "-DFD_HAS_ATOMIC=1", "-DFD_HAS_ARM64=1", "-DFD_HAS_INT128=0", "-DFD_HAS_DOUBLE=1",
+                "-DFD_HAS_ALLOCA=1", "-Wno-format", "-Wno-format-extra-args",
+            },
+            .x86_64 => &.{
+                "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1",
+                "-D_CRT_SECURE_NO_WARNINGS", "-DFD_IO_STYLE=1", "-DFD_LOG_STYLE=1", "-DFD_HAS_THREADS=1",
+                "-DFD_HAS_ATOMIC=1", "-DFD_HAS_X86=1", "-DFD_HAS_SSE=1", "-DFD_HAS_AVX=1",
+                "-DFD_HAS_AVX2=1", "-DFD_HAS_AESNI=1", "-DFD_IS_X86_64=1", "-DFD_HAS_INT128=0",
+                "-DFD_HAS_DOUBLE=1", "-DFD_HAS_ALLOCA=1", "-Wno-format", "-Wno-format-extra-args",
+            },
+            else => &.{
+                "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1", "-DFD_HAS_WINDOWS=1",
+                "-D_CRT_SECURE_NO_WARNINGS", "-DFD_IO_STYLE=1", "-DFD_LOG_STYLE=1", "-DFD_HAS_THREADS=1",
+                "-DFD_HAS_ATOMIC=1", "-Wno-format", "-Wno-format-extra-args",
+            },
+        },
         else => &.{ "-std=c17", "-U__BMI2__", "-U__LZCNT__", "-DFD_HAS_HOSTED=1" },
     };
 }
 
 fn linkTickoniFiredancer(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniFiredancerShims(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_tango", "fd_util" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_tango", "fd_util" });
 }
 
 fn addTickoniFiredancerShims(b: *std.Build, step: *std.Build.Step.Compile) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
-    const target_os = step.root_module.resolved_target.?.result.os.tag;
+    const target_info = step.root_module.resolved_target.?.result;
     step.root_module.addCSourceFiles(.{
         .files = &.{
             "src/tickoni/c_abi/shim/tango.c",
@@ -2084,12 +2229,12 @@ fn addTickoniFiredancerShims(b: *std.Build, step: *std.Build.Step.Compile) void 
             "src/tickoni/c_abi/shim/sandbox.c",
             "src/tickoni/c_abi/shim/os.c",
         },
-        .flags = shimCFlagsFor(target_os),
+        .flags = shimCFlagsFor(target_info),
     });
 }
 
-fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const u8, libs: []const []const u8) void {
-    step.root_module.addLibraryPath(.{ .cwd_relative = fd_lib_dir });
+fn linkTickoniSystemLibraries(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8, libs: []const []const u8) void {
+    step.root_module.addLibraryPath(b.path(fd_lib_dir));
     for (libs) |lib| step.root_module.linkSystemLibrary(lib, .{});
     if (step.root_module.resolved_target.?.result.os.tag == .windows) {
         // COFF static linking is less forgiving about archive-member discovery
@@ -2097,6 +2242,11 @@ fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const
         // closure so later unresolveds can pull additional members from the
         // same Firedancer archives.
         for (libs) |lib| step.root_module.linkSystemLibrary(lib, .{});
+        // Windows prebuilt FD libs (from CI) reference libuuid.a.
+        // contrib/fd-build-windows.sh post-build step compiles
+        // libuuid_stub.c and archives it as libuuid.a so the library lookup
+        // succeeds. Do NOT add libuuid_stub.c as a raw C source file here —
+        // that would create duplicate symbols with the .a archive.
     }
     step.root_module.linkSystemLibrary("stdc++", .{});
 }
@@ -2111,15 +2261,15 @@ fn linkTickoniSystemLibraries(step: *std.Build.Step.Compile, fd_lib_dir: []const
 /// src/disco/topo/Local.mk's own test_topob unit test.
 fn linkTickoniTopoRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniTopoRunShims(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
 }
 
 fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
-    const target_os = step.root_module.resolved_target.?.result.os.tag;
+    const target_info = step.root_module.resolved_target.?.result;
 
-    const topo_run_platform_file = switch (target_os) {
+    const topo_run_platform_file = switch (target_info.os.tag) {
         .macos => "src/tickoni/c_abi/shim/topo_run_platform_macos.c",
         .windows => "src/tickoni/c_abi/shim/topo_run_platform_windows.c",
         else => "src/tickoni/c_abi/shim/topo_run_platform_linux.c",
@@ -2127,7 +2277,7 @@ fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
 
     step.root_module.addCSourceFiles(.{
         .files = &.{ "src/tickoni/c_abi/shim/topo_run.c", topo_run_platform_file, "src/tickoni/c_abi/shim/topob.c" },
-        .flags = shimCFlagsFor(target_os),
+        .flags = shimCFlagsFor(target_info),
     });
 }
 
@@ -2143,16 +2293,16 @@ fn addTickoniTopoRunShims(b: *std.Build, step: *std.Build.Step.Compile) void {
 /// linkTickoniFiredancer and linkTickoniTopoRun.
 fn linkTickoniTileRun(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniTileRunShim(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_disco", "fd_ballet", "fd_waltz" });
 }
 
 fn addTickoniTileRunShim(b: *std.Build, step: *std.Build.Step.Compile) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
-    const target_os = step.root_module.resolved_target.?.result.os.tag;
+    const target_info = step.root_module.resolved_target.?.result;
     step.root_module.addCSourceFiles(.{
         .files = &.{"src/tickoni/c_abi/shim/tile_run.c"},
-        .flags = shimCFlagsFor(target_os),
+        .flags = shimCFlagsFor(target_info),
     });
 }
 
@@ -2171,12 +2321,12 @@ fn addTickoniShimLibrary(
     mod.addIncludePath(b.path("src"));
     mod.addCSourceFiles(.{
         .files = files,
-        .flags = shimCFlagsFor(target.result.os.tag),
+        .flags = shimCFlagsFor(target.result),
     });
     if (target.result.os.tag == .windows) {
         mod.addCSourceFiles(.{
             .files = &.{"src/tickoni/c_abi/shim/windows_crt.c"},
-            .flags = shimCFlagsFor(target.result.os.tag),
+            .flags = shimCFlagsFor(target.result),
         });
     }
     return b.addLibrary(.{
@@ -2219,6 +2369,7 @@ fn addTickoniCodecShimLibrary(
 fn addWindowsFdManifestFixups(b: *std.Build, step: *std.Build.Step.Compile, manifest_path: []const u8) void {
     if (step.root_module.resolved_target.?.result.os.tag != .windows) return;
 
+    // Read and apply Windows FD manifest fixups
     var threaded = std.Io.Threaded.init_single_threaded;
     const manifest = std.Io.Dir.cwd().readFileAlloc(
         threaded.io(),
@@ -2241,17 +2392,17 @@ fn addWindowsFdManifestFixups(b: *std.Build, step: *std.Build.Step.Compile, mani
 /// src/tickoni/codec/audit.zig and src/tickoni/codec/thesis.zig.
 fn linkTickoniCodec(b: *std.Build, step: *std.Build.Step.Compile, fd_lib_dir: []const u8) void {
     addTickoniCodecShim(b, step);
-    linkTickoniSystemLibraries(step, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
+    linkTickoniSystemLibraries(b, step, fd_lib_dir, &.{ "fd_ballet", "fd_util" });
 }
 
 fn addTickoniCodecShim(b: *std.Build, step: *std.Build.Step.Compile) void {
     step.root_module.link_libc = true;
     step.root_module.addIncludePath(b.path("src"));
-    const target_os = step.root_module.resolved_target.?.result.os.tag;
+    const target_info = step.root_module.resolved_target.?.result;
     step.root_module.addCSourceFiles(.{
         .files = &.{
             "src/tickoni/c_abi/shim/ballet.c",
         },
-        .flags = shimCFlagsFor(target_os),
+        .flags = shimCFlagsFor(target_info),
     });
 }

@@ -199,12 +199,15 @@ fn cmdStart(init: std.process.Init, topo: rt.topology.Topology) !void {
         const diag = state.snapshotDiag();
         const metrics_line = try std.fmt.bufPrint(
             &buf,
-            "metrics: produced={d} audited={d} duplicates={d} denied={d} backpressure_waits={d} max_queue_depth={d} max_latency_hops={d}\n",
+            "metrics: produced={d} normalized={d} invalid={d} duplicates={d} allowed={d} denied={d} audited={d} backpressure_waits={d} max_queue_depth={d} max_latency_hops={d}\n",
             .{
                 metrics.produced,
-                metrics.audited,
+                metrics.normalized,
+                metrics.invalid,
                 metrics.duplicates,
+                metrics.allowed,
                 metrics.denied,
+                metrics.audited,
                 metrics.backpressure_waits,
                 metrics.max_queue_depth,
                 metrics.max_latency_hops,
@@ -214,9 +217,11 @@ fn cmdStart(init: std.process.Init, topo: rt.topology.Topology) !void {
 
         const diag_line = try std.fmt.bufPrint(
             &buf,
-            "diag: sandbox_failures={d} replay_checked={s} replay_match={s}\n",
+            "diag: sandbox_failures={d} audit_records={d} crashed_tile={d} replay_checked={s} replay_match={s}\n",
             .{
                 diag.sandbox_failures,
+                diag.audit_records,
+                diag.crashed_tile,
                 if (diag.replay_checked) "true" else "false",
                 if (diag.replay_match) "true" else "false",
             },
