@@ -4,7 +4,6 @@
 /* fd_pb_tokenize.h provides an API to iterate over tokens in Protobuf
    wire format.  It can be used to deserialize Protobuf. */
 
-#include <stdint.h>
 #include "fd_pb_wire.h"
 
 struct fd_pb_inbuf {
@@ -44,10 +43,10 @@ struct fd_pb_tlv {
   uint field_id;
 
   union {
-    uint64_t varint;
-    uint64_t i64;
-    uint64_t len;
-    uint32_t i32;
+    ulong varint;
+    ulong i64;
+    ulong len;
+    uint i32;
   };
 };
 
