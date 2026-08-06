@@ -8,7 +8,7 @@ const PaymentPipelineState = runtime.PaymentPipelineState;
 
 pub fn runDiag(state: *PaymentPipelineState) void {
     const log = logger.get();
-    try log.enter("tkdiag", "runDiag");
+    log.enter("tkdiag", "runDiag") catch {};
     defer log.exit("tkdiag", "runDiag") catch {};
 
     while (!state.replay_checked.load(.acquire) and !state.stop.load(.acquire)) {

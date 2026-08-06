@@ -11,7 +11,7 @@ const PaymentPipelineState = runtime.PaymentPipelineState;
 
 pub fn runPolicy(state: *PaymentPipelineState) void {
     const log = logger.get();
-    try log.enter("tkpoly", "runPolicy");
+    log.enter("tkpoly", "runPolicy") catch {};
     defer log.exit("tkpoly", "runPolicy") catch {};
 
     defer state.q_poly_audit.close();

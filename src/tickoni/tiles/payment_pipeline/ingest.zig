@@ -2,7 +2,7 @@
 /// test-hook sandbox-failure edge that simulates the process-supervisor
 /// crash path while the pipeline still runs in threads.
 const std = @import("std");
-const runtime = @import("runtime");
+const runtime = @import("runtime.zig");
 const logger = @import("logger");
 
 const PaymentPipelineState = runtime.PaymentPipelineState;
@@ -10,28 +10,28 @@ const PaymentPipelineState = runtime.PaymentPipelineState;
 pub const tile_tkings: i32 = 0;
 
 pub fn runIngest(state: *PaymentPipelineState) void {
-    const log = logger.get() catch {};
-    _ = log.enter("tkings", "runIngest") catch {};
+    const log = logger.get();
+    log.enter("tkings", "runIngest") catch {};
     defer log.exit("tkings", "runIngest") catch {};
 
-    defer state.q_ing_norm.close() catch {};
+    defer state.q_ing_norm.close();
 
     var offset: u64 = 0;
     while (offset < state.config.event_count) : (offset += 1) {
         if (state.stop.load(.acquire)) break;
         if (state.config.sandbox_fail_at) |fail_at| {
             if (offset == fail_at) {
-                _ = state.sandbox_failures.fetchAdd(1, .release) catch {};
-                state.crashed_tile.store(tile_tkings, .release) catch {};
+                _ = state.sandbox_failures.fetchAdd(1, .release);
+                state.crashed_tile.store(tile_tkings, .release);
                 log.err("tkings", "runIngest", "sandbox failure triggered at offset") catch {};
-                state.requestStop() catch {};
+                state.requestStop();
                 break;
             }
         }
 
-        const raw = runtime.syntheticPayment(state.config, offset) catch {};
+        const raw = runtime.syntheticPayment(state.config, offset);
         if (state.q_ing_norm.push(.{ .raw = raw, .pipeline_hops = 1 }, &state.stop)) |_| {
-            _ = state.produced.fetchAdd(1, .release) catch {};
+            _ = state.produced.fetchAdd(1, .release);
             if (logger.isVerbose()) log.debug("tkings", "runIngest", "produced event") catch {};
         } else |_| {
             log.debug("tkings", "runIngest", "queue full, stopping") catch {};
