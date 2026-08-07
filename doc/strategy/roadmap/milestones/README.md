@@ -20,11 +20,11 @@ carried-forward platform backlog item such as `P1`.
 | --- | --- |
 | [M1](m1.md): Safe Money Decisions | Investment intent becomes a paper trade; portfolio and cash impact is visible |
 | [M2](m2.md): Governed Harness Runtime | Tile processes are real, agent runs are bounded, tool dispatch is normalized, model limits are enforced |
-| [M4](m3.md): Proof And Trust | Observable checkpoints, tamper-evident capsules, and partner-inspectable trust and capability surfaces |
-| [M5](m4.md): Crypto Guard And Spot Trade | Crypto and stablecoin guardrails with trading authority separate from transfer authority |
-| [M6](m5.md): Approved Payment And Broker Sandbox | Payment proposals, approved sandbox execution, and operations workflows governed by the same harness |
-| [M7](m6.md): Social Thesis And Money Feed | Users can copy thesis and money-decision templates into their own account limits |
-| [M8](m7.md): Guarded Money Movement | Payment, transfer, and crypto movement proposals become policy-checked, approval-bound, and replayable |
+| [M4](m4.md): Proof And Trust | Observable checkpoints, tamper-evident capsules, and partner-inspectable trust and capability surfaces |
+| [M5](m5.md): Crypto Guard And Spot Trade | Crypto and stablecoin guardrails with trading authority separate from transfer authority |
+| [M6](m6.md): Approved Payment And Broker Sandbox | Payment proposals, approved sandbox execution, and operations workflows governed by the same harness |
+| [M7](m7.md): Social Thesis And Money Feed | Users can copy thesis and money-decision templates into their own account limits |
+| [M8](m8.md): Guarded Money Movement | Payment, transfer, and crypto movement proposals become policy-checked, approval-bound, and replayable |
 
 ## Cross-References
 
