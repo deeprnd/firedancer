@@ -38,7 +38,7 @@ policy-checked financial event — not a synthetic alert.
 ## Product Fit Thesis
 
 This fits Tickoni because it closes the feedback loop for the consumer investing
-workflow. V5.5 delivers watchlist management and automatic Damodaran valuation, but
+workflow. V5.5 delivers watchlist management and automatic DCF valuation, but
 the user currently has to poll or refresh CaseOps to see when a valuation completes
 or a rebalance suggestion arrives. Push notifications transform Tickoni from a
 "check-back-and-see" system into a proactive governance platform: the user is
@@ -69,7 +69,7 @@ suppress governance events; it must log to `tkaudt` and surface in CaseOps.
 
 ## User / Operator Problem
 
-A consumer investor has Tickoni valuing companies on their watchlist. A Damodaran
+A consumer investor has Tickoni valuing companies on their watchlist. A DCF
 valuation completes, a rebalance suggestion appears, or a case requires operator
 review. Currently, the user must open Tickoni CaseOps, browse the board, and hope
 they notice the new event. In a mobile or desktop context, the user may not have
@@ -166,7 +166,7 @@ ad-hoc notification system.
 ```text
 Given:  A user has subscribed to "valuation.complete" events for their "Growth"
         portfolio (portfolio_id = growth_001, tickers = [AMZN, AAPL, MSFT])
-When:   The Damodaran valuation for AMZN completes and is recorded in tkaudt
+When:   The DCF valuation for AMZN completes and is recorded in tkaudt
 Then:   Tickoni's tkapi publishes a WebSocket notification to the user's device
         containing: event_type=valuation.complete, event_hash=<tkaudt_hash>,
         portfolio_id=growth_001, ticker=AMZN, policy_outcome=allow,

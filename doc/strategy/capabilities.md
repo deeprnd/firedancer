@@ -438,7 +438,7 @@ policy.modify
 valuation.analysis.propose        deferred until V4.32
 ```
 
-Valuation capabilities (V4.32 — Damodaran DCF):
+Valuation capabilities (V4.32 — DCF):
 
 ```text
 valuation_market_data.read
@@ -453,6 +453,8 @@ valuation_sensitivity.analyze
 valuation_conclusion.render
 valuation_audit.check
 ```
+
+Note: uses Aswath Damodaran's freely available NYU Stern datasets (ERP, country risk, industry betas) and his public valuation framework. The `tkval` tile implements the methodology and computation — not a branded product.
 
 Valuation scope dimensions:
 
