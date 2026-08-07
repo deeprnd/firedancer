@@ -52,7 +52,7 @@ Use these project docs to fill and implement issues:
 || [V3.19](v3.19.md) | Tickoni Terminal CaseOps UI |
 || [V2.21](v2.21.md) | macOS Retail Runtime Support |
 || [V2.22](v2.22.md) | Windows Retail Runtime Support |
-|| [V4.32](v4.32.md) | Core Damodaran Engine — tkval tile, WACC, FCFF, Gordon Growth, exit-multiple cross-check |
+|| [V4.32](v4.32.md) | Core DCF Valuation Engine — tkval tile, WACC, FCFF, Gordon Growth, exit-multiple cross-check |
 || [V4.34](v4.34.md) | Valuation Data Layer — ERP (FreeXL), EDGAR (Edgartools), XBRL (Arelle), market data, financial validation |
 || [V4.24](v4.24.md) | Monte Carlo and Scenario Analysis — native Monte Carlo, cross-check suite, sensitivity tables, methodology audit |
 || [V4.25](v4.25.md) | Investment Conclusion and Governance — per-share value, verdict engine, valuation.propose, audit, replay |
