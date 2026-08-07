@@ -30,8 +30,8 @@ Release label conventions:
 
 Examples:
   - `M1 — The Paper Moon`
-  - `V4.1 — Portfolio Guardrails`
-  - `V5.6.S2 — Snapshot Review Surface`
+  - `V5.1 — Portfolio Guardrails`
+  - `V6.6.S2 — Snapshot Review Surface`
   - `Hotfix — Replay Hash Repair`
 
 How to build the content from roadmap work:

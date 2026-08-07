@@ -1,18 +1,18 @@
 # Backlog Proposal: Social Tracking And Copy Feed
 
 **Status:** Backlog Proposal
-**Proposed milestone:** M11 (Social Thesis And Money Feed)
+**Proposed milestone:** M12 (Social Thesis And Money Feed)
 **Candidate issue type if accepted:** epic
 **Candidate labels:** [`social` `investing` `trust` `enhancement`]
 **Related docs / examples:** doc/strategy/roadmap/milestones/m11.md, doc/knowledge/architecture.md
 
 ## Proposal Summary
 
-A social tracking layer on top of M11's thesis and money-decision feed: users can follow other users, view leaderboards of policy-compliant behavior, join guilds around shared investment themes, and copy-thought workflows where every copied template is re-evaluated against the copier's own capability envelope. The social signals (following, leaderboards, guild membership) are built on top of the same audit-replay infrastructure that M11 already requires — they surface what Tickoni has already recorded, they do not generate new financial consequences.
+A social tracking layer on top of M12's thesis and money-decision feed: users can follow other users, view leaderboards of policy-compliant behavior, join guilds around shared investment themes, and copy-thought workflows where every copied template is re-evaluated against the copier's own capability envelope. The social signals (following, leaderboards, guild membership) are built on top of the same audit-replay infrastructure that M12 already requires — they surface what Tickoni has already recorded, they do not generate new financial consequences.
 
 ## Product Fit Thesis
 
-This fits Tickoni because it extends M11's "browse -> inspect -> copy" surface with explicit trust primitives: follow (who am I trusting?), guilds (what shared policy envelope are we optimizing for?), and leaderboards (who has the most consistent policy-compliant proposal history?). The social layer is purely observational and informational — it never creates financial consequences, never executes anything, and always routes copies through `tkpoly` capability re-evaluation. The product risk is controlled because the social signals are derived from audit records, not from PnL or performance claims.
+This fits Tickoni because it extends M12's "browse -> inspect -> copy" surface with explicit trust primitives: follow (who am I trusting?), guilds (what shared policy envelope are we optimizing for?), and leaderboards (who has the most consistent policy-compliant proposal history?). The social layer is purely observational and informational — it never creates financial consequences, never executes anything, and always routes copies through `tkpoly` capability re-evaluation. The product risk is controlled because the social signals are derived from audit records, not from PnL or performance claims.
 
 It is not just a generic social / copy-trading UX because the ranking and visibility signals are policy-compliance outcomes, not returns. Leaderboards rank by audit quality, policy pass rate, and proposal discipline — not by returns, alpha, or risk-taking. The "copy" action is always a re-evaluated proposal, never a direct execution.
 
@@ -30,7 +30,7 @@ It is not just a generic social / copy-trading UX because the ranking and visibi
 
 ## User / Operator Problem
 
-The M11 feed lets users browse and copy thesis cards and money-decision cards. But browsing a single card in isolation doesn't answer two critical questions a copier needs:
+The M12 feed lets users browse and copy thesis cards and money-decision cards. But browsing a single card in isolation doesn't answer two critical questions a copier needs:
 
 1. "Can I trust the author's judgment, or did they just get lucky?"
 2. "What kind of person (or organization) consistently operates within policy?"
@@ -62,7 +62,7 @@ Expected behavior:
 
 ## Why Now
 
-M11 already establishes the core "browse -> inspect -> copy" mechanism and the re-evaluation boundary. Adding social tracking in the same milestone avoids creating a second trust boundary later. The audit infrastructure (`tkaudt`) and policy engine (`tkpoly`) are already in scope for M11, so the social signals are derived from existing infrastructure, not new trust surfaces. Delaying social features to a later milestone would mean rebuilding the feed UI twice or creating a separate trust model that conflicts with M11's re-evaluation discipline.
+M12 already establishes the core "browse -> inspect -> copy" mechanism and the re-evaluation boundary. Adding social tracking in the same milestone avoids creating a second trust boundary later. The audit infrastructure (`tkaudt`) and policy engine (`tkpoly`) are already in scope for M12, so the social signals are derived from existing infrastructure, not new trust surfaces. Delaying social features to a later milestone would mean rebuilding the feed UI twice or creating a separate trust model that conflicts with M12's re-evaluation discipline.
 
 ## Example Scenario
 
@@ -92,7 +92,7 @@ Then:   User B clicks "copy" on the thesis card. The copy is re-evaluated
 * Leaderboard ranking by policy compliance quality only
 * Guilds as shared-scope communities (no shared execution, no shared wallets)
 * Card-level trust signals (author compliance history, scope compatibility)
-* Copy workflow with social context (the copy itself is unchanged from M11: re-evaluated by tkpoly)
+* Copy workflow with social context (the copy itself is unchanged from M12: re-evaluated by tkpoly)
 * Replay of social events from audit records
 
 ### Out Of Scope
@@ -152,7 +152,7 @@ This should not move forward if:
 * it encourages blind-copying under the illusion of trust (social signal != financial guarantee)
 * it cannot identify the relevant policy, approval, evidence, or replay boundary for social actions
 * guilds evolve into shared-custody or shared-execution arrangements
-* it duplicates M11's core copy workflow instead of extending it with social trust signals
+* it duplicates M12's core copy workflow instead of extending it with social trust signals
 * it makes social engagement metrics (likes, comments, follower count) the ranking signal
 
 ## Open Decisions
@@ -169,7 +169,7 @@ This should not move forward if:
 
 If accepted, this should become:
 
-* [x] Epic: spans multiple stories (follow, leaderboard, guilds, social signals, social copy) and delivers a complete social-tracking product increment within M11
+* [x] Epic: spans multiple stories (follow, leaderboard, guilds, social signals, social copy) and delivers a complete social-tracking product increment within M12
 * [ ] Story: follow and card-level trust signals
 * [ ] Story: leaderboard ranking and display
 * [ ] Story: guild creation, membership, and scope tagging

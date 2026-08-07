@@ -65,7 +65,7 @@ Read before filling:
 # VX.Y: [Epic Title]
 
 **Status:** [Backlog] upon creation
-**Milestone:** [M1 | M2 | M3 | M4 | M5 | M6 | M7 | M8 | M9 | M10 | M11]
+**Milestone:** [M1 | M2 | M4 | M5 | M6 | M7 | M8 | M9 | M10 | M11 | M12]
 **Labels:** `type/epic`, [`area/agents` | `area/audit` | `area/crypto` | `type/documentation` | `type/feature` | `area/investing` | `area/operations` | `area/payments` | `area/platform` | `area/security` | `area/social` | `area/trust`]
 
 <!-- One paragraph: what complete feature this epic delivers and why now. -->
@@ -205,13 +205,13 @@ If the epic has 200+ lines of scope, it should have 7+ stories — not 2.
 ### Good Split Example (Portfolio Management Epic)
 
 ```
-V4.1.S1: Portfolio CRUD — create/edit/delete portfolios and holdings with
+V5.1.S1: Portfolio CRUD — create/edit/delete portfolios and holdings with
          validation, capability envelopes, and audit trail.
-V4.1.S2: Portfolio CaseOps surface — portfolio state and mutations visible
+V5.1.S2: Portfolio CaseOps surface — portfolio state and mutations visible
          through CaseOps with stable event IDs and hashes.
-V4.1.S3: Portfolio replay — deterministic replay of portfolio mutations
+V5.1.S3: Portfolio replay — deterministic replay of portfolio mutations
          against the same event stream with stable hashes and reconstructed state.
-V4.1.S4: Evidence, demo, and release closure — T10 expansion covering
+V5.1.S4: Evidence, demo, and release closure — T10 expansion covering
          fixtures, quality gates, documentation, and roadmap updates.
 ```
 

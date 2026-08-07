@@ -435,10 +435,10 @@ payout.approve
 account.freeze
 risk_rule.override
 policy.modify
-valuation.analysis.propose        deferred until V3.22
+valuation.analysis.propose        deferred until V4.22
 ```
 
-Valuation capabilities (V3.22 — Damodaran DCF):
+Valuation capabilities (V4.22 — Damodaran DCF):
 
 ```text
 valuation_market_data.read
@@ -684,14 +684,14 @@ payout.approve
 account.freeze
 risk_rule.override
 policy.modify
-valuation_analysis.analyze       deferred until V3.22
-valuation_analysis.propose       deferred until V3.22
-valuation_conclusion.render      deferred until V3.22
-valuation_peer.compare           deferred until V3.22
-valuation_reverse_dcf.analyze    deferred until V3.22
-valuation_sensitivity.analyze    deferred until V3.22
-valuation_transcript.extract     deferred until V3.22
-valuation_audit.check            deferred until V3.22
+valuation_analysis.analyze       deferred until V4.22
+valuation_analysis.propose       deferred until V4.22
+valuation_conclusion.render      deferred until V4.22
+valuation_peer.compare           deferred until V4.22
+valuation_reverse_dcf.analyze    deferred until V4.22
+valuation_sensitivity.analyze    deferred until V4.22
+valuation_transcript.extract     deferred until V4.22
+valuation_audit.check            deferred until V4.22
 ```
 
 ## V1 Capability Depth By Increment
