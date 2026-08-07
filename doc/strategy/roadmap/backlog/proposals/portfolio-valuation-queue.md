@@ -24,7 +24,7 @@ governed runtime into a consumer-facing investing app: users manage portfolios
 (add/edit/delete holdings), view exposure by industry and sector through pie
 charts, receive rebalance suggestions against target exposure, maintain watchlists,
 and get every portfolio and watchlist company automatically queued for Damodaran-style
-valuation via V4.22. A model selector lets users choose which LLM model backs each
+valuation via V4.32. A model selector lets users choose which LLM model backs each
 investigation from four tiers: local open-source, OpenAI, Anthropic Claude, or
 Tickoni subscription (finance-tuned models fine-tuned on financial reasoning).
 
@@ -55,7 +55,7 @@ decision that allowed or denied a rebalance proposal.
 | What audit, evidence, or replay value does it create? | Every portfolio mutation is a source event with a stable payload hash. Every valuation run is captured as a replay capsule substituting model/adapter outputs. Exposure charts are deterministic functions of auditable holding records. |
 | What finance-native scope matters: account, beneficiary, wallet, rail, currency, market, venue, instrument, amount, exposure, frequency, approval path? | Account (portfolio id), instrument (ticker/ISIN/CUSIP), amount (shares/notional), exposure (sector/industry/asset-class breakdown), concentration limits (single-name, sector caps), currency (position currency vs portfolio base), approval path (rebalance proposals over concentration limits). |
 | How does it keep agents off the direct money path? | Agents (via `tkdisp`->`tkagnt`->`tkmodl`) only produce investigation reports and `valuation.analysis.propose` records. The rebalance suggestion is a `portfolio.rebalance.propose` envelope; no adapter call or order placement occurs. |
-| How does it avoid becoming generic agent automation or trading-alpha UX? | No performance ranking, no alpha generation, no gamification. The product object is a governable portfolio state machine with audit, replay, and policy gates. Valuation is deterministic math (V4.22), not generative alpha. |
+| How does it avoid becoming generic agent automation or trading-alpha UX? | No performance ranking, no alpha generation, no gamification. The product object is a governable portfolio state machine with audit, replay, and policy gates. Valuation is deterministic math (V4.32), not generative alpha. |
 
 ## User / Operator Problem
 
@@ -63,13 +63,13 @@ The user is a consumer investor who wants to build and track a portfolio, see wh
 their money actually is (by industry, sector, asset class), understand when the
 portfolio drifts from their target allocation, and get grounded, audited company
 valuations before making changes. Currently, Tickoni has the governed runtime, the
-Damodaran valuation engine (V4.22), and the capability model -- but no end-to-end
+Damodaran valuation engine (V4.32), and the capability model -- but no end-to-end
 app surface that wires these together. The user has a runtime without a wallet.
 
 ## Current Gap
 
 Tickoni can process financial events, normalize them, deduplicate them, policy-check
-them, and audit them. V4.22 can run a full Damodaran DCF valuation and produce a
+them, and audit them. V4.32 can run a full Damodaran DCF valuation and produce a
 proposal-grade record. But there is no:
 
 - Portfolio state object (holdings, cash, base currency) that users can create and
@@ -78,9 +78,9 @@ proposal-grade record. But there is no:
   pie charts from auditable holding records.
 - Rebalance suggestion logic that compares current exposure to a user-defined target
   and surfaces `portfolio.rebalance.propose` envelopes.
-- Watchlist that feeds into the V4.22 valuation queue.
+- Watchlist that feeds into the V4.32 valuation queue.
 - Automatic valuation queue: when a ticker enters a portfolio or watchlist, it should
-  be queued for Damodaran valuation with all V4.22 capability checks.
+  be queued for Damodaran valuation with all V4.32 capability checks.
 - Model selection: users need to choose which LLM model powers each investigation.
   Four tiers: local open-source (e.g., Qwen, Llama), OpenAI, Anthropic Claude,
   or Tickoni subscription (finance-tuned models fine-tuned on financial reasoning).
@@ -105,10 +105,10 @@ Expected behavior:
   target and surfaces `portfolio.rebalance.propose` envelopes for any material
   drift, with explicit scope (which holdings to buy/sell, by how much, against
   which concentration limits).
-* Watchlist: users add and remove tickers. Watchlist tickers enter the V4.22
+* Watchlist: users add and remove tickers. Watchlist tickers enter the V4.32
   valuation queue automatically.
 * Automatic valuation queue: when a company appears in any portfolio or watchlist,
-  it is queued for Damodaran valuation. The queue respects V4.22 capability checks
+  it is queued for Damodaran valuation. The queue respects V4.32 capability checks
   (`valuation_market_data.read`, `valuation_financials.read`, `valuation_analysis.analyze`).
   Valuation runs use the user's selected model for any LLM-powered evidence
   generation, but the DCF math itself is deterministic.
@@ -122,7 +122,7 @@ Expected behavior:
 ## Why Now
 
 M5 has been sitting as a two-line description in the milestone backlog. The runtime
-(P0), the capability model (P1), and the V4.22 valuation engine are all specified
+(P0), the capability model (P1), and the V4.32 valuation engine are all specified
 and partially implemented. Wires the three together now converts Tickoni from a
 governed event engine with a valuation calculator into a demonstrable consumer
 investing product. It also produces a clean demo moment: create a portfolio, see
@@ -146,7 +146,7 @@ Then:   Tickoni renders pie charts showing Technology 82% (drift: +42%),
         `portfolio.rebalance.propose` envelope with capability scope,
         concentration limits, and approval-required status.
 When:   The user adds "AMZN" to their watchlist.
-Then:   Tickoni queues AMZN for V4.22 Damodaran valuation. The valuation uses
+Then:   Tickoni queues AMZN for V4.32 Damodaran valuation. The valuation uses
         the user's selected model (e.g., "local-openai/gpt-4o") for evidence
         generation but runs the DCF math deterministically. When complete,
         the user receives a subscription event: "AMZN valuation complete:
@@ -167,7 +167,7 @@ Then:   Tickoni queues AMZN for V4.22 Damodaran valuation. The valuation uses
 * Target exposure management and rebalance suggestion generation.
 * Watchlist CRUD: add/remove tickers with optional notes.
 * Automatic valuation queue for portfolio and watchlist companies.
-* V4.22 Damodaran valuation integration with capability checks.
+* V4.32 Damodaran valuation integration with capability checks.
 * Model selection: per-portfolio or per-watchlist LLM model choice from four tiers
   (local open-source, OpenAI, Anthropic Claude, Tickoni subscription finance-tuned).
 
@@ -176,7 +176,7 @@ Then:   Tickoni queues AMZN for V4.22 Damodaran valuation. The valuation uses
 * Live order placement or any execution path.
 * Portfolio optimization or modern portfolio theory (Markowitz, Black-Litterman).
 * Factor models, alpha generation, or performance ranking.
-* Direct market data ingestion (assumed provided as input/fixture per V4.22).
+* Direct market data ingestion (assumed provided as input/fixture per V4.32).
 * Social/clone/copy portfolio features (deferred to M7).
 * Multi-currency portfolio reconciliation (single base currency per portfolio).
 * Tax-lot accounting or harvest-loss tracking.

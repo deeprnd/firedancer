@@ -107,7 +107,7 @@ Example of good decomposition for M6 (what M6 should look like):
   - `V6.2`: Chain-risk scoring and travel-rule checks — #[github-epic-issue]
   - `V6.3`: Policy enforcement for crypto transfers — #[github-epic-issue]
   - `V6.4`: Stablecoin cash-impact view — #[github-epic-issue]
-  - `V6.5`: Intent, schema, and instrument catalog — #[github-epic-issue]
+  - `V6.31`: Intent, schema, and instrument catalog — #[github-epic-issue]
   - `V6.6`: Account and market snapshots — #[github-epic-issue]
   - `V6.7`: Fee-aware ticket generation — #[github-epic-issue]
   - `V6.8`: Order lifecycle and sandbox submission — #[github-epic-issue]
@@ -115,7 +115,7 @@ Example of good decomposition for M6 (what M6 should look like):
 
 Example of poor decomposition (what to avoid):
 
-  - `V6.5`: Crypto And Stablecoin Guard — broad, mixes allowlist + policy
+  - `V6.31`: Crypto And Stablecoin Guard — broad, mixes allowlist + policy
     + audit in one epic (7 tasks that belong in 3 epics)
   - `V6.9`: Crypto Thesis To Guarded Spot Trade — monolith with 6 stories
     and 36 tasks, should be 7+ separate epics
