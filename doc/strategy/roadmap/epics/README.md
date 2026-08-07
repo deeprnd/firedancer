@@ -40,33 +40,33 @@ Use these project docs to fill and implement issues:
 
 | Increment | Description |
 | --- | --- |
-- `[V5.1](v5..md): Portfolio Management And Valuation Queue` — Portfolio CRUD, exposure charts, rebalance suggestions, watchlist with automatic valuation queue
-|- `[V5.2](v5..md): Model Selection And Governance` — Per-portfolio model tier selection stored as `tkmodl` capability scope with budget enforcement |
+- `[V5.26](v5.26.md): Portfolio Management And Valuation Queue` — Portfolio CRUD, exposure charts, rebalance suggestions, watchlist with automatic valuation queue
+|- `[V5.2](v5.2.md): Model Selection And Governance` — Per-portfolio model tier selection stored as `tkmodl` capability scope with budget enforcement |
 || [V1.0](v1.0.md) | Runtime Proof |
 || [V1.1](v1.1.md) | Investment Intent To Paper Trade |
 || [V1.11](v1.11.md) | Investment Demo Release Closure |
 || [V2.14](v2.14.md) | Firedancer Process And Shared-Memory Topology |
 || [V1.3](v1.3.md) | Portfolio And Cash Impact Loop |
-|| [V11.2](v11..md) | Pay And Move Money Guard |
-|| [V11.20](v11..md) | Guarded Crypto Transfers |
+|| [V11.28](v11.28.md) | Pay And Move Money Guard |
+|| [V11.20](v11.20.md) | Guarded Crypto Transfers |
 || [V3.19](v3.19.md) | Tickoni Terminal CaseOps UI |
 || [V2.21](v2.21.md) | macOS Retail Runtime Support |
 || [V2.22](v2.22.md) | Windows Retail Runtime Support |
-|| [V4.22](v4..md) | Core Damodaran Engine — tkval tile, WACC, FCFF, Gordon Growth, exit-multiple cross-check |
-|| [V4.23](v4..md) | Valuation Data Layer — ERP (FreeXL), EDGAR (Edgartools), XBRL (Arelle), market data, financial validation |
-|| [V4.24](v4..md) | Monte Carlo and Scenario Analysis — native Monte Carlo, cross-check suite, sensitivity tables, methodology audit |
-|| [V4.25](v4..md) | Investment Conclusion and Governance — per-share value, verdict engine, valuation.propose, audit, replay |
-|| [V6.5](v6..md) | Crypto And Stablecoin Guard |
-|| [V6.9](v6..md) | Crypto Thesis To Guarded Spot Trade |
-|| [V7.12](v7..md) | Runtime Hooks |
-|| [V7.15](v7..md) | Bounded Agent Run Governance |
-|| [V7.17](v7..md) | Tkmodl Budget And Call-Limit Governance |
-|| [V7.18](v7..md) | Replay Proof Bundle And Evidence Integrity |
-|| [V7.7](v7..md) | Trust Layer |
-|| [V7.8](v7..md) | Capability Control Surface |
-|| [V8.13](v8..md) | Non-Investment Operations Workflows |
-|| [V8.22](v8..md) | Financial Telemetry, Audit, And Observability Governance |
-|| [V8.6](v8..md) | Guarded Broker, Payment, And Crypto Sandbox |
+|| [V4.32](v4.32.md) | Core Damodaran Engine — tkval tile, WACC, FCFF, Gordon Growth, exit-multiple cross-check |
+|| [V4.23](v4.23.md) | Valuation Data Layer — ERP (FreeXL), EDGAR (Edgartools), XBRL (Arelle), market data, financial validation |
+|| [V4.24](v4.24.md) | Monte Carlo and Scenario Analysis — native Monte Carlo, cross-check suite, sensitivity tables, methodology audit |
+|| [V4.25](v4.25.md) | Investment Conclusion and Governance — per-share value, verdict engine, valuation.propose, audit, replay |
+|| [V6.31](v6.31.md) | Crypto And Stablecoin Guard |
+|| [V6.9](v6.9.md) | Crypto Thesis To Guarded Spot Trade |
+|| [V7.12](v7.12.md) | Runtime Hooks |
+|| [V7.15](v7.15.md) | Bounded Agent Run Governance |
+|| [V7.17](v7.17.md) | Tkmodl Budget And Call-Limit Governance |
+|| [V7.18](v7.18.md) | Replay Proof Bundle And Evidence Integrity |
+|| [V7.7](v7.7.md) | Trust Layer |
+|| [V7.8](v7.8.md) | Capability Control Surface |
+|| [V8.13](v8.13.md) | Non-Investment Operations Workflows |
+|| [V8.33](v8.33.md) | Financial Telemetry, Audit, And Observability Governance |
+|| [V8.6](v8.6.md) | Guarded Broker, Payment, And Crypto Sandbox |
 
 ## How Roadmap Files Are Organized
 

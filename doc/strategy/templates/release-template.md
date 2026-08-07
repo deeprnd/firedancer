@@ -30,7 +30,7 @@ Release label conventions:
 
 Examples:
   - `M1 — The Paper Moon`
-  - `V5.1 — Portfolio Guardrails`
+  - `V5.26 — Portfolio Guardrails`
   - `V6.6.S2 — Snapshot Review Surface`
   - `Hotfix — Replay Hash Repair`
 
