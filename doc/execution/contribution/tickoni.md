@@ -36,7 +36,7 @@ performance, performance before developer convenience; bounded control flow;
 startup allocation; dense executable invariants; deliberate naming; and design
 work before implementation. These rules are adapted to Tickoni's financial,
 auditable, replayable, process-isolated runtime rather than copied as
-TigerBeetle-specific policy.
+ledger-specific policy.
 
 ## Design Priorities
 
@@ -829,8 +829,8 @@ or degraded mode must be selected explicitly before the call.
   module.
 - No lint, formatter, sanitizer, seccomp, or test bypasses as a substitute for
   refactoring.
-- No direct agent-to-model, agent-to-financial-API, agent-to-TigerBeetle, or
-  UI-to-TigerBeetle paths.
+- No direct agent-to-model, agent-to-financial-API, agent-to-ledger, or
+  UI-to-ledger paths.
 - No hidden mutable global registries for capabilities, adapters, model
   providers, tile links, or storage backends.
 
@@ -840,15 +840,15 @@ or degraded mode must be selected explicitly before the call.
   human-authored operating context. They are read as context and must not be
   treated as deterministic runtime truth unless versioned and captured into
   audit or replay inputs.
-- DuckDB is for market data, analytics, backtests, research tables, and local
-  analytical projections. Do not use DuckDB as authoritative balances,
+- the analytics store is for market data, analytics, backtests, research tables, and local
+  analytical projections. Do not use the analytics store as authoritative balances,
   transfers, fills, or accounting state.
-- TigerBeetle is for balances, transfers, fills, accounting entries, and
+- the approved execution ledger is for balances, transfers, fills, accounting entries, and
   approved ledger-style financial state. Access belongs behind `tkexec` or a
   narrow executor-owned finance database module.
 - Runtime code, agents, UI/API handlers, model gateway code, and adapter code
   should use explicit storage module APIs or tile messages. Do not scatter file
-  IO, SQL, DuckDB queries, or TigerBeetle calls across unrelated code.
+  IO, SQL, analytics store queries, or ledger calls across unrelated code.
 - If a needed operation is not exposed by the proper storage boundary, add or
   extend that boundary instead of bypassing it.
 - Storage writes that affect policy, audit, replay, balances, transfers, fills,
@@ -1573,7 +1573,7 @@ Phase 4:
 
 - `tkexec`
 - privileged accounting ledger actions
-- TigerBeetle or other finance database integrations
+- the approved execution ledger or other finance database integrations
 
 If a demo needs a later-phase behavior early, implement a narrow stub that
 preserves the boundary and emits audit records. Do not collapse phases into one

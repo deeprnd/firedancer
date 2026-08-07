@@ -108,7 +108,7 @@ Before Mac/Windows support graduates, a demo-ready distribution should include:
 * Separate user-scoped install locations by default; admin/root installation should be opt-in and justified.
 * Logs, audit JSONL, replay capsules, and local config stored in documented per-user directories.
 * Uninstall instructions that remove binaries and services without deleting audit/replay evidence unless explicitly requested.
-* A no-secrets default: installers must not ask for broker, payment, crypto, TigerBeetle, or live model-provider credentials to run the demo.
+* A no-secrets default: installers must not ask for broker, payment, crypto, approved execution ledger, or live model-provider credentials to run the demo.
 * Installer telemetry disabled by default unless a later privacy decision explicitly approves opt-in diagnostics.
 
 ## Why Now
