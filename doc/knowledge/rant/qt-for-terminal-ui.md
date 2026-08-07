@@ -14,7 +14,8 @@ tags:
   - "zig"
   - "licensing"
 supersedes: []
-superseded_by: []
+superseded_by:
+  - "ADR-04: Constrained MVVM in `tk_ui` over internal tile channels (local transport override)"
 related:
   - "V2.19: Tickoni Native Investment Terminal"
 ---
@@ -27,8 +28,10 @@ In the context of Tickoni's professional desktop terminal, facing the need
 for a dense, keyboard-first, multi-window UI on Linux, macOS, and Windows while
 preserving the Zig runtime's financial and licensing boundaries, it was decided to
 build the official terminal with Qt 6 Quick/QML and a thin C++ application layer.
-The terminal will be a separate executable that communicates with the Zig
-runtime through `tkapi` over HTTP/WebSocket. We will not use Tauri, Flutter, a
+For local operation, the terminal communicates with the Zig runtime through
+`tk_api` over bounded shared-memory channels inside the `tk_ui` composite tile
+(see ADR-04). For remote operation, it communicates through `tk_gateway` over
+HTTP, WebSocket, or QUIC. We will not use Tauri, Flutter, a
 browser/Electron-style shell, a Qt Widgets-only UI, or direct Qt bindings from
 Zig as the default architecture.
 This provides one native cross-platform terminal with strong model/view and
@@ -161,8 +164,10 @@ Quality attributes affected:
   changed by another decision.
 - The official Qt terminal is a separate executable and is not required to build
   or run the runtime or CLI.
-- `tkapi` is the only terminal boundary for governed reads and actions.
-- The default transport is local or remote HTTP/WebSocket.
+- `tk_api` is the semantic boundary for governed reads and actions. A separate
+  `tk_ui` tile wraps the Qt application for local operation.
+- Local transport uses bounded shared-memory channels (see ADR-04).
+- Remote transport uses HTTP, WebSocket, or QUIC through `tk_gateway`.
 - QML owns presentation, layout, focus, and bindings only.
 - C++ owns Qt application lifecycle, typed UI models, command dispatch,
   transport, connection state, and QML type registration.
