@@ -12,11 +12,11 @@ epic or story using the relevant template.
 # Backlog Proposal: Broker Platform Sync — Read-Only Portfolio Ingestion
 
 **Status:** Backlog Proposal
-**Proposed milestone:** M9 (end-to-end read-only system with broker/crypto sync)
+**Proposed milestone:** M10 (end-to-end read-only system with broker/crypto sync)
 **Candidate issue type if accepted:** epic
 **Candidate labels:** `investing`, `platform`, `security`, `audit`, `operations`
 **Related docs / examples:**
-- `doc/strategy/roadmap/milestones/m9.md` — M9 scope includes broker/crypto sync
+- `doc/strategy/roadmap/milestones/m9.md` — M10 scope includes broker/crypto sync
 - `doc/knowledge/architecture.md` — tkadpt boundary, tool broker, adapter pattern
 - `doc/strategy/capabilities.md` — finance-native capability envelopes
 - `doc/knowledge/tile-topology.md` — tkadpt, tktool tile definitions
@@ -76,7 +76,7 @@ Tickoni has:
 - A portfolio data model in DuckDB (conceptual, not yet fully implemented).
 - Agent scaffolding that assumes portfolio state exists.
 - The `tkadpt` adapter boundary and `tktool` tool broker for external reads.
-- The sandbox adapter manifest infrastructure (V7.6) for broker stubs.
+- The sandbox adapter manifest infrastructure (V8.6) for broker stubs.
 
 Tickoni does not have:
 - Any broker platform integration (read or write).
@@ -127,15 +127,15 @@ Expected behavior:
 
 ## Why Now
 
-M9 explicitly requires "end to end working read-only system" with "sync with
+M10 explicitly requires "end to end working read-only system" with "sync with
 brokers/crypto platforms." This epic provides the broker-read half of that
-requirement. Without it, M9's read-only system is limited to synthetic data
+requirement. Without it, M10's read-only system is limited to synthetic data
 and YouTube/social sources, which cannot demonstrate portfolio-level financial
 control — the core Tickoni value proposition.
 
-Additionally, the sandbox adapter infrastructure from V7.6 (broker stub manifests)
+Additionally, the sandbox adapter infrastructure from V8.6 (broker stub manifests)
 provides the scaffolding this epic can consume. The tool broker pattern from V2.19
-and V7.13 is already wired. The capability envelope model in `tkpoly` supports
+and V8.13 is already wired. The capability envelope model in `tkpoly` supports
 extending with new scopes. No foundational building block needs to be invented
 from scratch.
 
@@ -224,7 +224,7 @@ This should not move forward if:
 * it makes trading performance, alpha, PnL, or gamification the dominant product object
 * it cannot identify the relevant policy, approval, evidence, or replay boundary
 * it requires live external side effects before Tickoni has a safe paper/sandbox path
-* it duplicates an epic/story that already covers broker integration (e.g., V7.6 sandbox manifests)
+* it duplicates an epic/story that already covers broker integration (e.g., V8.6 sandbox manifests)
 * the broker platforms' API models are fundamentally incompatible with Tickoni's canonical schema, requiring excessive transformation logic
 * credential management for external broker platforms introduces unacceptable security surface (token storage, refresh, revocation)
 
@@ -233,10 +233,10 @@ This should not move forward if:
 | Decision | Options | Owner / next step |
 | -------- | ------- | ----------------- |
 | Which broker platform(s) to target first? | eToro (simple REST API), IBKR (complex but comprehensive), SnapTrade (banking aggregation), Robinhood (consumer, simpler) | Investigation required: review each platform's API docs for read-only portfolio access, credential model, and rate limits. |
-| Should sync be on-demand, scheduled, or both? | On-demand only (operator triggers), scheduled only (configurable interval), or both | Depends on operator expectations and M9 demo needs. On-demand is simplest to prove. |
+| Should sync be on-demand, scheduled, or both? | On-demand only (operator triggers), scheduled only (configurable interval), or both | Depends on operator expectations and M10 demo needs. On-demand is simplest to prove. |
 | How are broker credentials managed? | Stored encrypted in Tickoni backend, accessed via `tkadpt` with scoped tokens; or delegated to a credential vault (e.g., HashiCorp Vault) | Security boundary decision. Must fail closed if credentials are missing or expired. |
 | What is the broker_read approval level? | Operator-only enable, user-level consent gate, or policy-gated per-account | Tied to consumer hardware tier constraint (no sudo/elevated privilege). |
-| Should crypto exchanges be in the same epic? | In-scope (broker+crypto sync) or out-of-scope (broker-only, crypto separate) | M9 mentions both, but scope discipline suggests separating unless crypto adds zero marginal cost. |
+| Should crypto exchanges be in the same epic? | In-scope (broker+crypto sync) or out-of-scope (broker-only, crypto separate) | M10 mentions both, but scope discipline suggests separating unless crypto adds zero marginal cost. |
 | How are normalization schema versions managed? | Embed `schema_version` in event, version the normalizer in `tknorm`, require version upgrade for format changes | Must support replay of historical syncs; version mismatch should not break audit chain. |
 
 ## Graduation Path

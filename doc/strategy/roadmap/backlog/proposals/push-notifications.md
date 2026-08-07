@@ -12,11 +12,11 @@ epic or story using the relevant template.
 # Backlog Proposal: Push Notifications And Device Subscriptions
 
 **Status:** Backlog Proposal
-**Proposed milestone:** TBD (post-M4 or parallel to M5+)
+**Proposed milestone:** TBD (post-M5 or parallel to M6+)
 **Candidate issue type if accepted:** epic
 **Candidate labels:** [`platform` | `security` | `investing` | `operations`]
 **Related docs / examples:**
-- `doc/strategy/roadmap/epics/v4.5.md` — V4.5 explicitly excludes push notifications as out of scope
+- `doc/strategy/roadmap/epics/v4.5.md` — V5.5 explicitly excludes push notifications as out of scope
 - `doc/strategy/roadmap/backlog/proposals/portfolio-valuation-queue.md` — mentions "subscription delivery" as an open decision
 - `doc/execution/contribution/tickoni-engine-issues.md` — `fd_http_server` / `tkapi` security surface
 - `doc/knowledge/architecture.md` — `tkapi` tile, attached systems
@@ -38,7 +38,7 @@ policy-checked financial event — not a synthetic alert.
 ## Product Fit Thesis
 
 This fits Tickoni because it closes the feedback loop for the consumer investing
-workflow. V4.5 delivers watchlist management and automatic Damodaran valuation, but
+workflow. V5.5 delivers watchlist management and automatic Damodaran valuation, but
 the user currently has to poll or refresh CaseOps to see when a valuation completes
 or a rebalance suggestion arrives. Push notifications transform Tickoni from a
 "check-back-and-see" system into a proactive governance platform: the user is
@@ -87,11 +87,11 @@ but breaks down for cross-device workflows or when the operator steps away.
 
 Tickoni has:
 - `tkapi` with `fd_http_server` providing the CaseOps API surface (HTTP/WebSocket).
-- V4.5 watchlist management and automatic valuation queue.
+- V5.5 watchlist management and automatic valuation queue.
 - `tkaudt` append-only, hash-chained audit records.
 - `tkmetr` tile for metrics.
-- An explicit open decision in V4.5 about "subscription delivery: WebSocket to CaseOps API vs event-sourced DuckDB table vs both."
-- V4.5 explicitly marks "push notifications or device push" as out of scope.
+- An explicit open decision in V5.5 about "subscription delivery: WebSocket to CaseOps API vs event-sourced DuckDB table vs both."
+- V5.5 explicitly marks "push notifications or device push" as out of scope.
 
 Tickoni does not have:
 - Any subscription or push notification transport layer.
@@ -140,16 +140,16 @@ Expected behavior:
 
 ## Why Now
 
-V4.5 closes the loop for watchlist-driven valuation but leaves the user in a
+V5.5 closes the loop for watchlist-driven valuation but leaves the user in a
 "check CaseOps" pattern. This is the minimum gap between a working governance
 system and a usable consumer product. The infrastructure is already in place:
-`tkapi` uses `fd_http_server` which supports WebSocket upgrades, V4.5 produces
+`tkapi` uses `fd_http_server` which supports WebSocket upgrades, V5.5 produces
 the governance events (valuation completions, rebalance proposals), and `tkaudt`
 provides the immutable audit chain that notifications reference. Adding
 subscriptions and push notifications is the last step to make Tickoni's consumer
 workflow feel real-time rather than poll-based.
 
-The open subscription delivery decision in V4.5 is a blocker for M4 demo quality
+The open subscription delivery decision in V5.5 is a blocker for M5 demo quality
 if the demo requires showing real-time valuation completion to a user who is
 not actively watching CaseOps. Adding this as a parallel or near-parallel
 increment removes that blocker and demonstrates Tickoni's ability to govern

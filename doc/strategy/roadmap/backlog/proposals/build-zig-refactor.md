@@ -12,7 +12,7 @@ epic or story using the relevant template.
 # Backlog Proposal: Refactor `build.zig` to <500 Lines via Declarative Modules + Walk-Based Registration
 
 **Status:** Backlog Proposal
-**Proposed milestone:** M3
+**Proposed milestone:** M4
 **Candidate issue type if accepted:** epic
 **Candidate labels:** [`documentation`, `enhancement`]
 **Related docs / examples:** `doc/strategy/templates/proposal-template.md`, `src/tickoni/test/mocks/`, `src/tickoni/codec/`
