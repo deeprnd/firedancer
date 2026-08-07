@@ -90,7 +90,7 @@ Tickoni has:
 - V5.5 watchlist management and automatic valuation queue.
 - `tkaudt` append-only, hash-chained audit records.
 - `tkmetr` tile for metrics.
-- An explicit open decision in V5.5 about "subscription delivery: WebSocket to CaseOps API vs event-sourced DuckDB table vs both."
+- An explicit open decision in V5.5 about "subscription delivery: WebSocket to CaseOps API vs event-sourced analytics store table vs both."
 - V5.5 explicitly marks "push notifications or device push" as out of scope.
 
 Tickoni does not have:
@@ -117,7 +117,7 @@ Expected behavior:
   CaseOps, selecting which event types to receive (valuation.complete,
   rebalance.propose, case.approval_required, policy.decision) and optional
   filters (portfolio_id, ticker, case_id). The subscription is stored in
-  DuckDB with a stable `subscription_id` and recorded in `tkaudt`.
+  the analytics store with a stable `subscription_id` and recorded in `tkaudt`.
 * WebSocket delivery: `tkapi` opens a persistent WebSocket connection to the
   subscribed device/browser. When a matching event enters `tkaudt`, `tkapi`
   publishes a notification payload containing the event reference (hash, source
@@ -190,7 +190,7 @@ Then:   No WebSocket or push notification is sent to any device. The replay
   routing, payload formatting)
 * Subscription CRUD: create/list/delete/update subscriptions with event type
   and filter configuration
-* Subscription state storage: DuckDB subscription table with stable `subscription_id`,
+* Subscription state storage: the analytics store subscription table with stable `subscription_id`,
   scoped to `tkapi` and `tkaudt`
 * Basic event taxonomy: valuation.complete, rebalance.propose, case.approval_required,
   policy.decision, replay.complete
@@ -300,7 +300,7 @@ Suggested next artifact:
 * [ ] Create epic using `epic-template.md` with the expanded scope from this proposal
 * [ ] Create investigation story for WebSocket transport vs SSE tradeoff
 * [ ] Create story for WebSocket subscription transport in `tkapi` (proof-of-concept)
-* [ ] Create story for subscription CRUD and DuckDB storage
+* [ ] Create story for subscription CRUD and analytics store storage
 * [ ] Create story for `subscription.manage` capability scope and policy definition
 * [ ] Create story for delivery auditing in `tkaudt`
 * [ ] Create story for replay-safe notification substitution

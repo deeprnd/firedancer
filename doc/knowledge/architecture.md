@@ -28,12 +28,12 @@ The TPS claim comes from running financial event processing on Firedancer's
 core tile infrastructure: bounded shared-memory queues, explicit topology,
 workspaces, sandboxed tile processes, low-overhead metrics, and tile-local
 network services. The web application, storage systems, agent daemon, LLM
-server, TigerBeetle, and trading APIs are attached systems around that runtime.
+server, the approved execution ledger, and trading APIs are attached systems around that runtime.
 They do not replace the runtime.
 
 ```text
 ┌────────────────────┐      ┌──────────────────────┐      ┌─────────────────────┐
-│      Next.js       │<────>│   Zig CaseOps API    │<────>│  Markdown + DuckDB  │
+│      Next.js       │<────>│   Zig CaseOps API    │<────>│  Markdown + the analytics store  │
 │ CaseOps operator UI│      │  tkapi HTTP + WS     │      │ memory + analytics  │
 └────────────────────┘      └──────────┬───────────┘      └─────────────────────┘
                                        │
@@ -78,7 +78,7 @@ Governed external systems:
                    gateways, risk systems, compliance systems
 
   tkexec  <────>  approved mutation backends
-                   TigerBeetle balances, transfers, fills, accounting,
+                   the approved execution ledger balances, transfers, fills, accounting,
                    approved payment/trading execution
 ```
 
@@ -122,14 +122,14 @@ memory, theses, policies, company notes, runbooks, and case narratives. These
 files are useful context for agents and operators, but they are not
 deterministic runtime truth by themselves.
 
-The **DuckDB analytics store** holds market data, analytics, backtests,
+The **analytics store** holds market data, analytics, backtests,
 research tables, local projections, and investigation datasets. It is optimized
 for analytical reads and reproducible research, not authoritative balances or
 money movement.
 
-The **TigerBeetle finance database** holds balances, transfers, fills,
+The **approved execution ledger** holds balances, transfers, fills,
 accounting entries, and approved ledger-style financial state. Agents, the UI,
-and non-executor tiles do not connect to TigerBeetle directly. `tkexec` owns
+and non-executor tiles do not connect to the approved execution ledger directly. `tkexec` owns
 approved execution after policy, audit, replay, and human approval are already
 proven.
 
@@ -626,7 +626,7 @@ money-adjacent systems.
 
 `tkexec` may be added only after policy, audit, replay, approval, and adapter
 boundaries are already proven. For accounting ledger integrations such as
-TigerBeetle, only `tkexec` receives ledger network credentials. Replay uses
+the approved execution ledger, only `tkexec` receives ledger network credentials. Replay uses
 deterministic mock connector results and never invokes production mutation.
 
 ## Sandboxing

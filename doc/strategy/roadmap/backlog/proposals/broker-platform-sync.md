@@ -28,7 +28,7 @@ epic or story using the relevant template.
 Add read-only synchronization with external broker platforms (one or more of eToro,
 Interactive Brokers, SnapTrade, Robinhood) so Tickoni can ingest a user's existing
 holdings and portfolio composition as canonical financial events. The sync populates
-Tickoni's portfolio state in DuckDB and is exposed through CaseOps for operator review.
+Tickoni's portfolio state in analytics store and is exposed through CaseOps for operator review.
 All adapter calls are paper/sandbox — no live trading authority. A new broker-read
 capability scope and associated policy gate must be introduced.
 
@@ -73,7 +73,7 @@ portfolio snapshot.
 ## Current Gap
 
 Tickoni has:
-- A portfolio data model in DuckDB (conceptual, not yet fully implemented).
+- A portfolio data model in the analytics store (conceptual, not yet fully implemented).
 - Agent scaffolding that assumes portfolio state exists.
 - The `tkadpt` adapter boundary and `tktool` tool broker for external reads.
 - The sandbox adapter manifest infrastructure (V8.6) for broker stubs.
@@ -92,7 +92,7 @@ When a Tickoni operator enables a broker platform integration in CaseOps, Tickon
 should:
 
 - Allow the operator to connect to a supported broker platform via a governed
-  credential flow (stored behind `tkadpt`, not in DuckDB or Markdown).
+  credential flow (stored behind `tkadpt`, not in the analytics store or Markdown).
 - Run a scheduled or on-demand sync that pulls the current portfolio snapshot
   from the broker platform through a sandbox or stub adapter.
 - Normalize the raw broker data into Tickoni's canonical financial event schema.
@@ -100,7 +100,7 @@ should:
 - Route the normalized events through `tkpoly` with the new `broker_read`
   capability scope for audit-only decisions.
 - Record all sync events in `tkaudt` as an append-only, hash-chained audit chain.
-- Persist the normalized holdings into DuckDB for analytics and agent use.
+- Persist the normalized holdings into the analytics store for analytics and agent use.
 - Display sync status, last-sync timestamp, held-instrument count, and any
   normalization or dedupe anomalies in CaseOps.
 
@@ -121,7 +121,7 @@ Expected behavior:
   `deny` if the event attempts any write or transfer scope.
 * `tkaudt` appends records for the sync start, each holding record, and sync
   completion with hash-chained continuity.
-* DuckDB's portfolio table is populated/updated with the latest snapshot.
+* the analytics store's portfolio table is populated/updated with the latest snapshot.
 * CaseOps shows the sync result: instruments found, new vs. updated positions,
   any normalization rejections, and the full audit trail.
 
@@ -149,7 +149,7 @@ Then:   Tickoni pulls the current holdings from SnapTrade through a sandbox adap
         normalizes them into canonical events, deduplicates against prior snapshots,
         policy-checks them with broker_read capability (allow),
         records hash-chained audit entries in tkaudt,
-        populates DuckDB portfolio tables,
+        populates the analytics store portfolio tables,
         and CaseOps displays: sync completed, 47 instruments found, 12 new, 35 updated,
         0 rejected, last sync timestamp, source_system=etoro
 ```
@@ -164,7 +164,7 @@ Then:   Tickoni pulls the current holdings from SnapTrade through a sandbox adap
 * Deduplication of sync events using source offsets and idempotency keys
 * New `broker_read` capability scope in `tkpoly`
 * Audit trail of all sync events in `tkaudt` (append-only, hash-chained)
-* DuckDB portfolio table population from normalized sync data
+* the analytics store portfolio table population from normalized sync data
 * CaseOps display of sync status, instrument counts, and audit trail
 * Policy gate enforcement: read-only only, no write/trade scope from sync events
 

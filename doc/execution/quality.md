@@ -104,7 +104,7 @@ check them off rather than re-derive them.
       every changed trust boundary is explicitly tested, not assumed safe by
       construction.
 - [ ] Forbidden-direct-access checks: if the story touches a hard boundary
-      (`tkmodl`, `tktool`/`tkadpt`, `tkexec`, TigerBeetle, the C ABI membrane),
+      (`tkmodl`, `tktool`/`tkadpt`, `tkexec`, the approved execution ledger, the C ABI membrane),
       a test or static check confirms nothing outside the owning module
       reaches it directly.
 - [ ] Malformed envelope/config/manifest handling: capability envelopes,

@@ -143,7 +143,7 @@ doc/observability.md and doc/telemetry.md for metrics/diagnostics expectations.
 | Tool broker or adapter dispatch (`tktool` / `tkadpt`) | [Applies | N/A | Decision needed] | ... |
 | Approved execution (`tkexec`) | [Applies | N/A | Decision needed] | ... |
 | CaseOps API/UI (`tkapi`) | [Applies | N/A | Decision needed] | ... |
-| Storage role: Markdown, DuckDB, TigerBeetle | [Applies | N/A | Decision needed] | ... |
+| Storage role: Memory, Analytics, Ledger | [Applies | N/A | Decision needed] | ... |
 | Metrics, diagnostics, and operations | [Applies | N/A | Decision needed] | ... |
 | Security and fail-closed behavior | [Applies | N/A | Decision needed] | ... |
 
@@ -251,7 +251,7 @@ child story acceptance criteria and evidence gates.
 - [ ] Relevant policy, audit, replay, adapter, API/UI, metrics, diagnostics,
       and documentation artifacts are linked from this epic.
 - [ ] Non-goals and deferred work are visible in the roadmap.
-- [ ] No live model, broker, payment, trading, crypto, TigerBeetle, or execution
+- [ ] No live model, broker, payment, trading, crypto, approved execution ledger, or execution
       side effects occur unless this epic explicitly enables an approved
       sandbox/live execution path.
 

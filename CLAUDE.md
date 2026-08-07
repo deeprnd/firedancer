@@ -46,8 +46,8 @@ Core layers:
    execution.
 3. Attached systems are governed integrations around the runtime: Next.js
    CaseOps UI, Zig `tkapi` HTTP/WebSocket API, Markdown memory/policy files,
-   DuckDB analytics/backtest stores, LLM server/model providers, local Agent
-   Daemon, TigerBeetle, and trading/crypto/payment/risk/compliance APIs.
+   the analytics store analytics/backtest stores, LLM server/model providers, local Agent
+   Daemon, the approved execution ledger, and trading/crypto/payment/risk/compliance APIs.
 
 Core loop:
 1. Financial events enter `tkings`.
@@ -67,9 +67,9 @@ Key principle:
   semantics.
 - Markdown files hold human-authored memory, theses, policies, and company
   notes; they are not deterministic runtime truth by themselves.
-- DuckDB holds market data, analytics, backtests, and local research
+- The analytics store holds market data, analytics, backtests, and local research
   projections; it is not the finance ledger.
-- TigerBeetle holds balances, transfers, fills, and accounting state behind
+- The approved execution ledger holds balances, transfers, fills, and accounting state behind
   approved `tkexec` mutations, never a direct agent/UI dependency.
 - LLM servers and model providers are accessed through `tkmodl`; local agent
   CLIs are accessed through a governed daemon; financial APIs are accessed
@@ -186,9 +186,9 @@ Notes:
   Firedancer HTTP infrastructure where practical.
 - Markdown files hold memory, theses, policies, company notes, runbooks, and
   human-authored operating context.
-- DuckDB holds market data, analytics, backtests, research tables, and local
+- Analytics store holds market data, analytics, backtests, research tables, and local
   analytical projections.
-- TigerBeetle holds balances, transfers, fills, accounting entries, and
+- Execution ledger holds balances, transfers, fills, accounting entries, and
   approved ledger-style financial state behind `tkexec`, not a direct
   dependency of agents, UI, or ordinary API reads.
 - LLM servers and model providers are reached only through `tkmodl`; local
@@ -232,7 +232,7 @@ Business flow:
 - CaseOps exposes operator review: cases, evidence, agent findings, policy
   decisions, approval workflow, audit timeline, and replay status.
 - `tkexec` is future approved execution only. It owns privileged mutation paths
-  such as TigerBeetle accounting-ledger writes, payment execution, or trading
+  such as the approved execution ledger accounting-ledger writes, payment execution, or trading
   execution after policy, approval, signed envelope, audit, and read-back.
 
 Framework requirements:
@@ -252,7 +252,7 @@ Framework requirements:
 - human approval for money-impacting, ledger-impacting, trading-impacting,
   risk-impacting, and compliance-impacting mutations,
 - clear separation between human-authored Markdown memory/policy context,
-  analytical DuckDB state, and TigerBeetle financial ledger state.
+  analytical analytics store state, and the approved execution ledger financial ledger state.
 
 Autonomous execution is not the priority in the current framework. Throughput,
 determinism, isolation, finance-native permissions, auditability, replay, and
@@ -322,7 +322,7 @@ Do not change these assumptions without explicit approval:
   audit state or summary-only logs for material boundary events.
 - Replay must run with external effects disabled. It must substitute captured
   model, adapter, proposal, approval, and execution results instead of calling
-  LLM servers, trading APIs, payment APIs, TigerBeetle, or `tkexec`.
+  LLM servers, trading APIs, payment APIs, the approved execution ledger, or `tkexec`.
 - Every model, tool, adapter, proposal, approval, and execution request must
   carry a finance-native capability envelope with actor, role, workflow,
   case/run id, scope, policy version, and budget where applicable.
@@ -401,7 +401,7 @@ These are mandatory unless the user explicitly directs otherwise.
   not duplicate policy checks in prompts, UI code, adapter code, or ad hoc
   helper functions.
 - Keep `tkmodl`, `tktool`, `tkadpt`, and `tkexec` as hard boundaries. Do not
-  let agents or UI code call LLM providers, financial APIs, TigerBeetle, or
+  let agents or UI code call LLM providers, financial APIs, the approved execution ledger, or
   execution backends directly.
 - Prefer domain-driven naming from the position docs: use terms such as
   `trading_order.propose`, `payment_retry.propose`, `ledger_correction.propose`,
