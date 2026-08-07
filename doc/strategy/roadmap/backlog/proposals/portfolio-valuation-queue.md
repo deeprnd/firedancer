@@ -15,7 +15,7 @@ epic or story using the relevant template.
 **Proposed milestone:** M5
 **Candidate issue type if accepted:** epic
 **Candidate labels:** [`investing` | `platform` | `enhancement` | `documentation`]
-**Related docs / examples:** [doc/strategy/roadmap/epics/v3.22.md] (Damodaran valuation engine), [doc/strategy/capabilities.md] (valuation capabilities, trading_portfolio.read), [doc/strategy/roadmap/milestones/m4.md] (source M5 description)
+**Related docs / examples:** [doc/strategy/roadmap/epics/v3.22.md] (DCF valuation engine), [doc/strategy/capabilities.md] (valuation capabilities, trading_portfolio.read), [doc/strategy/roadmap/milestones/m4.md] (source M5 description)
 
 ## Proposal Summary
 
@@ -23,7 +23,7 @@ Build the portfolio management surface and valuation queue that turns Tickoni's
 governed runtime into a consumer-facing investing app: users manage portfolios
 (add/edit/delete holdings), view exposure by industry and sector through pie
 charts, receive rebalance suggestions against target exposure, maintain watchlists,
-and get every portfolio and watchlist company automatically queued for Damodaran-style
+and get every portfolio and watchlist company automatically queued for DCF-style
 valuation via V4.32. A model selector lets users choose which LLM model backs each
 investigation from four tiers: local open-source, OpenAI, Anthropic Claude, or
 Tickoni subscription (finance-tuned models fine-tuned on financial reasoning).
@@ -63,13 +63,13 @@ The user is a consumer investor who wants to build and track a portfolio, see wh
 their money actually is (by industry, sector, asset class), understand when the
 portfolio drifts from their target allocation, and get grounded, audited company
 valuations before making changes. Currently, Tickoni has the governed runtime, the
-Damodaran valuation engine (V4.32), and the capability model -- but no end-to-end
+DCF valuation engine (V4.32), and the capability model -- but no end-to-end
 app surface that wires these together. The user has a runtime without a wallet.
 
 ## Current Gap
 
 Tickoni can process financial events, normalize them, deduplicate them, policy-check
-them, and audit them. V4.32 can run a full Damodaran DCF valuation and produce a
+them, and audit them. V4.32 can run a full DCF valuation and produce a
 proposal-grade record. But there is no:
 
 - Portfolio state object (holdings, cash, base currency) that users can create and
@@ -80,7 +80,7 @@ proposal-grade record. But there is no:
   and surfaces `portfolio.rebalance.propose` envelopes.
 - Watchlist that feeds into the V4.32 valuation queue.
 - Automatic valuation queue: when a ticker enters a portfolio or watchlist, it should
-  be queued for Damodaran valuation with all V4.32 capability checks.
+  be queued for DCF valuation with all V4.32 capability checks.
 - Model selection: users need to choose which LLM model powers each investigation.
   Four tiers: local open-source (e.g., Qwen, Llama), OpenAI, Anthropic Claude,
   or Tickoni subscription (finance-tuned models fine-tuned on financial reasoning).
@@ -108,7 +108,7 @@ Expected behavior:
 * Watchlist: users add and remove tickers. Watchlist tickers enter the V4.32
   valuation queue automatically.
 * Automatic valuation queue: when a company appears in any portfolio or watchlist,
-  it is queued for Damodaran valuation. The queue respects V4.32 capability checks
+  it is queued for DCF valuation. The queue respects V4.32 capability checks
   (`valuation_market_data.read`, `valuation_financials.read`, `valuation_analysis.analyze`).
   Valuation runs use the user's selected model for any LLM-powered evidence
   generation, but the DCF math itself is deterministic.
@@ -146,7 +146,7 @@ Then:   Tickoni renders pie charts showing Technology 82% (drift: +42%),
         `portfolio.rebalance.propose` envelope with capability scope,
         concentration limits, and approval-required status.
 When:   The user adds "AMZN" to their watchlist.
-Then:   Tickoni queues AMZN for V4.32 Damodaran valuation. The valuation uses
+Then:   Tickoni queues AMZN for V4.32 DCF valuation. The valuation uses
         the user's selected model (e.g., "local-openai/gpt-4o") for evidence
         generation but runs the DCF math deterministically. When complete,
         the user receives a subscription event: "AMZN valuation complete:
@@ -167,7 +167,7 @@ Then:   Tickoni queues AMZN for V4.32 Damodaran valuation. The valuation uses
 * Target exposure management and rebalance suggestion generation.
 * Watchlist CRUD: add/remove tickers with optional notes.
 * Automatic valuation queue for portfolio and watchlist companies.
-* V4.32 Damodaran valuation integration with capability checks.
+* V4.32 DCF valuation integration with capability checks.
 * Model selection: per-portfolio or per-watchlist LLM model choice from four tiers
   (local open-source, OpenAI, Anthropic Claude, Tickoni subscription finance-tuned).
 
