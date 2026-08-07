@@ -435,10 +435,10 @@ payout.approve
 account.freeze
 risk_rule.override
 policy.modify
-valuation.analysis.propose        deferred until V3.22
+valuation.analysis.propose        deferred until V4.32
 ```
 
-Valuation capabilities (V3.22 — Damodaran DCF):
+Valuation capabilities (V4.32 — DCF):
 
 ```text
 valuation_market_data.read
@@ -453,6 +453,8 @@ valuation_sensitivity.analyze
 valuation_conclusion.render
 valuation_audit.check
 ```
+
+Note: uses Aswath Damodaran's freely available NYU Stern datasets (ERP, country risk, industry betas) and his public valuation framework. The `tkval` tile implements the methodology and computation — not a branded product.
 
 Valuation scope dimensions:
 
@@ -684,14 +686,14 @@ payout.approve
 account.freeze
 risk_rule.override
 policy.modify
-valuation_analysis.analyze       deferred until V3.22
-valuation_analysis.propose       deferred until V3.22
-valuation_conclusion.render      deferred until V3.22
-valuation_peer.compare           deferred until V3.22
-valuation_reverse_dcf.analyze    deferred until V3.22
-valuation_sensitivity.analyze    deferred until V3.22
-valuation_transcript.extract     deferred until V3.22
-valuation_audit.check            deferred until V3.22
+valuation_analysis.analyze       deferred until V4.32
+valuation_analysis.propose       deferred until V4.32
+valuation_conclusion.render      deferred until V4.32
+valuation_peer.compare           deferred until V4.32
+valuation_reverse_dcf.analyze    deferred until V4.32
+valuation_sensitivity.analyze    deferred until V4.32
+valuation_transcript.extract     deferred until V4.32
+valuation_audit.check            deferred until V4.32
 ```
 
 ## V1 Capability Depth By Increment

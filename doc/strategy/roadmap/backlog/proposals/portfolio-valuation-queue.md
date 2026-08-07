@@ -12,10 +12,10 @@ epic or story using the relevant template.
 # Backlog Proposal: Portfolio Management And Valuation Queue
 
 **Status:** Backlog Proposal
-**Proposed milestone:** M4
+**Proposed milestone:** M5
 **Candidate issue type if accepted:** epic
 **Candidate labels:** [`investing` | `platform` | `enhancement` | `documentation`]
-**Related docs / examples:** [doc/strategy/roadmap/epics/v3.22.md] (Damodaran valuation engine), [doc/strategy/capabilities.md] (valuation capabilities, trading_portfolio.read), [doc/strategy/roadmap/milestones/m4.md] (source M4 description)
+**Related docs / examples:** [doc/strategy/roadmap/epics/v3.22.md] (DCF valuation engine), [doc/strategy/capabilities.md] (valuation capabilities, trading_portfolio.read), [doc/strategy/roadmap/milestones/m4.md] (source M5 description)
 
 ## Proposal Summary
 
@@ -23,8 +23,8 @@ Build the portfolio management surface and valuation queue that turns Tickoni's
 governed runtime into a consumer-facing investing app: users manage portfolios
 (add/edit/delete holdings), view exposure by industry and sector through pie
 charts, receive rebalance suggestions against target exposure, maintain watchlists,
-and get every portfolio and watchlist company automatically queued for Damodaran-style
-valuation via V3.22. A model selector lets users choose which LLM model backs each
+and get every portfolio and watchlist company automatically queued for DCF-style
+valuation via V4.32. A model selector lets users choose which LLM model backs each
 investigation from four tiers: local open-source, OpenAI, Anthropic Claude, or
 Tickoni subscription (finance-tuned models fine-tuned on financial reasoning).
 
@@ -55,7 +55,7 @@ decision that allowed or denied a rebalance proposal.
 | What audit, evidence, or replay value does it create? | Every portfolio mutation is a source event with a stable payload hash. Every valuation run is captured as a replay capsule substituting model/adapter outputs. Exposure charts are deterministic functions of auditable holding records. |
 | What finance-native scope matters: account, beneficiary, wallet, rail, currency, market, venue, instrument, amount, exposure, frequency, approval path? | Account (portfolio id), instrument (ticker/ISIN/CUSIP), amount (shares/notional), exposure (sector/industry/asset-class breakdown), concentration limits (single-name, sector caps), currency (position currency vs portfolio base), approval path (rebalance proposals over concentration limits). |
 | How does it keep agents off the direct money path? | Agents (via `tkdisp`->`tkagnt`->`tkmodl`) only produce investigation reports and `valuation.analysis.propose` records. The rebalance suggestion is a `portfolio.rebalance.propose` envelope; no adapter call or order placement occurs. |
-| How does it avoid becoming generic agent automation or trading-alpha UX? | No performance ranking, no alpha generation, no gamification. The product object is a governable portfolio state machine with audit, replay, and policy gates. Valuation is deterministic math (V3.22), not generative alpha. |
+| How does it avoid becoming generic agent automation or trading-alpha UX? | No performance ranking, no alpha generation, no gamification. The product object is a governable portfolio state machine with audit, replay, and policy gates. Valuation is deterministic math (V4.32), not generative alpha. |
 
 ## User / Operator Problem
 
@@ -63,13 +63,13 @@ The user is a consumer investor who wants to build and track a portfolio, see wh
 their money actually is (by industry, sector, asset class), understand when the
 portfolio drifts from their target allocation, and get grounded, audited company
 valuations before making changes. Currently, Tickoni has the governed runtime, the
-Damodaran valuation engine (V3.22), and the capability model -- but no end-to-end
+DCF valuation engine (V4.32), and the capability model -- but no end-to-end
 app surface that wires these together. The user has a runtime without a wallet.
 
 ## Current Gap
 
 Tickoni can process financial events, normalize them, deduplicate them, policy-check
-them, and audit them. V3.22 can run a full Damodaran DCF valuation and produce a
+them, and audit them. V4.32 can run a full DCF valuation and produce a
 proposal-grade record. But there is no:
 
 - Portfolio state object (holdings, cash, base currency) that users can create and
@@ -78,9 +78,9 @@ proposal-grade record. But there is no:
   pie charts from auditable holding records.
 - Rebalance suggestion logic that compares current exposure to a user-defined target
   and surfaces `portfolio.rebalance.propose` envelopes.
-- Watchlist that feeds into the V3.22 valuation queue.
+- Watchlist that feeds into the V4.32 valuation queue.
 - Automatic valuation queue: when a ticker enters a portfolio or watchlist, it should
-  be queued for Damodaran valuation with all V3.22 capability checks.
+  be queued for DCF valuation with all V4.32 capability checks.
 - Model selection: users need to choose which LLM model powers each investigation.
   Four tiers: local open-source (e.g., Qwen, Llama), OpenAI, Anthropic Claude,
   or Tickoni subscription (finance-tuned models fine-tuned on financial reasoning).
@@ -105,10 +105,10 @@ Expected behavior:
   target and surfaces `portfolio.rebalance.propose` envelopes for any material
   drift, with explicit scope (which holdings to buy/sell, by how much, against
   which concentration limits).
-* Watchlist: users add and remove tickers. Watchlist tickers enter the V3.22
+* Watchlist: users add and remove tickers. Watchlist tickers enter the V4.32
   valuation queue automatically.
 * Automatic valuation queue: when a company appears in any portfolio or watchlist,
-  it is queued for Damodaran valuation. The queue respects V3.22 capability checks
+  it is queued for DCF valuation. The queue respects V4.32 capability checks
   (`valuation_market_data.read`, `valuation_financials.read`, `valuation_analysis.analyze`).
   Valuation runs use the user's selected model for any LLM-powered evidence
   generation, but the DCF math itself is deterministic.
@@ -121,8 +121,8 @@ Expected behavior:
 
 ## Why Now
 
-M4 has been sitting as a two-line description in the milestone backlog. The runtime
-(P0), the capability model (P1), and the V3.22 valuation engine are all specified
+M5 has been sitting as a two-line description in the milestone backlog. The runtime
+(P0), the capability model (P1), and the V4.32 valuation engine are all specified
 and partially implemented. Wires the three together now converts Tickoni from a
 governed event engine with a valuation calculator into a demonstrable consumer
 investing product. It also produces a clean demo moment: create a portfolio, see
@@ -146,7 +146,7 @@ Then:   Tickoni renders pie charts showing Technology 82% (drift: +42%),
         `portfolio.rebalance.propose` envelope with capability scope,
         concentration limits, and approval-required status.
 When:   The user adds "AMZN" to their watchlist.
-Then:   Tickoni queues AMZN for V3.22 Damodaran valuation. The valuation uses
+Then:   Tickoni queues AMZN for V4.32 DCF valuation. The valuation uses
         the user's selected model (e.g., "local-openai/gpt-4o") for evidence
         generation but runs the DCF math deterministically. When complete,
         the user receives a subscription event: "AMZN valuation complete:
@@ -167,7 +167,7 @@ Then:   Tickoni queues AMZN for V3.22 Damodaran valuation. The valuation uses
 * Target exposure management and rebalance suggestion generation.
 * Watchlist CRUD: add/remove tickers with optional notes.
 * Automatic valuation queue for portfolio and watchlist companies.
-* V3.22 Damodaran valuation integration with capability checks.
+* V4.32 DCF valuation integration with capability checks.
 * Model selection: per-portfolio or per-watchlist LLM model choice from four tiers
   (local open-source, OpenAI, Anthropic Claude, Tickoni subscription finance-tuned).
 
@@ -176,8 +176,8 @@ Then:   Tickoni queues AMZN for V3.22 Damodaran valuation. The valuation uses
 * Live order placement or any execution path.
 * Portfolio optimization or modern portfolio theory (Markowitz, Black-Litterman).
 * Factor models, alpha generation, or performance ranking.
-* Direct market data ingestion (assumed provided as input/fixture per V3.22).
-* Social/clone/copy portfolio features (deferred to M6).
+* Direct market data ingestion (assumed provided as input/fixture per V4.32).
+* Social/clone/copy portfolio features (deferred to M7).
 * Multi-currency portfolio reconciliation (single base currency per portfolio).
 * Tax-lot accounting or harvest-loss tracking.
 * Options, futures, leveraged/inverse ETFs.
@@ -241,9 +241,9 @@ This should not move forward if:
 | Rebalance draft source | Agent-drafted (`tkagnt` produces suggestion) vs computation-drafted (deterministic exposure diff produces suggestion) | Product: computation-drafted is simpler and replay-stable; agent-drafted adds evidence but is non-deterministic |
 | Valuation queue ownership | `tkdisp` schedules queued valuations as bounded agent runs vs a dedicated `tkvalq` tile | Platform: `tkdisp` keeps governance consistent; `tkvalq` isolates the queue but adds a new tile |
 | Model selection granularity | Per-portfolio model vs per-watchlist-item model vs global model | Product: per-portfolio is sufficient for V1; per-watchlist adds complexity |
-| Subscription delivery | WebSocket to CaseOps API vs event-sourced DuckDB table vs both | Platform: WebSocket to `tkapi` is the minimal path; DuckDB table for audit/replay |
+| Subscription delivery | WebSocket to CaseOps API vs event-sourced analytics store table vs both | Platform: WebSocket to `tkapi` is the minimal path; analytics store table for audit/replay |
 | Concentration limit model | Per-name cap only vs per-sector cap only vs both | Policy: both is safer but requires policy table changes |
-| Portfolio state storage | Audit chain reconstruction only vs indexed holding table in DuckDB | Platform: audit chain is the source of truth; DuckDB indexed table for performant exposure queries |
+| Portfolio state storage | Audit chain reconstruction only vs indexed holding table in the analytics store | Platform: audit chain is the source of truth; the analytics store indexed table for performant exposure queries |
 
 ## Graduation Path
 

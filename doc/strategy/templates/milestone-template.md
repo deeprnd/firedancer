@@ -25,10 +25,10 @@ Where:
   TN = task number within that story
 
 Example:
-  M3       = milestone 3
-  V3.12    = epic 12 under milestone 3
-  V3.12.S2 = story 2 under epic V3.12
-  V3.12.S2.T3 = task 3 under story V3.12.S2
+  M4       = milestone 3
+  V4.12    = epic 12 under milestone 3
+  V4.12.S2 = story 2 under epic V4.12
+  V4.12.S2.T3 = task 3 under story V4.12.S2
 
 Required for every milestone:
   - Product or platform outcome in one sentence
@@ -86,7 +86,7 @@ Scoping rules for epics:
      policy enforcement, audit, demo) or by user outcome (check scope,
      submit proposal, view results, replay).
   2. If an epic has more than 3 story groups or more than 12 tasks, it is
-     too big and must be split. V5.9 is the example to avoid: a single
+     too big and must be split. V6.9 is the example to avoid: a single
      epic with 6 stories and 36 tasks. Split that into separate epics for
      intent/schema, snapshots, ticketing, policy, order lifecycle, and
      demo/replay.
@@ -99,25 +99,25 @@ Scoping rules for epics:
 
 Each line should name the epic code, title, and the linked GitHub issue.
 
-Example of good decomposition for M5 (what M5 should look like):
+Example of good decomposition for M6 (what M6 should look like):
 
   Capability epics:
 
-  - `V5.1`: Crypto allowlist and account fixtures — #[github-epic-issue]
-  - `V5.2`: Chain-risk scoring and travel-rule checks — #[github-epic-issue]
-  - `V5.3`: Policy enforcement for crypto transfers — #[github-epic-issue]
-  - `V5.4`: Stablecoin cash-impact view — #[github-epic-issue]
-  - `V5.5`: Intent, schema, and instrument catalog — #[github-epic-issue]
-  - `V5.6`: Account and market snapshots — #[github-epic-issue]
-  - `V5.7`: Fee-aware ticket generation — #[github-epic-issue]
-  - `V5.8`: Order lifecycle and sandbox submission — #[github-epic-issue]
-  - `V5.9`: Demo, audit, and replay — #[github-epic-issue]
+  - `V6.1`: Crypto allowlist and account fixtures — #[github-epic-issue]
+  - `V6.2`: Chain-risk scoring and travel-rule checks — #[github-epic-issue]
+  - `V6.3`: Policy enforcement for crypto transfers — #[github-epic-issue]
+  - `V6.4`: Stablecoin cash-impact view — #[github-epic-issue]
+  - `V6.31`: Intent, schema, and instrument catalog — #[github-epic-issue]
+  - `V6.6`: Account and market snapshots — #[github-epic-issue]
+  - `V6.7`: Fee-aware ticket generation — #[github-epic-issue]
+  - `V6.8`: Order lifecycle and sandbox submission — #[github-epic-issue]
+  - `V6.9`: Demo, audit, and replay — #[github-epic-issue]
 
 Example of poor decomposition (what to avoid):
 
-  - `V5.5`: Crypto And Stablecoin Guard — broad, mixes allowlist + policy
+  - `V6.31`: Crypto And Stablecoin Guard — broad, mixes allowlist + policy
     + audit in one epic (7 tasks that belong in 3 epics)
-  - `V5.9`: Crypto Thesis To Guarded Spot Trade — monolith with 6 stories
+  - `V6.9`: Crypto Thesis To Guarded Spot Trade — monolith with 6 stories
     and 36 tasks, should be 7+ separate epics
 
 Group by capability boundary, not by theme.

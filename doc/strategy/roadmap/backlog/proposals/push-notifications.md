@@ -12,11 +12,11 @@ epic or story using the relevant template.
 # Backlog Proposal: Push Notifications And Device Subscriptions
 
 **Status:** Backlog Proposal
-**Proposed milestone:** TBD (post-M4 or parallel to M5+)
+**Proposed milestone:** TBD (post-M5 or parallel to M6+)
 **Candidate issue type if accepted:** epic
 **Candidate labels:** [`platform` | `security` | `investing` | `operations`]
 **Related docs / examples:**
-- `doc/strategy/roadmap/epics/v4.5.md` — V4.5 explicitly excludes push notifications as out of scope
+- `doc/strategy/roadmap/epics/v4.5.md` — V5.5 explicitly excludes push notifications as out of scope
 - `doc/strategy/roadmap/backlog/proposals/portfolio-valuation-queue.md` — mentions "subscription delivery" as an open decision
 - `doc/execution/contribution/tickoni-engine-issues.md` — `fd_http_server` / `tkapi` security surface
 - `doc/knowledge/architecture.md` — `tkapi` tile, attached systems
@@ -38,7 +38,7 @@ policy-checked financial event — not a synthetic alert.
 ## Product Fit Thesis
 
 This fits Tickoni because it closes the feedback loop for the consumer investing
-workflow. V4.5 delivers watchlist management and automatic Damodaran valuation, but
+workflow. V5.5 delivers watchlist management and automatic DCF valuation, but
 the user currently has to poll or refresh CaseOps to see when a valuation completes
 or a rebalance suggestion arrives. Push notifications transform Tickoni from a
 "check-back-and-see" system into a proactive governance platform: the user is
@@ -69,7 +69,7 @@ suppress governance events; it must log to `tkaudt` and surface in CaseOps.
 
 ## User / Operator Problem
 
-A consumer investor has Tickoni valuing companies on their watchlist. A Damodaran
+A consumer investor has Tickoni valuing companies on their watchlist. A DCF
 valuation completes, a rebalance suggestion appears, or a case requires operator
 review. Currently, the user must open Tickoni CaseOps, browse the board, and hope
 they notice the new event. In a mobile or desktop context, the user may not have
@@ -87,11 +87,11 @@ but breaks down for cross-device workflows or when the operator steps away.
 
 Tickoni has:
 - `tkapi` with `fd_http_server` providing the CaseOps API surface (HTTP/WebSocket).
-- V4.5 watchlist management and automatic valuation queue.
+- V5.5 watchlist management and automatic valuation queue.
 - `tkaudt` append-only, hash-chained audit records.
 - `tkmetr` tile for metrics.
-- An explicit open decision in V4.5 about "subscription delivery: WebSocket to CaseOps API vs event-sourced DuckDB table vs both."
-- V4.5 explicitly marks "push notifications or device push" as out of scope.
+- An explicit open decision in V5.5 about "subscription delivery: WebSocket to CaseOps API vs event-sourced analytics store table vs both."
+- V5.5 explicitly marks "push notifications or device push" as out of scope.
 
 Tickoni does not have:
 - Any subscription or push notification transport layer.
@@ -117,7 +117,7 @@ Expected behavior:
   CaseOps, selecting which event types to receive (valuation.complete,
   rebalance.propose, case.approval_required, policy.decision) and optional
   filters (portfolio_id, ticker, case_id). The subscription is stored in
-  DuckDB with a stable `subscription_id` and recorded in `tkaudt`.
+  the analytics store with a stable `subscription_id` and recorded in `tkaudt`.
 * WebSocket delivery: `tkapi` opens a persistent WebSocket connection to the
   subscribed device/browser. When a matching event enters `tkaudt`, `tkapi`
   publishes a notification payload containing the event reference (hash, source
@@ -140,16 +140,16 @@ Expected behavior:
 
 ## Why Now
 
-V4.5 closes the loop for watchlist-driven valuation but leaves the user in a
+V5.5 closes the loop for watchlist-driven valuation but leaves the user in a
 "check CaseOps" pattern. This is the minimum gap between a working governance
 system and a usable consumer product. The infrastructure is already in place:
-`tkapi` uses `fd_http_server` which supports WebSocket upgrades, V4.5 produces
+`tkapi` uses `fd_http_server` which supports WebSocket upgrades, V5.5 produces
 the governance events (valuation completions, rebalance proposals), and `tkaudt`
 provides the immutable audit chain that notifications reference. Adding
 subscriptions and push notifications is the last step to make Tickoni's consumer
 workflow feel real-time rather than poll-based.
 
-The open subscription delivery decision in V4.5 is a blocker for M4 demo quality
+The open subscription delivery decision in V5.5 is a blocker for M5 demo quality
 if the demo requires showing real-time valuation completion to a user who is
 not actively watching CaseOps. Adding this as a parallel or near-parallel
 increment removes that blocker and demonstrates Tickoni's ability to govern
@@ -166,7 +166,7 @@ ad-hoc notification system.
 ```text
 Given:  A user has subscribed to "valuation.complete" events for their "Growth"
         portfolio (portfolio_id = growth_001, tickers = [AMZN, AAPL, MSFT])
-When:   The Damodaran valuation for AMZN completes and is recorded in tkaudt
+When:   The DCF valuation for AMZN completes and is recorded in tkaudt
 Then:   Tickoni's tkapi publishes a WebSocket notification to the user's device
         containing: event_type=valuation.complete, event_hash=<tkaudt_hash>,
         portfolio_id=growth_001, ticker=AMZN, policy_outcome=allow,
@@ -190,7 +190,7 @@ Then:   No WebSocket or push notification is sent to any device. The replay
   routing, payload formatting)
 * Subscription CRUD: create/list/delete/update subscriptions with event type
   and filter configuration
-* Subscription state storage: DuckDB subscription table with stable `subscription_id`,
+* Subscription state storage: the analytics store subscription table with stable `subscription_id`,
   scoped to `tkapi` and `tkaudt`
 * Basic event taxonomy: valuation.complete, rebalance.propose, case.approval_required,
   policy.decision, replay.complete
@@ -300,7 +300,7 @@ Suggested next artifact:
 * [ ] Create epic using `epic-template.md` with the expanded scope from this proposal
 * [ ] Create investigation story for WebSocket transport vs SSE tradeoff
 * [ ] Create story for WebSocket subscription transport in `tkapi` (proof-of-concept)
-* [ ] Create story for subscription CRUD and DuckDB storage
+* [ ] Create story for subscription CRUD and analytics store storage
 * [ ] Create story for `subscription.manage` capability scope and policy definition
 * [ ] Create story for delivery auditing in `tkaudt`
 * [ ] Create story for replay-safe notification substitution

@@ -788,7 +788,7 @@ Retail runtimes must fail closed for unsupported behavior:
 
 - live trading
 - live payment or transfer execution
-- TigerBeetle writes
+- Ledger writes
 - direct model-provider bypass
 - direct adapter bypass
 - privileged execution
@@ -872,7 +872,7 @@ silent drift in orchestration semantics Tickoni relies on.
 - Do not add Tickoni product fields to upstream Firedancer topology structs.
 - Do not encode financial policy or approval behavior in orchestration
   bootstrap state.
-- Do not treat Markdown, DuckDB, TigerBeetle, model providers, or financial
+- Do not treat Markdown, the analytics store, the approved execution ledger, model providers, or financial
   adapters as direct dependencies of the orchestration layer.
 - Do not let agents, UI, model tiles, tool brokers, adapters, or future
   execution paths bypass `tkpoly`, `tkaudt`, and replay boundaries.
