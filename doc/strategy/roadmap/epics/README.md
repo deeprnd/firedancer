@@ -49,7 +49,7 @@ Use these project docs to fill and implement issues:
 || [V1.3](v1.3.md) | Portfolio And Cash Impact Loop |
 || [V11.2](v11..md) | Pay And Move Money Guard |
 || [V11.20](v11..md) | Guarded Crypto Transfers |
-|| [V2.19](v2.19.md) | Tickoni Terminal CaseOps UI |
+|| [V3.19](v3.19.md) | Tickoni Terminal CaseOps UI |
 || [V2.21](v2.21.md) | macOS Retail Runtime Support |
 || [V2.22](v2.22.md) | Windows Retail Runtime Support |
 || [V4.22](v4..md) | Core Damodaran Engine — tkval tile, WACC, FCFF, Gordon Growth, exit-multiple cross-check |
